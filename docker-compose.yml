@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - '3000:80'
+    environment:
+      - REACT_APP_API_BASE_URL=http://backend:8000/api/v1
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    ports:
+      - '3001:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:8000/api/v1
+      - CHOKIDAR_USEPOLLING=true
+    command: npm start
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true

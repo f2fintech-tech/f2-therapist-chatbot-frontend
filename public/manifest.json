@@ -1,0 +1,28 @@
+{
+  "short_name": "F2 Chatbot",
+  "name": "F2 Financial Therapist Chatbot",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
+  "description": "F2 Financial Therapy AI Chatbot - Your personal financial wellness companion",
+  "orientation": "portrait",
+  "categories": ["finance", "health", "utilities"]
+}
