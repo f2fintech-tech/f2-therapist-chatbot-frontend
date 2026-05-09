@@ -17,6 +17,16 @@ From the repo root, run:
 
 This installs dependencies for the full workspace (all packages under artifacts, lib, and scripts).
 
+## Run frontend
+
+From the repo root, run:
+
+```bash
+PORT=5173 BASE_PATH=/ pnpm --filter @workspace/f2-finheal dev
+```
+
+Then open http://localhost:5173
+
 ## Useful commands
 
 ```bash
