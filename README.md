@@ -21,6 +21,8 @@ This installs dependencies for the full workspace (all packages under artifacts,
 
 From the repo root, run:
 
+Do not prefix this with `bash`.
+
 ```bash
 PORT=5173 BASE_PATH=/ pnpm --filter @workspace/f2-finheal dev
 ```
