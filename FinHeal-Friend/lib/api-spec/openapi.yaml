@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: F2 FinHeal — Financial Wellness API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: chat
+    description: Chat / conversation endpoints
+  - name: user
+    description: User profile and wellness data
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /v1/chat:
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a chat message and receive an AI response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
+  /v1/chat/sessions/{user_id}:
+    get:
+      operationId: getChatSessions
+      tags: [chat]
+      summary: List past chat sessions for a user
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of past sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatSession"
+
+  /v1/user/{id}/wellness-score:
+    get:
+      operationId: getWellnessScore
+      tags: [user]
+      summary: Get wellness score for a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Wellness score data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellnessScore"
+
+  /v1/user/{id}/goals:
+    get:
+      operationId: getUserGoals
+      tags: [user]
+      summary: Get financial goals for a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of goals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FinancialGoal"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    ChatMessageInput:
+      type: object
+      required: [message, session_id, user_id]
+      properties:
+        message:
+          type: string
+        session_id:
+          type: string
+        user_id:
+          type: string
+
+    MoodDimensions:
+      type: object
+      properties:
+        stress:
+          type: number
+        urgency:
+          type: number
+        openness:
+          type: number
+        willingness:
+          type: number
+        emotion:
+          type: number
+
+    MoodAnalysis:
+      type: object
+      properties:
+        primary_emotion:
+          type: string
+          description: "calm | anxious | stressed"
+        label:
+          type: string
+        dimensions:
+          $ref: "#/components/schemas/MoodDimensions"
+
+    ChatResponse:
+      type: object
+      required: [message, session_id]
+      properties:
+        message:
+          type: string
+        session_id:
+          type: string
+        mood:
+          $ref: "#/components/schemas/MoodAnalysis"
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    ChatSession:
+      type: object
+      required: [id, user_id, title, created_at]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        created_at:
+          type: string
+        mood_color:
+          type: string
+
+    WellnessScore:
+      type: object
+      required: [score, label, change_pts, trend]
+      properties:
+        score:
+          type: integer
+        label:
+          type: string
+        change_pts:
+          type: integer
+        trend:
+          type: string
+        session_count:
+          type: integer
+        goals_count:
+          type: integer
+        active_days:
+          type: integer
+
+    FinancialGoal:
+      type: object
+      required: [id, user_id, name, icon, current, target, color]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        name:
+          type: string
+        icon:
+          type: string
+        current:
+          type: number
+        target:
+          type: number
+        color:
+          type: string
+        unit:
+          type: string

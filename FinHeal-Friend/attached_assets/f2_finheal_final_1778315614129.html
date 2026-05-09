@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>F2 FinHeal — Your Financial Wellness Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --brand:#3244e6;
+  --brand-dark:#1e2db8;
+  --brand-mid:#4a5cf0;
+  --brand-light:#eef0fd;
+  --brand-xlight:#f6f7fe;
+  --brand-border:#d4d8fa;
+  --white:#ffffff;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --green:#10b981;
+  --green-light:#ecfdf5;
+  --amber:#f59e0b;
+  --amber-light:#fffbeb;
+  --red:#ef4444;
+  --red-light:#fef2f2;
+  --sidebar-w:268px;
+  --right-w:252px;
+  --font:'Plus Jakarta Sans',sans-serif;
+  --font-display:'Playfair Display',serif;
+  --radius-xs:6px;
+  --radius-sm:10px;
+  --radius-md:14px;
+  --radius-lg:20px;
+  --radius-xl:28px;
+  --shadow-xs:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm:0 2px 8px rgba(0,0,0,0.07),0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md:0 4px 16px rgba(50,68,230,0.1),0 2px 6px rgba(0,0,0,0.06);
+  --shadow-brand:0 8px 24px rgba(50,68,230,0.22);
+}
+
+html,body{height:100%;background:var(--gray-100);color:var(--gray-900);font-family:var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── SHELL ── */
+.shell{display:flex;height:100vh;width:100vw;overflow:hidden;background:var(--gray-100);gap:6px;padding:6px}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--white);
+  border-radius:var(--radius-lg);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  box-shadow:var(--shadow-sm);
+  border:1px solid var(--gray-200);
+}
+
+.sidebar-logo{
+  padding:20px 18px 16px;
+  display:flex;align-items:center;gap:11px;
+  border-bottom:1px solid var(--gray-100);
+}
+.logo-mark{
+  width:38px;height:38px;
+  background:var(--brand);
+  border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+  box-shadow:var(--shadow-brand);
+  flex-shrink:0;
+  position:relative;
+  overflow:hidden;
+}
+.logo-mark::after{
+  content:'';position:absolute;
+  top:-10px;right:-10px;
+  width:30px;height:30px;
+  background:rgba(255,255,255,0.15);
+  border-radius:50%;
+}
+.logo-words{display:flex;flex-direction:column;gap:1px}
+.logo-name{font-size:15px;font-weight:700;color:var(--gray-900);letter-spacing:-0.4px}
+.logo-tagline{font-size:10px;font-weight:500;color:var(--brand);letter-spacing:0.6px;text-transform:uppercase}
+
+/* Wellness Score Card */
+.score-card{
+  margin:14px 12px;
+  background:var(--brand);
+  border-radius:var(--radius-md);
+  padding:16px;
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+  transition:transform 0.2s ease,box-shadow 0.2s ease;
+}
+.score-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-brand)}
+.score-card::before{
+  content:'';position:absolute;
+  right:-20px;bottom:-20px;
+  width:90px;height:90px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.08);
+}
+.score-card::after{
+  content:'';position:absolute;
+  right:20px;bottom:20px;
+  width:40px;height:40px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.06);
+}
+.score-eyebrow{font-size:9px;font-weight:600;color:rgba(255,255,255,0.65);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px}
+.score-row{display:flex;align-items:flex-end;gap:6px;margin-bottom:10px}
+.score-big{font-family:var(--font-display);font-size:42px;color:#fff;line-height:1;font-weight:700}
+.score-denom{font-size:14px;color:rgba(255,255,255,0.55);margin-bottom:5px}
+.score-bar-bg{height:3px;background:rgba(255,255,255,0.2);border-radius:3px}
+.score-bar-fill{height:3px;background:rgba(255,255,255,0.9);border-radius:3px;width:68%;transition:width 1.2s cubic-bezier(0.4,0,0.2,1)}
+.score-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.score-change{font-size:11px;color:rgba(255,255,255,0.8)}
+.score-change strong{color:#fff}
+.score-badge{font-size:9px;font-weight:600;background:rgba(255,255,255,0.2);color:#fff;padding:3px 8px;border-radius:20px;letter-spacing:0.5px}
+
+/* Mood Row */
+.mood-section{padding:12px 12px 8px}
+.mood-label{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+.mood-row{display:flex;justify-content:space-between;gap:4px}
+.mood-btn{
+  flex:1;height:36px;
+  border-radius:var(--radius-sm);
+  border:1.5px solid var(--gray-200);
+  background:var(--white);
+  font-size:17px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s ease;
+  position:relative;
+}
+.mood-btn:hover{border-color:var(--brand-border);background:var(--brand-xlight);transform:scale(1.08)}
+.mood-btn.active{border-color:var(--brand);background:var(--brand-light);box-shadow:0 0 0 3px rgba(50,68,230,0.1)}
+
+/* Nav */
+.nav-wrap{padding:8px 8px 0;flex:1;overflow-y:auto}
+.nav-wrap::-webkit-scrollbar{width:0}
+.nav-group-label{font-size:9.5px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.9px;padding:4px 8px 6px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  transition:all 0.15s ease;
+  font-size:13px;font-weight:500;
+  color:var(--gray-600);
+  margin-bottom:1px;
+  position:relative;
+}
+.nav-item:hover{background:var(--gray-50);color:var(--gray-900)}
+.nav-item.active{background:var(--brand-light);color:var(--brand);font-weight:600}
+.nav-item.active .nav-icon-wrap{background:var(--brand);box-shadow:var(--shadow-brand)}
+.nav-icon-wrap{
+  width:28px;height:28px;
+  border-radius:var(--radius-xs);
+  background:var(--gray-100);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+  transition:all 0.15s;
+}
+.nav-badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--brand);color:#fff}
+.nav-badge.soft{background:var(--green-light);color:var(--green)}
+
+/* Footer */
+.sidebar-foot{
+  padding:12px;
+  border-top:1px solid var(--gray-100);
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;
+  border-radius:0 0 var(--radius-lg) var(--radius-lg);
+  transition:background 0.15s;
+}
+.sidebar-foot:hover{background:var(--gray-50)}
+.avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--brand),var(--brand-mid));
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.foot-name{font-size:13px;font-weight:600;color:var(--gray-800)}
+.foot-plan{font-size:11px;color:var(--gray-400)}
+.foot-cog{font-size:15px;color:var(--gray-300);margin-left:auto;transition:transform 0.3s}
+.sidebar-foot:hover .foot-cog{transform:rotate(60deg)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--white);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--gray-200)}
+
+/* Topbar */
+.topbar{
+  height:60px;
+  border-bottom:1px solid var(--gray-100);
+  display:flex;align-items:center;
+  padding:0 20px;gap:12px;
+  flex-shrink:0;
+  background:var(--white);
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+}
+.topbar-left{flex:1}
+.topbar-title{font-size:14px;font-weight:700;color:var(--gray-900)}
+.topbar-meta{font-size:11px;color:var(--gray-400);display:flex;align-items:center;gap:5px;margin-top:1px}
+.online-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--green-light)}
+.topbar-btns{display:flex;gap:6px}
+.t-btn{
+  height:30px;padding:0 12px;
+  border-radius:var(--radius-xs);
+  border:1.5px solid var(--gray-200);
+  background:var(--white);
+  color:var(--gray-600);
+  font-family:var(--font);
+  font-size:11.5px;font-weight:600;
+  cursor:pointer;
+  display:flex;align-items:center;gap:5px;
+  transition:all 0.15s;
+}
+.t-btn:hover{border-color:var(--brand-border);background:var(--brand-xlight);color:var(--brand)}
+.t-btn.solid{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:var(--shadow-md)}
+.t-btn.solid:hover{background:var(--brand-dark);box-shadow:var(--shadow-brand)}
+
+/* Chat */
+.chat-scroll{flex:1;overflow-y:auto;padding:24px 20px;scroll-behavior:smooth}
+.chat-scroll::-webkit-scrollbar{width:5px}
+.chat-scroll::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:5px}
+.chat-scroll::-webkit-scrollbar-track{background:transparent}
+
+/* Welcome */
+.welcome{text-align:center;padding:16px 32px 28px;animation:fadeUp 0.5s ease forwards}
+.welcome-ring{
+  width:64px;height:64px;border-radius:50%;
+  background:var(--brand-light);
+  border:2px solid var(--brand-border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;margin:0 auto 14px;
+  animation:pulse-ring 2s ease-in-out infinite;
+}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(50,68,230,0.15)}50%{box-shadow:0 0 0 10px rgba(50,68,230,0)}}
+.welcome-title{font-family:var(--font-display);font-size:26px;color:var(--gray-900);margin-bottom:8px}
+.welcome-title span{color:var(--brand);font-style:italic}
+.welcome-sub{font-size:13.5px;color:var(--gray-500);line-height:1.7;max-width:420px;margin:0 auto}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 16px 24px;animation:fadeUp 0.5s 0.1s ease both}
+.chip{
+  padding:8px 14px;
+  border-radius:20px;
+  border:1.5px solid var(--gray-200);
+  background:var(--white);
+  color:var(--gray-600);
+  font-family:var(--font);
+  font-size:12px;font-weight:500;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  white-space:nowrap;
+  box-shadow:var(--shadow-xs);
+}
+.chip:hover{
+  border-color:var(--brand);
+  color:var(--brand);
+  background:var(--brand-xlight);
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md);
+}
+
+/* Date divider */
+.divider{
+  text-align:center;margin:8px 0 16px;
+  position:relative;
+}
+.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:var(--gray-100)}
+.divider span{
+  background:var(--white);position:relative;z-index:1;
+  font-size:11px;color:var(--gray-400);padding:0 12px;font-weight:500;
+}
+
+/* Messages */
+.msg-row{display:flex;gap:10px;margin-bottom:14px;max-width:800px;margin-left:auto;margin-right:auto;width:100%;animation:fadeUp 0.25s ease forwards}
+.msg-row.user{flex-direction:row-reverse}
+.m-avatar{
+  width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;flex-shrink:0;margin-top:18px;
+}
+.m-avatar.bot{background:var(--brand);color:#fff;box-shadow:0 2px 8px rgba(50,68,230,0.3)}
+.m-avatar.user{background:var(--gray-100);color:var(--gray-600)}
+.msg-content{max-width:68%}
+.emotion-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:600;
+  padding:3px 9px;border-radius:20px;
+  margin-bottom:5px;letter-spacing:0.3px;
+}
+.ec-calm{background:var(--green-light);color:var(--green)}
+.ec-anxious{background:var(--amber-light);color:var(--amber)}
+.ec-stressed{background:var(--red-light);color:var(--red)}
+.bubble{
+  padding:13px 16px;
+  border-radius:4px var(--radius-md) var(--radius-md) var(--radius-md);
+  font-size:13.5px;line-height:1.7;
+}
+.bubble.bot{
+  background:var(--white);
+  border:1.5px solid var(--gray-100);
+  color:var(--gray-800);
+  box-shadow:var(--shadow-xs);
+}
+.bubble.user{
+  background:var(--brand);
+  border-radius:var(--radius-md) 4px var(--radius-md) var(--radius-md);
+  color:#fff;
+  box-shadow:var(--shadow-md);
+}
+.msg-time{font-size:10px;color:var(--gray-400);margin-top:4px;padding:0 4px}
+.msg-row.user .msg-time{text-align:right}
+
+/* Typing */
+.typing-row{display:flex;gap:10px;margin-bottom:14px;max-width:800px;margin:0 auto;width:100%;padding-bottom:14px}
+.typing-bubble{
+  background:var(--white);
+  border:1.5px solid var(--gray-100);
+  border-radius:4px var(--radius-md) var(--radius-md) var(--radius-md);
+  padding:14px 18px;
+  display:flex;gap:5px;align-items:center;
+  box-shadow:var(--shadow-xs);
+}
+.tdot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--brand);opacity:0.4;
+  animation:bounce 1.3s ease-in-out infinite;
+}
+.tdot:nth-child(2){animation-delay:.15s}
+.tdot:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:0.4}30%{transform:translateY(-6px);opacity:1}}
+
+/* Suggestions after bot reply */
+.reply-suggestions{
+  display:flex;flex-wrap:wrap;gap:6px;
+  padding:4px 40px 4px;
+  max-width:800px;margin:0 auto;
+  animation:fadeUp 0.3s ease forwards;
+}
+.r-sug{
+  padding:6px 12px;border-radius:20px;
+  border:1.5px solid var(--brand-border);
+  background:var(--brand-xlight);
+  color:var(--brand);font-size:11.5px;font-weight:500;
+  cursor:pointer;transition:all 0.15s;
+  font-family:var(--font);
+}
+.r-sug:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+/* Input */
+.input-zone{
+  padding:12px 20px 14px;
+  background:var(--white);
+  border-top:1px solid var(--gray-100);
+  border-radius:0 0 var(--radius-lg) var(--radius-lg);
+  flex-shrink:0;
+}
+.input-box{
+  max-width:800px;margin:0 auto;
+  background:var(--gray-50);
+  border:1.5px solid var(--gray-200);
+  border-radius:var(--radius-xl);
+  display:flex;align-items:flex-end;
+  padding:10px 10px 10px 18px;gap:8px;
+  transition:border-color 0.2s ease,box-shadow 0.2s ease;
+}
+.input-box:focus-within{
+  border-color:var(--brand);
+  background:var(--white);
+  box-shadow:0 0 0 4px rgba(50,68,230,0.08);
+}
+textarea.cin{
+  flex:1;background:transparent;border:none;outline:none;
+  color:var(--gray-900);font-family:var(--font);
+  font-size:13.5px;resize:none;
+  min-height:22px;max-height:100px;
+  line-height:1.55;padding:3px 0;
+}
+textarea.cin::placeholder{color:var(--gray-400)}
+.in-actions{display:flex;gap:5px;align-items:center;padding-bottom:1px}
+.in-btn{
+  width:32px;height:32px;border-radius:50%;
+  border:none;background:transparent;
+  color:var(--gray-400);font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all 0.15s;
+}
+.in-btn:hover{background:var(--gray-100);color:var(--gray-600)}
+.send{
+  width:36px;height:36px;border-radius:50%;border:none;
+  background:var(--brand);color:#fff;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all 0.2s ease;
+  box-shadow:0 2px 8px rgba(50,68,230,0.35);
+  flex-shrink:0;
+}
+.send:hover{background:var(--brand-dark);transform:scale(1.07);box-shadow:var(--shadow-brand)}
+.send:active{transform:scale(0.95)}
+.send svg{transition:transform 0.15s}
+.send:hover svg{transform:translateX(1px) translateY(-1px)}
+.disclaimer{max-width:800px;margin:7px auto 0;font-size:10.5px;color:var(--gray-400);text-align:center}
+
+/* ── RIGHT PANEL ── */
+.right{
+  width:var(--right-w);min-width:var(--right-w);
+  background:var(--white);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-sm);
+  border:1px solid var(--gray-200);
+  display:flex;flex-direction:column;
+  overflow-y:auto;padding:16px 12px;gap:0;
+}
+.right::-webkit-scrollbar{width:0}
+.r-section{margin-bottom:18px}
+.r-section:last-child{margin-bottom:0}
+.r-title{font-size:9.5px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+/* Stat row */
+.stats-3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat-box{
+  background:var(--gray-50);
+  border:1.5px solid var(--gray-100);
+  border-radius:var(--radius-sm);
+  padding:9px 6px;text-align:center;
+}
+.stat-n{font-family:var(--font-display);font-size:22px;color:var(--gray-900);line-height:1.1}
+.stat-l{font-size:9px;color:var(--gray-400);font-weight:600;text-transform:uppercase;letter-spacing:0.6px;margin-top:2px}
+
+/* Mood dims */
+.dim-card{background:var(--gray-50);border:1.5px solid var(--gray-100);border-radius:var(--radius-sm);padding:12px}
+.stress-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.stress-head span:first-child{font-size:12px;font-weight:600;color:var(--gray-700)}
+.stress-pct{font-size:13px;font-weight:700;color:var(--amber)}
+.stress-track{height:5px;background:var(--gray-200);border-radius:5px;overflow:hidden;margin-bottom:12px}
+.stress-fill{height:100%;width:62%;background:linear-gradient(90deg,var(--green),var(--amber));border-radius:5px}
+.dim{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.dim:last-child{margin-bottom:0}
+.dim-lbl{font-size:11px;color:var(--gray-500);width:66px;flex-shrink:0;font-weight:500}
+.dim-track{flex:1;height:4px;background:var(--gray-200);border-radius:4px;overflow:hidden}
+.dim-bar{height:100%;border-radius:4px;transition:width 1s ease}
+.dim-v{font-size:10px;color:var(--gray-400);width:22px;text-align:right}
+
+/* Goals */
+.goal-item{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--gray-100)}
+.goal-item:last-child{border-bottom:none;padding-bottom:0}
+.g-icon{
+  width:28px;height:28px;border-radius:var(--radius-xs);
+  background:var(--brand-light);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+}
+.g-info{flex:1;min-width:0}
+.g-name{font-size:11.5px;font-weight:600;color:var(--gray-700);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-track{height:3px;background:var(--gray-200);border-radius:3px;overflow:hidden}
+.g-fill{height:100%;background:var(--brand);border-radius:3px}
+.g-meta{display:flex;justify-content:space-between;margin-top:3px}
+.g-pct{font-size:10px;color:var(--gray-400)}
+.g-amt{font-size:10px;color:var(--brand);font-weight:500}
+
+/* Tip */
+.tip-box{
+  background:var(--brand-xlight);
+  border:1.5px solid var(--brand-border);
+  border-radius:var(--radius-sm);
+  padding:12px;
+}
+.tip-eyebrow{font-size:9px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px}
+.tip-text{font-size:11.5px;color:var(--gray-600);line-height:1.6}
+
+/* History */
+.h-item{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 8px;border-radius:var(--radius-xs);
+  cursor:pointer;transition:background 0.15s;margin-bottom:1px;
+}
+.h-item:hover{background:var(--gray-50)}
+.h-dot{width:5px;height:5px;border-radius:50%;background:var(--brand);flex-shrink:0}
+.h-text{font-size:11.5px;color:var(--gray-600);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-date{font-size:10px;color:var(--gray-400)}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg-row{animation:fadeUp 0.22s ease forwards}
+
+/* Entry animation */
+.sidebar{animation:slideIn 0.4s ease forwards}
+.main{animation:fadeUp 0.4s 0.05s ease both}
+.right{animation:slideInR 0.4s 0.08s ease both}
+@keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideInR{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">💙</div>
+    <div class="logo-words">
+      <div class="logo-name">F2 FinHeal</div>
+      <div class="logo-tagline">Financial Wellness AI</div>
+    </div>
+  </div>
+
+  <!-- Score Card -->
+  <div class="score-card">
+    <div class="score-eyebrow">Your Wellness Score</div>
+    <div class="score-row">
+      <div class="score-big">68</div>
+      <div class="score-denom">/ 100</div>
+    </div>
+    <div class="score-bar-bg"><div class="score-bar-fill"></div></div>
+    <div class="score-footer">
+      <div class="score-change">Trending <strong>↑ +4 pts</strong> this week</div>
+      <div class="score-badge">GOOD</div>
+    </div>
+  </div>
+
+  <!-- Mood -->
+  <div class="mood-section">
+    <div class="mood-label">How are you feeling today?</div>
+    <div class="mood-row">
+      <button class="mood-btn" onclick="selectMood(this)" title="Very Stressed">😰</button>
+      <button class="mood-btn" onclick="selectMood(this)" title="Anxious">😟</button>
+      <button class="mood-btn active" onclick="selectMood(this)" title="Neutral">😐</button>
+      <button class="mood-btn" onclick="selectMood(this)" title="Okay">🙂</button>
+      <button class="mood-btn" onclick="selectMood(this)" title="Great">😄</button>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <div class="nav-wrap">
+    <div class="nav-group-label">Main</div>
+    <div class="nav-item active" onclick="setActive(this)">
+      <div class="nav-icon-wrap">💬</div>Talk to FinHeal
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">🧭</div>Financial Health Test
+      <span class="nav-badge soft">New</span>
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">📊</div>My Dashboard
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">🎯</div>Financial Goals
+      <span class="nav-badge">3</span>
+    </div>
+
+    <div class="nav-group-label" style="margin-top:10px">Learn & Grow</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">📚</div>Financial Education
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">💡</div>Tips & Insights
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">🏦</div>Loan Calculator
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">🔔</div>Reminders
+    </div>
+
+    <div class="nav-group-label" style="margin-top:10px">Support</div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">🧑‍💼</div>Talk to an Advisor
+    </div>
+    <div class="nav-item" onclick="setActive(this)">
+      <div class="nav-icon-wrap">⚙️</div>Settings
+    </div>
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="avatar">AR</div>
+    <div>
+      <div class="foot-name">Aditya Rawal</div>
+      <div class="foot-plan">Premium Member</div>
+    </div>
+    <div class="foot-cog">⚙️</div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN CHAT ══════════ -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">Financial Wellness Chat</div>
+      <div class="topbar-meta">
+        <span class="online-dot"></span>
+        FinHeal AI · Always available · Session #14
+      </div>
+    </div>
+    <div class="topbar-btns">
+      <button class="t-btn" onclick="clearChat()">🗑 Clear</button>
+      <button class="t-btn">📋 Notes</button>
+      <button class="t-btn solid">💳 View Loan Options</button>
+    </div>
+  </div>
+
+  <div class="chat-scroll" id="chatScroll">
+
+    <div class="welcome" id="welcome">
+      <div class="welcome-ring">🌟</div>
+      <div class="welcome-title">Good morning, <span>Aditya</span></div>
+      <div class="welcome-sub">I'm here to help you navigate your financial journey — without judgment, with full support. Tell me what's on your mind today.</div>
+    </div>
+
+    <div class="chips" id="chips">
+      <div class="chip" onclick="useChip(this)">😰 Stressed about my EMI</div>
+      <div class="chip" onclick="useChip(this)">📉 My credit score dropped</div>
+      <div class="chip" onclick="useChip(this)">💸 Help me budget better</div>
+      <div class="chip" onclick="useChip(this)">🤔 Am I eligible for a loan?</div>
+      <div class="chip" onclick="useChip(this)">📅 Plan my debt repayment</div>
+      <div class="chip" onclick="useChip(this)">🧠 Financial health test</div>
+    </div>
+
+    <div class="divider"><span>Today · May 9, 2026</span></div>
+
+    <!-- Bot opening -->
+    <div class="msg-row bot">
+      <div class="m-avatar bot">F2</div>
+      <div class="msg-content">
+        <div class="emotion-chip ec-calm">🟢 Empathetic Mode</div>
+        <div class="bubble bot">Hi Aditya! I noticed your wellness score improved by 4 points this week — that's real progress. 💙<br><br>I can also see you've been keeping up with your EMI payments consistently. How are you feeling about your finances right now? Sometimes just talking it through helps more than you'd expect.</div>
+        <div class="msg-time">9:01 AM</div>
+      </div>
+    </div>
+
+    <!-- User -->
+    <div class="msg-row user">
+      <div class="m-avatar user">AR</div>
+      <div class="msg-content">
+        <div class="bubble user">Honestly, I'm a bit anxious. I have 3 loans running and I feel like I'm just paying interest and not really clearing anything. It's stressing me out.</div>
+        <div class="msg-time" style="text-align:right">9:03 AM</div>
+      </div>
+    </div>
+
+    <!-- Bot reply -->
+    <div class="msg-row bot">
+      <div class="m-avatar bot">F2</div>
+      <div class="msg-content">
+        <div class="emotion-chip ec-anxious">🟡 Sensing Anxiety</div>
+        <div class="bubble bot">I completely understand that feeling — juggling multiple loans can feel like running on a treadmill. That anxiety is completely valid, and it's very common. 🤝<br><br>Here's what I want you to know: <strong>interest-heavy phases are normal in the early loan lifecycle.</strong> But there are proven strategies to flip the script.<br><br>To help you properly, could you tell me:<br>• How many EMIs are remaining for each loan?<br>• Which one has the highest interest rate?<br><br>That'll let me give you a real, personalised plan — not just generic advice.</div>
+        <div class="msg-time">9:03 AM</div>
+      </div>
+    </div>
+
+    <!-- Inline suggestions -->
+    <div class="reply-suggestions">
+      <button class="r-sug" onclick="useSug(this)">Share my loan details</button>
+      <button class="r-sug" onclick="useSug(this)">What is avalanche method?</button>
+      <button class="r-sug" onclick="useSug(this)">Show a repayment plan</button>
+    </div>
+
+    <!-- Typing (hidden) -->
+    <div class="typing-row" id="typing" style="display:none">
+      <div class="m-avatar bot">F2</div>
+      <div class="typing-bubble">
+        <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Input -->
+  <div class="input-zone">
+    <div class="input-box">
+      <textarea class="cin" id="inp" placeholder="Share what's on your mind about your finances…" rows="1" onkeydown="handleKey(event)" oninput="grow(this)"></textarea>
+      <div class="in-actions">
+        <button class="in-btn" title="Attach">📎</button>
+        <button class="in-btn" title="Voice">🎙</button>
+        <button class="send" onclick="send()" title="Send">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="disclaimer">FinHeal provides supportive financial guidance — not certified financial advice. For critical decisions, consult a licensed advisor.</div>
+  </div>
+</main>
+
+<!-- ══════════ RIGHT PANEL ══════════ -->
+<aside class="right">
+
+  <div class="r-section">
+    <div class="r-title">This Session</div>
+    <div class="stats-3">
+      <div class="stat-box"><div class="stat-n">7</div><div class="stat-l">Chats</div></div>
+      <div class="stat-box"><div class="stat-n">3</div><div class="stat-l">Goals</div></div>
+      <div class="stat-box"><div class="stat-n">12</div><div class="stat-l">Days</div></div>
+    </div>
+  </div>
+
+  <div class="r-section">
+    <div class="r-title">Mood Analysis</div>
+    <div class="dim-card">
+      <div class="stress-head"><span>Stress Level</span><span class="stress-pct">62%</span></div>
+      <div class="stress-track"><div class="stress-fill"></div></div>
+      <div class="dim">
+        <div class="dim-lbl">Urgency</div>
+        <div class="dim-track"><div class="dim-bar" style="width:55%;background:#f59e0b"></div></div>
+        <div class="dim-v">55</div>
+      </div>
+      <div class="dim">
+        <div class="dim-lbl">Openness</div>
+        <div class="dim-track"><div class="dim-bar" style="width:78%;background:#10b981"></div></div>
+        <div class="dim-v">78</div>
+      </div>
+      <div class="dim">
+        <div class="dim-lbl">Willingness</div>
+        <div class="dim-track"><div class="dim-bar" style="width:82%;background:var(--brand)"></div></div>
+        <div class="dim-v">82</div>
+      </div>
+      <div class="dim">
+        <div class="dim-lbl">Emotion</div>
+        <div class="dim-track"><div class="dim-bar" style="width:40%;background:#ef4444"></div></div>
+        <div class="dim-v">40</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="r-section">
+    <div class="r-title">Active Goals</div>
+    <div class="goal-item">
+      <div class="g-icon">🏠</div>
+      <div class="g-info">
+        <div class="g-name">Home Down Payment</div>
+        <div class="g-track"><div class="g-fill" style="width:34%"></div></div>
+        <div class="g-meta"><span class="g-pct">34%</span><span class="g-amt">₹3.4L / ₹10L</span></div>
+      </div>
+    </div>
+    <div class="goal-item">
+      <div class="g-icon">💳</div>
+      <div class="g-info">
+        <div class="g-name">Clear Personal Loan</div>
+        <div class="g-track"><div class="g-fill" style="width:61%;background:var(--green)"></div></div>
+        <div class="g-meta"><span class="g-pct">61%</span><span class="g-amt" style="color:var(--green)">₹1.8L / ₹3L</span></div>
+      </div>
+    </div>
+    <div class="goal-item" style="border-bottom:none;padding-bottom:0">
+      <div class="g-icon">🌱</div>
+      <div class="g-info">
+        <div class="g-name">Emergency Fund</div>
+        <div class="g-track"><div class="g-fill" style="width:20%;background:var(--amber)"></div></div>
+        <div class="g-meta"><span class="g-pct">20%</span><span class="g-amt" style="color:var(--amber)">₹30K / ₹1.5L</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="r-section">
+    <div class="r-title">Today's Insight</div>
+    <div class="tip-box">
+      <div class="tip-eyebrow">💡 Debt Strategy</div>
+      <div class="tip-text">Paying ₹500 extra/month on your highest-interest loan can reduce total interest by up to 18% and close it 4 months early.</div>
+    </div>
+  </div>
+
+  <div class="r-section">
+    <div class="r-title">Past Conversations</div>
+    <div class="h-item"><div class="h-dot"></div><div class="h-text">EMI stress & budgeting plan</div><div class="h-date">May 7</div></div>
+    <div class="h-item"><div class="h-dot" style="background:var(--green)"></div><div class="h-text">Credit score tips</div><div class="h-date">May 5</div></div>
+    <div class="h-item"><div class="h-dot" style="background:var(--amber)"></div><div class="h-text">Loan eligibility check</div><div class="h-date">May 2</div></div>
+    <div class="h-item"><div class="h-dot"></div><div class="h-text">Setting savings goals</div><div class="h-date">Apr 29</div></div>
+  </div>
+
+</aside>
+
+</div>
+<script>
+function setActive(el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+}
+function selectMood(el){
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+function grow(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,100)+'px';
+}
+function handleKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
+}
+function useChip(el){
+  const txt=el.textContent.replace(/^[^\s]+\s/,'').trim();
+  document.getElementById('inp').value=txt;
+  document.getElementById('inp').focus();
+  document.getElementById('chips').style.opacity='0';
+  document.getElementById('chips').style.pointerEvents='none';
+  document.getElementById('welcome').style.display='none';
+}
+function useSug(el){
+  document.getElementById('inp').value=el.textContent.trim();
+  document.getElementById('inp').focus();
+}
+function clearChat(){
+  const sc=document.getElementById('chatScroll');
+  sc.innerHTML=`
+    <div class="welcome" id="welcome"><div class="welcome-ring">🌟</div>
+    <div class="welcome-title">Good morning, <span>Aditya</span></div>
+    <div class="welcome-sub">I'm here to help you navigate your financial journey — without judgment, with full support. Tell me what's on your mind today.</div></div>
+    <div class="chips" id="chips">
+      <div class="chip" onclick="useChip(this)">😰 Stressed about my EMI</div>
+      <div class="chip" onclick="useChip(this)">📉 My credit score dropped</div>
+      <div class="chip" onclick="useChip(this)">💸 Help me budget better</div>
+      <div class="chip" onclick="useChip(this)">🤔 Am I eligible for a loan?</div>
+      <div class="chip" onclick="useChip(this)">📅 Plan my debt repayment</div>
+      <div class="chip" onclick="useChip(this)">🧠 Financial health test</div>
+    </div>
+    <div class="divider"><span>Today · May 9, 2026</span></div>
+    <div class="typing-row" id="typing" style="display:none">
+      <div class="m-avatar bot">F2</div>
+      <div class="typing-bubble"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>
+    </div>`;
+}
+const replies=[
+  {ec:'ec-calm',el:'🟢 Listening carefully',
+   text:`Thank you for sharing that with me. 💙 It takes real courage to talk about financial stress openly.<br><br>Let me help you see this clearly. The feeling of 'only paying interest' usually means your loans are front-loaded — which is by design. But there are proven ways to break out of that cycle.<br><br>Would you like me to walk you through the <strong>avalanche</strong> or <strong>snowball</strong> debt repayment method? Both can give you visible progress much faster.`,
+   sugs:['Explain the avalanche method','Show me a 6-month plan','What is my total debt?']},
+  {ec:'ec-calm',el:'🟢 Here for you',
+   text:`That's a really smart question to ask. Most people don't think about this until much later. 🙌<br><br>Based on what you've told me:<br>• Focus on your <strong>highest interest loan first</strong> — even ₹1,000 extra per month makes a real difference.<br>• Your credit profile is solid — you're in a good position.<br>• Building even a small emergency fund (₹15,000) before aggressively paying debt gives you a safety net.<br><br>Shall I create a personalised 6-month repayment plan for you?`,
+   sugs:['Yes, create my plan','How do I improve CIBIL?','Talk to an advisor']},
+  {ec:'ec-anxious',el:'🟡 Sensing Stress',
+   text:`I hear you — and I want you to know that feeling overwhelmed about money is one of the most common human experiences. You're not alone in this. 🌿<br><br>Before we dive into numbers, take a breath. The fact that you're here, thinking about this, means you're already ahead of most people.<br><br>Let's take this one step at a time. What feels most urgent right now — the immediate EMI pressure, or the longer-term picture?`,
+   sugs:['The EMI pressure right now','The longer-term picture','Both, help me prioritise']}
+];
+let ri=0;
+function send(){
+  const inp=document.getElementById('inp');
+  const txt=inp.value.trim();
+  if(!txt)return;
+  const sc=document.getElementById('chatScroll');
+  document.getElementById('welcome')&&(document.getElementById('welcome').style.display='none');
+  document.getElementById('chips')&&(document.getElementById('chips').style.display='none');
+  document.querySelectorAll('.reply-suggestions').forEach(s=>s.style.display='none');
+  const urow=document.createElement('div');
+  urow.className='msg-row user';
+  urow.innerHTML=`<div class="m-avatar user">AR</div><div class="msg-content"><div class="bubble user">${txt.replace(/\n/g,'<br>')}</div><div class="msg-time" style="text-align:right">${now()}</div></div>`;
+  const typing=document.getElementById('typing');
+  sc.insertBefore(urow,typing);
+  inp.value='';inp.style.height='auto';
+  typing.style.display='flex';
+  sc.scrollTop=sc.scrollHeight;
+  setTimeout(()=>{
+    typing.style.display='none';
+    const r=replies[ri%replies.length];ri++;
+    const brow=document.createElement('div');
+    brow.className='msg-row bot';
+    brow.innerHTML=`<div class="m-avatar bot">F2</div><div class="msg-content"><div class="emotion-chip ${r.ec}">${r.el}</div><div class="bubble bot">${r.text}</div><div class="msg-time">${now()}</div></div>`;
+    sc.insertBefore(brow,typing);
+    if(r.sugs){
+      const sg=document.createElement('div');
+      sg.className='reply-suggestions';
+      sg.innerHTML=r.sugs.map(s=>`<button class="r-sug" onclick="useSug(this)">${s}</button>`).join('');
+      sc.insertBefore(sg,typing);
+    }
+    sc.scrollTop=sc.scrollHeight;
+  },1600+Math.random()*700);
+}
+function now(){
+  return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+</script>
+</body>
+</html>
