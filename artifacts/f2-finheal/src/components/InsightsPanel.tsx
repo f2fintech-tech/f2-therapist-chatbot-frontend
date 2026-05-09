@@ -5,6 +5,8 @@ export default function InsightsPanel({ userId, sessionId, moodDimensions }: { u
   const { data: wellness } = useGetWellnessScore(userId);
   const { data: goals } = useGetUserGoals(userId);
   const { data: sessions } = useGetChatSessions(userId);
+  const goalsList = Array.isArray(goals) ? goals : [];
+  const sessionsList = Array.isArray(sessions) ? sessions : [];
 
   const defaultDims = { stress: 62, urgency: 40, openness: 85, willingness: 70, emotion: 55 };
   const currentDims = moodDimensions || defaultDims;
@@ -51,7 +53,7 @@ export default function InsightsPanel({ userId, sessionId, moodDimensions }: { u
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
         <div>
-          {goals?.map(g => (
+          {goalsList.map(g => (
             <div key={g.id} className="flex items-center gap-[9px] py-[9px] border-b border-gray-100 last:border-0 last:pb-0">
               <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{g.icon}</div>
               <div className="flex-1 min-w-0">
@@ -80,7 +82,7 @@ export default function InsightsPanel({ userId, sessionId, moodDimensions }: { u
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Past Conversations</div>
         <div>
-          {sessions?.map(s => (
+          {sessionsList.map(s => (
             <div key={s.id} className="flex items-center gap-[8px] p-[7px_8px] rounded-[6px] cursor-pointer transition-colors mb-[1px] hover:bg-gray-50">
               <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.mood_color || 'var(--color-primary)' }} />
               <div className="text-[11.5px] text-gray-600 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{s.title}</div>
