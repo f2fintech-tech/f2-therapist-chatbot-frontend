@@ -17,17 +17,23 @@ From the repo root, run:
 
 This installs dependencies for the full workspace (all packages under artifacts, lib, and scripts).
 
-## Run frontend
+## Run the frontend against your backend
+
+Make sure your FastAPI backend is running at the URL in `.env`:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+```
 
 From the repo root, run:
 
-Do not prefix this with `bash`.
-
 ```bash
-PORT=5173 BASE_PATH=/ pnpm --filter @workspace/f2-finheal dev
+./start-dev.sh
 ```
 
 Then open http://localhost:5173
+
+This starts only the frontend and points it at the backend URL from `.env`.
 
 ## Useful commands
 

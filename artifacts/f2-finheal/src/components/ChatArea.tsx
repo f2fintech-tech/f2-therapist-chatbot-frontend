@@ -1,37 +1,32 @@
-import { useState, useRef, useEffect } from "react";
-import { useBackendChat } from "@/hooks/useBackendChat";
-import type { BackendMoodDimensions } from "@/services/backend-chat";
+import { useEffect, useRef, useState } from "react";
+import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 
-interface Message {
-  id: string;
-  role: "bot" | "user";
-  content: string;
-  mood?: { primary_emotion?: string; label?: string };
-  time: string;
-  suggestions?: string[];
+interface ChatAreaProps {
+  conversationId: string | null;
+  conversationCount: number;
+  error: BackendRequestError | null;
+  isHealthy: boolean | null;
+  isLoading: boolean;
+  messages: ChatMessage[];
+  onClearChat: () => void;
+  onMoodUpdate: (dims: MoodDimensions) => void;
+  onSendMessage: (text: string) => Promise<void>;
 }
 
 export default function ChatArea({
-  userId,
-  sessionId,
+  conversationId,
+  conversationCount,
+  error,
+  isHealthy,
+  isLoading,
+  messages,
+  onClearChat,
   onMoodUpdate,
-}: {
-  userId: string;
-  sessionId: string;
-  onMoodUpdate: (dims: BackendMoodDimensions) => void;
-}) {
+  onSendMessage,
+}: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const {
-    messages,
-    isLoading,
-    error,
-    conversationId,
-    sendMessage,
-    clearChat,
-  } = useBackendChat({ userId, onMoodUpdate });
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -43,17 +38,37 @@ export default function ChatArea({
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const handleSend = (text: string) => {
+  useEffect(() => {
+    const latestBotMessage = [...messages].reverse().find((message) => message.role === "bot" && message.mood);
+    if (!latestBotMessage?.mood) {
+      return;
+    }
+
+    const dimensions = latestBotMessage.mood.dimensions;
+    if (dimensions && Object.keys(dimensions).length > 0) {
+      onMoodUpdate(dimensions);
+    }
+  }, [messages, onMoodUpdate]);
+
+  const handleSend = async (text: string) => {
     if (!text.trim()) return;
+
     setInputValue("");
 
-    void sendMessage(text.trim());
+    try {
+      await onSendMessage(text.trim());
+    } catch {
+      // The hook already normalizes and stores the error state.
+    }
   };
+
+  const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
+  const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend(inputValue);
+      void handleSend(inputValue);
     }
   };
 
@@ -63,12 +78,14 @@ export default function ChatArea({
         <div className="flex-1">
           <div className="text-[14px] font-bold text-gray-900">Financial Wellness Chat</div>
           <div className="text-[11px] text-gray-400 flex items-center gap-[5px] mt-[1px]">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#10b981] shadow-[0_0_0_2px_#ecfdf5]" />
-            FinHeal AI · Always available · {conversationId ? `Conversation ${conversationId.slice(0, 8)}` : `Session ${sessionId}`}
+            <span
+              className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
+            />
+            FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
           </div>
         </div>
         <div className="flex gap-[6px]">
-          <button onClick={clearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
+          <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
             🗑 Clear
           </button>
           <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
@@ -79,6 +96,12 @@ export default function ChatArea({
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mx-[20px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c]">
+          {error.message}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-[20px] py-[24px] scroll-smooth" ref={scrollRef}>
         {messages.length === 0 ? (
@@ -178,21 +201,16 @@ export default function ChatArea({
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">📎</button>
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">🎙</button>
             <button 
-              onClick={() => handleSend(inputValue)}
+              onClick={() => void handleSend(inputValue)}
               disabled={isLoading || !inputValue.trim()}
               className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
               </svg>
             </button>
           </div>
         </div>
-        {error && (
-          <div className="max-w-[800px] mx-auto mt-[8px] text-[11px] text-red-600 text-center">
-            {error}
-          </div>
-        )}
         <div className="max-w-[800px] mx-auto mt-[7px] text-[10.5px] text-gray-400 text-center">
           FinHeal AI is an empathetic companion but does not provide certified legal or tax advice.
         </div>

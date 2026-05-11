@@ -1,129 +1,221 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getBackendHealth,
-  sendBackendMessage,
-  type BackendApiError,
-  type BackendChatResponse,
-  type BackendMoodDimensions,
-} from "@/services/backend-chat";
+  getConversationMessages,
+  getConversations,
+  normalizeBackendError,
+  sendChatMessage,
+  type BackendRequestError,
+  type ChatMessage,
+  type ConversationSummary,
+  type MoodDimensions,
+} from "@/lib/backendChat";
 
-export interface ChatMessage {
-  id: string;
-  role: "bot" | "user";
-  content: string;
-  mood?: { primary_emotion?: string; label?: string };
-  time: string;
-  suggestions?: string[];
+export interface UseBackendChatResult {
+  messages: ChatMessage[];
+  isLoading: boolean;
+  error: BackendRequestError | null;
+  conversationId: string | null;
+  isHealthy: boolean | null;
+  conversations: ConversationSummary[];
+  conversationCount: number;
+  sendMessage: (message: string) => Promise<void>;
+  clearMessages: () => void;
+  loadConversation: (conversationId: string) => Promise<void>;
+  refreshConversations: () => Promise<void>;
 }
 
-interface UseBackendChatOptions {
-  userId: string;
-  onMoodUpdate?: (dims: BackendMoodDimensions) => void;
+function toTimeString(timestamp: string): string {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatTime(): string {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function buildErrorMessage(error: unknown): string {
-  if (typeof error === "object" && error !== null && "message" in error) {
-    return String((error as BackendApiError).message);
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Something went wrong while sending your message.";
-}
-
-function mapResponseToBotMessage(data: BackendChatResponse): ChatMessage {
+function createUserMessage(content: string): ChatMessage {
   return {
-    id: data.message_id,
-    role: "bot",
-    content: data.response,
-    mood: data.mood
-      ? {
-          primary_emotion: data.mood.primary_emotion,
-          label: data.mood.label,
-        }
-      : undefined,
-    time: formatTime(),
-    suggestions: [],
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role: "user",
+    content,
+    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
   };
 }
 
-export function useBackendChat({ userId, onMoodUpdate }: UseBackendChatOptions) {
+function createAssistantMessage(response: {
+  message_id: string;
+  response: string;
+  timestamp: string;
+  mood?: { primary_emotion?: string; label?: string; dimensions?: MoodDimensions };
+  suggestions?: string[];
+}): ChatMessage {
+  return {
+    id: response.message_id,
+    role: "bot",
+    content: response.response,
+    time: toTimeString(response.timestamp),
+    mood: response.mood,
+    suggestions: response.suggestions,
+  };
+}
+
+export function useBackendChat(userId: string): UseBackendChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isHealthy, setIsHealthy] = useState(false);
+  const [error, setError] = useState<BackendRequestError | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const bootstrappedUserId = useRef<string | null>(null);
 
-  const checkHealth = useCallback(async () => {
-    try {
-      const health = await getBackendHealth();
-      setIsHealthy(health.status === "healthy");
-    } catch {
-      setIsHealthy(false);
+  const conversationCount = useMemo(() => conversations.length, [conversations]);
+
+  const refreshConversations = useCallback(async () => {
+    if (!userId) {
+      setConversations([]);
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    void checkHealth();
-  }, [checkHealth]);
+    const nextConversations = await getConversations(userId);
+    setConversations(nextConversations);
+    return;
+  }, [userId]);
 
-  const sendMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || isLoading) return;
+  const loadConversation = useCallback(
+    async (nextConversationId: string) => {
+      if (!userId || !nextConversationId) {
+        return;
+      }
 
-      const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: trimmed,
-        time: formatTime(),
-      };
-
-      setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
       setError(null);
 
       try {
-        const data = await sendBackendMessage({
-          message: trimmed,
-          user_id: userId,
-          ...(conversationId ? { conversation_id: conversationId } : {}),
-        });
-
-        setConversationId(data.conversation_id);
-        setMessages((prev) => [...prev, mapResponseToBotMessage(data)]);
-        if (data.mood?.dimensions && onMoodUpdate) {
-          onMoodUpdate(data.mood.dimensions);
-        }
-      } catch (err) {
-        setError(buildErrorMessage(err));
+        const nextMessages = await getConversationMessages(nextConversationId, userId);
+        setMessages(nextMessages);
+        setConversationId(nextConversationId);
+        await refreshConversations();
+      } catch (caughtError) {
+        setError(normalizeBackendError(caughtError));
       } finally {
         setIsLoading(false);
       }
     },
-    [conversationId, isLoading, onMoodUpdate, userId],
+    [refreshConversations, userId],
   );
 
-  const clearChat = useCallback(() => {
+  const sendMessage = useCallback(
+    async (message: string) => {
+      const trimmedMessage = message.trim();
+      if (!trimmedMessage || !userId) {
+        return;
+      }
+
+      const optimisticMessage = createUserMessage(trimmedMessage);
+      setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await sendChatMessage({
+          message: trimmedMessage,
+          user_id: userId,
+          conversation_id: conversationId ?? undefined,
+        });
+
+        setConversationId(response.conversation_id);
+        setMessages((currentMessages) => [...currentMessages, createAssistantMessage(response)]);
+
+        await refreshConversations();
+      } catch (caughtError) {
+        setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
+        setError(normalizeBackendError(caughtError));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [conversationId, refreshConversations, userId],
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function bootstrap() {
+      if (!userId) {
+        setMessages([]);
+        setConversations([]);
+        setConversationId(null);
+        setError(null);
+        setIsHealthy(null);
+        return;
+      }
+
+      if (bootstrappedUserId.current === userId) {
+        return;
+      }
+
+      bootstrappedUserId.current = userId;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const [healthyResult, nextConversations] = await Promise.all([
+          getBackendHealth(),
+          getConversations(userId),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setIsHealthy(healthyResult);
+        setConversations(nextConversations);
+
+        const latestConversation = nextConversations[0];
+        if (latestConversation) {
+          const nextMessages = await getConversationMessages(latestConversation.id, userId);
+          if (isCancelled) {
+            return;
+          }
+
+          setConversationId(latestConversation.id);
+          setMessages(nextMessages);
+        } else {
+          setConversationId(null);
+          setMessages([]);
+        }
+      } catch (caughtError) {
+        if (isCancelled) {
+          return;
+        }
+
+        setIsHealthy(false);
+        setError(normalizeBackendError(caughtError));
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId]);
+
+  const clearMessages = useCallback(() => {
     setMessages([]);
-    setConversationId(null);
-    setError(null);
   }, []);
 
   return {
     messages,
-    conversationId,
     isLoading,
     error,
+    conversationId,
     isHealthy,
+    conversations,
+    conversationCount,
     sendMessage,
-    clearChat,
-    checkHealth,
+    clearMessages,
+    loadConversation,
+    refreshConversations,
   };
 }

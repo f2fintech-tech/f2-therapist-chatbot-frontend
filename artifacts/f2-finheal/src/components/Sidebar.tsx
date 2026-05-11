@@ -7,6 +7,7 @@ export default function Sidebar({ userId, sessionId }: { userId: string; session
 
   const { data: wellnessData } = useGetWellnessScore(userId);
   const { data: goalsData } = useGetUserGoals(userId);
+  const changePoints = wellnessData?.change_pts ?? 0;
 
   const moods = [
     { emoji: "😰", title: "Very Stressed" },
@@ -44,7 +45,7 @@ export default function Sidebar({ userId, sessionId }: { userId: string; session
         </div>
         <div className="flex justify-between items-center mt-[8px]">
           <div className="text-[11px] text-white/80">
-            {wellnessData?.trend} <strong className="text-white">{wellnessData?.change_pts > 0 ? '+' : ''}{wellnessData?.change_pts} pts</strong> this week
+            {wellnessData?.trend} <strong className="text-white">{changePoints > 0 ? '+' : ''}{changePoints} pts</strong> this week
           </div>
           <div className="text-[9px] font-semibold bg-white/20 text-white px-[8px] py-[3px] rounded-[20px] tracking-[0.5px] uppercase">{wellnessData?.label || "..."}</div>
         </div>
