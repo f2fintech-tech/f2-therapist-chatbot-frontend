@@ -2,15 +2,15 @@ import { useState, useRef } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import InsightsPanel from "@/components/InsightsPanel";
-import type { MoodDimensions } from "@workspace/api-client-react/src/generated/api.schemas";
+import type { BackendMoodDimensions } from "@/services/backend-chat";
 
-const USER_ID = "user_aditya";
+const USER_ID = import.meta.env.VITE_USER_ID || "550e8400-e29b-41d4-a716-446655440000";
 
 export default function FinHealChat() {
-  const [sessionId, setSessionId] = useState("session_1");
-  const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [currentMoodDims, setCurrentMoodDims] = useState<BackendMoodDimensions | null>(null);
 
-  const handleMoodUpdate = (dims: MoodDimensions) => {
+  const handleMoodUpdate = (dims: BackendMoodDimensions) => {
     setCurrentMoodDims(dims);
   };
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { useSendMessage, useGetChatSessions } from "@workspace/api-client-react";
-import type { MoodDimensions } from "@workspace/api-client-react/src/generated/api.schemas";
+import { useBackendChat } from "@/hooks/useBackendChat";
+import type { BackendMoodDimensions } from "@/services/backend-chat";
 
 interface Message {
   id: string;
@@ -11,16 +11,27 @@ interface Message {
   suggestions?: string[];
 }
 
-export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: string; sessionId: string; onMoodUpdate: (dims: MoodDimensions) => void }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatArea({
+  userId,
+  sessionId,
+  onMoodUpdate,
+}: {
+  userId: string;
+  sessionId: string;
+  onMoodUpdate: (dims: BackendMoodDimensions) => void;
+}) {
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const sendMessageMut = useSendMessage();
-  const { data: sessions } = useGetChatSessions(userId);
-
-  const sessionCount = sessions?.length || 14;
+  const {
+    messages,
+    isLoading,
+    error,
+    conversationId,
+    sendMessage,
+    clearChat,
+  } = useBackendChat({ userId, onMoodUpdate });
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -30,42 +41,14 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, sendMessageMut.isPending]);
+  }, [messages, isLoading]);
 
   const handleSend = (text: string) => {
     if (!text.trim()) return;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: text.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setMessages(prev => [...prev, userMsg]);
     setInputValue("");
 
-    sendMessageMut.mutate({
-      data: { message: text.trim(), session_id: sessionId, user_id: userId }
-    }, {
-      onSuccess: (data) => {
-        const botMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "bot",
-          content: data.message,
-          mood: data.mood,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggestions: data.suggestions
-        };
-        setMessages(prev => [...prev, botMsg]);
-        if (data.mood?.dimensions) {
-          onMoodUpdate(data.mood.dimensions);
-        }
-      }
-    });
+    void sendMessage(text.trim());
   };
-
-  const clearChat = () => setMessages([]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -81,7 +64,7 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
           <div className="text-[14px] font-bold text-gray-900">Financial Wellness Chat</div>
           <div className="text-[11px] text-gray-400 flex items-center gap-[5px] mt-[1px]">
             <span className="w-[6px] h-[6px] rounded-full bg-[#10b981] shadow-[0_0_0_2px_#ecfdf5]" />
-            FinHeal AI · Always available · Session #{sessionCount}
+            FinHeal AI · Always available · {conversationId ? `Conversation ${conversationId.slice(0, 8)}` : `Session ${sessionId}`}
           </div>
         </div>
         <div className="flex gap-[6px]">
@@ -167,7 +150,7 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
           </div>
         )}
 
-        {sendMessageMut.isPending && (
+        {isLoading && (
           <div className="flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto pb-[14px]">
             <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
             <div className="bg-white border-[1.5px] border-gray-100 rounded-[4px_14px_14px_14px] p-[14px_18px] flex gap-[5px] items-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -196,7 +179,7 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">🎙</button>
             <button 
               onClick={() => handleSend(inputValue)}
-              disabled={sendMessageMut.isPending || !inputValue.trim()}
+              disabled={isLoading || !inputValue.trim()}
               className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
@@ -205,6 +188,11 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
             </button>
           </div>
         </div>
+        {error && (
+          <div className="max-w-[800px] mx-auto mt-[8px] text-[11px] text-red-600 text-center">
+            {error}
+          </div>
+        )}
         <div className="max-w-[800px] mx-auto mt-[7px] text-[10.5px] text-gray-400 text-center">
           FinHeal AI is an empathetic companion but does not provide certified legal or tax advice.
         </div>
