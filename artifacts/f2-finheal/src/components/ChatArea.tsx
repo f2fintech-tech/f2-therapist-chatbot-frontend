@@ -1,26 +1,32 @@
-import { useState, useRef, useEffect } from "react";
-import { useSendMessage, useGetChatSessions } from "@workspace/api-client-react";
-import type { MoodDimensions } from "@workspace/api-client-react/src/generated/api.schemas";
+import { useEffect, useRef, useState } from "react";
+import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 
-interface Message {
-  id: string;
-  role: "bot" | "user";
-  content: string;
-  mood?: { primary_emotion?: string; label?: string };
-  time: string;
-  suggestions?: string[];
+interface ChatAreaProps {
+  conversationId: string | null;
+  conversationCount: number;
+  error: BackendRequestError | null;
+  isHealthy: boolean | null;
+  isLoading: boolean;
+  messages: ChatMessage[];
+  onClearChat: () => void;
+  onMoodUpdate: (dims: MoodDimensions) => void;
+  onSendMessage: (text: string) => Promise<void>;
 }
 
-export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: string; sessionId: string; onMoodUpdate: (dims: MoodDimensions) => void }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatArea({
+  conversationId,
+  conversationCount,
+  error,
+  isHealthy,
+  isLoading,
+  messages,
+  onClearChat,
+  onMoodUpdate,
+  onSendMessage,
+}: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const sendMessageMut = useSendMessage();
-  const { data: sessions } = useGetChatSessions(userId);
-
-  const sessionCount = sessions?.length || 14;
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -30,47 +36,39 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, sendMessageMut.isPending]);
+  }, [messages, isLoading]);
 
-  const handleSend = (text: string) => {
+  useEffect(() => {
+    const latestBotMessage = [...messages].reverse().find((message) => message.role === "bot" && message.mood);
+    if (!latestBotMessage?.mood) {
+      return;
+    }
+
+    const dimensions = latestBotMessage.mood.dimensions;
+    if (dimensions && Object.keys(dimensions).length > 0) {
+      onMoodUpdate(dimensions);
+    }
+  }, [messages, onMoodUpdate]);
+
+  const handleSend = async (text: string) => {
     if (!text.trim()) return;
 
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: text.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setMessages(prev => [...prev, userMsg]);
     setInputValue("");
 
-    sendMessageMut.mutate({
-      data: { message: text.trim(), session_id: sessionId, user_id: userId }
-    }, {
-      onSuccess: (data) => {
-        const botMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "bot",
-          content: data.message,
-          mood: data.mood,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggestions: data.suggestions
-        };
-        setMessages(prev => [...prev, botMsg]);
-        if (data.mood?.dimensions) {
-          onMoodUpdate(data.mood.dimensions);
-        }
-      }
-    });
+    try {
+      await onSendMessage(text.trim());
+    } catch {
+      // The hook already normalizes and stores the error state.
+    }
   };
 
-  const clearChat = () => setMessages([]);
+  const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
+  const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend(inputValue);
+      void handleSend(inputValue);
     }
   };
 
@@ -80,12 +78,14 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
         <div className="flex-1">
           <div className="text-[14px] font-bold text-gray-900">Financial Wellness Chat</div>
           <div className="text-[11px] text-gray-400 flex items-center gap-[5px] mt-[1px]">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#10b981] shadow-[0_0_0_2px_#ecfdf5]" />
-            FinHeal AI · Always available · Session #{sessionCount}
+            <span
+              className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
+            />
+            FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
           </div>
         </div>
         <div className="flex gap-[6px]">
-          <button onClick={clearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
+          <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
             🗑 Clear
           </button>
           <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
@@ -96,6 +96,12 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mx-[20px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c]">
+          {error.message}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-[20px] py-[24px] scroll-smooth" ref={scrollRef}>
         {messages.length === 0 ? (
@@ -167,7 +173,7 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
           </div>
         )}
 
-        {sendMessageMut.isPending && (
+        {isLoading && (
           <div className="flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto pb-[14px]">
             <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
             <div className="bg-white border-[1.5px] border-gray-100 rounded-[4px_14px_14px_14px] p-[14px_18px] flex gap-[5px] items-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -195,11 +201,11 @@ export default function ChatArea({ userId, sessionId, onMoodUpdate }: { userId: 
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">📎</button>
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">🎙</button>
             <button 
-              onClick={() => handleSend(inputValue)}
-              disabled={sendMessageMut.isPending || !inputValue.trim()}
+              onClick={() => void handleSend(inputValue)}
+              disabled={isLoading || !inputValue.trim()}
               className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
               </svg>
             </button>
