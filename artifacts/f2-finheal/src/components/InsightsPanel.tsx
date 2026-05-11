@@ -1,12 +1,27 @@
-import { useGetWellnessScore, useGetUserGoals, useGetChatSessions } from "@workspace/api-client-react";
-import type { MoodDimensions } from "@workspace/api-client-react/src/generated/api.schemas";
+import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
+import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 
-export default function InsightsPanel({ userId, sessionId, moodDimensions }: { userId: string; sessionId: string; moodDimensions: MoodDimensions | null }) {
+export default function InsightsPanel({
+  userId,
+  sessionId,
+  moodDimensions,
+  conversationId,
+  conversationCount,
+  conversations,
+  onConversationSelect,
+}: {
+  userId: string;
+  sessionId: string;
+  moodDimensions: MoodDimensions | null;
+  conversationId: string | null;
+  conversationCount: number;
+  conversations: ConversationSummary[];
+  onConversationSelect: (conversationId: string) => Promise<void>;
+}) {
   const { data: wellness } = useGetWellnessScore(userId);
   const { data: goals } = useGetUserGoals(userId);
-  const { data: sessions } = useGetChatSessions(userId);
   const goalsList = Array.isArray(goals) ? goals : [];
-  const sessionsList = Array.isArray(sessions) ? sessions : [];
+  const sessionsList = conversations;
 
   const defaultDims = { stress: 62, urgency: 40, openness: 85, willingness: 70, emotion: 55 };
   const currentDims = moodDimensions || defaultDims;
@@ -18,7 +33,7 @@ export default function InsightsPanel({ userId, sessionId, moodDimensions }: { u
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">This Session</div>
         <div className="grid grid-cols-3 gap-[6px]">
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{wellness?.session_count || 14}</div>
+            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{conversationCount || 0}</div>
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Chats</div>
           </div>
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
@@ -83,11 +98,16 @@ export default function InsightsPanel({ userId, sessionId, moodDimensions }: { u
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Past Conversations</div>
         <div>
           {sessionsList.map(s => (
-            <div key={s.id} className="flex items-center gap-[8px] p-[7px_8px] rounded-[6px] cursor-pointer transition-colors mb-[1px] hover:bg-gray-50">
-              <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.mood_color || 'var(--color-primary)' }} />
-              <div className="text-[11.5px] text-gray-600 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{s.title}</div>
-              <div className="text-[10px] text-gray-400">{new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-            </div>
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => void onConversationSelect(s.id)}
+              className={`flex w-full items-center gap-[8px] p-[7px_8px] rounded-[6px] cursor-pointer transition-colors mb-[1px] hover:bg-gray-50 ${s.id === conversationId ? "bg-[#eef0fd]" : ""}`}
+            >
+              <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
+              <div className="text-[11.5px] text-gray-600 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-left">{s.title}</div>
+              <div className="text-[10px] text-gray-400">{new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+            </button>
           ))}
         </div>
       </div>
