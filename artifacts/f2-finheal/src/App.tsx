@@ -1,9 +1,13 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setBaseUrl } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import FinHealChat from "@/pages/FinHealChat";
 import NotFound from "@/pages/not-found";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+setBaseUrl(new URL(apiBaseUrl).origin);
 
 const queryClient = new QueryClient();
 
