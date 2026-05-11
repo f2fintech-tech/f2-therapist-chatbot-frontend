@@ -1,7 +1,22 @@
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
 const DEFAULT_TIMEOUT_MS = 15000;
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+function resolveDefaultApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  const { protocol, hostname } = window.location;
+  if (protocol === "https:" && hostname.endsWith(".app.github.dev")) {
+    // Codespaces/VSC tunnel style host: replace visible app port with backend port.
+    const backendHost = hostname.replace(/-\d+\./, "-8000.");
+    return `https://${backendHost}/api/v1`;
+  }
+
+  return DEFAULT_API_BASE_URL;
+}
+
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBaseUrl();
 const configuredApiKey = (import.meta.env.VITE_API_KEY || "").trim();
 
 const normalizedApiBaseUrl = configuredBaseUrl.replace(/\/+$/, "");

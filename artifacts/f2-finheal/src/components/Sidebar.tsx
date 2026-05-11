@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
+import type { UserProfile } from "@/utils/user";
 
-export default function Sidebar({ userId, sessionId }: { userId: string; sessionId: string }) {
+export default function Sidebar({ userId, userProfile, sessionId }: { userId: string; userProfile: UserProfile; sessionId: string }) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState("Talk to FinHeal");
 
@@ -89,10 +90,10 @@ export default function Sidebar({ userId, sessionId }: { userId: string; session
       </div>
 
       <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] cursor-pointer hover:bg-gray-50 transition-colors group">
-        <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0">AR</div>
+        <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0">{userProfile.initials}</div>
         <div>
-          <div className="text-[13px] font-semibold text-gray-800">Aditya Rawal</div>
-          <div className="text-[11px] text-gray-400">Premium Member</div>
+          <div className="text-[13px] font-semibold text-gray-800">{userProfile.displayName}</div>
+          <div className="text-[11px] text-gray-400">{userProfile.userTier || "Standard"} Member</div>
         </div>
         <div className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60">⚙️</div>
       </div>

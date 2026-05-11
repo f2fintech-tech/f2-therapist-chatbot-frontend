@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
+import type { UserProfile } from "@/utils/user";
 
 interface ChatAreaProps {
   conversationId: string | null;
@@ -8,6 +9,7 @@ interface ChatAreaProps {
   isHealthy: boolean | null;
   isLoading: boolean;
   messages: ChatMessage[];
+  userProfile: UserProfile;
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions) => void;
   onSendMessage: (text: string) => Promise<void>;
@@ -20,6 +22,7 @@ export default function ChatArea({
   isHealthy,
   isLoading,
   messages,
+  userProfile,
   onClearChat,
   onMoodUpdate,
   onSendMessage,
@@ -108,7 +111,7 @@ export default function ChatArea({
           <>
             <div className="text-center px-[32px] py-[16px] pb-[28px] animate-fade-up">
               <div className="w-[64px] h-[64px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[28px] mx-auto mb-[14px] animate-pulse-ring">🌟</div>
-              <div className="font-serif text-[26px] text-gray-900 mb-[8px]">Good morning, <span className="text-primary italic">Aditya</span></div>
+              <div className="font-serif text-[26px] text-gray-900 mb-[8px]">Good morning, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
               <div className="text-[13.5px] text-gray-500 leading-relaxed max-w-[420px] mx-auto">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
             
@@ -135,7 +138,7 @@ export default function ChatArea({
             {m.role === 'bot' ? (
               <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
             ) : (
-              <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">AR</div>
+              <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
             )}
             <div className="max-w-[68%] flex flex-col">
               {m.role === 'bot' && m.mood && m.mood.primary_emotion && (
