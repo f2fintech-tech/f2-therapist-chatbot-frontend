@@ -55888,12 +55888,13 @@ var insertFinancialGoalSchema = createInsertSchema(financialGoalsTable).omit({ i
 
 // ../../lib/db/src/index.ts
 var { Pool: Pool3 } = esm_default;
-if (!process.env.DATABASE_URL) {
+var dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?"
+    "DATABASE_URL environment variable is required.\nFor local development, use: docker-compose up -d\nOr set: DATABASE_URL=postgresql://user:password@localhost:5432/finheal"
   );
 }
-var pool = new Pool3({ connectionString: process.env.DATABASE_URL });
+var pool = new Pool3({ connectionString: dbUrl });
 var db = drizzle(pool, { schema: schema_exports });
 
 // src/lib/logger.ts
