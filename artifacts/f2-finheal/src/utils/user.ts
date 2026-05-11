@@ -13,6 +13,44 @@ export interface UserProfile {
   email?: string;
 }
 
+const DISPLAY_NAME_STORAGE_KEY = "finheal-user-display-name";
+const DEFAULT_DISPLAY_NAMES = [
+  "Explorer",
+  "Participant",
+  "Learner",
+  "Friend",
+  "Seeker",
+  "Companion",
+  "Adventurer",
+  "Collaborator",
+  "Innovator",
+  "Pioneer",
+];
+
+function getAnonymousDisplayNamePool(): string[] {
+  const configuredNames = import.meta.env.VITE_USER_DISPLAY_NAMES?.trim();
+
+  if (!configuredNames) {
+    return DEFAULT_DISPLAY_NAMES;
+  }
+
+  const parsedNames = configuredNames
+    .split(/[\n,|]+/)
+    .map((name: string) => name.trim())
+    .filter(Boolean);
+
+  return parsedNames.length > 0 ? parsedNames : DEFAULT_DISPLAY_NAMES;
+}
+
+function pickRandomDisplayName(names: string[]): string {
+  if (names.length === 0) {
+    return "Client";
+  }
+
+  const randomIndex = Math.floor(Math.random() * names.length);
+  return names[randomIndex] || "Client";
+}
+
 /**
  * Generate user initials from a full name.
  * @example
@@ -62,11 +100,11 @@ export function parseName(fullName: string): { firstName: string; lastName: stri
 /**
  * Generate a user-friendly display name from a UUID or custom user ID.
  * If a display name override is set (via env or sessionStorage), use that.
- * Otherwise, generate a friendly placeholder name.
+ * Otherwise, generate a neutral therapy-friendly placeholder name.
  *
  * @example
  * generateUserDisplayName("123e4567-e89b-12d3-a456-426614174000")
- * // => "User" (default friendly name if no override)
+ * // => "Client" (default friendly name if no override)
  * generateUserDisplayName("123e4567-e89b-12d3-a456-426614174000", "Aditya Rawal")
  * // => "Aditya Rawal"
  */
@@ -78,16 +116,18 @@ export function generateUserDisplayName(
     return overrideName.trim();
   }
 
-  // Check sessionStorage for user display name preference
   if (typeof window !== "undefined") {
-    const storedName = window.sessionStorage.getItem("finheal-user-display-name");
+    const storedName = window.sessionStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
     if (storedName) {
       return storedName;
     }
+
+    const selectedName = pickRandomDisplayName(getAnonymousDisplayNamePool());
+    window.sessionStorage.setItem(DISPLAY_NAME_STORAGE_KEY, selectedName);
+    return selectedName;
   }
 
-  // Fallback: generate a generic but friendly name
-  return "Financial Friend";
+  return pickRandomDisplayName(getAnonymousDisplayNamePool());
 }
 
 /**
@@ -117,7 +157,7 @@ export function createUserProfile(
  */
 export function setUserDisplayName(displayName: string): void {
   if (typeof window !== "undefined") {
-    window.sessionStorage.setItem("finheal-user-display-name", displayName.trim());
+    window.sessionStorage.setItem(DISPLAY_NAME_STORAGE_KEY, displayName.trim());
   }
 }
 
@@ -126,7 +166,7 @@ export function setUserDisplayName(displayName: string): void {
  */
 export function getUserDisplayName(): string | null {
   if (typeof window !== "undefined") {
-    return window.sessionStorage.getItem("finheal-user-display-name");
+    return window.sessionStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
   }
   return null;
 }
@@ -136,7 +176,7 @@ export function getUserDisplayName(): string | null {
  */
 export function clearUserDisplayName(): void {
   if (typeof window !== "undefined") {
-    window.sessionStorage.removeItem("finheal-user-display-name");
+    window.sessionStorage.removeItem(DISPLAY_NAME_STORAGE_KEY);
   }
 }
 
