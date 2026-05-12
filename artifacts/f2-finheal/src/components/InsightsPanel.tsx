@@ -130,6 +130,13 @@ export default function InsightsPanel({
       )}
       {/* Insights Drawer - Narrow screens */}
       <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] gap-0 scrollbar-none lg:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <button
+          onClick={onClose}
+          aria-label="Close insights"
+          className="absolute top-3 right-3 h-6 w-6 rounded-md bg-white/90 flex items-center justify-center text-red-400 hover:bg-white z-50 shadow-sm"
+        >
+          ✕
+        </button>
         {panelContent}
       </aside>
       {/* Insights Sidebar - Desktop */}
