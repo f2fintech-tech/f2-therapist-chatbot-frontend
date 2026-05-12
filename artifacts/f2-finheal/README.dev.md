@@ -6,7 +6,7 @@ Steps to run locally (Codespaces / local machine):
 
    cp .env.example .env
 
-2. Edit `.env` if you need a different backend host (default is `http://localhost:8000/api/v1`).
+2. Edit `.env` only if you need a different backend host; the default is `/api/v1`, which Vite proxies to the backend.
 
 3. Start the dev server (ensure `PORT` and `BASE_PATH` are set in `.env` or environment):
 
@@ -17,5 +17,5 @@ Steps to run locally (Codespaces / local machine):
 
 Notes:
 - Use `VITE_API_BASE_URL` to override the API endpoint.
-- If your Codespace exposes ports differently, set `VITE_API_BASE_URL` to the backend URL visible to the Codespace browser.
+- The recommended local/Codespaces value is `/api/v1` so the browser talks only to the frontend origin.
 - Do NOT commit your `.env` file. Use `.env.example` as source-of-truth.

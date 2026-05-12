@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
+const DEFAULT_API_BASE_URL = "/api/v1";
 const DEFAULT_TIMEOUT_MS = 45000;
 
 function resolveCodespacesBackendFromCurrentHost(): string | null {
@@ -11,17 +11,11 @@ function resolveCodespacesBackendFromCurrentHost(): string | null {
     return null;
   }
 
-  // In Codespaces, use localhost instead of tunnel URL to avoid tunnel auth (401) on preflight requests.
-  // Both frontend and backend are running on the same machine, so localhost works fine.
+  // In Codespaces, use a same-origin API path so the frontend dev server can proxy to the backend.
   return DEFAULT_API_BASE_URL;
 }
 
 function resolveDefaultApiBaseUrl(): string {
-  const codespacesBackend = resolveCodespacesBackendFromCurrentHost();
-  if (codespacesBackend) {
-    return codespacesBackend;
-  }
-
   return DEFAULT_API_BASE_URL;
 }
 
@@ -37,13 +31,14 @@ function resolveConfiguredApiBaseUrl(): string {
     const isLocalFrontend = hostname === "localhost" || hostname === "127.0.0.1";
     const isLocalHttpTarget = envValue.startsWith("http://localhost") || envValue.startsWith("http://127.0.0.1");
     const isCodespacesTarget = envValue.includes(".app.github.dev");
+    const isRelativeTarget = envValue.startsWith("/");
 
-    // Codespaces frontend should call the same-codespace backend tunnel host.
-    if (isCodespacesFrontend && (isLocalHttpTarget || isCodespacesTarget)) {
-      return resolveCodespacesBackendFromCurrentHost() || envValue;
+    // Codespaces frontend should use the proxied API path so the browser never hits localhost directly.
+    if (isCodespacesFrontend && (isLocalHttpTarget || isCodespacesTarget || isRelativeTarget)) {
+      return DEFAULT_API_BASE_URL;
     }
 
-    // Local frontend should call local backend, not a possibly-auth-gated tunnel URL.
+    // Local frontend should avoid a Codespaces tunnel URL if one was configured.
     if (isLocalFrontend && isCodespacesTarget) {
       return DEFAULT_API_BASE_URL;
     }
@@ -56,14 +51,6 @@ const configuredBaseUrl = resolveConfiguredApiBaseUrl();
 const configuredApiKey = (import.meta.env.VITE_API_KEY || "").trim();
 
 const normalizedApiBaseUrl = configuredBaseUrl.replace(/\/+$/, "");
-const apiOrigin = (() => {
-  try {
-    return new URL(normalizedApiBaseUrl).origin;
-  } catch {
-    return typeof window !== "undefined" ? window.location.origin : "http://127.0.0.1:8000";
-  }
-})();
-
 export interface MoodDimensions {
   stress?: number;
   urgency?: number;
@@ -212,11 +199,11 @@ async function parseResponseBody<T>(response: Response, expectJson: boolean): Pr
   }
 }
 
-async function request<T>(path: string, options: RequestOptions = {}, useOriginBase = false): Promise<T> {
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, expectJson = true, headers, ...init } = options;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-  const url = useOriginBase ? buildUrl(apiOrigin, path) : buildUrl(normalizedApiBaseUrl, path);
+  const url = buildUrl(normalizedApiBaseUrl, path);
 
   try {
     const response = await fetch(url, {
@@ -305,7 +292,7 @@ function normalizeConversationMessage(message: BackendConversationMessage): Chat
 }
 
 export async function getBackendHealth(): Promise<boolean> {
-  await request<unknown>("health", { expectJson: false }, true);
+  await request<unknown>("health", { expectJson: false });
   return true;
 }
 
