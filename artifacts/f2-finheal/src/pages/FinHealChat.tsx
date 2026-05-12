@@ -34,18 +34,25 @@ const USER_PROFILE = getOrCreateUserProfile(USER_ID);
 
 export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const chat = useBackendChat(USER_ID);
 
   const handleMoodUpdate = (dims: MoodDimensions) => {
     setCurrentMoodDims(dims);
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+  const closeInsights = () => setInsightsOpen(false);
+
   return (
-    <div className="flex h-[100dvh] w-[100vw] overflow-hidden bg-[#f3f4f6] gap-[6px] p-[6px]">
+    <div className="flex min-h-[100dvh] w-full flex-col gap-[6px] overflow-y-auto bg-[#f3f4f6] p-[6px] lg:h-[100dvh] lg:flex-row lg:overflow-hidden">
       <Sidebar 
         userId={USER_ID} 
         userProfile={USER_PROFILE}
-        sessionId={chat.conversationId ?? "new-conversation"} 
+        sessionId={chat.conversationId ?? "new-conversation"}
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
       />
       <ChatArea
         conversationId={chat.conversationId}
@@ -58,6 +65,8 @@ export default function FinHealChat() {
         onClearChat={chat.clearMessages}
         onMoodUpdate={handleMoodUpdate}
         onSendMessage={chat.sendMessage}
+        onToggleSidebar={() => setSidebarOpen((open) => !open)}
+        onToggleInsights={() => setInsightsOpen((open) => !open)}
       />
       <InsightsPanel
         conversationId={chat.conversationId}
@@ -67,6 +76,8 @@ export default function FinHealChat() {
         onConversationSelect={chat.loadConversation}
         sessionId={chat.conversationId ?? "new-conversation"}
         userId={USER_ID}
+        isOpen={insightsOpen}
+        onClose={closeInsights}
       />
     </div>
   );
