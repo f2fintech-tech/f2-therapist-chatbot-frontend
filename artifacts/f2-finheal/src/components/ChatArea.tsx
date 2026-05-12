@@ -40,13 +40,26 @@ export default function ChatArea({
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Use setTimeout to ensure DOM has updated before scrolling
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, 0);
     }
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Alternative: scroll last message into view as fallback
+  useEffect(() => {
+    const lastMessage = document.querySelector('[data-message-id]:last-of-type');
+    if (lastMessage) {
+      lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     const latestBotMessage = [...messages].reverse().find((message) => message.role === "bot" && message.mood);
@@ -202,7 +215,7 @@ export default function ChatArea({
         )}
 
         {messages.map((m) => (
-          <div key={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {m.role === 'bot' ? (
               <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
             ) : (
