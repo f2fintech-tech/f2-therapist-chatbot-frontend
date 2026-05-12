@@ -2,7 +2,15 @@ import { useState } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
 
-export default function Sidebar({ userId, userProfile, sessionId }: { userId: string; userProfile: UserProfile; sessionId: string }) {
+interface SidebarProps {
+  userId: string;
+  userProfile: UserProfile;
+  sessionId: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState("Talk to FinHeal");
 
@@ -19,8 +27,17 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
   ];
 
   return (
-    <aside className="w-[268px] min-w-[268px] bg-white rounded-[20px] flex flex-col overflow-hidden shadow-sm border border-gray-200">
-      <div className="px-[18px] py-[20px] pb-[16px] flex items-center gap-[11px] border-b border-gray-100">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      {/* Mobile Drawer */}
+      <aside className={`fixed left-0 top-0 bottom-0 w-[268px] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[268px] lg:min-w-[268px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <div className="px-[16px] py-[18px] pb-[14px] flex items-center gap-[11px] border-b border-gray-100 sm:px-[18px] sm:py-[20px] sm:pb-[16px]">
         <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
           💙
           <div className="absolute -top-[10px] -right-[10px] w-[30px] h-[30px] bg-white/15 rounded-full" />
@@ -32,7 +49,7 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
       </div>
 
       {/* Wellness Score Card */}
-      <div className="mx-[12px] my-[14px] bg-primary rounded-[14px] p-[16px] relative overflow-hidden cursor-pointer transition-all hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)]">
+      <div className="mx-[12px] my-[14px] bg-primary rounded-[14px] p-[16px] relative overflow-hidden cursor-pointer transition-all hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] sm:p-[18px]">
         <div className="absolute -right-[20px] -bottom-[20px] w-[90px] h-[90px] rounded-full bg-white/10" />
         <div className="absolute right-[20px] bottom-[20px] w-[40px] h-[40px] rounded-full bg-white/5" />
         
@@ -44,7 +61,7 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
         <div className="h-[3px] bg-white/20 rounded-[3px]">
           <div className="h-[3px] bg-white/90 rounded-[3px] transition-all duration-1000" style={{ width: `${wellnessData?.score || 0}%` }} />
         </div>
-        <div className="flex justify-between items-center mt-[8px]">
+        <div className="flex flex-col gap-[6px] mt-[8px] sm:flex-row sm:items-center sm:justify-between">
           <div className="text-[11px] text-white/80">
             {wellnessData?.trend} <strong className="text-white">{changePoints > 0 ? '+' : ''}{changePoints} pts</strong> this week
           </div>
@@ -53,7 +70,7 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
       </div>
 
       {/* Mood */}
-      <div className="px-[12px] py-[12px] pb-[8px]">
+      <div className="px-[12px] py-[12px] pb-[8px] sm:pb-[10px]">
         <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.8px] mb-[8px]">How are you feeling today?</div>
         <div className="flex justify-between gap-[4px]">
           {moods.map((m) => (
@@ -70,7 +87,7 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none">
+      <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none lg:min-h-0">
         <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
         
         <NavBtn icon="💬" label="Talk to FinHeal" active={activeNav === "Talk to FinHeal"} onClick={() => setActiveNav("Talk to FinHeal")} />
@@ -97,7 +114,8 @@ export default function Sidebar({ userId, userProfile, sessionId }: { userId: st
         </div>
         <div className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60">⚙️</div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
