@@ -31,12 +31,12 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-30 xl:hidden"
           onClick={onClose}
         />
       )}
       {/* Mobile Drawer */}
-      <aside className={`fixed left-0 top-0 bottom-0 w-[268px] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[268px] lg:min-w-[268px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed left-0 top-0 bottom-0 w-[268px] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 xl:static xl:rounded-[20px] xl:w-[clamp(240px,18vw,280px)] xl:min-w-[240px] xl:max-w-[280px] xl:h-full xl:min-h-0 xl:shadow-sm xl:border xl:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} xl:translate-x-0`}>
       <div className="px-[16px] py-[18px] pb-[14px] flex items-center gap-[11px] border-b border-gray-100 sm:px-[18px] sm:py-[20px] sm:pb-[16px]">
         <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
           💙
@@ -87,7 +87,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none lg:min-h-0">
+      <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none xl:min-h-0">
         <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
         
         <NavBtn icon="💬" label="Talk to FinHeal" active={activeNav === "Talk to FinHeal"} onClick={() => setActiveNav("Talk to FinHeal")} />
