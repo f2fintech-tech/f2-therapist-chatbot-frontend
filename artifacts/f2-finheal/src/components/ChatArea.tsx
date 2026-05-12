@@ -32,6 +32,9 @@ export default function ChatArea({
   onToggleInsights,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,6 +72,50 @@ export default function ChatArea({
     }
   };
 
+  const handleFileSelected = async (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const result = reader.result as string | ArrayBuffer | null;
+      if (!result) return;
+      try {
+        await onSendMessage(JSON.stringify({ type: 'file', name: file.name, mime: file.type, data: result }));
+      } catch {
+        // ignore send errors
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startRecording = async () => {
+    if (isRecording) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      mr.ondataavailable = (ev) => { if (ev.data && ev.data.size) recordedChunksRef.current.push(ev.data); };
+      mr.onstop = async () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+        const file = new File([blob], `recording-${Date.now()}.webm`, { type: blob.type });
+        await handleFileSelected(file);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setIsRecording(true);
+    } catch {
+      // permission or media error
+    }
+  };
+
+  const stopRecording = () => {
+    if (!isRecording) return;
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
+
   const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
   const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
 
@@ -85,7 +132,7 @@ export default function ChatArea({
         <div className="flex items-start gap-[10px] sm:items-center">
           <button
             onClick={onToggleSidebar}
-            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0"
+            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
             aria-label="Toggle sidebar"
           >
             ☰
@@ -115,7 +162,7 @@ export default function ChatArea({
 
       <button
         onClick={onToggleInsights}
-        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
+        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
         aria-label="Toggle insights panel"
       >
         ☰
@@ -222,8 +269,22 @@ export default function ChatArea({
             style={{ height: "auto" }}
           />
           <div className="flex flex-wrap gap-[5px] items-center justify-end pb-[1px] sm:flex-nowrap">
-            <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">📎</button>
-            <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">🎙</button>
+            <label className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
+              📎
+              <input
+                type="file"
+                accept="*/*"
+                onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={() => (isRecording ? stopRecording() : void startRecording())}
+              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+              aria-pressed={isRecording}
+            >
+              {isRecording ? '⏺' : '🎙'}
+            </button>
             <button 
               onClick={() => void handleSend(inputValue)}
               disabled={isLoading || !inputValue.trim()}
