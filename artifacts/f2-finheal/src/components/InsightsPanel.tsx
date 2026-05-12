@@ -1,6 +1,18 @@
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 
+interface InsightsPanelProps {
+  userId: string;
+  sessionId: string;
+  moodDimensions: MoodDimensions | null;
+  conversationId: string | null;
+  conversationCount: number;
+  conversations: ConversationSummary[];
+  onConversationSelect: (conversationId: string) => Promise<void>;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
 export default function InsightsPanel({
   userId,
   sessionId,
@@ -9,15 +21,9 @@ export default function InsightsPanel({
   conversationCount,
   conversations,
   onConversationSelect,
-}: {
-  userId: string;
-  sessionId: string;
-  moodDimensions: MoodDimensions | null;
-  conversationId: string | null;
-  conversationCount: number;
-  conversations: ConversationSummary[];
-  onConversationSelect: (conversationId: string) => Promise<void>;
-}) {
+  isOpen,
+  onClose,
+}: InsightsPanelProps) {
   const { data: wellness } = useGetWellnessScore(userId);
   const { data: goals } = useGetUserGoals(userId);
   const goalsList = Array.isArray(goals) ? goals : [];
@@ -26,12 +32,11 @@ export default function InsightsPanel({
   const defaultDims = { stress: 62, urgency: 40, openness: 85, willingness: 70, emotion: 55 };
   const currentDims = moodDimensions || defaultDims;
 
-  return (
-    <aside className="w-[252px] min-w-[252px] bg-white rounded-[20px] shadow-sm border border-gray-200 flex flex-col overflow-y-auto px-[12px] py-[16px] gap-0 animate-[slideInR_0.4s_0.08s_ease_both] scrollbar-none">
-      
+  const panelContent = (
+    <>
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">This Session</div>
-        <div className="grid grid-cols-3 gap-[6px]">
+        <div className="grid grid-cols-1 gap-[6px] sm:grid-cols-3 lg:grid-cols-3">
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
             <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{conversationCount || 0}</div>
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Chats</div>
@@ -111,7 +116,27 @@ export default function InsightsPanel({
           ))}
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      {/* Insights Drawer - Narrow screens */}
+      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] gap-0 scrollbar-none lg:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        {panelContent}
+      </aside>
+      {/* Insights Sidebar - Desktop */}
+      <aside className="hidden bg-white rounded-[20px] shadow-sm border border-gray-200 flex-col overflow-y-auto px-[12px] py-[16px] gap-0 animate-[slideInR_0.4s_0.08s_ease_both] scrollbar-none lg:flex lg:w-[260px] lg:min-w-[260px] lg:h-full lg:min-h-0">
+        {panelContent}
+      </aside>
+    </>
   );
 }
 
