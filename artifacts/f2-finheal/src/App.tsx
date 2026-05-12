@@ -6,17 +6,44 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import FinHealChat from "@/pages/FinHealChat";
 import NotFound from "@/pages/not-found";
 
+function resolveCodespacesBackendFromCurrentHost(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const { protocol, hostname } = window.location;
+  if (protocol !== "https:" || !hostname.endsWith(".app.github.dev")) {
+    return null;
+  }
+
+  return `https://${hostname.replace(/-\d+\./, "-8000.")}/api/v1`;
+}
+
 function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
+    if (typeof window !== "undefined") {
+      const { protocol, hostname } = window.location;
+      const isCodespacesFrontend = protocol === "https:" && hostname.endsWith(".app.github.dev");
+      const isLocalFrontend = hostname === "localhost" || hostname === "127.0.0.1";
+      const isLocalHttpTarget = configured.startsWith("http://localhost") || configured.startsWith("http://127.0.0.1");
+      const isCodespacesTarget = configured.includes(".app.github.dev");
+
+      if (isCodespacesFrontend && (isLocalHttpTarget || isCodespacesTarget)) {
+        return resolveCodespacesBackendFromCurrentHost() || configured;
+      }
+
+      if (isLocalFrontend && isCodespacesTarget) {
+        return "http://localhost:8000/api/v1";
+      }
+    }
+
     return configured;
   }
 
-  if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
-    if (protocol === "https:" && hostname.endsWith(".app.github.dev")) {
-      return `https://${hostname.replace(/-\d+\./, "-8000.")}/api/v1`;
-    }
+  const codespacesBackend = resolveCodespacesBackendFromCurrentHost();
+  if (codespacesBackend) {
+    return codespacesBackend;
   }
 
   return "http://localhost:8000/api/v1";

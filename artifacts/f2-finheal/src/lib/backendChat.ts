@@ -1,22 +1,58 @@
 const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
-const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_TIMEOUT_MS = 45000;
 
-function resolveDefaultApiBaseUrl(): string {
+function resolveCodespacesBackendFromCurrentHost(): string | null {
   if (typeof window === "undefined") {
-    return DEFAULT_API_BASE_URL;
+    return null;
   }
 
   const { protocol, hostname } = window.location;
-  if (protocol === "https:" && hostname.endsWith(".app.github.dev")) {
-    // Codespaces/VSC tunnel style host: replace visible app port with backend port.
-    const backendHost = hostname.replace(/-\d+\./, "-8000.");
-    return `https://${backendHost}/api/v1`;
+  if (protocol !== "https:" || !hostname.endsWith(".app.github.dev")) {
+    return null;
+  }
+
+  // In Codespaces, use localhost instead of tunnel URL to avoid tunnel auth (401) on preflight requests.
+  // Both frontend and backend are running on the same machine, so localhost works fine.
+  return DEFAULT_API_BASE_URL;
+}
+
+function resolveDefaultApiBaseUrl(): string {
+  const codespacesBackend = resolveCodespacesBackendFromCurrentHost();
+  if (codespacesBackend) {
+    return codespacesBackend;
   }
 
   return DEFAULT_API_BASE_URL;
 }
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBaseUrl();
+function resolveConfiguredApiBaseUrl(): string {
+  const envValue = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (!envValue) {
+    return resolveDefaultApiBaseUrl();
+  }
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    const isCodespacesFrontend = protocol === "https:" && hostname.endsWith(".app.github.dev");
+    const isLocalFrontend = hostname === "localhost" || hostname === "127.0.0.1";
+    const isLocalHttpTarget = envValue.startsWith("http://localhost") || envValue.startsWith("http://127.0.0.1");
+    const isCodespacesTarget = envValue.includes(".app.github.dev");
+
+    // Codespaces frontend should call the same-codespace backend tunnel host.
+    if (isCodespacesFrontend && (isLocalHttpTarget || isCodespacesTarget)) {
+      return resolveCodespacesBackendFromCurrentHost() || envValue;
+    }
+
+    // Local frontend should call local backend, not a possibly-auth-gated tunnel URL.
+    if (isLocalFrontend && isCodespacesTarget) {
+      return DEFAULT_API_BASE_URL;
+    }
+  }
+
+  return envValue;
+}
+
+const configuredBaseUrl = resolveConfiguredApiBaseUrl();
 const configuredApiKey = (import.meta.env.VITE_API_KEY || "").trim();
 
 const normalizedApiBaseUrl = configuredBaseUrl.replace(/\/+$/, "");
