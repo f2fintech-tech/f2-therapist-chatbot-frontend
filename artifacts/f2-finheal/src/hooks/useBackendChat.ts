@@ -26,10 +26,6 @@ export interface UseBackendChatResult {
   refreshConversations: () => Promise<void>;
 }
 
-function toTimeString(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
 function createUserMessage(content: string): ChatMessage {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -50,7 +46,7 @@ function createAssistantMessage(response: {
     id: response.message_id,
     role: "bot",
     content: response.response,
-    time: toTimeString(response.timestamp),
+    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     mood: response.mood,
     suggestions: response.suggestions,
   };
@@ -134,18 +130,19 @@ export function useBackendChat(userId: string): UseBackendChatResult {
           conversation_id: conversationId ?? undefined,
         });
 
-          setConversationId(response.conversation_id);
-          const assistantMsg = createAssistantMessage(response);
-          setMessages((currentMessages) => {
-            const next = [...currentMessages, assistantMsg];
-            // Persist to localStorage as fallback
-            try {
-              upsertLocalConversation(response.conversation_id, userId, next, undefined);
-            } catch {}
-            return next;
-          });
+        setConversationId(response.conversation_id);
+        const assistantMsg = createAssistantMessage(response);
+        const conversationTitle = response.title?.trim() || trimmedMessage.substring(0, 60).trim();
+        setMessages((currentMessages) => {
+          const next = [...currentMessages, assistantMsg];
+          // Persist to localStorage as fallback
+          try {
+            upsertLocalConversation(response.conversation_id, userId, next, conversationTitle);
+          } catch {}
+          return next;
+        });
 
-          await refreshConversations();
+        await refreshConversations();
       } catch (caughtError) {
         setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
         setError(normalizeBackendError(caughtError));
@@ -178,17 +175,17 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       setError(null);
 
       try {
-        const [healthyResult, nextConversations] = await Promise.all([
-          getBackendHealth(),
-          getConversations(userId),
-        ]);
-
+        // Check health but don't fail if it's down - use localStorage fallback
+        const healthyResult = await getBackendHealth().catch(() => false);
+        
         if (isCancelled) {
           return;
         }
 
         setIsHealthy(healthyResult);
-        // merge local conversations into the initial list
+
+        // Load conversations with localStorage fallback (handles backend failure gracefully)
+        const nextConversations = await getConversations(userId).catch(() => []);
         const local = listLocalConversations(userId);
         const merged = [...local, ...nextConversations].reduce<ConversationSummary[]>((acc, cur) => {
           if (!acc.find((c) => c.id === cur.id)) acc.push(cur);
@@ -196,28 +193,14 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         }, []).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
         setConversations(merged);
 
-        const latestConversation = merged[0];
-        if (latestConversation) {
-          const nextMessages = await getConversationMessages(latestConversation.id, userId);
-          if (isCancelled) {
-            return;
-          }
-
-          setConversationId(latestConversation.id);
-          setMessages(nextMessages);
-        } else {
-          setConversationId(null);
-          // attempt to load most recent local conversation if any
-          const localOnly = listLocalConversations(userId);
-          if (localOnly.length > 0) {
-            const first = localOnly[0];
-            const msgs = getLocalConversationMessages(first.id, userId);
-            setConversationId(first.id);
-            setMessages(msgs);
-          } else {
-            setMessages([]);
-          }
+        if (isCancelled) {
+          return;
         }
+
+        // Don't auto-load a conversation - show home page instead
+        // User must select a conversation from the list on the right
+        setConversationId(null);
+        setMessages([]);
       } catch (caughtError) {
         if (isCancelled) {
           return;

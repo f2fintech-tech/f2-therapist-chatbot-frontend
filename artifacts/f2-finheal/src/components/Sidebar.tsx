@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
+import { listUserGoals, createGoal, deleteGoal } from "@/utils/localGoals";
+import type { Goal } from "@/utils/localGoals";
 
 interface SidebarProps {
   userId: string;
@@ -13,10 +15,40 @@ interface SidebarProps {
 export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState("Talk to FinHeal");
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [formData, setFormData] = useState({
+    name: "",
+    targetAmount: "",
+    currency: "₹",
+    icon: "🎯",
+    color: "#3344e6",
+  });
 
   const { data: wellnessData } = useGetWellnessScore(userId);
-  const { data: goalsData } = useGetUserGoals(userId);
   const changePoints = wellnessData?.change_pts ?? 0;
+
+  // Load goals from localStorage
+  useEffect(() => {
+    const userGoals = listUserGoals(userId);
+    setGoals(userGoals);
+  }, [userId]);
+
+  const handleCreateGoal = () => {
+    if (!formData.name.trim() || !formData.targetAmount.trim()) {
+      alert("Please fill in goal name and target amount");
+      return;
+    }
+    const goal = createGoal(userId, formData.name, parseFloat(formData.targetAmount), formData.currency, formData.color, formData.icon);
+    setGoals([...goals, goal]);
+    setFormData({ name: "", targetAmount: "", currency: "$", icon: "🎯", color: "#3344e6" });
+    setShowGoalForm(false);
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    deleteGoal(goalId);
+    setGoals(goals.filter(g => g.id !== goalId));
+  };
 
   const moods = [
     { emoji: "😰", title: "Very Stressed" },
@@ -88,22 +120,158 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none xl:min-h-0">
-        <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
-        
-        <NavBtn icon="💬" label="Talk to FinHeal" active={activeNav === "Talk to FinHeal"} onClick={() => setActiveNav("Talk to FinHeal")} />
-        <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={() => setActiveNav("Financial Health Test")} />
-        <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={() => setActiveNav("My Dashboard")} />
-        <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goalsData?.length.toString() || "0"} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
+        {activeNav === "Financial Goals" ? (
+          // Goal Management View
+          <div>
+            <button
+              onClick={() => setActiveNav("Talk to FinHeal")}
+              className="text-[12px] text-primary font-semibold mb-[12px] hover:underline"
+            >
+              ← Back
+            </button>
+            <div className="mb-[12px]">
+              <button
+                onClick={() => setShowGoalForm(!showGoalForm)}
+                className="w-full bg-primary text-white font-semibold py-[10px] rounded-[10px] hover:opacity-90 transition-opacity text-[13px]"
+              >
+                {showGoalForm ? "Cancel" : "+ Add New Goal"}
+              </button>
+            </div>
 
-        <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
-        <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => setActiveNav("Financial Education")} />
-        <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
-        <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={() => setActiveNav("Loan Calculator")} />
-        <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
+            {showGoalForm && (
+              <div className="bg-gray-50 border border-gray-200 rounded-[10px] p-[12px] mb-[12px]">
+                <div className="mb-[10px]">
+                  <label className="text-[11px] font-semibold text-gray-700 block mb-[4px]">Goal Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Save for vacation"
+                    className="w-full px-[8px] py-[6px] border border-gray-300 rounded-[6px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-700 block mb-[4px]">Target Amount</label>
+                    <input
+                      type="number"
+                      value={formData.targetAmount}
+                      onChange={e => setFormData({ ...formData, targetAmount: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full px-[8px] py-[6px] border border-gray-300 rounded-[6px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-700 block mb-[4px]">Currency</label>
+                    <select
+                      value={formData.currency}
+                      onChange={e => setFormData({ ...formData, currency: e.target.value })}
+                      className="w-full px-[8px] py-[6px] border border-gray-300 rounded-[6px] text-[12px] focus:outline-none focus:border-primary"
+                    >
+                      <option>₹</option>
+                      <option>$</option>
+                      <option>€</option>
+                      <option>£</option>
+                      <option>¥</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-700 block mb-[4px]">Icon</label>
+                    <select
+                      value={formData.icon}
+                      onChange={e => setFormData({ ...formData, icon: e.target.value })}
+                      className="w-full px-[8px] py-[6px] border border-gray-300 rounded-[6px] text-[12px] focus:outline-none focus:border-primary"
+                    >
+                      <option>🎯</option>
+                      <option>🏠</option>
+                      <option>✈️</option>
+                      <option>🚗</option>
+                      <option>🎓</option>
+                      <option>💍</option>
+                      <option>🏥</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-700 block mb-[4px]">Color</label>
+                    <input
+                      type="color"
+                      value={formData.color}
+                      onChange={e => setFormData({ ...formData, color: e.target.value })}
+                      className="w-full h-[32px] border border-gray-300 rounded-[6px] cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleCreateGoal}
+                  className="w-full bg-primary text-white font-semibold py-[8px] rounded-[6px] hover:opacity-90 transition-opacity text-[12px]"
+                >
+                  Create Goal
+                </button>
+              </div>
+            )}
 
-        <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
-        <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={() => setActiveNav("Talk to an Advisor")} />
-        <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={() => setActiveNav("Settings")} />
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.8px] mb-[8px]">Your Goals ({goals.length})</div>
+            {goals.length === 0 ? (
+              <div className="text-center py-[16px]">
+                <div className="text-[11px] text-gray-400">No goals yet. Create your first goal!</div>
+              </div>
+            ) : (
+              <div className="space-y-[8px]">
+                {goals.map(goal => {
+                  const progress = (goal.currentAmount / goal.targetAmount) * 100;
+                  return (
+                    <div key={goal.id} className="bg-gray-50 border border-gray-200 rounded-[8px] p-[10px]">
+                      <div className="flex items-center justify-between mb-[6px]">
+                        <div className="flex items-center gap-[6px]">
+                          <span className="text-[16px]">{goal.icon}</span>
+                          <span className="text-[12px] font-semibold text-gray-700 truncate">{goal.name}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          className="text-[11px] text-gray-400 hover:text-red-500 font-semibold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="h-[3px] bg-gray-200 rounded-[3px] mb-[6px] overflow-hidden">
+                        <div
+                          className="h-full transition-all"
+                          style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-gray-600">
+                        <span>{Math.round(progress)}%</span>
+                        <span>{goal.currency}{goal.currentAmount} / {goal.currency}{goal.targetAmount}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Regular Navigation View
+          <>
+            <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
+            
+            <NavBtn icon="💬" label="Talk to FinHeal" active={activeNav === "Talk to FinHeal"} onClick={() => setActiveNav("Talk to FinHeal")} />
+            <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={() => setActiveNav("Financial Health Test")} />
+            <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={() => setActiveNav("My Dashboard")} />
+            <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
+
+            <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
+            <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => setActiveNav("Financial Education")} />
+            <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
+            <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={() => setActiveNav("Loan Calculator")} />
+            <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
+
+            <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
+            <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={() => setActiveNav("Talk to an Advisor")} />
+            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={() => setActiveNav("Settings")} />
+          </>
+        )}
       </div>
 
       <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] cursor-pointer hover:bg-gray-50 transition-colors group">

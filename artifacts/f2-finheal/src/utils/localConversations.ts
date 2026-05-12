@@ -31,6 +31,16 @@ function _writeStore(items: StoredConversation[]) {
   }
 }
 
+export function getMostRecentLocalConversationUserId(): string | null {
+  const items = _readStore();
+  if (items.length === 0) {
+    return null;
+  }
+
+  const latest = [...items].sort((a, b) => (b.updated_at || b.created_at || "").localeCompare(a.updated_at || a.created_at || ""))[0];
+  return latest?.user_id || null;
+}
+
 export function listLocalConversations(userId: string): ConversationSummary[] {
   const items = _readStore().filter((c) => c.user_id === userId);
   return items
@@ -76,4 +86,20 @@ export function exportLocalConversation(conversationId: string, userId: string):
   const conv = items.find((c) => c.id === conversationId && c.user_id === userId);
   if (!conv) return null;
   return JSON.stringify(conv, null, 2);
+}
+
+export function migrateConversationsFromEmptyUserId(toUserId: string): void {
+  const items = _readStore();
+  const unownedConversations = items.filter((c) => c.user_id === "");
+  
+  if (unownedConversations.length === 0) {
+    return;
+  }
+  
+  // migrate unowned conversations to target userId
+  unownedConversations.forEach((conv) => {
+    conv.user_id = toUserId;
+  });
+  
+  _writeStore(items);
 }

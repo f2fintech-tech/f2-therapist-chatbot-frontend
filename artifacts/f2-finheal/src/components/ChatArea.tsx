@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
+import { extractMoodDimensions } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
 
 interface ChatAreaProps {
@@ -13,6 +14,7 @@ interface ChatAreaProps {
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions) => void;
   onSendMessage: (text: string) => Promise<void>;
+  onLogout?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
 }
@@ -28,6 +30,7 @@ export default function ChatArea({
   onClearChat,
   onMoodUpdate,
   onSendMessage,
+  onLogout,
   onToggleSidebar,
   onToggleInsights,
 }: ChatAreaProps) {
@@ -62,14 +65,32 @@ export default function ChatArea({
   }, [messages.length]);
 
   useEffect(() => {
-    const latestBotMessage = [...messages].reverse().find((message) => message.role === "bot" && message.mood);
-    if (!latestBotMessage?.mood) {
-      return;
+    // Aggregate mood dimensions across all bot messages in the current conversation.
+    const sums: Record<string, number> = {};
+    const counts: Record<string, number> = {};
+
+    for (const msg of messages) {
+      if (msg.role !== "bot" || !msg.mood) continue;
+      const dimsRaw = extractMoodDimensions(msg.mood as any);
+      if (!dimsRaw) continue;
+      const dims = dimsRaw as Record<string, number>;
+      for (const [k, v] of Object.entries(dims)) {
+        if (typeof v !== "number") continue;
+        sums[k] = (sums[k] || 0) + v;
+        counts[k] = (counts[k] || 0) + 1;
+      }
     }
 
-    const dimensions = latestBotMessage.mood.dimensions;
-    if (dimensions && Object.keys(dimensions).length > 0) {
-      onMoodUpdate(dimensions);
+    const aggregated: Record<string, number> = {};
+    for (const k of Object.keys(sums)) {
+      const avg = sums[k] / (counts[k] || 1);
+      aggregated[k] = Math.round(avg);
+    }
+
+    if (Object.keys(aggregated).length > 0) {
+      onMoodUpdate(aggregated as unknown as MoodDimensions);
+    } else {
+      onMoodUpdate(null);
     }
   }, [messages, onMoodUpdate]);
 
@@ -139,6 +160,20 @@ export default function ChatArea({
     }
   };
 
+  // Auto-resize textarea to fit content (up to max height)
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+
+    // Reset height to allow shrinking when text is removed
+    el.style.height = "auto";
+
+    const maxHeight = 100; // px (matches CSS max-h-[100px])
+    const nextHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [inputValue]);
+
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 lg:min-h-0">
       <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
@@ -164,6 +199,11 @@ export default function ChatArea({
           <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]">
             🗑 Clear
           </button>
+          {onLogout && (
+            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]">
+              🚪 Sign out
+            </button>
+          )}
           <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] sm:hidden">
             📋 Notes
           </button>

@@ -91,6 +91,7 @@ export interface BackendChatResponse {
   conversation_id: string;
   message_id: string;
   timestamp: string;
+  title?: string;
   mood?: BackendMood;
   suggestions?: string[];
 }

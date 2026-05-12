@@ -1,5 +1,8 @@
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
+import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
+import { useState, useEffect } from "react";
+import type { Goal } from "@/utils/localGoals";
 
 interface InsightsPanelProps {
   userId: string;
@@ -25,12 +28,34 @@ export default function InsightsPanel({
   onClose,
 }: InsightsPanelProps) {
   const { data: wellness } = useGetWellnessScore(userId);
-  const { data: goals } = useGetUserGoals(userId);
-  const goalsList = Array.isArray(goals) ? goals : [];
+  const [goalsList, setGoalsList] = useState<Goal[]>([]);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState<string>("");
+
+  // Load goals from localStorage on component mount and when userId changes
+  useEffect(() => {
+    const goals = listUserGoals(userId);
+    setGoalsList(goals);
+  }, [userId]);
+
+  const handleUpdateProgress = (goalId: string, newAmount: number) => {
+    updateGoalProgress(goalId, newAmount);
+    const updated = listUserGoals(userId);
+    setGoalsList(updated);
+    setEditingGoalId(null);
+  };
+
+  const handleDeleteGoal = (goalId: string) => {
+    deleteGoal(goalId);
+    const updated = listUserGoals(userId);
+    setGoalsList(updated);
+  };
+
   const sessionsList = conversations;
 
-  const defaultDims = { stress: 62, urgency: 40, openness: 85, willingness: 70, emotion: 55 };
-  const currentDims = moodDimensions || defaultDims;
+  const currentDims = moodDimensions;
+  const renderPercent = (value?: number) => (typeof value === "number" ? `${Math.round(value)}%` : "—");
+  const stressValue = currentDims?.stress;
 
   const panelContent = (
     <>
@@ -42,7 +67,7 @@ export default function InsightsPanel({
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Chats</div>
           </div>
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{wellness?.goals_count || 3}</div>
+            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{goalsList.length}</div>
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Goals</div>
           </div>
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
@@ -57,37 +82,103 @@ export default function InsightsPanel({
         <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px]">
           <div className="flex justify-between items-baseline mb-[8px]">
             <span className="text-[12px] font-semibold text-gray-700">Stress Level</span>
-            <span className="text-[13px] font-bold text-[#f59e0b]">{currentDims.stress}%</span>
+            <span className="text-[13px] font-bold text-[#f59e0b]">{renderPercent(stressValue)}</span>
           </div>
           <div className="h-[5px] bg-gray-200 rounded-[5px] overflow-hidden mb-[12px]">
-            <div className="h-full bg-gradient-to-r from-[#10b981] to-[#f59e0b] rounded-[5px] transition-all duration-1000" style={{ width: `${currentDims.stress}%` }} />
+            <div className="h-full bg-gradient-to-r from-[#10b981] to-[#f59e0b] rounded-[5px] transition-all duration-1000" style={{ width: `${stressValue ?? 0}%` }} />
           </div>
 
-          <DimRow label="Urgency" val={currentDims.urgency || 40} color="bg-primary" />
-          <DimRow label="Openness" val={currentDims.openness || 85} color="bg-primary" />
-          <DimRow label="Willingness" val={currentDims.willingness || 70} color="bg-primary" />
-          <DimRow label="Emotion" val={currentDims.emotion || 55} color="bg-[#f59e0b]" />
+          <DimRow label="Urgency" val={currentDims?.urgency} color="bg-primary" />
+          <DimRow label="Openness" val={currentDims?.openness} color="bg-primary" />
+          <DimRow label="Willingness" val={currentDims?.willingness} color="bg-primary" />
+          <DimRow label="Emotion" val={currentDims?.emotion} color="bg-[#f59e0b]" />
         </div>
       </div>
 
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
         <div>
-          {goalsList.map(g => (
-            <div key={g.id} className="flex items-center gap-[9px] py-[9px] border-b border-gray-100 last:border-0 last:pb-0">
-              <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{g.icon}</div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11.5px] font-semibold text-gray-700 mb-[4px] whitespace-nowrap overflow-hidden text-ellipsis">{g.name}</div>
-                <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden">
-                  <div className="h-full rounded-[3px] transition-all" style={{ width: `${(g.current / g.target) * 100}%`, backgroundColor: g.color || 'var(--color-primary)' }} />
-                </div>
-                <div className="flex justify-between mt-[3px]">
-                  <div className="text-[10px] text-gray-400">{Math.round((g.current / g.target) * 100)}%</div>
-                  <div className="text-[10px] font-medium" style={{ color: g.color || 'var(--color-primary)' }}>${g.current}{g.unit}</div>
-                </div>
-              </div>
+          {goalsList.length === 0 ? (
+            <div className="py-[12px] text-center">
+              <div className="text-[11px] text-gray-400">No goals yet. Create one to get started!</div>
             </div>
-          ))}
+          ) : (
+            goalsList.map(goal => {
+              const progress = (goal.currentAmount / goal.targetAmount) * 100;
+              const isEditing = editingGoalId === goal.id;
+              return (
+                <div key={goal.id} className="py-[9px] border-b border-gray-100 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-[9px] mb-[6px]">
+                    <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{goal.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11.5px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">{goal.name}</div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteGoal(goal.id)}
+                      className="text-[11px] text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                      title="Delete goal"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
+                    <div
+                      className="h-full rounded-[3px] transition-all"
+                      style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center gap-[6px]">
+                    <div className="text-[10px] text-gray-400">{Math.round(progress)}%</div>
+                    {isEditing ? (
+                      <div className="flex gap-[4px] flex-1 justify-end">
+                        <div className="text-[10px] text-gray-500">{goal.currency}</div>
+                        <input
+                          type="number"
+                          value={editAmount}
+                          onChange={e => setEditAmount(e.target.value)}
+                          className="w-[45px] text-[10px] px-[4px] py-[4px] border-[1.5px] border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="0"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)}
+                          className="text-[10px] bg-primary text-white px-[8px] py-[4px] rounded hover:opacity-90 transition-opacity font-medium"
+                        >
+                          Update
+                        </button>
+                        <button
+                          onClick={() => setEditingGoalId(null)}
+                          className="text-[10px] bg-gray-200 text-gray-700 px-[8px] py-[4px] rounded hover:opacity-80 transition-opacity"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-[6px]">
+                        <div
+                          className="text-[10px] font-medium px-[6px] py-[2px] rounded bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 hover:border-primary transition-all"
+                          style={{ color: goal.color || 'var(--color-primary)' }}
+                          title="Click to edit current amount"
+                        >
+                          {goal.currency}{goal.currentAmount}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEditingGoalId(goal.id);
+                            setEditAmount(goal.currentAmount.toString());
+                          }}
+                          className="text-[10px] text-gray-400 hover:text-primary transition-colors px-[4px]"
+                          title="Edit goal progress"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -147,14 +238,17 @@ export default function InsightsPanel({
   );
 }
 
-function DimRow({ label, val, color }: { label: string; val: number; color: string }) {
+function DimRow({ label, val, color }: { label: string; val?: number; color: string }) {
+  const valueLabel = typeof val === "number" ? `${Math.round(val)}%` : "—";
+  const width = typeof val === "number" ? val : 0;
+
   return (
     <div className="flex items-center gap-[7px] mb-[7px] last:mb-0">
       <div className="text-[11px] text-gray-500 w-[66px] shrink-0 font-medium">{label}</div>
       <div className="flex-1 h-[4px] bg-gray-200 rounded-[4px] overflow-hidden">
-        <div className={`h-full rounded-[4px] transition-all duration-1000 ${color}`} style={{ width: `${val}%` }} />
+        <div className={`h-full rounded-[4px] transition-all duration-1000 ${color}`} style={{ width: `${width}%` }} />
       </div>
-      <div className="text-[10px] text-gray-400 w-[22px] text-right">{val}%</div>
+      <div className="text-[10px] text-gray-400 w-[22px] text-right">{valueLabel}</div>
     </div>
   );
 }
