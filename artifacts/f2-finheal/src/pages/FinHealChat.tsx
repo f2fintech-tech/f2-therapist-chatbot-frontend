@@ -46,7 +46,7 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
 
   return (
-    <div className="flex min-h-[100dvh] w-full flex-col gap-[6px] overflow-y-auto bg-[#f3f4f6] p-[6px] lg:h-[100dvh] lg:flex-row lg:overflow-hidden">
+    <div className="flex min-h-[100dvh] w-full flex-col gap-[6px] overflow-y-auto bg-[#f3f4f6] p-[6px] xl:h-[100dvh] xl:flex-row xl:overflow-hidden">
       <Sidebar 
         userId={USER_ID} 
         userProfile={USER_PROFILE}
