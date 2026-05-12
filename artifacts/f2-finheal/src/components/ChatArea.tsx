@@ -13,6 +13,8 @@ interface ChatAreaProps {
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions) => void;
   onSendMessage: (text: string) => Promise<void>;
+  onToggleSidebar: () => void;
+  onToggleInsights: () => void;
 }
 
 export default function ChatArea({
@@ -26,6 +28,8 @@ export default function ChatArea({
   onClearChat,
   onMoodUpdate,
   onSendMessage,
+  onToggleSidebar,
+  onToggleInsights,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -76,51 +80,68 @@ export default function ChatArea({
   };
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      <div className="h-[60px] border-b border-gray-100 flex items-center px-[20px] gap-[12px] shrink-0 bg-white rounded-t-[20px]">
-        <div className="flex-1">
-          <div className="text-[14px] font-bold text-gray-900">Financial Wellness Chat</div>
-          <div className="text-[11px] text-gray-400 flex items-center gap-[5px] mt-[1px]">
-            <span
-              className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
-            />
-            FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
+    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 lg:min-h-0">
+      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+        <div className="flex items-start gap-[10px] sm:items-center">
+          <button
+            onClick={onToggleSidebar}
+            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Financial Wellness Chat</div>
+            <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
+              <span
+                className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
+              />
+              FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
+            </div>
           </div>
         </div>
-        <div className="flex gap-[6px]">
-          <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
+        <div className="flex flex-wrap gap-[6px] sm:justify-end">
+          <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]">
             🗑 Clear
           </button>
-          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary">
+          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] sm:hidden">
             📋 Notes
           </button>
-          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-primary bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] font-sans text-[11.5px] font-semibold flex items-center gap-[5px] transition-all hover:bg-[#1e2db8] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)]">
+          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-primary bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:bg-[#1e2db8] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] sm:text-[11.5px]">
             💳 View Loan Options
           </button>
         </div>
       </div>
 
+      <button
+        onClick={onToggleInsights}
+        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
+        aria-label="Toggle insights panel"
+      >
+        ☰
+      </button>
+
       {error && (
-        <div className="mx-[20px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c]">
+        <div className="mx-[16px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c] sm:mx-[20px]">
           {error.message}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-[20px] py-[24px] scroll-smooth" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto px-[16px] py-[20px] scroll-smooth sm:px-[20px] sm:py-[24px]" ref={scrollRef}>
         {messages.length === 0 ? (
           <>
-            <div className="text-center px-[32px] py-[16px] pb-[28px] animate-fade-up">
-              <div className="w-[64px] h-[64px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[28px] mx-auto mb-[14px] animate-pulse-ring">🌟</div>
-              <div className="font-serif text-[26px] text-gray-900 mb-[8px]">Good morning, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
-              <div className="text-[13.5px] text-gray-500 leading-relaxed max-w-[420px] mx-auto">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
+            <div className="text-center px-[10px] py-[16px] pb-[24px] animate-fade-up sm:px-[32px] sm:pb-[28px]">
+              <div className="w-[56px] h-[56px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[24px] mx-auto mb-[14px] animate-pulse-ring sm:w-[64px] sm:h-[64px] sm:text-[28px]">🌟</div>
+              <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">Good morning, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
+              <div className="text-[13px] text-gray-500 leading-relaxed max-w-[420px] mx-auto sm:text-[13.5px]">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
             
-            <div className="flex flex-wrap gap-[8px] justify-center px-[16px] pb-[24px] animate-fade-up delay-100">
+            <div className="flex flex-wrap gap-[8px] justify-center px-[4px] pb-[24px] animate-fade-up delay-100 sm:px-[16px]">
               {["😰 Stressed about my EMI", "📉 My credit score dropped", "💸 Help me budget better", "🤔 Am I eligible for a loan?", "📅 Plan my debt repayment", "🧠 Financial health test"].map(text => (
                 <button
                   key={text}
                   onClick={() => setInputValue(text)}
-                  className="px-[14px] py-[8px] rounded-[20px] border-[1.5px] border-gray-200 bg-white text-gray-600 text-[12px] font-medium transition-all shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-primary hover:text-primary hover:bg-[#f6f7fe] hover:-translate-y-[2px] hover:shadow-[0_4px_16px_rgba(50,68,230,0.1)] whitespace-nowrap"
+                  className="px-[12px] py-[8px] rounded-[20px] border-[1.5px] border-gray-200 bg-white text-gray-600 text-[11.5px] font-medium transition-all shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-primary hover:text-primary hover:bg-[#f6f7fe] hover:-translate-y-[2px] hover:shadow-[0_4px_16px_rgba(50,68,230,0.1)] whitespace-nowrap sm:px-[14px] sm:text-[12px]"
                 >
                   {text}
                 </button>
@@ -140,7 +161,7 @@ export default function ChatArea({
             ) : (
               <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
             )}
-            <div className="max-w-[68%] flex flex-col">
+            <div className="max-w-[82%] flex flex-col sm:max-w-[68%]">
               {m.role === 'bot' && m.mood && m.mood.primary_emotion && (
                 <div className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[9px] py-[3px] rounded-[20px] mb-[5px] tracking-[0.3px] self-start ${
                   m.mood.primary_emotion === 'calm' ? 'bg-[#ecfdf5] text-[#10b981]' : 
@@ -150,7 +171,7 @@ export default function ChatArea({
                   {m.mood.label || m.mood.primary_emotion}
                 </div>
               )}
-              <div className={`px-[16px] py-[13px] text-[13.5px] leading-relaxed ${
+              <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] ${
                 m.role === 'bot' 
                   ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
                   : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
@@ -188,8 +209,8 @@ export default function ChatArea({
         )}
       </div>
 
-      <div className="p-[12px_20px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0">
-        <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex items-end p-[10px_10px_10px_18px] gap-[8px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)]">
+      <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
+        <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-col items-stretch p-[10px] gap-[8px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:flex-row sm:items-end sm:p-[10px_10px_10px_18px]">
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -200,7 +221,7 @@ export default function ChatArea({
             rows={1}
             style={{ height: "auto" }}
           />
-          <div className="flex gap-[5px] items-center pb-[1px]">
+          <div className="flex flex-wrap gap-[5px] items-center justify-end pb-[1px] sm:flex-nowrap">
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">📎</button>
             <button className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600">🎙</button>
             <button 
