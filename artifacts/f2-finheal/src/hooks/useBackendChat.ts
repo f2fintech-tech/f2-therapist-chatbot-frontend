@@ -10,6 +10,7 @@ import {
   type ConversationSummary,
   type MoodDimensions,
 } from "@/lib/backendChat";
+import { listLocalConversations, upsertLocalConversation, getLocalConversationMessages } from "@/utils/localConversations";
 
 export interface UseBackendChatResult {
   messages: ChatMessage[];
@@ -72,8 +73,14 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       return;
     }
 
-    const nextConversations = await getConversations(userId);
-    setConversations(nextConversations);
+    const nextConversations = await getConversations(userId).catch(() => []);
+    // Merge in any locally-saved conversations (localStorage) so user doesn't lose recent chats when backend absent
+    const local = listLocalConversations(userId);
+    const merged = [...local, ...nextConversations].reduce<ConversationSummary[]>((acc, cur) => {
+      if (!acc.find((c) => c.id === cur.id)) acc.push(cur);
+      return acc;
+    }, []).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    setConversations(merged);
     return;
   }, [userId]);
 
@@ -92,7 +99,15 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         setConversationId(nextConversationId);
         await refreshConversations();
       } catch (caughtError) {
-        setError(normalizeBackendError(caughtError));
+        // Try local fallback if backend messages are unavailable
+        const localMsgs = getLocalConversationMessages(nextConversationId, userId);
+        if (localMsgs && localMsgs.length > 0) {
+          setMessages(localMsgs);
+          setConversationId(nextConversationId);
+          await refreshConversations();
+        } else {
+          setError(normalizeBackendError(caughtError));
+        }
       } finally {
         setIsLoading(false);
       }
@@ -119,10 +134,18 @@ export function useBackendChat(userId: string): UseBackendChatResult {
           conversation_id: conversationId ?? undefined,
         });
 
-        setConversationId(response.conversation_id);
-        setMessages((currentMessages) => [...currentMessages, createAssistantMessage(response)]);
+          setConversationId(response.conversation_id);
+          const assistantMsg = createAssistantMessage(response);
+          setMessages((currentMessages) => {
+            const next = [...currentMessages, assistantMsg];
+            // Persist to localStorage as fallback
+            try {
+              upsertLocalConversation(response.conversation_id, userId, next, undefined);
+            } catch {}
+            return next;
+          });
 
-        await refreshConversations();
+          await refreshConversations();
       } catch (caughtError) {
         setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
         setError(normalizeBackendError(caughtError));
@@ -165,9 +188,15 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         }
 
         setIsHealthy(healthyResult);
-        setConversations(nextConversations);
+        // merge local conversations into the initial list
+        const local = listLocalConversations(userId);
+        const merged = [...local, ...nextConversations].reduce<ConversationSummary[]>((acc, cur) => {
+          if (!acc.find((c) => c.id === cur.id)) acc.push(cur);
+          return acc;
+        }, []).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+        setConversations(merged);
 
-        const latestConversation = nextConversations[0];
+        const latestConversation = merged[0];
         if (latestConversation) {
           const nextMessages = await getConversationMessages(latestConversation.id, userId);
           if (isCancelled) {
@@ -178,7 +207,16 @@ export function useBackendChat(userId: string): UseBackendChatResult {
           setMessages(nextMessages);
         } else {
           setConversationId(null);
-          setMessages([]);
+          // attempt to load most recent local conversation if any
+          const localOnly = listLocalConversations(userId);
+          if (localOnly.length > 0) {
+            const first = localOnly[0];
+            const msgs = getLocalConversationMessages(first.id, userId);
+            setConversationId(first.id);
+            setMessages(msgs);
+          } else {
+            setMessages([]);
+          }
         }
       } catch (caughtError) {
         if (isCancelled) {
