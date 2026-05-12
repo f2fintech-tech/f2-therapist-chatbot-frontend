@@ -124,12 +124,12 @@ export default function InsightsPanel({
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-30 2xl:hidden"
           onClick={onClose}
         />
       )}
       {/* Insights Drawer - Narrow screens */}
-      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] gap-0 scrollbar-none lg:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] gap-0 scrollbar-none 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <button
           onClick={onClose}
           aria-label="Close insights"
@@ -140,7 +140,7 @@ export default function InsightsPanel({
         {panelContent}
       </aside>
       {/* Insights Sidebar - Desktop */}
-      <aside className="hidden bg-white rounded-[20px] shadow-sm border border-gray-200 flex-col overflow-y-auto px-[12px] py-[16px] gap-0 animate-[slideInR_0.4s_0.08s_ease_both] scrollbar-none lg:flex lg:w-[260px] lg:min-w-[260px] lg:h-full lg:min-h-0">
+      <aside className="hidden bg-white rounded-[20px] shadow-sm border border-gray-200 flex-col overflow-y-auto px-[12px] py-[16px] gap-0 animate-[slideInR_0.4s_0.08s_ease_both] scrollbar-none 2xl:flex 2xl:w-[clamp(250px,18vw,300px)] 2xl:min-w-[250px] 2xl:max-w-[300px] 2xl:h-full 2xl:min-h-0">
         {panelContent}
       </aside>
     </>
