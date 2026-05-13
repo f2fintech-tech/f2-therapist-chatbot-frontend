@@ -117,7 +117,7 @@ export default function FinHealChat() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] w-full flex-col gap-[6px] overflow-y-auto bg-[#f3f4f6] p-[6px] xl:h-[100dvh] xl:flex-row xl:overflow-hidden">
+    <div className="flex h-[100dvh] w-full flex-col gap-[6px] overflow-hidden bg-[#f3f4f6] p-[6px] xl:flex-row">
       <Sidebar 
         userId={userId} 
         userProfile={userProfile}
