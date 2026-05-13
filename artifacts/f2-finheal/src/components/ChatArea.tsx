@@ -175,7 +175,7 @@ export default function ChatArea({
   }, [inputValue]);
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 lg:min-h-0">
+    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
         <div className="flex items-start gap-[10px] sm:items-center">
           <button
@@ -227,7 +227,7 @@ export default function ChatArea({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-[16px] py-[20px] scroll-smooth sm:px-[20px] sm:py-[24px]" ref={scrollRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[20px] scroll-smooth sm:px-[20px] sm:py-[24px]" ref={scrollRef}>
         {messages.length === 0 ? (
           <>
             <div className="text-center px-[10px] py-[16px] pb-[24px] animate-fade-up sm:px-[32px] sm:pb-[28px]">
