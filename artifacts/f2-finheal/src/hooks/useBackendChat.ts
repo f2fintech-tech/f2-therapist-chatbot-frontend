@@ -3,6 +3,7 @@ import {
   getBackendHealth,
   getConversationMessages,
   getConversations,
+  formatMessageTimestamp,
   normalizeBackendError,
   sendChatMessage,
   type BackendRequestError,
@@ -27,11 +28,13 @@ export interface UseBackendChatResult {
 }
 
 function createUserMessage(content: string): ChatMessage {
+  const timestamp = new Date().toISOString();
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     role: "user",
     content,
-    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    timestamp,
+    time: formatMessageTimestamp(timestamp),
   };
 }
 
@@ -46,7 +49,8 @@ function createAssistantMessage(response: {
     id: response.message_id,
     role: "bot",
     content: response.response,
-    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    timestamp: response.timestamp,
+    time: formatMessageTimestamp(response.timestamp),
     mood: response.mood,
     suggestions: response.suggestions,
   };

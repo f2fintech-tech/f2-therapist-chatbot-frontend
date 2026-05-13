@@ -71,6 +71,7 @@ export interface ChatMessage {
   id: string;
   role: "bot" | "user";
   content: string;
+  timestamp?: string;
   time: string;
   mood?: BackendMood;
   suggestions?: string[];
@@ -245,6 +246,53 @@ function extractArray<T>(value: unknown): T[] {
   return Array.isArray(arrayCandidate) ? (arrayCandidate as T[]) : [];
 }
 
+function isSameLocalCalendarDay(left: Date, right: Date): boolean {
+  return left.toLocaleDateString() === right.toLocaleDateString();
+}
+
+export function formatMessageTimestamp(rawTimestamp: string | undefined): string {
+  if (!rawTimestamp) {
+    return "";
+  }
+
+  const timestamp = new Date(rawTimestamp);
+  if (Number.isNaN(timestamp.getTime())) {
+    return rawTimestamp;
+  }
+
+  const now = new Date();
+  const timeText = timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isSameLocalCalendarDay(timestamp, now)) {
+    return timeText;
+  }
+
+  const dateText = timestamp.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  return `${dateText}, ${timeText}`;
+}
+
+export function formatConversationDateLabel(rawTimestamp: string | undefined): string {
+  if (!rawTimestamp) {
+    return "";
+  }
+
+  const timestamp = new Date(rawTimestamp);
+  if (Number.isNaN(timestamp.getTime())) {
+    return rawTimestamp;
+  }
+
+  return timestamp.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function extractMoodDimensions(mood: BackendMood | undefined): MoodDimensions | null {
   if (!mood) {
     return null;
@@ -286,7 +334,8 @@ function normalizeConversationMessage(message: BackendConversationMessage): Chat
     id: message.id || message.message_id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     role: message.role === "user" ? "user" : "bot",
     content: message.content || message.response || "",
-    time: new Date(rawTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    timestamp: rawTimestamp,
+    time: formatMessageTimestamp(rawTimestamp),
     mood: message.mood,
     suggestions: message.suggestions,
   };

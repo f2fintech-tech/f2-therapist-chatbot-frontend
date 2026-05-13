@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
-import { extractMoodDimensions } from "@/lib/backendChat";
+import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
 
 interface ChatAreaProps {
@@ -152,6 +152,7 @@ export default function ChatArea({
 
   const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
   const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
+  const conversationStartDate = messages.find((message) => message.timestamp)?.timestamp;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -250,7 +251,9 @@ export default function ChatArea({
           </>
         ) : (
           <div className="text-center my-[8px] mb-[16px] relative before:content-[''] before:absolute before:top-1/2 before:left-0 before:right-0 before:h-[1px] before:bg-gray-100">
-            <span className="bg-white relative z-10 text-[11px] text-gray-400 px-[12px] font-medium">Today · {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span className="bg-white relative z-10 text-[11px] text-gray-400 px-[12px] font-medium">
+              Conversation started · {formatConversationDateLabel(conversationStartDate)}
+            </span>
           </div>
         )}
 
@@ -278,7 +281,9 @@ export default function ChatArea({
               }`}>
                 {m.content}
               </div>
-              <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>{m.time}</div>
+              <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>
+                {m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}
+              </div>
             </div>
           </div>
         ))}
