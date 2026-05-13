@@ -1,4 +1,8 @@
-import { getMostRecentLocalConversationUserId, migrateConversationsFromEmptyUserId } from "@/utils/localConversations";
+import {
+  getMostRecentLocalConversationUserId,
+  migrateConversationsFromEmptyUserId,
+  migrateConversationsFromUserId,
+} from "@/utils/localConversations";
 
 export interface DemoAuthSession {
   username: string;
@@ -20,8 +24,26 @@ const DEMO_CREDENTIALS: DemoCredentials = {
   password: import.meta.env.VITE_DEMO_PASSWORD?.trim() || "FinHeal@123",
 };
 
-const DEMO_FALLBACK_USER_ID = "f2-finheal-demo-user";
+const DEMO_FALLBACK_USER_ID = "5d2ab354-e9f1-42ad-97f9-2d9eec92611a";
 const DEMO_DISPLAY_NAME = "Pioneer";
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string | null | undefined): value is string {
+  return !!value && UUID_PATTERN.test(value);
+}
+
+function ensureUuidUserId(candidate: string | null | undefined): string {
+  if (isValidUuid(candidate)) {
+    return candidate;
+  }
+
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return DEMO_FALLBACK_USER_ID;
+}
 
 function readStoredSession(): DemoAuthSession | null {
   if (typeof window === "undefined") {
@@ -46,7 +68,27 @@ function readStoredSession(): DemoAuthSession | null {
 }
 
 export function getStoredDemoSession(): DemoAuthSession | null {
-  return readStoredSession();
+  const session = readStoredSession();
+  if (!session || typeof window === "undefined") {
+    return session;
+  }
+
+  const normalizedUserId = ensureUuidUserId(session.userId);
+  if (normalizedUserId === session.userId) {
+    return session;
+  }
+
+  migrateConversationsFromUserId(session.userId, normalizedUserId);
+  migrateConversationsFromEmptyUserId(normalizedUserId);
+
+  const normalizedSession: DemoAuthSession = {
+    ...session,
+    userId: normalizedUserId,
+  };
+  window.localStorage.setItem(DEMO_AUTH_STORAGE_KEY, JSON.stringify(normalizedSession));
+  window.localStorage.setItem(DEMO_USER_ID_STORAGE_KEY, normalizedUserId);
+
+  return normalizedSession;
 }
 
 export function getDemoLoginCredentials(): DemoCredentials {
@@ -61,16 +103,24 @@ export function signInDemoAccount(username: string, password: string): DemoAuthS
   if (typeof window === "undefined") {
     return {
       username: DEMO_CREDENTIALS.username,
-      userId: DEMO_FALLBACK_USER_ID,
+      userId: ensureUuidUserId(DEMO_FALLBACK_USER_ID),
       displayName: DEMO_DISPLAY_NAME,
       authenticatedAt: new Date().toISOString(),
     };
   }
 
   const recoveredUserId = getMostRecentLocalConversationUserId();
+  const storedUserId = window.localStorage.getItem(DEMO_USER_ID_STORAGE_KEY);
+  const legacyUserId = recoveredUserId || storedUserId || DEMO_FALLBACK_USER_ID;
+  const normalizedUserId = ensureUuidUserId(legacyUserId);
+
+  if (legacyUserId !== normalizedUserId) {
+    migrateConversationsFromUserId(legacyUserId, normalizedUserId);
+  }
+
   const session: DemoAuthSession = {
     username: DEMO_CREDENTIALS.username,
-    userId: recoveredUserId || window.localStorage.getItem(DEMO_USER_ID_STORAGE_KEY) || DEMO_FALLBACK_USER_ID,
+    userId: normalizedUserId,
     displayName: DEMO_DISPLAY_NAME,
     authenticatedAt: new Date().toISOString(),
   };

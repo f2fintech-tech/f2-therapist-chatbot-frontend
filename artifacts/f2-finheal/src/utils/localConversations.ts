@@ -103,3 +103,23 @@ export function migrateConversationsFromEmptyUserId(toUserId: string): void {
   
   _writeStore(items);
 }
+
+export function migrateConversationsFromUserId(fromUserId: string, toUserId: string): void {
+  if (!fromUserId || !toUserId || fromUserId === toUserId) {
+    return;
+  }
+
+  const items = _readStore();
+  let changed = false;
+
+  for (const conv of items) {
+    if (conv.user_id === fromUserId) {
+      conv.user_id = toUserId;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    _writeStore(items);
+  }
+}
