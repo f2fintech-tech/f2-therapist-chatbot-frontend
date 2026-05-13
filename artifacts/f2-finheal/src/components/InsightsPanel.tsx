@@ -1,5 +1,6 @@
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
+import { formatConversationDateLabel } from "@/lib/backendChat";
 import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
 import { useState, useEffect } from "react";
 import type { Goal } from "@/utils/localGoals";
@@ -219,7 +220,7 @@ export default function InsightsPanel({
             >
               <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
               <div className="text-[11.5px] text-gray-600 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-left">{s.title}</div>
-              <div className="text-[10px] text-gray-400">{new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+              <div className="text-[10px] text-gray-400">{formatConversationDateLabel(s.createdAt)}</div>
             </button>
           ))}
         </div>

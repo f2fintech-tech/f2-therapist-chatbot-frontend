@@ -246,16 +246,17 @@ function extractArray<T>(value: unknown): T[] {
   return Array.isArray(arrayCandidate) ? (arrayCandidate as T[]) : [];
 }
 
-function getBrowserTimeZone(): string | undefined {
-  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat === "undefined") {
-    return undefined;
-  }
-
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+function getDisplayTimeZone(): string {
+  return "Asia/Kolkata";
 }
 
-function isSameLocalCalendarDay(left: Date, right: Date): boolean {
-  return left.toLocaleDateString() === right.toLocaleDateString();
+function getCalendarDateKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: getDisplayTimeZone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 export function formatMessageTimestamp(rawTimestamp: string | undefined): string {
@@ -269,22 +270,22 @@ export function formatMessageTimestamp(rawTimestamp: string | undefined): string
   }
 
   const now = new Date();
-  const browserTimeZone = getBrowserTimeZone();
-  const timeText = timestamp.toLocaleTimeString(undefined, {
+  const displayTimeZone = getDisplayTimeZone();
+  const timeText = timestamp.toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
-    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
+    timeZone: displayTimeZone,
   });
 
-  if (isSameLocalCalendarDay(timestamp, now)) {
+  if (getCalendarDateKey(timestamp) === getCalendarDateKey(now)) {
     return timeText;
   }
 
-  const dateText = timestamp.toLocaleDateString(undefined, {
+  const dateText = timestamp.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "short",
     day: "numeric",
-    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
+    timeZone: displayTimeZone,
   });
 
   return `${dateText}, ${timeText}`;
@@ -300,12 +301,11 @@ export function formatConversationDateLabel(rawTimestamp: string | undefined): s
     return rawTimestamp;
   }
 
-  const browserTimeZone = getBrowserTimeZone();
-  return timestamp.toLocaleDateString(undefined, {
+  return timestamp.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "short",
     day: "numeric",
-    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
+    timeZone: getDisplayTimeZone(),
   });
 }
 
