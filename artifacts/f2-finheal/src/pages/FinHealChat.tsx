@@ -5,6 +5,8 @@ import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
 import { getDemoLoginCredentials, getStoredDemoSession, signInDemoAccount, signOutDemoAccount } from "@/utils/demoAuth";
+import { deleteLocalConversation } from "@/utils/localConversations";
+import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 
 const loginDefaults = getDemoLoginCredentials();
@@ -17,6 +19,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
   const chat = useBackendChat(userId);
@@ -52,6 +55,35 @@ export default function FinHealChat() {
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1535px)").matches) {
       setInsightsOpen(false);
+    }
+  };
+
+  const handleConversationDelete = async (conversationId: string) => {
+    if (!conversationId) return;
+    if (isDeletingConversation) return;
+
+    setIsDeletingConversation(true);
+
+    try {
+      await apiDeleteConversation(conversationId, userId);
+    } catch (e) {
+      try {
+        deleteLocalConversation(conversationId, userId);
+      } catch {}
+    } finally {
+      try {
+        // Ensure local fallback is removed as well to avoid it reappearing
+        try {
+          deleteLocalConversation(conversationId, userId);
+        } catch {}
+
+        await chat.refreshConversations();
+      } catch {}
+      if (chat.conversationId === conversationId) {
+        chat.clearMessages();
+      }
+      setInsightsOpen(false);
+      setIsDeletingConversation(false);
     }
   };
 
@@ -154,6 +186,7 @@ export default function FinHealChat() {
         conversationCount={chat.conversationCount}
         moodDimensions={currentMoodDims}
         onConversationSelect={handleConversationSelect}
+        onDeleteConversation={handleConversationDelete}
         sessionId={chat.conversationId ?? "new-conversation"}
         userId={userId}
         isOpen={insightsOpen}

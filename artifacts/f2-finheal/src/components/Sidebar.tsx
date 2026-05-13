@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, createGoal, deleteGoal } from "@/utils/localGoals";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import type { Goal } from "@/utils/localGoals";
 
 interface SidebarProps {
@@ -46,8 +47,26 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
   };
 
   const handleDeleteGoal = (goalId: string) => {
-    deleteGoal(goalId);
-    setGoals(goals.filter(g => g.id !== goalId));
+    // open confirmation dialog instead of immediate delete
+    setGoalIdToDelete(goalId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // confirmation dialog state for goal deletion
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
+
+  const handleConfirmDelete = () => {
+    if (!goalIdToDelete) return;
+    deleteGoal(goalIdToDelete);
+    setGoals(goals.filter(g => g.id !== goalIdToDelete));
+    setIsDeleteDialogOpen(false);
+    setGoalIdToDelete(null);
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setGoalIdToDelete(null);
   };
 
   const moods = [
@@ -228,12 +247,13 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                           <span className="text-[16px]">{goal.icon}</span>
                           <span className="text-[12px] font-semibold text-gray-700 truncate">{goal.name}</span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteGoal(goal.id)}
-                          className="text-[11px] text-gray-400 hover:text-red-500 font-semibold"
-                        >
-                          ✕
-                        </button>
+                            <button
+                              onClick={() => handleDeleteGoal(goal.id)}
+                              className="text-[11px] text-gray-400 hover:text-red-500 font-semibold"
+                              aria-label={`Delete goal ${goal.name}`}
+                            >
+                              ✕
+                            </button>
                       </div>
                       <div className="h-[3px] bg-gray-200 rounded-[3px] mb-[6px] overflow-hidden">
                         <div
@@ -282,6 +302,14 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
         </div>
         <div className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60">⚙️</div>
       </div>
+      {/* Confirm delete dialog for goals */}
+      <ConfirmDeleteDialog
+        isOpen={isDeleteDialogOpen}
+        title="Delete Goal"
+        description="Do you want to delete this goal? This action cannot be undone."
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
       </aside>
     </>
   );

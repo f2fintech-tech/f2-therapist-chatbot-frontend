@@ -40,7 +40,9 @@ export default function ConfirmDeleteDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
-        onCancel();
+        // Call onCancel asynchronously to avoid triggering setState during
+        // render in parent components (prevents maximum update depth loops).
+        setTimeout(() => onCancel(), 0);
       }
     }}>
       <DialogContent className="sm:max-w-[400px]">

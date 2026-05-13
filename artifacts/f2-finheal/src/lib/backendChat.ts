@@ -409,6 +409,11 @@ export async function getConversationMessages(
   return extractArray<BackendConversationMessage>(response).map(normalizeConversationMessage);
 }
 
+export async function deleteConversation(conversationId: string, userId: string): Promise<void> {
+  const params = new URLSearchParams({ user_id: userId });
+  await request<void>(`conversations/${conversationId}?${params.toString()}`, { method: "DELETE", expectJson: false });
+}
+
 export function getApiBaseUrl(): string {
   return normalizedApiBaseUrl;
 }

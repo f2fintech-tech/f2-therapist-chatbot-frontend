@@ -2,6 +2,7 @@ import { useGetWellnessScore } from "@workspace/api-client-react";
 import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 import { formatConversationDateLabel } from "@/lib/backendChat";
 import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
+import tips from "@/data/insights.json";
 import { useState, useEffect } from "react";
 import type { Goal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
@@ -14,7 +15,7 @@ interface InsightsPanelProps {
   conversationCount: number;
   conversations: ConversationSummary[];
   onConversationSelect: (conversationId: string) => Promise<void>;
-  onDeleteConversation: (conversationId: string) => Promise<void>;
+  onDeleteConversation?: (conversationId: string) => Promise<void>;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -81,7 +82,9 @@ export default function InsightsPanel({
 
   const handleConfirmChatDelete = async () => {
     if (chatIdToDelete) {
-      await onDeleteConversation(chatIdToDelete);
+      if (onDeleteConversation) {
+        await onDeleteConversation(chatIdToDelete);
+      }
       setIsChatDeleteDialogOpen(false);
       setChatIdToDelete(null);
     }
@@ -91,6 +94,14 @@ export default function InsightsPanel({
   const currentDims = moodDimensions;
   const renderPercent = (value?: number) => (typeof value === "number" ? `${Math.round(value)}%` : "—");
   const stressValue = currentDims?.stress;
+
+  const getTodaysTip = (items: string[]) => {
+    if (!items || items.length === 0) return "";
+    const key = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const hash = Array.from(key).reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    const idx = Math.abs(hash) % items.length;
+    return items[idx];
+  };
 
   const panelContent = (
     <>
@@ -181,7 +192,7 @@ export default function InsightsPanel({
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Today's Insight</div>
         <div className="bg-[#f6f7fe] border-[1.5px] border-[#d4d8fa] rounded-[10px] p-[12px]">
           <div className="text-[9px] font-bold text-primary uppercase tracking-[0.8px] mb-[5px]">Tip</div>
-          <div className="text-[11.5px] text-gray-600 leading-[1.6]">Breaking high-interest debt into smaller weekly payments can reduce interest.</div>
+          <div className="text-[11.5px] text-gray-600 leading-[1.6]">{getTodaysTip(tips as string[])}</div>
         </div>
       </div>
 
@@ -204,10 +215,14 @@ export default function InsightsPanel({
               <button
                 type="button"
                 onClick={(e) => handleDeleteChatClick(e, s.id)}
-                className="absolute right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-[10px] text-gray-400 hover:text-red-500 transition-all px-2"
+                aria-label="Delete conversation"
                 title="Delete conversation"
+                disabled={isChatDeleteDialogOpen}
+                className={`absolute right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 transition-all transform px-2 ${isChatDeleteDialogOpen ? 'cursor-not-allowed opacity-50' : 'hover:text-red-500 hover:scale-110'}`}
               >
-                🗑️
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M9 3v1H4v2h16V4h-5V3H9zm1 6v8h2V9H10zm4 0v8h2V9h-2z" />
+                </svg>
               </button>
             </div>
           ))}
