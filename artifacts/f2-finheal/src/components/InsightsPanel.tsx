@@ -95,11 +95,26 @@ export default function InsightsPanel({
   const renderPercent = (value?: number) => (typeof value === "number" ? `${Math.round(value)}%` : "—");
   const stressValue = currentDims?.stress;
 
+  const getDayOfYear = (date: Date, timeZone = "Asia/Kolkata") => {
+    // Use Intl.DateTimeFormat to get the date parts in the desired timezone
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "numeric", day: "numeric" })
+      .formatToParts(date)
+      .reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {} as Record<string, string>);
+
+    const year = Number(parts.year);
+    const month = Number(parts.month);
+    const day = Number(parts.day);
+
+    // Compute day-of-year by using UTC timestamps for the local date parts
+    const utcMidnight = Date.UTC(year, month - 1, day);
+    const utcYearStart = Date.UTC(year, 0, 1);
+    return Math.floor((utcMidnight - utcYearStart) / 86400000) + 1;
+  };
+
   const getTodaysTip = (items: string[]) => {
     if (!items || items.length === 0) return "";
-    const key = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const hash = Array.from(key).reduce((s, ch) => s + ch.charCodeAt(0), 0);
-    const idx = Math.abs(hash) % items.length;
+    const day = getDayOfYear(new Date(), "Asia/Kolkata");
+    const idx = (day - 1) % items.length;
     return items[idx];
   };
 
@@ -189,10 +204,9 @@ export default function InsightsPanel({
 
       {/* Today's Insight */}
       <div className="mb-[18px]">
-        <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Today's Insight</div>
+        <div className="text-[14px] font-bold text-blue-500 uppercase tracking-[1px] mb-[10px]">Today's Insight</div>
         <div className="bg-[#f6f7fe] border-[1.5px] border-[#d4d8fa] rounded-[10px] p-[12px]">
-          <div className="text-[9px] font-bold text-primary uppercase tracking-[0.8px] mb-[5px]">Tip</div>
-          <div className="text-[11.5px] text-gray-600 leading-[1.6]">{getTodaysTip(tips as string[])}</div>
+        <div className="text-[13px] text-gray-600 italic leading-[1.6]">{getTodaysTip(tips as string[])}</div>
         </div>
       </div>
 
