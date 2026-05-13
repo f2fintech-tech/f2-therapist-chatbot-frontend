@@ -246,6 +246,14 @@ function extractArray<T>(value: unknown): T[] {
   return Array.isArray(arrayCandidate) ? (arrayCandidate as T[]) : [];
 }
 
+function getBrowserTimeZone(): string | undefined {
+  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat === "undefined") {
+    return undefined;
+  }
+
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 function isSameLocalCalendarDay(left: Date, right: Date): boolean {
   return left.toLocaleDateString() === right.toLocaleDateString();
 }
@@ -261,16 +269,22 @@ export function formatMessageTimestamp(rawTimestamp: string | undefined): string
   }
 
   const now = new Date();
-  const timeText = timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const browserTimeZone = getBrowserTimeZone();
+  const timeText = timestamp.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
+  });
 
   if (isSameLocalCalendarDay(timestamp, now)) {
     return timeText;
   }
 
-  const dateText = timestamp.toLocaleDateString([], {
+  const dateText = timestamp.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
+    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
   });
 
   return `${dateText}, ${timeText}`;
@@ -286,10 +300,12 @@ export function formatConversationDateLabel(rawTimestamp: string | undefined): s
     return rawTimestamp;
   }
 
-  return timestamp.toLocaleDateString([], {
+  const browserTimeZone = getBrowserTimeZone();
+  return timestamp.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
+    ...(browserTimeZone ? { timeZone: browserTimeZone } : {}),
   });
 }
 
