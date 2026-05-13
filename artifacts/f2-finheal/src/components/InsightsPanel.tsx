@@ -1,4 +1,4 @@
-import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
+import { useGetWellnessScore } from "@workspace/api-client-react";
 import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 import { formatConversationDateLabel } from "@/lib/backendChat";
 import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
@@ -14,6 +14,7 @@ interface InsightsPanelProps {
   conversationCount: number;
   conversations: ConversationSummary[];
   onConversationSelect: (conversationId: string) => Promise<void>;
+  onDeleteConversation: (conversationId: string) => Promise<void>;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -26,6 +27,7 @@ export default function InsightsPanel({
   conversationCount,
   conversations,
   onConversationSelect,
+  onDeleteConversation,
   isOpen,
   onClose,
 }: InsightsPanelProps) {
@@ -33,10 +35,15 @@ export default function InsightsPanel({
   const [goalsList, setGoalsList] = useState<Goal[]>([]);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
+
+  // Goal Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
 
-  // Load goals from localStorage on component mount and when userId changes
+  // Chat Delete State
+  const [isChatDeleteDialogOpen, setIsChatDeleteDialogOpen] = useState(false);
+  const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
+
   useEffect(() => {
     const goals = listUserGoals(userId);
     setGoalsList(goals);
@@ -49,6 +56,7 @@ export default function InsightsPanel({
     setEditingGoalId(null);
   };
 
+  // Goal Delete Handlers
   const handleDeleteGoal = (goalId: string) => {
     setGoalIdToDelete(goalId);
     setIsDeleteDialogOpen(true);
@@ -64,19 +72,29 @@ export default function InsightsPanel({
     }
   };
 
-  const handleCancelDelete = () => {
-    setIsDeleteDialogOpen(false);
-    setGoalIdToDelete(null);
+  // Chat Delete Handlers
+  const handleDeleteChatClick = (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation(); // Prevents chat selection when clicking delete
+    setChatIdToDelete(chatId);
+    setIsChatDeleteDialogOpen(true);
+  };
+
+  const handleConfirmChatDelete = async () => {
+    if (chatIdToDelete) {
+      await onDeleteConversation(chatIdToDelete);
+      setIsChatDeleteDialogOpen(false);
+      setChatIdToDelete(null);
+    }
   };
 
   const sessionsList = conversations;
-
   const currentDims = moodDimensions;
   const renderPercent = (value?: number) => (typeof value === "number" ? `${Math.round(value)}%` : "—");
   const stressValue = currentDims?.stress;
 
   const panelContent = (
     <>
+      {/* Session Stats */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">This Session</div>
         <div className="grid grid-cols-1 gap-[6px] sm:grid-cols-3 lg:grid-cols-3">
@@ -95,6 +113,7 @@ export default function InsightsPanel({
         </div>
       </div>
 
+      {/* Mood Analysis */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Mood Analysis</div>
         <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px]">
@@ -105,7 +124,6 @@ export default function InsightsPanel({
           <div className="h-[5px] bg-gray-200 rounded-[5px] overflow-hidden mb-[12px]">
             <div className="h-full bg-gradient-to-r from-[#10b981] to-[#f59e0b] rounded-[5px] transition-all duration-1000" style={{ width: `${stressValue ?? 0}%` }} />
           </div>
-
           <DimRow label="Urgency" val={currentDims?.urgency} color="bg-primary" />
           <DimRow label="Openness" val={currentDims?.openness} color="bg-primary" />
           <DimRow label="Willingness" val={currentDims?.willingness} color="bg-primary" />
@@ -113,12 +131,13 @@ export default function InsightsPanel({
         </div>
       </div>
 
+      {/* Active Goals */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
         <div>
           {goalsList.length === 0 ? (
             <div className="py-[12px] text-center">
-              <div className="text-[11px] text-gray-400">No goals yet. Create one to get started!</div>
+              <div className="text-[11px] text-gray-400">No goals yet.</div>
             </div>
           ) : (
             goalsList.map(goal => {
@@ -129,67 +148,24 @@ export default function InsightsPanel({
                   <div className="flex items-center gap-[9px] mb-[6px]">
                     <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{goal.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11.5px] font-semibold text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis">{goal.name}</div>
+                      <div className="text-[11.5px] font-semibold text-gray-700 truncate">{goal.name}</div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteGoal(goal.id)}
-                      className="text-[11px] text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                      title="Delete goal"
-                    >
-                      ✕
-                    </button>
+                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-[11px] text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
                   </div>
                   <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
-                    <div
-                      className="h-full rounded-[3px] transition-all"
-                      style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }}
-                    />
+                    <div className="h-full rounded-[3px] transition-all" style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }} />
                   </div>
-                  <div className="flex justify-between items-center gap-[6px]">
+                  <div className="flex justify-between items-center">
                     <div className="text-[10px] text-gray-400">{Math.round(progress)}%</div>
                     {isEditing ? (
-                      <div className="flex gap-[4px] flex-1 justify-end">
-                        <div className="text-[10px] text-gray-500">{goal.currency}</div>
-                        <input
-                          type="number"
-                          value={editAmount}
-                          onChange={e => setEditAmount(e.target.value)}
-                          className="w-[45px] text-[10px] px-[4px] py-[4px] border-[1.5px] border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          placeholder="0"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)}
-                          className="text-[10px] bg-primary text-white px-[8px] py-[4px] rounded hover:opacity-90 transition-opacity font-medium"
-                        >
-                          Update
-                        </button>
-                        <button
-                          onClick={() => setEditingGoalId(null)}
-                          className="text-[10px] bg-gray-200 text-gray-700 px-[8px] py-[4px] rounded hover:opacity-80 transition-opacity"
-                        >
-                          Cancel
-                        </button>
+                      <div className="flex gap-[4px]">
+                        <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="w-[45px] text-[10px] border rounded" autoFocus />
+                        <button onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)} className="text-[10px] bg-primary text-white px-2 py-1 rounded">Update</button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-[6px]">
-                        <div
-                          className="text-[10px] font-medium px-[6px] py-[2px] rounded bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 hover:border-primary transition-all"
-                          style={{ color: goal.color || 'var(--color-primary)' }}
-                          title="Click to edit current amount"
-                        >
-                          {goal.currency}{goal.currentAmount}
-                        </div>
-                        <button
-                          onClick={() => {
-                            setEditingGoalId(goal.id);
-                            setEditAmount(goal.currentAmount.toString());
-                          }}
-                          className="text-[10px] text-gray-400 hover:text-primary transition-colors px-[4px]"
-                          title="Edit goal progress"
-                        >
-                          ✏️
-                        </button>
+                      <div className="flex items-center gap-1 cursor-pointer" onClick={() => { setEditingGoalId(goal.id); setEditAmount(goal.currentAmount.toString()); }}>
+                        <span className="text-[10px] font-medium" style={{ color: goal.color }}>{goal.currency}{goal.currentAmount}</span>
+                        <span className="text-[10px]">✏️</span>
                       </div>
                     )}
                   </div>
@@ -200,28 +176,40 @@ export default function InsightsPanel({
         </div>
       </div>
 
+      {/* Today's Insight */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Today's Insight</div>
         <div className="bg-[#f6f7fe] border-[1.5px] border-[#d4d8fa] rounded-[10px] p-[12px]">
           <div className="text-[9px] font-bold text-primary uppercase tracking-[0.8px] mb-[5px]">Tip</div>
-          <div className="text-[11.5px] text-gray-600 leading-[1.6]">Breaking your high-interest debt into smaller weekly payments can reduce overall interest.</div>
+          <div className="text-[11.5px] text-gray-600 leading-[1.6]">Breaking high-interest debt into smaller weekly payments can reduce interest.</div>
         </div>
       </div>
 
+      {/* Past Conversations with Delete Button */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Past Conversations</div>
         <div>
           {sessionsList.map(s => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => void onConversationSelect(s.id)}
-              className={`flex w-full items-center gap-[8px] p-[7px_8px] rounded-[6px] cursor-pointer transition-colors mb-[1px] hover:bg-gray-50 ${s.id === conversationId ? "bg-[#eef0fd]" : ""}`}
-            >
-              <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
-              <div className="text-[11.5px] text-gray-600 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-left">{s.title}</div>
-              <div className="text-[10px] text-gray-400">{formatConversationDateLabel(s.createdAt)}</div>
-            </button>
+            <div key={s.id} className="group relative">
+              <button
+                type="button"
+                onClick={() => void onConversationSelect(s.id)}
+                className={`flex w-full items-center gap-[8px] p-[7px_8px] rounded-[6px] transition-colors mb-[1px] hover:bg-gray-50 ${s.id === conversationId ? "bg-[#eef0fd]" : ""}`}
+              >
+                <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
+                <div className="text-[11.5px] text-gray-600 flex-1 truncate text-left pr-6">{s.title}</div>
+                <div className="text-[10px] text-gray-400 shrink-0">{formatConversationDateLabel(s.createdAt)}</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => handleDeleteChatClick(e, s.id)}
+                className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-[10px] text-gray-400 hover:text-red-500 transition-all px-2"
+                title="Delete conversation"
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -230,34 +218,34 @@ export default function InsightsPanel({
 
   return (
     <>
+      {/* Shared Dialog Theme for Goals and Chats */}
       <ConfirmDeleteDialog
         isOpen={isDeleteDialogOpen}
         title="Delete Goal"
         description="Do you want to delete this goal? This action cannot be undone."
         onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+      />
+
+      <ConfirmDeleteDialog
+        isOpen={isChatDeleteDialogOpen}
+        title="Delete Conversation"
+        description="Do you want to delete this conversation? This history will be permanently removed."
+        onConfirm={handleConfirmChatDelete}
+        onCancel={() => setIsChatDeleteDialogOpen(false)}
       />
 
       {/* Mobile Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-30 2xl:hidden"
-          onClick={onClose}
-        />
-      )}
-      {/* Insights Drawer - Narrow screens */}
-      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] gap-0 scrollbar-none 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <button
-          onClick={onClose}
-          aria-label="Close insights"
-          className="absolute top-3 right-3 h-6 w-6 rounded-md bg-white/90 flex items-center justify-center text-red-400 hover:bg-white z-50 shadow-sm"
-        >
-          ✕
-        </button>
+      {isOpen && <div className="fixed inset-0 bg-black/40 z-30 2xl:hidden" onClick={onClose} />}
+
+      {/* Sidebar - Mobile */}
+      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <button onClick={onClose} className="absolute top-3 right-3 h-6 w-6 rounded-md flex items-center justify-center text-red-400 z-50">✕</button>
         {panelContent}
       </aside>
-      {/* Insights Sidebar - Desktop */}
-      <aside className="hidden bg-white rounded-[20px] shadow-sm border border-gray-200 flex-col overflow-y-auto px-[12px] py-[16px] gap-0 animate-[slideInR_0.4s_0.08s_ease_both] scrollbar-none 2xl:flex 2xl:w-[clamp(250px,18vw,300px)] 2xl:min-w-[250px] 2xl:max-w-[300px] 2xl:h-full 2xl:min-h-0">
+
+      {/* Sidebar - Desktop */}
+      <aside className="hidden bg-white rounded-[20px] shadow-sm border border-gray-200 flex-col overflow-y-auto px-[12px] py-[16px] 2xl:flex 2xl:w-[clamp(250px,18vw,300px)] 2xl:h-full scrollbar-none">
         {panelContent}
       </aside>
     </>
@@ -266,13 +254,11 @@ export default function InsightsPanel({
 
 function DimRow({ label, val, color }: { label: string; val?: number; color: string }) {
   const valueLabel = typeof val === "number" ? `${Math.round(val)}%` : "—";
-  const width = typeof val === "number" ? val : 0;
-
   return (
     <div className="flex items-center gap-[7px] mb-[7px] last:mb-0">
       <div className="text-[11px] text-gray-500 w-[66px] shrink-0 font-medium">{label}</div>
       <div className="flex-1 h-[4px] bg-gray-200 rounded-[4px] overflow-hidden">
-        <div className={`h-full rounded-[4px] transition-all duration-1000 ${color}`} style={{ width: `${width}%` }} />
+        <div className={`h-full rounded-[4px] transition-all duration-1000 ${color}`} style={{ width: `${val ?? 0}%` }} />
       </div>
       <div className="text-[10px] text-gray-400 w-[22px] text-right">{valueLabel}</div>
     </div>
