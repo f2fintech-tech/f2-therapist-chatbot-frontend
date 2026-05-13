@@ -46,6 +46,11 @@ export default function InsightsPanel({
   };
 
   const handleDeleteGoal = (goalId: string) => {
+    const shouldDelete = window.confirm("Do you want to delete this goal?");
+    if (!shouldDelete) {
+      return;
+    }
+
     deleteGoal(goalId);
     const updated = listUserGoals(userId);
     setGoalsList(updated);
