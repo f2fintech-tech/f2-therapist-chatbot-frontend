@@ -204,10 +204,10 @@ export default function InsightsPanel({
               <button
                 type="button"
                 onClick={(e) => handleDeleteChatClick(e, s.id)}
-                className="absolute right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-[10px] text-gray-400 hover:text-red-500 transition-all px-2"
+                className="absolute right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-[10px] text-gray-400 hover:text-red-500 transition-all px-2"
                 title="Delete conversation"
               >
-                ✕
+                🗑️
               </button>
             </div>
           ))}
