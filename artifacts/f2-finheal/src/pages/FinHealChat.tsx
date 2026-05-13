@@ -47,6 +47,14 @@ export default function FinHealChat() {
     setCurrentMoodDims(dims);
   };
 
+  const handleConversationSelect = async (conversationId: string) => {
+    await chat.loadConversation(conversationId);
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1535px)").matches) {
+      setInsightsOpen(false);
+    }
+  };
+
   const closeSidebar = () => setSidebarOpen(false);
   const closeInsights = () => setInsightsOpen(false);
 
@@ -145,7 +153,7 @@ export default function FinHealChat() {
         conversations={chat.conversations}
         conversationCount={chat.conversationCount}
         moodDimensions={currentMoodDims}
-        onConversationSelect={chat.loadConversation}
+        onConversationSelect={handleConversationSelect}
         sessionId={chat.conversationId ?? "new-conversation"}
         userId={userId}
         isOpen={insightsOpen}
