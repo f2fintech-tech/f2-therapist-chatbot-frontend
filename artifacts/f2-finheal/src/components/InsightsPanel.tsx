@@ -3,6 +3,7 @@ import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
 import { useState, useEffect } from "react";
 import type { Goal } from "@/utils/localGoals";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 
 interface InsightsPanelProps {
   userId: string;
@@ -31,6 +32,8 @@ export default function InsightsPanel({
   const [goalsList, setGoalsList] = useState<Goal[]>([]);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
 
   // Load goals from localStorage on component mount and when userId changes
   useEffect(() => {
@@ -46,14 +49,23 @@ export default function InsightsPanel({
   };
 
   const handleDeleteGoal = (goalId: string) => {
-    const shouldDelete = window.confirm("Do you want to delete this goal?");
-    if (!shouldDelete) {
-      return;
-    }
+    setGoalIdToDelete(goalId);
+    setIsDeleteDialogOpen(true);
+  };
 
-    deleteGoal(goalId);
-    const updated = listUserGoals(userId);
-    setGoalsList(updated);
+  const handleConfirmDelete = () => {
+    if (goalIdToDelete) {
+      deleteGoal(goalIdToDelete);
+      const updated = listUserGoals(userId);
+      setGoalsList(updated);
+      setIsDeleteDialogOpen(false);
+      setGoalIdToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteDialogOpen(false);
+    setGoalIdToDelete(null);
   };
 
   const sessionsList = conversations;
@@ -217,6 +229,14 @@ export default function InsightsPanel({
 
   return (
     <>
+      <ConfirmDeleteDialog
+        isOpen={isDeleteDialogOpen}
+        title="Delete Goal"
+        description="Do you want to delete this goal? This action cannot be undone."
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
+
       {/* Mobile Overlay */}
       {isOpen && (
         <div
