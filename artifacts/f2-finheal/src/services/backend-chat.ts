@@ -47,12 +47,20 @@ export interface SendBackendMessageInput {
   conversation_id?: string;
 }
 
-const DEFAULT_API_BASE_URL = "http://localhost:8000/api/v1";
 const REQUEST_TIMEOUT_MS = 15000;
 
 function getApiBaseUrl(): string {
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-  return envBaseUrl || DEFAULT_API_BASE_URL;
+  if (!envBaseUrl) {
+    console.warn(
+      "VITE_API_BASE_URL is not set in environment variables. " +
+      "Please create a .env file with VITE_API_BASE_URL=http://localhost:8000/api/v1 or your backend URL."
+    );
+    throw new Error(
+      "Backend API URL is not configured. Set VITE_API_BASE_URL in .env file."
+    );
+  }
+  return envBaseUrl;
 }
 
 function getRootBaseUrl(): string {
@@ -60,7 +68,15 @@ function getRootBaseUrl(): string {
 }
 
 function getApiKey(): string {
-  return import.meta.env.VITE_API_KEY?.trim() || "";
+  const envKey = import.meta.env.VITE_API_KEY?.trim();
+  if (!envKey) {
+    console.warn(
+      "VITE_API_KEY is not set in environment variables. " +
+      "API requests may fail with 401 authorization errors. " +
+      "Set VITE_API_KEY in .env file (e.g., VITE_API_KEY=dev-key)."
+    );
+  }
+  return envKey || "";
 }
 
 function buildHeaders(): HeadersInit {
