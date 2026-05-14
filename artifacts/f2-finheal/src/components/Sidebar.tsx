@@ -3,6 +3,7 @@ import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-reac
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Goal } from "@/utils/localGoals";
 
 interface SidebarProps {
@@ -11,9 +12,11 @@ interface SidebarProps {
   sessionId: string;
   isOpen: boolean;
   onClose: () => void;
+  onOpenChat: () => void;
+  onOpenFinancialHealthTests: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onOpenFinancialHealthTests }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState("Talk to FinHeal");
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -121,12 +124,30 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
     setEditFormData({ targetAmount: "" });
   };
 
+  const handleOpenTalkToFinHeal = () => {
+    setActiveNav("Talk to FinHeal");
+    onOpenChat();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenFinancialHealthTests = () => {
+    setActiveNav("Financial Health Test");
+    onOpenFinancialHealthTests();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
   const moods = [
-    { emoji: "😰", title: "Very Stressed" },
-    { emoji: "😟", title: "Anxious" },
-    { emoji: "😐", title: "Neutral" },
-    { emoji: "🙂", title: "Okay" },
-    { emoji: "😄", title: "Great" },
+    { emoji: "😰", title: "Very Stressed", hoverText: "Stressed" },
+    { emoji: "😟", title: "Anxious", hoverText: "Worried" },
+    { emoji: "😐", title: "Neutral", hoverText: "Neutral" },
+    { emoji: "🙂", title: "Okay", hoverText: "Calm & Happy" },
+    { emoji: "😄", title: "Great", hoverText: "Energetic" },
   ];
 
   return (
@@ -175,18 +196,31 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
       {/* Mood */}
       <div className="px-[12px] py-[12px] pb-[8px] sm:pb-[10px]">
         <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.8px] mb-[8px]">How are you feeling today?</div>
-        <div className="flex justify-between gap-[4px]">
-          {moods.map((m) => (
-            <button
-              key={m.emoji}
-              title={m.title}
-              onClick={() => setActiveMood(m.emoji)}
-              className={`flex-1 h-[36px] rounded-[10px] border-[1.5px] text-[17px] flex items-center justify-center transition-all ${activeMood === m.emoji ? 'border-primary bg-primary/10 shadow-[0_0_0_3px_rgba(50,68,230,0.1)]' : 'border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:scale-105'}`}
-            >
-              {m.emoji}
-            </button>
-          ))}
-        </div>
+        <TooltipProvider delayDuration={0}>
+          <div className="flex justify-between gap-[4px]">
+            {moods.map((m) => (
+              <Tooltip key={m.emoji}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={m.title}
+                    onClick={() => setActiveMood(m.emoji)}
+                    className={`flex-1 h-[36px] rounded-[10px] border-[1.5px] text-[17px] flex items-center justify-center transition-all ${activeMood === m.emoji ? 'border-primary bg-primary/10 shadow-[0_0_0_3px_rgba(50,68,230,0.1)]' : 'border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:scale-105'}`}
+                  >
+                    {m.emoji}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  sideOffset={10}
+                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)]"
+                >
+                  {m.hoverText}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Nav */}
@@ -300,22 +334,44 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                           <span className="text-[12px] font-semibold text-gray-700 truncate">{goal.name}</span>
                         </div>
                         <div className="flex items-center gap-[6px]">
-                          <button
-                            onClick={() => handleEditGoal(goal)}
-                            className="text-[11px] text-gray-400 hover:text-primary font-semibold transition-colors"
-                            aria-label={`Edit goal ${goal.name}`}
-                            title="Edit goal"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGoal(goal.id)}
-                            className="text-[11px] text-gray-400 hover:text-red-500 font-semibold transition-colors"
-                            aria-label={`Delete goal ${goal.name}`}
-                            title="Delete goal"
-                          >
-                            ✕
-                          </button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditGoal(goal)}
+                                    className="text-[11px] text-gray-400 hover:text-primary font-semibold transition-colors"
+                                    aria-label={`Edit goal ${goal.name}`}
+                                  >
+                                    ✏️
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={8}
+                                  className="rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] text-[10px] font-medium text-gray-700 shadow-[0_10px_24px_rgba(17,24,39,0.12)]"
+                                >
+                                  Edit goal
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteGoal(goal.id)}
+                                    className="text-[11px] text-gray-400 hover:text-red-500 font-semibold transition-colors"
+                                    aria-label={`Delete goal ${goal.name}`}
+                                  >
+                                    ✕
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={8}
+                                  className="rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] text-[10px] font-medium text-gray-700 shadow-[0_10px_24px_rgba(17,24,39,0.12)]"
+                                >
+                                  Delete goal
+                                </TooltipContent>
+                              </Tooltip>
                         </div>
                       </div>
                       <div className="h-[3px] bg-gray-200 rounded-[3px] mb-[6px] overflow-hidden">
@@ -339,8 +395,17 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
           <>
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
             
-            <NavBtn icon="💬" label="Talk to FinHeal" active={activeNav === "Talk to FinHeal"} onClick={() => setActiveNav("Talk to FinHeal")} />
-            <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={() => setActiveNav("Financial Health Test")} />
+            <button
+              type="button"
+              onClick={handleOpenTalkToFinHeal}
+              className={`flex items-center gap-[10px] px-[10px] py-[9px] rounded-[10px] cursor-pointer transition-all mb-[1px] text-[13px] w-full ${activeNav === "Talk to FinHeal" ? 'bg-[#eef0fd] text-primary font-semibold' : 'text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900'}`}
+            >
+              <div className={`w-[28px] h-[28px] rounded-[6px] flex items-center justify-center text-[14px] shrink-0 transition-all ${activeNav === "Talk to FinHeal" ? 'bg-primary shadow-[0_8px_24px_rgba(50,68,230,0.22)]' : 'bg-gray-100'}`}>
+                💬
+              </div>
+              <span>Talk to FinHeal</span>
+            </button>
+            <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
             <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={() => setActiveNav("My Dashboard")} />
             <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
 
