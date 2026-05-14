@@ -141,7 +141,7 @@ export default function InsightsPanel({
 
       {/* Mood Analysis */}
       <div className="mb-[18px]">
-        <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Mood Analysis</div>
+        <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Mood Analysis</div>
         <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px]">
           <div className="flex justify-between items-baseline mb-[8px]">
             <span className="text-[12px] font-semibold text-gray-700">Stress Level</span>
@@ -159,7 +159,7 @@ export default function InsightsPanel({
 
       {/* Active Goals */}
       <div className="mb-[18px]">
-        <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
+        <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
         <div>
           {goalsList.length === 0 ? (
             <div className="py-[12px] text-center">
@@ -174,7 +174,7 @@ export default function InsightsPanel({
                   <div className="flex items-center gap-[9px] mb-[6px]">
                     <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{goal.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11.5px] font-semibold text-gray-700 truncate">{goal.name}</div>
+                      <div className="text-[13px] font-semibold text-gray-700 truncate">{goal.name}</div>
                     </div>
                     <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
                   </div>
