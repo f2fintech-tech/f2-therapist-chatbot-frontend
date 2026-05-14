@@ -32,7 +32,7 @@ const testCards: TestCard[] = [
     description: "25 scenario-based MCQs covering literacy, leverage, liquidity, resilience, and behavior.",
     duration: "10-12 min",
     focus: "Scenario reasoning and personal finance judgment",
-    result: "Instant score + answer review",
+    result: "Saved locally + score on finish",
     accent: "from-[#10b981] to-[#34d399]",
   },
   {

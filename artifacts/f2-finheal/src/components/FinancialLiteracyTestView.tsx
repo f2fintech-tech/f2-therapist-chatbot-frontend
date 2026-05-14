@@ -1,17 +1,155 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface FinancialLiteracyTestViewProps {
+  userId: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  onBackToCatalog: () => void;
 }
+
+type AnswerLetter = "A" | "B" | "C" | "D";
 
 type QuestionItem = {
   id: number;
   question: string;
   options: [string, string, string, string];
-  correctAnswer: "A" | "B" | "C" | "D";
+  correctAnswer: AnswerLetter;
 };
+
+type ShuffledOption = {
+  letter: AnswerLetter;
+  text: string;
+  isCorrect: boolean;
+};
+
+type ShuffledQuestion = {
+  id: number;
+  question: string;
+  options: ShuffledOption[];
+};
+
+type StoredAttempt = {
+  attemptId: string;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt: string | null;
+  isFinished: boolean;
+  questions: ShuffledQuestion[];
+  selectedAnswers: Record<number, AnswerLetter>;
+};
+
+type LiteracyTestStorage = {
+  version: 1;
+  currentAttempt: StoredAttempt | null;
+  history: StoredAttempt[];
+};
+
+const STORAGE_PREFIX = "finheal_financial_literacy_test";
+
+function getStorageKey(userId: string) {
+  return `${STORAGE_PREFIX}:${userId || "anonymous"}`;
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+function createShuffledQuestions(): ShuffledQuestion[] {
+  const shuffledQuestions = shuffleArray(questions);
+
+  return shuffledQuestions.map((question) => {
+    const shuffledOptions = shuffleArray(
+      question.options.map((text, index) => ({
+        text,
+        isCorrect: String.fromCharCode(65 + index) === question.correctAnswer,
+      })),
+    );
+
+    return {
+      id: question.id,
+      question: question.question,
+      options: shuffledOptions.map((option, index) => ({
+        letter: String.fromCharCode(65 + index) as AnswerLetter,
+        text: option.text,
+        isCorrect: option.isCorrect,
+      })),
+    };
+  });
+}
+
+function createNewAttempt(): StoredAttempt {
+  const now = new Date().toISOString();
+  return {
+    attemptId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    createdAt: now,
+    updatedAt: now,
+    finishedAt: null,
+    isFinished: false,
+    questions: createShuffledQuestions(),
+    selectedAnswers: {},
+  };
+}
+
+function readStorage(userId: string): LiteracyTestStorage {
+  if (typeof window === "undefined") {
+    return { version: 1, currentAttempt: null, history: [] };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getStorageKey(userId));
+    if (!raw) {
+      return { version: 1, currentAttempt: null, history: [] };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<LiteracyTestStorage>;
+    if (parsed.version !== 1) {
+      return { version: 1, currentAttempt: null, history: [] };
+    }
+
+    return {
+      version: 1,
+      currentAttempt: parsed.currentAttempt ?? null,
+      history: Array.isArray(parsed.history) ? parsed.history : [],
+    };
+  } catch {
+    return { version: 1, currentAttempt: null, history: [] };
+  }
+}
+
+function writeStorage(userId: string, value: LiteracyTestStorage) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getStorageKey(userId), JSON.stringify(value));
+  } catch {
+    // Ignore storage quota/security errors.
+  }
+}
+
+function getAttemptSummary(attempt: StoredAttempt) {
+  const total = attempt.questions.length;
+  const answered = Object.keys(attempt.selectedAnswers).length;
+  const correct = attempt.questions.reduce((count, question) => {
+    const selected = attempt.selectedAnswers[question.id];
+    const selectedOption = question.options.find((option) => option.letter === selected);
+    return count + (selectedOption?.isCorrect ? 1 : 0);
+  }, 0);
+
+  return {
+    answered,
+    correct,
+    total,
+    score: total > 0 ? Math.round((correct / total) * 100) : 0,
+  };
+}
 
 const questions: QuestionItem[] = [
   {
@@ -291,29 +429,231 @@ const questions: QuestionItem[] = [
   },
 ];
 
-export default function FinancialLiteracyTestView({ onToggleSidebar, onToggleInsights }: FinancialLiteracyTestViewProps) {
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({});
+export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyTestViewProps) {
+  const [storageState, setStorageState] = useState<LiteracyTestStorage>(() => {
+    const stored = readStorage(userId);
+    if (stored.currentAttempt) {
+      return stored;
+    }
 
-  const scoreSummary = useMemo(() => {
-    const answered = Object.keys(selectedAnswers).length;
-    const correct = questions.reduce((total, question) => {
-      return selectedAnswers[question.id] === question.correctAnswer ? total + 1 : total;
-    }, 0);
-
-    return {
-      answered,
-      correct,
-      total: questions.length,
-      score: Math.round((correct / questions.length) * 100),
+    const currentAttempt = createNewAttempt();
+    const nextState: LiteracyTestStorage = {
+      version: 1,
+      currentAttempt,
+      history: stored.history,
     };
-  }, [selectedAnswers]);
+    writeStorage(userId, nextState);
+    return nextState;
+  });
 
-  const handleSelectAnswer = (questionId: number, answer: "A" | "B" | "C" | "D") => {
-    setSelectedAnswers((current) => ({
-      ...current,
-      [questionId]: answer,
+  useEffect(() => {
+    const stored = readStorage(userId);
+    if (stored.currentAttempt) {
+      setStorageState(stored);
+      return;
+    }
+
+    const currentAttempt = createNewAttempt();
+    const nextState: LiteracyTestStorage = {
+      version: 1,
+      currentAttempt,
+      history: stored.history,
+    };
+    setStorageState(nextState);
+    writeStorage(userId, nextState);
+  }, [userId]);
+
+  useEffect(() => {
+    writeStorage(userId, storageState);
+  }, [storageState, userId]);
+
+  const currentAttempt = storageState.currentAttempt ?? createNewAttempt();
+  const currentSummary = useMemo(() => getAttemptSummary(currentAttempt), [currentAttempt]);
+  const latestHistoryAttempt = storageState.history[0] ?? null;
+  const latestHistorySummary = latestHistoryAttempt ? getAttemptSummary(latestHistoryAttempt) : null;
+
+  const handleSelectAnswer = (questionId: number, answer: AnswerLetter) => {
+    setStorageState((current) => {
+      if (!current.currentAttempt || current.currentAttempt.isFinished) {
+        return current;
+      }
+
+      return {
+        ...current,
+        currentAttempt: {
+          ...current.currentAttempt,
+          updatedAt: new Date().toISOString(),
+          selectedAnswers: {
+            ...current.currentAttempt.selectedAnswers,
+            [questionId]: answer,
+          },
+        },
+      };
+    });
+  };
+
+  const handleFinishTest = () => {
+    setStorageState((current) => {
+      if (!current.currentAttempt || current.currentAttempt.isFinished) {
+        return current;
+      }
+
+      const finishedAttempt: StoredAttempt = {
+        ...current.currentAttempt,
+        isFinished: true,
+        finishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      return {
+        version: 1,
+        currentAttempt: finishedAttempt,
+        history: [finishedAttempt, ...current.history.filter((attempt) => attempt.attemptId !== finishedAttempt.attemptId)].slice(0, 10),
+      };
+    });
+  };
+
+  const handleStartNewAttempt = () => {
+    const nextAttempt = createNewAttempt();
+    setStorageState((current) => ({
+      version: 1,
+      currentAttempt: nextAttempt,
+      history: current.history,
     }));
   };
+
+  if (currentAttempt.isFinished) {
+    return (
+      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
+        <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Financial Literacy Test Results</div>
+            <div className="text-[10px] text-gray-400 sm:text-[11px]">Your finished attempt is saved locally for this user on this device.</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onToggleInsights}
+            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0"
+            aria-label="Toggle insights panel"
+          >
+            ☰
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+          <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
+            <div className="absolute right-[-28px] top-[-28px] h-[120px] w-[120px] rounded-full bg-primary opacity-10" />
+            <div className="relative z-10 max-w-[780px]">
+              <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
+                Test complete
+              </div>
+              <h1 className="font-serif text-[28px] leading-[1.1] text-gray-900 sm:text-[34px]">
+                Your financial literacy score is ready.
+              </h1>
+              <p className="mt-[10px] max-w-[720px] text-[13px] leading-[1.7] text-gray-600 sm:text-[14px]">
+                This result page is separate from the test screen, so you can review your performance before starting another attempt.
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Correct</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.correct}</div>
+            </div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Accuracy</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.score}%</div>
+            </div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Answered</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.answered}/{currentSummary.total}</div>
+            </div>
+          </section>
+
+          <section className="mt-[18px]">
+            <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)]">
+              <CardContent className="flex flex-col gap-[12px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Final score</div>
+                  <div className="mt-[4px] text-[16px] font-semibold text-gray-900">
+                    {currentSummary.correct} correct out of {currentSummary.total}
+                  </div>
+                  <div className="mt-[2px] text-[12px] text-gray-500">
+                    Finishes are saved per user in localStorage on this device.
+                  </div>
+                </div>
+                <div className="flex items-center gap-[10px] rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[10px]">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Overall accuracy</div>
+                  <div className="text-[22px] font-serif text-gray-900">{currentSummary.score}%</div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {latestHistorySummary && latestHistoryAttempt && (
+            <section className="mt-[18px]">
+              <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                <CardHeader className="space-y-2 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+                  <CardTitle className="text-[16px] text-gray-900">Saved attempt</CardTitle>
+                  <CardDescription className="text-[12px] text-gray-600">
+                    Your latest attempt is stored on this device for this user and will reappear next time.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap items-center gap-[10px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
+                  <span className="rounded-[999px] bg-[#eef0fd] px-[10px] py-[5px] text-[11px] font-semibold text-primary">
+                    {latestHistorySummary.correct} / {latestHistorySummary.total} correct
+                  </span>
+                  <span className="rounded-[999px] bg-gray-100 px-[10px] py-[5px] text-[11px] font-medium text-gray-600">
+                    Accuracy {latestHistorySummary.score}%
+                  </span>
+                  <span className="rounded-[999px] bg-gray-100 px-[10px] py-[5px] text-[11px] font-medium text-gray-600">
+                    Finished {new Date(latestHistoryAttempt.finishedAt || latestHistoryAttempt.updatedAt).toLocaleString()}
+                  </span>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          <section className="mt-[18px] pb-[12px]">
+            <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <CardContent className="flex flex-col gap-[10px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
+                <div className="text-[12px] text-gray-600">
+                  Start a fresh shuffled attempt, or go back to the test catalog.
+                </div>
+                <div className="flex gap-[8px]">
+                  <button
+                    type="button"
+                    onClick={handleStartNewAttempt}
+                    className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
+                  >
+                    Start new attempt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onBackToCatalog}
+                    className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)]"
+                  >
+                    Back to tests
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
@@ -358,23 +698,23 @@ export default function FinancialLiteracyTestView({ onToggleSidebar, onToggleIns
             <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">25 MCQs</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Scenario-based</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Moderate to hard</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Saved locally</span>
             </div>
           </div>
         </section>
 
         <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Questions</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">25</div>
-          </div>
-          <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Answered</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{scoreSummary.answered}</div>
+            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.answered}</div>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Score</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{scoreSummary.score}%</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Status</div>
+            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentAttempt.isFinished ? "Finished" : "In progress"}</div>
+          </div>
+          <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Attempts saved</div>
+            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{storageState.history.length}</div>
           </div>
         </section>
 
@@ -382,25 +722,31 @@ export default function FinancialLiteracyTestView({ onToggleSidebar, onToggleIns
           <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)]">
             <CardContent className="flex flex-col gap-[12px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Instant scoring</div>
-                <div className="mt-[4px] text-[16px] font-semibold text-gray-900">{scoreSummary.correct} / {scoreSummary.total} correct</div>
-                <div className="mt-[2px] text-[12px] text-gray-500">Your score updates as soon as you select an answer.</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Local persistence</div>
+                <div className="mt-[4px] text-[16px] font-semibold text-gray-900">
+                  {currentAttempt.isFinished ? `${currentSummary.correct} / ${currentSummary.total} correct` : `${currentSummary.answered} / ${currentSummary.total} answered`}
+                </div>
+                <div className="mt-[2px] text-[12px] text-gray-500">
+                  {currentAttempt.isFinished
+                    ? "Marks are shown only after finishing the test."
+                    : "Selections are saved locally and scored only when you click Finish Test."}
+                </div>
               </div>
               <div className="flex items-center gap-[10px] rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[10px]">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Accuracy</div>
-                <div className="text-[22px] font-serif text-gray-900">{scoreSummary.score}%</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{currentAttempt.isFinished ? "Accuracy" : "Saved"}</div>
+                <div className="text-[22px] font-serif text-gray-900">{currentAttempt.isFinished ? `${currentSummary.score}%` : "Yes"}</div>
               </div>
             </CardContent>
           </Card>
         </section>
 
         <section className="mt-[18px] space-y-[12px]">
-          {questions.map((item) => (
+          {currentAttempt.questions.map((item, questionIndex) => (
             <Card key={item.id} className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
               <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Question {item.id}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Question {questionIndex + 1}</div>
                     <CardTitle className="mt-[4px] text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">
                       {item.question}
                     </CardTitle>
@@ -410,48 +756,65 @@ export default function FinancialLiteracyTestView({ onToggleSidebar, onToggleIns
                   </span>
                 </div>
                 <CardDescription className="text-[12px] text-gray-500">
-                  Pick one answer. The layout is ready for instant scoring later.
+                  Pick one answer. Your selection is saved locally and scored only on finish.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-[8px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
-                {item.options.map((option, optionIndex) => {
-                  const letter = String.fromCharCode(65 + optionIndex);
-                  const selectedAnswer = selectedAnswers[item.id];
+                {item.options.map((option) => {
+                  const letter = option.letter;
+                  const selectedAnswer = currentAttempt.selectedAnswers[item.id];
                   const isSelected = selectedAnswer === letter;
-                  const isCorrect = item.correctAnswer === letter;
                   const isAnswered = Boolean(selectedAnswer);
-                  const optionStateClass = isSelected
-                    ? isCorrect
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-rose-200 bg-rose-50"
-                    : isAnswered && isCorrect
-                      ? "border-emerald-200 bg-emerald-50"
+                  const showResultStyling = currentAttempt.isFinished;
+                  const optionStateClass = showResultStyling
+                    ? isSelected
+                      ? option.isCorrect
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-rose-200 bg-rose-50"
+                      : isAnswered && option.isCorrect
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-gray-200 bg-white"
+                    : isSelected
+                      ? "border-[#d4d8fa] bg-[#f6f7fe]"
                       : "border-gray-200 bg-white";
 
                   return (
                     <button
                       key={letter}
                       type="button"
-                      onClick={() => handleSelectAnswer(item.id, letter as "A" | "B" | "C" | "D")}
+                      onClick={() => handleSelectAnswer(item.id, letter)}
+                      disabled={currentAttempt.isFinished}
                       className={`flex items-start gap-[10px] rounded-[14px] border px-[12px] py-[10px] text-left transition-colors hover:border-[#d4d8fa] hover:bg-[#f6f7fe] ${optionStateClass}`}
                     >
-                      <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${isSelected && isCorrect ? "bg-emerald-600 text-white" : isSelected && !isCorrect ? "bg-rose-600 text-white" : isAnswered && isCorrect ? "bg-emerald-600 text-white" : "bg-[#eef0fd] text-primary"}`}>
+                      <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${showResultStyling && isSelected && option.isCorrect ? "bg-emerald-600 text-white" : showResultStyling && isSelected && !option.isCorrect ? "bg-rose-600 text-white" : showResultStyling && isAnswered && option.isCorrect ? "bg-emerald-600 text-white" : isSelected ? "bg-[#eef0fd] text-primary" : "bg-[#eef0fd] text-primary"}`}>
                         {letter}
                       </div>
-                      <div className="flex-1 text-[13px] leading-[1.6] text-gray-700">{option}</div>
+                      <div className="flex-1 text-[13px] leading-[1.6] text-gray-700">{option.text}</div>
                     </button>
                   );
                 })}
-                {selectedAnswers[item.id] && (
-                  <div className={`mt-[2px] rounded-[12px] border px-[12px] py-[10px] text-[12px] font-medium ${selectedAnswers[item.id] === item.correctAnswer ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
-                    {selectedAnswers[item.id] === item.correctAnswer
-                      ? `Correct answer: ${item.correctAnswer}`
-                      : `Selected ${selectedAnswers[item.id]}, correct answer is ${item.correctAnswer}`}
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}
+        </section>
+
+        <section className="mt-[18px] pb-[12px]">
+          <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <CardContent className="flex flex-col gap-[10px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
+              <div className="text-[12px] text-gray-600">
+                When you're done, click Finish Test to calculate the score and open the results page.
+              </div>
+              <div className="flex gap-[8px]">
+                <button
+                  type="button"
+                  onClick={handleFinishTest}
+                  className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
+                >
+                  Finish Test
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </section>
       </div>
     </main>

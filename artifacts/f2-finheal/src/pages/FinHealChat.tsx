@@ -241,8 +241,10 @@ export default function FinHealChat() {
         />
       ) : (
         <FinancialLiteracyTestView
+          userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onBackToCatalog={openTestCatalog}
         />
       )}
       <InsightsPanel
