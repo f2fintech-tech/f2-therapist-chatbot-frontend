@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
@@ -12,7 +12,7 @@ interface ChatAreaProps {
   messages: ChatMessage[];
   userProfile: UserProfile;
   onClearChat: () => void;
-  onMoodUpdate: (dims: MoodDimensions) => void;
+  onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
   onLogout?: () => void;
   onToggleSidebar: () => void;
@@ -64,8 +64,9 @@ export default function ChatArea({
     }
   }, [messages.length]);
 
-  useEffect(() => {
-    // Aggregate mood dimensions across all bot messages in the current conversation.
+  // Memoize aggregated mood to prevent recreating it on every render.
+  // This memo only recomputes when messages actually change.
+  const aggregatedMood = useMemo(() => {
     const sums: Record<string, number> = {};
     const counts: Record<string, number> = {};
 
@@ -87,12 +88,24 @@ export default function ChatArea({
       aggregated[k] = Math.round(avg);
     }
 
-    if (Object.keys(aggregated).length > 0) {
-      onMoodUpdate(aggregated as unknown as MoodDimensions);
-    } else {
-      onMoodUpdate(null);
+    return Object.keys(aggregated).length > 0 ? (aggregated as MoodDimensions) : null;
+  }, [messages]);
+
+  // Track previous mood to only notify on actual changes (prevents cascading re-renders).
+  // Use ref to avoid creating effect dependencies on the callback.
+  const prevMoodRef = useRef<MoodDimensions | null>(null);
+
+  // Only notify parent if mood actually changed, not on every render or callback change.
+  useEffect(() => {
+    const hasMoodChanged =
+      prevMoodRef.current !== aggregatedMood &&
+      JSON.stringify(prevMoodRef.current) !== JSON.stringify(aggregatedMood);
+
+    if (hasMoodChanged) {
+      prevMoodRef.current = aggregatedMood;
+      onMoodUpdate(aggregatedMood);
     }
-  }, [messages, onMoodUpdate]);
+  }, [aggregatedMood, onMoodUpdate]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;

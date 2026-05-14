@@ -3,7 +3,7 @@ import type { ConversationSummary, MoodDimensions } from "@/lib/backendChat";
 import { formatConversationDateLabel } from "@/lib/backendChat";
 import { listUserGoals, updateGoalProgress, deleteGoal } from "@/utils/localGoals";
 import tips from "@/data/insights.json";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Goal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 
@@ -58,12 +58,12 @@ export default function InsightsPanel({
   };
 
   // Goal Delete Handlers
-  const handleDeleteGoal = (goalId: string) => {
+  const handleDeleteGoal = useCallback((goalId: string) => {
     setGoalIdToDelete(goalId);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = useCallback(() => {
     if (goalIdToDelete) {
       deleteGoal(goalIdToDelete);
       const updated = listUserGoals(userId);
@@ -71,16 +71,16 @@ export default function InsightsPanel({
       setIsDeleteDialogOpen(false);
       setGoalIdToDelete(null);
     }
-  };
+  }, [goalIdToDelete, userId]);
 
   // Chat Delete Handlers
-  const handleDeleteChatClick = (e: React.MouseEvent, chatId: string) => {
+  const handleDeleteChatClick = useCallback((e: React.MouseEvent, chatId: string) => {
     e.stopPropagation(); // Prevents chat selection when clicking delete
     setChatIdToDelete(chatId);
     setIsChatDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleConfirmChatDelete = async () => {
+  const handleConfirmChatDelete = useCallback(async () => {
     if (chatIdToDelete) {
       if (onDeleteConversation) {
         await onDeleteConversation(chatIdToDelete);
@@ -88,7 +88,7 @@ export default function InsightsPanel({
       setIsChatDeleteDialogOpen(false);
       setChatIdToDelete(null);
     }
-  };
+  }, [chatIdToDelete, onDeleteConversation]);
 
   const sessionsList = conversations;
   const currentDims = moodDimensions;

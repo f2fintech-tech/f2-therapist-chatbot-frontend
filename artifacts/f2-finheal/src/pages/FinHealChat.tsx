@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -68,17 +68,34 @@ export default function FinHealChat() {
     setMainView("chat");
   };
 
-  const handleMoodUpdate = (dims: MoodDimensions) => {
-    setCurrentMoodDims(dims);
-  };
+  const handleMoodUpdate = useCallback((dims: MoodDimensions | null) => {
+    setCurrentMoodDims((prev) => {
+      if (prev === dims) {
+        return prev;
+      }
 
-  const handleConversationSelect = async (conversationId: string) => {
+      if (prev && dims) {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(dims);
+        if (
+          prevKeys.length === nextKeys.length &&
+          prevKeys.every((key) => prev[key] === dims[key])
+        ) {
+          return prev;
+        }
+      }
+
+      return dims;
+    });
+  }, []);
+
+  const handleConversationSelect = useCallback(async (conversationId: string) => {
     await chat.loadConversation(conversationId);
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1535px)").matches) {
       setInsightsOpen(false);
     }
-  };
+  }, [chat]);
 
   const handleConversationDelete = async (conversationId: string) => {
     if (!conversationId) return;
