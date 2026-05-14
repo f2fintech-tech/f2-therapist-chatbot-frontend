@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -6,12 +6,16 @@ import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
-import { getDemoLoginCredentials, getStoredDemoSession, signInDemoAccount, signOutDemoAccount } from "@/utils/demoAuth";
 import { deleteLocalConversation } from "@/utils/localConversations";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
+import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
+import { signInUser, signUpUser, signInGuest, fetchHearts } from "@/lib/backendAuth";
 
-const loginDefaults = getDemoLoginCredentials();
+const loginDefaults = {
+  username: "",
+  password: "",
+};
 
 export default function FinHealChat() {
   const getInitialMainView = () => {
@@ -31,10 +35,12 @@ export default function FinHealChat() {
     return "chat" as const;
   };
 
-  const [authSession, setAuthSession] = useState(() => getStoredDemoSession());
+  const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
   const [loginUsername, setLoginUsername] = useState(loginDefaults.username);
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -44,22 +50,74 @@ export default function FinHealChat() {
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
   const chat = useBackendChat(userId);
 
-  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const session = signInDemoAccount(loginUsername, loginPassword);
-    if (!session) {
-      setLoginError("Invalid demo credentials. Use the sample username and password shown on the card.");
+  const persistSession = (session: typeof authSession) => {
+    if (session) {
+      setStoredAuthSession(session);
+      setAuthSession(session);
+    }
+  };
+
+  const refreshHearts = useCallback(async () => {
+    if (!authSession?.userId) {
       return;
     }
 
-    setAuthSession(session);
+    try {
+      const hearts = await fetchHearts(authSession.userId);
+      const nextSession = { ...authSession, hearts };
+      setStoredAuthSession(nextSession);
+      setAuthSession(nextSession);
+    } catch {
+      // Ignore refresh failures; hearts may still be available from the stored session.
+    }
+  }, [authSession]);
+
+  useEffect(() => {
+    if (authSession?.userId && authSession.hearts == null) {
+      void refreshHearts();
+    }
+  }, [authSession, refreshHearts]);
+
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setLoginError(null);
-    setCurrentMoodDims(null);
-    setMainView("chat");
+    setIsSubmitting(true);
+
+    try {
+      const payload = authMode === "signup"
+        ? await signUpUser(loginUsername.trim(), loginPassword, authSession?.isGuest ? authSession.userId : undefined)
+        : await signInUser(loginUsername.trim(), loginPassword);
+
+      persistSession(payload);
+      setCurrentMoodDims(null);
+      setMainView("chat");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to authenticate. Please try again.";
+      setLoginError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    setLoginError(null);
+    setIsSubmitting(true);
+
+    try {
+      const session = await signInGuest(authSession?.isGuest ? authSession.userId : undefined);
+      persistSession(session);
+      setCurrentMoodDims(null);
+      setMainView("chat");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sign in as guest.";
+      setLoginError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleLogout = () => {
-    signOutDemoAccount();
+    clearStoredAuthSession();
     setAuthSession(null);
     setLoginError(null);
     setCurrentMoodDims(null);
@@ -67,6 +125,11 @@ export default function FinHealChat() {
     setInsightsOpen(false);
     setMainView("chat");
   };
+
+  const handleSendMessage = useCallback(async (text: string) => {
+    await chat.sendMessage(text);
+    await refreshHearts();
+  }, [chat, refreshHearts]);
 
   const handleMoodUpdate = useCallback((dims: MoodDimensions | null) => {
     setCurrentMoodDims((prev) => {
@@ -143,42 +206,59 @@ export default function FinHealChat() {
   if (!authSession || !userProfile) {
     return (
       <div className="flex min-h-[100dvh] w-full items-center justify-center bg-[radial-gradient(circle_at_top,_#eef0fd_0%,_#f8fafc_42%,_#ffffff_100%)] p-4">
-        <div className="w-full max-w-[460px] rounded-[28px] border border-gray-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] sm:p-8">
-          <div className="mb-6 flex items-center gap-4">
+        <div className="w-full max-w-[520px] rounded-[28px] border border-gray-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] sm:p-8">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-primary text-2xl text-white shadow-[0_10px_24px_rgba(50,68,230,0.22)]">
               💙
             </div>
             <div>
-              <div className="text-[22px] font-bold text-gray-900">F2 FinHeal</div>
-              <div className="text-sm text-gray-500">Demo login for chats and goals</div>
+              <div className="text-[22px] font-bold text-gray-900">Login or sign up</div>
+              <div className="text-sm text-gray-500">Access the FinHeal chat with persistent account authentication.</div>
             </div>
           </div>
 
-          <div className="mb-5 rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] p-4 text-sm text-gray-600">
-            Use the sample demo profile below. The login is stored in your browser so the same chats and goals reopen after refresh or restart.
+          <div className="mb-6 rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] p-4 text-sm text-gray-600">
+            Create a new account, sign in with existing credentials, or continue as a guest. Your session token is stored securely in browser storage.
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setAuthMode("login")}
+              className={`rounded-[14px] px-4 py-3 text-[14px] font-semibold transition ${authMode === "login" ? "bg-primary text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode("signup")}
+              className={`rounded-[14px] px-4 py-3 text-[14px] font-semibold transition ${authMode === "signup" ? "bg-primary text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
+              Create account
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Demo Username</span>
+              <span className="mb-2 block text-sm font-medium text-gray-700">Email</span>
               <input
                 value={loginUsername}
                 onChange={(event) => setLoginUsername(event.target.value)}
                 className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                placeholder={loginDefaults.username}
+                placeholder="you@example.com"
                 autoComplete="username"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Demo Password</span>
+              <span className="mb-2 block text-sm font-medium text-gray-700">Password</span>
               <input
                 type="password"
                 value={loginPassword}
                 onChange={(event) => setLoginPassword(event.target.value)}
                 className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                placeholder="FinHeal@123"
-                autoComplete="current-password"
+                placeholder="Enter your password"
+                autoComplete={authMode === "signup" ? "new-password" : "current-password"}
               />
             </label>
 
@@ -190,16 +270,34 @@ export default function FinHealChat() {
 
             <button
               type="submit"
-              className="h-12 w-full rounded-[14px] bg-primary text-white font-semibold shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition hover:bg-[#1e2db8]"
+              disabled={isSubmitting}
+              className="h-12 w-full rounded-[14px] bg-primary text-white font-semibold shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition hover:bg-[#1e2db8] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Sign in to demo profile
+              {authMode === "signup" ? "Create account" : "Sign in"}
             </button>
           </form>
 
-          <div className="mt-5 rounded-[18px] border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            <div className="mb-2 font-semibold text-gray-800">Sample credentials</div>
-            <div>Username: {loginDefaults.username}</div>
-            <div>Password: {loginDefaults.password}</div>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              disabled={isSubmitting}
+              className="h-12 w-full rounded-[14px] border border-gray-200 bg-white text-gray-700 font-semibold transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto px-4"
+            >
+              Continue as guest
+            </button>
+            <div className="text-sm text-gray-500">
+              {authMode === "signup"
+                ? "Already have an account? "
+                : "No account yet? "}
+              <button
+                type="button"
+                onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")}
+                className="text-primary font-semibold hover:underline"
+              >
+                {authMode === "signup" ? "Sign in" : "Create account"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -226,9 +324,10 @@ export default function FinHealChat() {
           isLoading={chat.isLoading}
           messages={chat.messages}
           userProfile={userProfile}
+          remainingHearts={authSession?.hearts ?? null}
           onClearChat={chat.clearMessages}
           onMoodUpdate={handleMoodUpdate}
-          onSendMessage={chat.sendMessage}
+          onSendMessage={handleSendMessage}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onLogout={handleLogout}

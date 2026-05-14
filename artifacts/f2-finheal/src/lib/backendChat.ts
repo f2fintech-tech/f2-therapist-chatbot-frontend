@@ -1,3 +1,5 @@
+import { getStoredAuthToken } from "@/utils/authSession";
+
 const DEFAULT_API_BASE_URL = "/api/v1";
 const DEFAULT_TIMEOUT_MS = 45000;
 
@@ -143,8 +145,11 @@ function buildUrl(baseUrl: string, path: string): string {
 
 function createHeaders(headers?: HeadersInit): Headers {
   const nextHeaders = new Headers(headers);
+  const storedToken = getStoredAuthToken();
 
-  if (configuredApiKey) {
+  if (storedToken) {
+    nextHeaders.set("Authorization", `Bearer ${storedToken}`);
+  } else if (configuredApiKey) {
     nextHeaders.set("Authorization", `Bearer ${configuredApiKey}`);
   }
 

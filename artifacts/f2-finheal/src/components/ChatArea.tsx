@@ -11,6 +11,7 @@ interface ChatAreaProps {
   isLoading: boolean;
   messages: ChatMessage[];
   userProfile: UserProfile;
+  remainingHearts?: number | null;
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
@@ -27,6 +28,7 @@ export default function ChatArea({
   isLoading,
   messages,
   userProfile,
+  remainingHearts,
   onClearChat,
   onMoodUpdate,
   onSendMessage,
@@ -207,6 +209,35 @@ export default function ChatArea({
               />
               FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
             </div>
+
+            {typeof remainingHearts === "number" && (
+              <div className="mt-[10px] rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px]">
+                <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
+                    <div className="mt-[6px] text-[12px] text-slate-500">Each chat uses 10 hearts. Refresh or sign up for more access.</div>
+                  </div>
+                  <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
+                    <span>❤️</span>
+                    <span>{remainingHearts} / 50</span>
+                  </div>
+                </div>
+
+                <div className="mt-[12px] h-[14px] overflow-hidden rounded-full bg-slate-200 shadow-inner">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r from-primary via-cyan-500 to-emerald-500 transition-all duration-500 ease-out ${
+                      remainingHearts <= 10 ? "shadow-[0_0_0_8px_rgba(254,226,226,0.16)]" : ""
+                    }`}
+                    style={{ width: `${Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%` }}
+                  />
+                </div>
+
+                <div className="mt-[10px] flex items-center justify-between text-[11px] text-slate-500">
+                  <span>{remainingHearts <= 0 ? "Hearts exhausted. Sign up for more access." : "Progress toward sign up — every chat reduces your hearts."}</span>
+                  <span className="font-semibold text-slate-700">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-[6px] sm:justify-end">
