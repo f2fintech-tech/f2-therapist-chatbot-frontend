@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
+import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
+import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
@@ -12,6 +14,23 @@ import { createUserProfile } from "@/utils/user";
 const loginDefaults = getDemoLoginCredentials();
 
 export default function FinHealChat() {
+  const getInitialMainView = () => {
+    if (typeof window === "undefined") {
+      return "chat" as const;
+    }
+
+    const view = new URLSearchParams(window.location.search).get("view");
+    if (view === "financial-literacy") {
+      return "financial-literacy" as const;
+    }
+
+    if (view === "tests") {
+      return "tests" as const;
+    }
+
+    return "chat" as const;
+  };
+
   const [authSession, setAuthSession] = useState(() => getStoredDemoSession());
   const [loginUsername, setLoginUsername] = useState(loginDefaults.username);
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
@@ -19,6 +38,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
@@ -35,6 +55,7 @@ export default function FinHealChat() {
     setAuthSession(session);
     setLoginError(null);
     setCurrentMoodDims(null);
+    setMainView("chat");
   };
 
   const handleLogout = () => {
@@ -44,6 +65,7 @@ export default function FinHealChat() {
     setCurrentMoodDims(null);
     setSidebarOpen(false);
     setInsightsOpen(false);
+    setMainView("chat");
   };
 
   const handleMoodUpdate = (dims: MoodDimensions) => {
@@ -89,6 +111,17 @@ export default function FinHealChat() {
 
   const closeSidebar = () => setSidebarOpen(false);
   const closeInsights = () => setInsightsOpen(false);
+  const openChatView = () => setMainView("chat");
+  const openTestCatalog = () => setMainView("tests");
+  const openFinancialLiteracyInNewTab = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("view", "financial-literacy");
+    window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+  };
 
   if (!authSession || !userProfile) {
     return (
@@ -164,22 +197,37 @@ export default function FinHealChat() {
         sessionId={chat.conversationId ?? "new-conversation"}
         isOpen={sidebarOpen}
         onClose={closeSidebar}
+        onOpenChat={openChatView}
+        onOpenFinancialHealthTests={openTestCatalog}
       />
-      <ChatArea
-        conversationId={chat.conversationId}
-        conversationCount={chat.conversationCount}
-        error={chat.error}
-        isHealthy={chat.isHealthy}
-        isLoading={chat.isLoading}
-        messages={chat.messages}
-        userProfile={userProfile}
-        onClearChat={chat.clearMessages}
-        onMoodUpdate={handleMoodUpdate}
-        onSendMessage={chat.sendMessage}
-        onToggleSidebar={() => setSidebarOpen((open) => !open)}
-        onToggleInsights={() => setInsightsOpen((open) => !open)}
-        onLogout={handleLogout}
-      />
+      {mainView === "chat" ? (
+        <ChatArea
+          conversationId={chat.conversationId}
+          conversationCount={chat.conversationCount}
+          error={chat.error}
+          isHealthy={chat.isHealthy}
+          isLoading={chat.isLoading}
+          messages={chat.messages}
+          userProfile={userProfile}
+          onClearChat={chat.clearMessages}
+          onMoodUpdate={handleMoodUpdate}
+          onSendMessage={chat.sendMessage}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onLogout={handleLogout}
+        />
+      ) : mainView === "tests" ? (
+        <FinancialHealthTestCatalog
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+        />
+      ) : (
+        <FinancialLiteracyTestView
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+        />
+      )}
       <InsightsPanel
         conversationId={chat.conversationId}
         conversations={chat.conversations}
