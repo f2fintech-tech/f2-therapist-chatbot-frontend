@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
-import { listUserGoals, createGoal, deleteGoal } from "@/utils/localGoals";
+import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import type { Goal } from "@/utils/localGoals";
 
@@ -56,6 +56,13 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
 
+  // edit goal state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    targetAmount: "",
+  });
+
   const handleConfirmDelete = () => {
     if (!goalIdToDelete) return;
     deleteGoal(goalIdToDelete);
@@ -67,6 +74,51 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
   const handleCancelDelete = () => {
     setIsDeleteDialogOpen(false);
     setGoalIdToDelete(null);
+  };
+
+  const handleEditGoal = (goal: Goal) => {
+    setEditingGoalId(goal.id);
+    setEditFormData({
+      targetAmount: goal.targetAmount.toString(),
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEditGoal = () => {
+    if (!editingGoalId) return;
+    if (!editFormData.targetAmount.trim()) {
+      alert("Please enter a target amount");
+      return;
+    }
+    
+    const targetAmount = parseFloat(editFormData.targetAmount);
+    
+    if (isNaN(targetAmount)) {
+      alert("Please enter a valid number");
+      return;
+    }
+    
+    if (targetAmount <= 0) {
+      alert("Target amount must be greater than 0");
+      return;
+    }
+    
+    updateGoal(editingGoalId, { targetAmount });
+    const updatedGoals = goals.map(g => 
+      g.id === editingGoalId 
+        ? { ...g, targetAmount }
+        : g
+    );
+    setGoals(updatedGoals);
+    setIsEditDialogOpen(false);
+    setEditingGoalId(null);
+    setEditFormData({ targetAmount: "" });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditDialogOpen(false);
+    setEditingGoalId(null);
+    setEditFormData({ targetAmount: "" });
   };
 
   const moods = [
@@ -247,13 +299,24 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                           <span className="text-[16px]">{goal.icon}</span>
                           <span className="text-[12px] font-semibold text-gray-700 truncate">{goal.name}</span>
                         </div>
-                            <button
-                              onClick={() => handleDeleteGoal(goal.id)}
-                              className="text-[11px] text-gray-400 hover:text-red-500 font-semibold"
-                              aria-label={`Delete goal ${goal.name}`}
-                            >
-                              ✕
-                            </button>
+                        <div className="flex items-center gap-[6px]">
+                          <button
+                            onClick={() => handleEditGoal(goal)}
+                            className="text-[11px] text-gray-400 hover:text-primary font-semibold transition-colors"
+                            aria-label={`Edit goal ${goal.name}`}
+                            title="Edit goal"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGoal(goal.id)}
+                            className="text-[11px] text-gray-400 hover:text-red-500 font-semibold transition-colors"
+                            aria-label={`Delete goal ${goal.name}`}
+                            title="Delete goal"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                       <div className="h-[3px] bg-gray-200 rounded-[3px] mb-[6px] overflow-hidden">
                         <div
@@ -310,6 +373,51 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />
+      
+      {/* Edit goal modal */}
+      {isEditDialogOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[14px] p-[24px] max-w-[400px] w-full shadow-lg">
+            <div className="flex items-center justify-between mb-[16px]">
+              <h2 className="text-[16px] font-bold text-gray-900">Edit Goal Target Amount</h2>
+              <button
+                onClick={handleCancelEdit}
+                className="text-[20px] text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-[12px]">
+              <div>
+                <label className="text-[12px] font-semibold text-gray-700 block mb-[6px]">Target Amount</label>
+                <input
+                  type="number"
+                  value={editFormData.targetAmount}
+                  onChange={e => setEditFormData({ ...editFormData, targetAmount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[8px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-[10px] mt-[20px]">
+              <button
+                onClick={handleCancelEdit}
+                className="flex-1 py-[10px] px-[16px] border border-gray-300 rounded-[8px] text-[13px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEditGoal}
+                className="flex-1 py-[10px] px-[16px] bg-primary text-white rounded-[8px] text-[13px] font-semibold hover:opacity-90 transition-opacity"
+              >
+                Update Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </aside>
     </>
   );
