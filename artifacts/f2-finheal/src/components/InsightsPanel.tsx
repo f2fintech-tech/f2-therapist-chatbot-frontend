@@ -176,22 +176,22 @@ export default function InsightsPanel({
                     <div className="flex-1 min-w-0">
                       <div className="text-[11.5px] font-semibold text-gray-700 truncate">{goal.name}</div>
                     </div>
-                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-[11px] text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
+                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
                   </div>
                   <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
                     <div className="h-full rounded-[3px] transition-all" style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }} />
                   </div>
                   <div className="flex justify-between items-center">
-                    <div className="text-[10px] text-gray-400">{Math.round(progress)}%</div>
+                    <div className="text-[12px] text-green-500">{Math.round(progress)}%</div>
                     {isEditing ? (
                       <div className="flex gap-[4px]">
-                        <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="w-[45px] text-[10px] border rounded" autoFocus />
+                        <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="w-[85px] text-[12px] border rounded" autoFocus />
                         <button onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)} className="text-[10px] bg-primary text-white px-2 py-1 rounded">Update</button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 cursor-pointer" onClick={() => { setEditingGoalId(goal.id); setEditAmount(goal.currentAmount.toString()); }}>
-                        <span className="text-[10px] font-medium" style={{ color: goal.color }}>{goal.currency}{goal.currentAmount}</span>
-                        <span className="text-[10px]">✏️</span>
+                        <span className="text-[12px] font-medium" style={{ color: goal.color }}>{goal.currency}{goal.currentAmount}</span>
+                        <span className="text-[12px]">✏️</span>
                       </div>
                     )}
                   </div>
