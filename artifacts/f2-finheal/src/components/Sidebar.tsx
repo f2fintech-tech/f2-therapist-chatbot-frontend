@@ -13,11 +13,12 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenChat: () => void;
+  onStartNewChat: () => void;
   onOpenFinancialHealthTests: () => void;
   initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onOpenFinancialHealthTests, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -131,7 +132,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
 
   const handleOpenTalkToFinHeal = () => {
     setActiveNav("Talk to FinHeal");
-    onOpenChat();
+    onStartNewChat();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -166,7 +167,12 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
       )}
       {/* Mobile Drawer */}
       <aside className={`fixed left-0 top-0 bottom-0 w-[268px] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 xl:static xl:rounded-[20px] xl:w-[clamp(240px,18vw,280px)] xl:min-w-[240px] xl:max-w-[280px] xl:h-full xl:min-h-0 xl:shadow-sm xl:border xl:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} xl:translate-x-0`}>
-      <div className="px-[16px] py-[18px] pb-[14px] flex items-center gap-[11px] border-b border-gray-100 sm:px-[18px] sm:py-[20px] sm:pb-[16px]">
+      <button
+        type="button"
+        onClick={handleOpenTalkToFinHeal}
+        className="w-full px-[16px] py-[18px] pb-[14px] flex items-center gap-[11px] border-b border-gray-100 text-left transition-colors hover:bg-gray-50 sm:px-[18px] sm:py-[20px] sm:pb-[16px]"
+        aria-label="Start a new chat"
+      >
         <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
           💙
           <div className="absolute -top-[10px] -right-[10px] w-[30px] h-[30px] bg-white/15 rounded-full" />
@@ -175,7 +181,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
           <div className="text-[15px] font-bold text-gray-900 tracking-tight">F2 FinHeal</div>
           <div className="text-[10px] font-medium text-primary tracking-wide uppercase">Financial Wellness AI</div>
         </div>
-      </div>
+      </button>
 
       {/* Wellness Score Card */}
       <div className="mx-[12px] my-[14px] bg-primary rounded-[14px] p-[16px] relative overflow-hidden cursor-pointer transition-all hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] sm:p-[18px]">

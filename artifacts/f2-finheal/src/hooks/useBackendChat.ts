@@ -25,6 +25,7 @@ export interface UseBackendChatResult {
   sendMessage: (message: string) => Promise<void>;
   stopSendingMessage: () => void;
   clearMessages: () => void;
+  clearConversation: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
 }
@@ -251,6 +252,16 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     setMessages([]);
   }, []);
 
+  const clearConversation = useCallback(() => {
+    activeSendControllerRef.current?.abort();
+    activeSendControllerRef.current = null;
+    setMessages([]);
+    setConversationId(null);
+    setError(null);
+    setIsLoading(false);
+    setIsSendingMessage(false);
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -263,6 +274,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     sendMessage,
     stopSendingMessage,
     clearMessages,
+    clearConversation,
     loadConversation,
     refreshConversations,
   };
