@@ -14,11 +14,12 @@ interface SidebarProps {
   onClose: () => void;
   onOpenChat: () => void;
   onOpenFinancialHealthTests: () => void;
+  initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onOpenFinancialHealthTests }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onOpenFinancialHealthTests, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
-  const [activeNav, setActiveNav] = useState("Talk to FinHeal");
+  const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [formData, setFormData] = useState({
@@ -37,6 +38,10 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
     const userGoals = listUserGoals(userId);
     setGoals(userGoals);
   }, [userId]);
+
+  useEffect(() => {
+    setActiveNav(initialActiveNav);
+  }, [initialActiveNav]);
 
   const handleCreateGoal = () => {
     if (!formData.name.trim() || !formData.targetAmount.trim()) {

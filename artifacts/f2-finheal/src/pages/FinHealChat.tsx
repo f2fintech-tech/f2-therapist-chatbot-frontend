@@ -193,6 +193,9 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
+  const activeSidebarNav = mainView === "chat"
+    ? "Talk to FinHeal"
+    : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") {
       return;
@@ -314,6 +317,7 @@ export default function FinHealChat() {
         onClose={closeSidebar}
         onOpenChat={openChatView}
         onOpenFinancialHealthTests={openTestCatalog}
+        initialActiveNav={activeSidebarNav}
       />
       {mainView === "chat" ? (
         <ChatArea

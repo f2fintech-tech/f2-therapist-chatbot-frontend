@@ -45,6 +45,27 @@ export default function InsightsPanel({
   const [isChatDeleteDialogOpen, setIsChatDeleteDialogOpen] = useState(false);
   const [chatIdToDelete, setChatIdToDelete] = useState<string | null>(null);
 
+  const getDaysLeftInMonth = useCallback(() => {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    })
+      .formatToParts(now)
+      .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {} as Record<string, string>);
+
+    const year = Number(parts.year);
+    const month = Number(parts.month);
+    const day = Number(parts.day);
+    const currentDate = new Date(year, month - 1, day);
+    const nextMonthStart = new Date(year, month, 1);
+    const millisPerDay = 24 * 60 * 60 * 1000;
+
+    return Math.max(0, Math.ceil((nextMonthStart.getTime() - currentDate.getTime()) / millisPerDay));
+  }, []);
+
   useEffect(() => {
     const goals = listUserGoals(userId);
     setGoalsList(goals);
@@ -133,8 +154,8 @@ export default function InsightsPanel({
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Goals</div>
           </div>
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{wellness?.active_days || 21}</div>
-            <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Days</div>
+            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{getDaysLeftInMonth()}</div>
+            <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Days Left</div>
           </div>
         </div>
       </div>
