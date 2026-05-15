@@ -155,7 +155,7 @@ export default function InsightsPanel({
           </div>
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
             <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{getDaysLeftInMonth()}</div>
-            <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Days Left</div>
+            <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Days until month end</div>
           </div>
         </div>
       </div>
