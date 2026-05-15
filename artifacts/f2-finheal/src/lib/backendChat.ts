@@ -135,6 +135,7 @@ export interface BackendRequestError extends Error {
 interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   expectJson?: boolean;
+  signal?: AbortSignal;
 }
 
 function buildUrl(baseUrl: string, path: string): string {
@@ -207,12 +208,32 @@ async function parseResponseBody<T>(response: Response, expectJson: boolean): Pr
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, expectJson = true, headers, ...init } = options;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, expectJson = true, headers, signal, ...init } = options;
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  let abortedByTimeout = false;
+  let abortedByExternalSignal = false;
   const url = buildUrl(normalizedApiBaseUrl, path);
 
+  const handleExternalAbort = () => {
+    abortedByExternalSignal = true;
+    controller.abort();
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      abortedByExternalSignal = true;
+      controller.abort();
+    } else {
+      signal.addEventListener("abort", handleExternalAbort, { once: true });
+    }
+  }
+
   try {
+    const timeoutId = window.setTimeout(() => {
+      abortedByTimeout = true;
+      controller.abort();
+    }, timeoutMs);
+
     const response = await fetch(url, {
       ...init,
       signal: controller.signal,
@@ -231,8 +252,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
     return parseResponseBody<T>(response, expectJson);
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      if (abortedByExternalSignal || signal?.aborted) {
+        throw createRequestError("Request cancelled.", { code: "cancelled" });
+      }
+
+      if (abortedByTimeout) {
+        throw createRequestError("Request timed out. Please try again.", { code: "timeout", isTimeout: true });
+      }
+    }
+
     throw normalizeBackendError(error);
   } finally {
+    if (signal) {
+      signal.removeEventListener("abort", handleExternalAbort);
+    }
     window.clearTimeout(timeoutId);
   }
 }
@@ -371,11 +405,12 @@ export async function sendChatMessage(payload: {
   message: string;
   user_id: string;
   conversation_id?: string;
-}): Promise<BackendChatResponse> {
+}, signal?: AbortSignal): Promise<BackendChatResponse> {
   return request<BackendChatResponse>("chat/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
 }
 

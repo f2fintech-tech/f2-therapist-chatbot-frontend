@@ -16,12 +16,14 @@ import { listLocalConversations, upsertLocalConversation, getLocalConversationMe
 export interface UseBackendChatResult {
   messages: ChatMessage[];
   isLoading: boolean;
+  isSendingMessage: boolean;
   error: BackendRequestError | null;
   conversationId: string | null;
   isHealthy: boolean | null;
   conversations: ConversationSummary[];
   conversationCount: number;
   sendMessage: (message: string) => Promise<void>;
+  stopSendingMessage: () => void;
   clearMessages: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
@@ -59,11 +61,13 @@ function createAssistantMessage(response: {
 export function useBackendChat(userId: string): UseBackendChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [error, setError] = useState<BackendRequestError | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const bootstrappedUserId = useRef<string | null>(null);
+  const activeSendControllerRef = useRef<AbortController | null>(null);
 
   const conversationCount = useMemo(() => conversations.length, [conversations]);
 
@@ -118,13 +122,15 @@ export function useBackendChat(userId: string): UseBackendChatResult {
   const sendMessage = useCallback(
     async (message: string) => {
       const trimmedMessage = message.trim();
-      if (!trimmedMessage || !userId) {
+      if (!trimmedMessage || !userId || isSendingMessage) {
         return;
       }
 
+      const controller = new AbortController();
+      activeSendControllerRef.current = controller;
       const optimisticMessage = createUserMessage(trimmedMessage);
       setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
-      setIsLoading(true);
+      setIsSendingMessage(true);
       setError(null);
 
       try {
@@ -132,7 +138,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
           message: trimmedMessage,
           user_id: userId,
           conversation_id: conversationId ?? undefined,
-        });
+        }, controller.signal);
 
         setConversationId(response.conversation_id);
         const assistantMsg = createAssistantMessage(response);
@@ -148,14 +154,27 @@ export function useBackendChat(userId: string): UseBackendChatResult {
 
         await refreshConversations();
       } catch (caughtError) {
+        const normalizedError = normalizeBackendError(caughtError);
         setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
-        setError(normalizeBackendError(caughtError));
+
+        if (normalizedError.code !== "cancelled") {
+          setError(normalizedError);
+        } else {
+          setError(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (activeSendControllerRef.current === controller) {
+          activeSendControllerRef.current = null;
+        }
+        setIsSendingMessage(false);
       }
     },
-    [conversationId, refreshConversations, userId],
+    [conversationId, isSendingMessage, refreshConversations, userId],
   );
+
+  const stopSendingMessage = useCallback(() => {
+    activeSendControllerRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -233,12 +252,14 @@ export function useBackendChat(userId: string): UseBackendChatResult {
   return {
     messages,
     isLoading,
+    isSendingMessage,
     error,
     conversationId,
     isHealthy,
     conversations,
     conversationCount,
     sendMessage,
+    stopSendingMessage,
     clearMessages,
     loadConversation,
     refreshConversations,

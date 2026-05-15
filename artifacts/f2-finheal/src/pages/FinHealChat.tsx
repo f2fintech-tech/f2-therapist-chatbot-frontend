@@ -326,12 +326,14 @@ export default function FinHealChat() {
           error={chat.error}
           isHealthy={chat.isHealthy}
           isLoading={chat.isLoading}
+          isSendingMessage={chat.isSendingMessage}
           messages={chat.messages}
           userProfile={userProfile}
           remainingHearts={authSession?.hearts ?? null}
           onClearChat={chat.clearMessages}
           onMoodUpdate={handleMoodUpdate}
           onSendMessage={handleSendMessage}
+          onStopSendingMessage={chat.stopSendingMessage}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onLogout={handleLogout}

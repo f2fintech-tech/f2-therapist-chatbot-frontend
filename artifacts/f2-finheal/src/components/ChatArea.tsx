@@ -9,12 +9,14 @@ interface ChatAreaProps {
   error: BackendRequestError | null;
   isHealthy: boolean | null;
   isLoading: boolean;
+  isSendingMessage: boolean;
   messages: ChatMessage[];
   userProfile: UserProfile;
   remainingHearts?: number | null;
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
+  onStopSendingMessage: () => void;
   onLogout?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
@@ -26,12 +28,14 @@ export default function ChatArea({
   error,
   isHealthy,
   isLoading,
+  isSendingMessage,
   messages,
   userProfile,
   remainingHearts,
   onClearChat,
   onMoodUpdate,
   onSendMessage,
+  onStopSendingMessage,
   onLogout,
   onToggleSidebar,
   onToggleInsights,
@@ -56,7 +60,7 @@ export default function ChatArea({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isSendingMessage]);
 
   // Alternative: scroll last message into view as fallback
   useEffect(() => {
@@ -110,7 +114,7 @@ export default function ChatArea({
   }, [aggregatedMood, onMoodUpdate]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || isLoading || isSendingMessage) return;
 
     setInputValue("");
 
@@ -122,7 +126,7 @@ export default function ChatArea({
   };
 
   const handleFileSelected = async (file: File | null) => {
-    if (!file) return;
+    if (!file || isLoading || isSendingMessage) return;
     const reader = new FileReader();
     reader.onload = async () => {
       const result = reader.result as string | ArrayBuffer | null;
@@ -137,7 +141,7 @@ export default function ChatArea({
   };
 
   const startRecording = async () => {
-    if (isRecording) return;
+    if (isRecording || isLoading || isSendingMessage) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -168,9 +172,10 @@ export default function ChatArea({
   const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
   const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
   const conversationStartDate = messages.find((message) => message.timestamp)?.timestamp;
+  const showTypingIndicator = isLoading || isSendingMessage;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !isLoading && !isSendingMessage) {
       e.preventDefault();
       void handleSend(inputValue);
     }
@@ -346,7 +351,7 @@ export default function ChatArea({
           </div>
         )}
 
-        {isLoading && (
+        {showTypingIndicator && (
           <div className="flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto pb-[14px]">
             <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
             <div className="bg-white border-[1.5px] border-gray-100 rounded-[4px_14px_14px_14px] p-[14px_18px] flex gap-[5px] items-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -371,7 +376,7 @@ export default function ChatArea({
             style={{ height: "auto" }}
           />
           <div className="flex flex-wrap gap-[5px] items-center justify-center pb-[1px] sm:flex-nowrap">
-            <label className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
+            <label className={`w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${isLoading || isSendingMessage ? "pointer-events-none opacity-40" : ""}`}>
               📎
               <input
                 type="file"
@@ -381,21 +386,38 @@ export default function ChatArea({
               />
             </label>
             <button
+              type="button"
               onClick={() => (isRecording ? stopRecording() : void startRecording())}
-              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+              disabled={isLoading || isSendingMessage}
+              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
               aria-pressed={isRecording}
             >
               {isRecording ? '⏺' : '🎙'}
             </button>
-            <button 
-              onClick={() => void handleSend(inputValue)}
-              disabled={isLoading || !inputValue.trim()}
-              className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </button>
+            {isSendingMessage ? (
+              <button
+                type="button"
+                onClick={onStopSendingMessage}
+                className="w-[36px] h-[36px] rounded-full bg-red-500 text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(239,68,68,0.28)] shrink-0 hover:bg-red-600 hover:scale-105 active:scale-95"
+                aria-label="Stop generating response"
+                title="Stop generating response"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={() => void handleSend(inputValue)}
+                disabled={isLoading || !inputValue.trim()}
+                className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         <div className="max-w-[800px] mx-auto mt-[7px] text-[10.5px] text-gray-400 text-center">
