@@ -212,6 +212,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const controller = new AbortController();
   let abortedByTimeout = false;
   let abortedByExternalSignal = false;
+  let timeoutId: number | undefined;
   const url = buildUrl(normalizedApiBaseUrl, path);
 
   const handleExternalAbort = () => {
@@ -229,7 +230,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   try {
-    const timeoutId = window.setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       abortedByTimeout = true;
       controller.abort();
     }, timeoutMs);
@@ -267,7 +268,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (signal) {
       signal.removeEventListener("abort", handleExternalAbort);
     }
-    window.clearTimeout(timeoutId);
+    if (typeof timeoutId === "number") {
+      window.clearTimeout(timeoutId);
+    }
   }
 }
 
