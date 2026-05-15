@@ -47,12 +47,14 @@ function createAssistantMessage(response: {
   mood?: { primary_emotion?: string; label?: string; dimensions?: MoodDimensions };
   suggestions?: string[];
 }): ChatMessage {
+  // Use browser's local time for consistency with user messages
+  const timestamp = new Date().toISOString();
   return {
     id: response.message_id,
     role: "bot",
     content: response.response,
-    timestamp: response.timestamp,
-    time: formatMessageTimestamp(response.timestamp),
+    timestamp,
+    time: formatMessageTimestamp(timestamp),
     mood: response.mood,
     suggestions: response.suggestions,
   };
@@ -141,18 +143,10 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         }, controller.signal);
 
         setConversationId(response.conversation_id);
-        // Use server timestamp for user message to ensure consistency with bot messages
-        const userMessageWithServerTime: ChatMessage = {
-          ...optimisticMessage,
-          timestamp: response.timestamp,
-          time: formatMessageTimestamp(response.timestamp),
-        };
         const assistantMsg = createAssistantMessage(response);
         const conversationTitle = response.title?.trim() || trimmedMessage.substring(0, 60).trim();
         setMessages((currentMessages) => {
-          // Replace optimistic message with server-timestamped version
-          const withoutOptimistic = currentMessages.filter((entry) => entry.id !== optimisticMessage.id);
-          const next = [...withoutOptimistic, userMessageWithServerTime, assistantMsg];
+          const next = [...currentMessages, assistantMsg];
           // Persist to localStorage as fallback
           try {
             upsertLocalConversation(response.conversation_id, userId, next, conversationTitle);
