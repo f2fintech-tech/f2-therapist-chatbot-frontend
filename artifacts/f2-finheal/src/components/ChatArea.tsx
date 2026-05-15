@@ -376,42 +376,56 @@ export default function ChatArea({
             style={{ height: "auto" }}
           />
           <div className="flex flex-wrap gap-[5px] items-center justify-center pb-[1px] sm:flex-nowrap">
-              <label
-                className={`w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${isLoading || isSendingMessage ? "pointer-events-none opacity-40" : ""}`}
-                aria-label="Attach file"
-                title="Attach file"
+              <div className="relative group">
+                <label
+                  className={`w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${isLoading || isSendingMessage ? "pointer-events-none opacity-40" : ""}`}
+                  aria-label="Attach file"
+                  title="Attach file"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-8.48 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" />
+                  </svg>
+                  <input
+                    type="file"
+                    accept="*/*"
+                    onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
+                    className="hidden"
+                  />
+                </label>
+
+                <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
+                  <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">Attach file</div>
+                  <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
+                </div>
+              </div>
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={() => (isRecording ? stopRecording() : void startRecording())}
+                disabled={isLoading || isSendingMessage}
+                className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
+                aria-pressed={isRecording}
+                aria-label={isRecording ? "Stop recording" : "Record audio"}
+                title={isRecording ? "Stop recording" : "Record audio"}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-8.48 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" />
-                </svg>
-                <input
-                  type="file"
-                  accept="*/*"
-                  onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
-                  className="hidden"
-                />
-              </label>
-            <button
-              type="button"
-              onClick={() => (isRecording ? stopRecording() : void startRecording())}
-              disabled={isLoading || isSendingMessage}
-              className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
-              aria-pressed={isRecording}
-              aria-label={isRecording ? "Stop recording" : "Record audio"}
-              title={isRecording ? "Stop recording" : "Record audio"}
-            >
-              {isRecording ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 1v11" />
-                  <path d="M8 5a4 4 0 0 0 8 0" />
-                  <path d="M19 11v1a7 7 0 0 1-14 0v-1" />
-                </svg>
-              )}
-            </button>
+                {isRecording ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 1v11" />
+                    <path d="M8 5a4 4 0 0 0 8 0" />
+                    <path d="M19 11v1a7 7 0 0 1-14 0v-1" />
+                  </svg>
+                )}
+              </button>
+
+              <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
+                <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">{isRecording ? 'Stop recording' : 'Record audio'}</div>
+                <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
+              </div>
+            </div>
             {isSendingMessage ? (
               <button
                 type="button"
