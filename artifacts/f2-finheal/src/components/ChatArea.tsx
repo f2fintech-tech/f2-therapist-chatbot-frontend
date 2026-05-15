@@ -140,6 +140,13 @@ export default function ChatArea({
     reader.readAsDataURL(file);
   };
 
+  const handleClearDraft = () => {
+    if (isLoading || isSendingMessage) return;
+
+    setInputValue("");
+    inputRef.current?.focus();
+  };
+
   const startRecording = async () => {
     if (isRecording || isLoading || isSendingMessage) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
@@ -246,7 +253,7 @@ export default function ChatArea({
           </div>
         </div>
         <div className="flex flex-wrap gap-[6px] sm:justify-end">
-          <button onClick={onClearChat} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]">
+          <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]" title="Clear draft text">
             🗑 Clear
           </button>
           {onLogout && (
