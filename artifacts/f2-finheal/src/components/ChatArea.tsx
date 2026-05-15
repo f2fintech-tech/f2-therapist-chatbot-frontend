@@ -392,7 +392,7 @@ export default function ChatArea({
               className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
               aria-pressed={isRecording}
             >
-              {isRecording ? '⏺' : '🎙'}
+              {isRecording ? '⏺' : '🎙️'}
             </button>
             {isSendingMessage ? (
               <button
