@@ -366,11 +366,11 @@ export default function ChatArea({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Type your message..."
-            className="flex-1 bg-transparent border-none outline-none text-gray-900 text-[13.5px] resize-none min-h-[22px] max-h-[100px] leading-[1.55] py-[3px] placeholder:text-gray-400"
+            className="flex-1 bg-transparent border-none outline-none text-gray-900 text-[16px] resize-none min-h-[22px] max-h-[100px] leading-[1.55] py-[6px] placeholder:text-gray-400"
             rows={1}
             style={{ height: "auto" }}
           />
-          <div className="flex flex-wrap gap-[5px] items-center justify-end pb-[1px] sm:flex-nowrap">
+          <div className="flex flex-wrap gap-[5px] items-center justify-center pb-[1px] sm:flex-nowrap">
             <label className="w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
               📎
               <input
