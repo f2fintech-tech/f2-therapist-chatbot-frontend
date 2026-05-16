@@ -37,6 +37,7 @@ minimumReleaseAge: 1440
 
 minimumReleaseAgeExclude:
   - '@replit/*'
+  - electron-to-chromium
   - stripe-replit-sync
 
 onlyBuiltDependencies:
