@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
+import LoanFitTestView from "@/components/LoanFitTestView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
@@ -32,6 +33,10 @@ export default function FinHealChat() {
       return "tests" as const;
     }
 
+    if (view === "loan-fit") {
+      return "loan-fit" as const;
+    }
+
     return "chat" as const;
   };
 
@@ -44,7 +49,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
@@ -193,6 +198,7 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
+  const openLoanFitTest = () => setMainView("loan-fit");
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -348,13 +354,22 @@ export default function FinHealChat() {
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+          onOpenLoanFitTest={openLoanFitTest}
         />
-      ) : (
+      ) : mainView === "financial-literacy" ? (
         <FinancialLiteracyTestView
           userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onBackToCatalog={openTestCatalog}
+        />
+      ) : (
+        <LoanFitTestView
+          userId={userId}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onBackToCatalog={openTestCatalog}
+          onOpenFinancialWellnessAssistant={openChatView}
         />
       )}
       <InsightsPanel

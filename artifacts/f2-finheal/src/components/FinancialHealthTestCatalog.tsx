@@ -4,6 +4,7 @@ interface FinancialHealthTestCatalogProps {
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onOpenFinancialLiteracyTest: () => void;
+  onOpenLoanFitTest: () => void;
 }
 
 type TestCard = {
@@ -82,7 +83,7 @@ const testCards: TestCard[] = [
   },
 ];
 
-export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest }: FinancialHealthTestCatalogProps) {
+export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenLoanFitTest }: FinancialHealthTestCatalogProps) {
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
@@ -210,10 +211,10 @@ export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleIn
                     <div className="text-[11px] text-gray-500">This slot will later hold the test route and instant score output.</div>
                     <button
                       type="button"
-                      onClick={test.id === "financial-literacy" ? onOpenFinancialLiteracyTest : undefined}
+                      onClick={test.id === "financial-literacy" ? onOpenFinancialLiteracyTest : test.id === "loan-fit" ? onOpenLoanFitTest : undefined}
                       className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
-                      {test.id === "financial-literacy" ? "Open in new tab" : "Open"}
+                      {test.id === "financial-literacy" ? "Open in new tab" : test.id === "loan-fit" ? "Start test" : "Open"}
                     </button>
                   </div>
                 </CardContent>
