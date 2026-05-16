@@ -3,7 +3,6 @@ import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
-import LoanFitTestView from "@/components/LoanFitTestView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
@@ -34,10 +33,6 @@ export default function FinHealChat() {
       return "tests" as const;
     }
 
-    if (view === "loan-fit") {
-      return "loan-fit" as const;
-    }
-
     return "chat" as const;
   };
 
@@ -50,7 +45,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
@@ -141,14 +136,8 @@ export default function FinHealChat() {
   };
 
   const handleLogout = () => {
-    const wasGuest = authSession?.isGuest ?? false;
     clearStoredAuthSession();
     setAuthSession(null);
-    if (wasGuest) {
-      window.localStorage.removeItem("finheal_quiz_completed");
-      window.localStorage.removeItem("finheal_user_tier");
-      window.localStorage.removeItem("finheal_quiz_score");
-    }
     setLoginError(null);
     setCurrentMoodDims(null);
     setSidebarOpen(false);
@@ -223,7 +212,6 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
-  const openLoanFitTest = () => setMainView("loan-fit");
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -249,15 +237,19 @@ export default function FinHealChat() {
             <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-primary text-2xl text-white shadow-[0_10px_24px_rgba(50,68,230,0.22)]">
               💙
             </div>
+    </>
             <div>
               <div className="text-[22px] font-bold text-gray-900">Login or sign up</div>
               <div className="text-sm text-gray-500">Access the FinHeal chat with persistent account authentication.</div>
             </div>
+    </>
           </div>
+    </>
 
           <div className="mb-6 rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] p-4 text-sm text-gray-600">
             Create a new account, sign in with existing credentials, or continue as a guest. Your session token is stored securely in browser storage.
           </div>
+    </>
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <button
@@ -275,6 +267,7 @@ export default function FinHealChat() {
               Create account
             </button>
           </div>
+    </>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <label className="block">
@@ -304,6 +297,7 @@ export default function FinHealChat() {
               <div className="rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
                 {loginError}
               </div>
+    </>
             )}
 
             <button
@@ -336,9 +330,13 @@ export default function FinHealChat() {
                 {authMode === "signup" ? "Sign in" : "Create account"}
               </button>
             </div>
+    </>
           </div>
+    </>
         </div>
+    </>
       </div>
+    </>
     );
   }
 
@@ -385,22 +383,13 @@ export default function FinHealChat() {
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
-          onOpenLoanFitTest={openLoanFitTest}
         />
-      ) : mainView === "financial-literacy" ? (
+      ) : (
         <FinancialLiteracyTestView
           userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onBackToCatalog={openTestCatalog}
-        />
-      ) : (
-        <LoanFitTestView
-          userId={userId}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onToggleInsights={() => setInsightsOpen((open) => !open)}
-          onBackToCatalog={openTestCatalog}
-          onOpenFinancialWellnessAssistant={openChatView}
         />
       )}
       <InsightsPanel
