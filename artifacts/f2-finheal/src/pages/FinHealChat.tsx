@@ -4,6 +4,7 @@ import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
 import LoanFitTestView from "@/components/LoanFitTestView";
+import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
@@ -37,6 +38,10 @@ export default function FinHealChat() {
       return "loan-fit" as const;
     }
 
+    if (view === "debt-balance") {
+      return "debt-balance" as const;
+    }
+
     return "chat" as const;
   };
 
@@ -49,7 +54,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit" | "debt-balance">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
@@ -199,6 +204,7 @@ export default function FinHealChat() {
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
   const openLoanFitTest = () => setMainView("loan-fit");
+  const openDebtBalanceReview = () => setMainView("debt-balance");
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -355,6 +361,7 @@ export default function FinHealChat() {
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
           onOpenLoanFitTest={openLoanFitTest}
+          onOpenDebtBalanceReview={openDebtBalanceReview}
         />
       ) : mainView === "financial-literacy" ? (
         <FinancialLiteracyTestView
@@ -363,8 +370,16 @@ export default function FinHealChat() {
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onBackToCatalog={openTestCatalog}
         />
-      ) : (
+      ) : mainView === "loan-fit" ? (
         <LoanFitTestView
+          userId={userId}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onBackToCatalog={openTestCatalog}
+          onOpenFinancialWellnessAssistant={openChatView}
+        />
+      ) : (
+        <DebtBalanceReviewView
           userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
