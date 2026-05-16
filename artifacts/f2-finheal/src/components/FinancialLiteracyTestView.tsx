@@ -775,8 +775,8 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
                         ? "border-emerald-200 bg-emerald-50"
                         : "border-gray-200 bg-white"
                     : isSelected
-                      ? "border-[#d4d8fa] bg-[#f6f7fe]"
-                      : "border-gray-200 bg-white";
+                      ? "border-primary bg-[#eef0fd] shadow-[0_10px_30px_rgba(50,68,230,0.12)]"
+                      : "border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f8f9ff]";
 
                   return (
                     <button
@@ -784,12 +784,30 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
                       type="button"
                       onClick={() => handleSelectAnswer(item.id, letter)}
                       disabled={currentAttempt.isFinished}
-                      className={`flex items-start gap-[10px] rounded-[14px] border px-[12px] py-[10px] text-left transition-colors hover:border-[#d4d8fa] hover:bg-[#f6f7fe] ${optionStateClass}`}
+                      className={`group flex w-full items-center justify-between rounded-[14px] border px-[12px] py-[10px] text-left transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary/10 ${optionStateClass}`}
                     >
-                      <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${showResultStyling && isSelected && option.isCorrect ? "bg-emerald-600 text-white" : showResultStyling && isSelected && !option.isCorrect ? "bg-rose-600 text-white" : showResultStyling && isAnswered && option.isCorrect ? "bg-emerald-600 text-white" : isSelected ? "bg-[#eef0fd] text-primary" : "bg-[#eef0fd] text-primary"}`}>
-                        {letter}
+                      <div className="flex items-start gap-[10px] flex-1">
+                        <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${showResultStyling && isSelected && option.isCorrect ? "bg-emerald-600 text-white" : showResultStyling && isSelected && !option.isCorrect ? "bg-rose-600 text-white" : showResultStyling && isAnswered && option.isCorrect ? "bg-emerald-600 text-white" : isSelected ? "bg-[#eef0fd] text-primary" : "bg-[#eef0fd] text-primary"}`}>
+                          {letter}
+                        </div>
+                        <div className={`flex-1 text-[13px] leading-[1.6] ${showResultStyling ? "text-gray-700" : isSelected ? "text-primary" : "text-gray-700"}`}>{option.text}</div>
                       </div>
-                      <div className="flex-1 text-[13px] leading-[1.6] text-gray-700">{option.text}</div>
+                      <span
+                        className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-all ml-3 ${
+                          showResultStyling && isSelected && option.isCorrect
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : showResultStyling && isSelected && !option.isCorrect
+                              ? "border-rose-600 bg-rose-600 text-white"
+                              : showResultStyling && isAnswered && option.isCorrect
+                                ? "border-emerald-600 bg-emerald-600 text-white"
+                                : isSelected
+                                  ? "border-primary bg-primary text-white"
+                                  : "border-gray-300 bg-white text-transparent group-hover:text-primary"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
                     </button>
                   );
                 })}
