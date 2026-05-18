@@ -18,6 +18,7 @@ interface ChatAreaProps {
   onSendMessage: (text: string) => Promise<void>;
   onStopSendingMessage: () => void;
   onLogout?: () => void;
+  onSignupPrompt?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
 }
@@ -37,6 +38,7 @@ export default function ChatArea({
   onSendMessage,
   onStopSendingMessage,
   onLogout,
+  onSignupPrompt,
   onToggleSidebar,
   onToggleInsights,
 }: ChatAreaProps) {
@@ -245,7 +247,16 @@ export default function ChatArea({
                 </div>
 
                 <div className="mt-[10px] flex items-center justify-between text-[11px] text-slate-500">
-                  <span>{remainingHearts <= 0 ? "Hearts exhausted. Sign up for more access." : "Progress toward sign up — every chat reduces your hearts."}</span>
+                  <span>
+                    {remainingHearts <= 0 ? (
+                      <button
+                        onClick={onSignupPrompt}
+                        className="font-semibold text-primary underline hover:text-[#1e2db8]"
+                      >
+                        Hearts exhausted — click here to sign up and continue chatting free
+                      </button>
+                    ) : "Progress toward sign up — every chat reduces your hearts."}
+                  </span>
                   <span className="font-semibold text-slate-700">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
                 </div>
               </div>

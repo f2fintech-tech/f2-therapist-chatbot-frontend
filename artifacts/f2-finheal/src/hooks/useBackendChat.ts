@@ -18,6 +18,7 @@ export interface UseBackendChatResult {
   isLoading: boolean;
   isSendingMessage: boolean;
   error: BackendRequestError | null;
+  heartsExhausted: boolean;
   conversationId: string | null;
   isHealthy: boolean | null;
   conversations: ConversationSummary[];
@@ -69,6 +70,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [heartsExhausted, setHeartsExhausted] = useState(false);
   const bootstrappedUserId = useRef<string | null>(null);
   const activeSendControllerRef = useRef<AbortController | null>(null);
 
@@ -161,7 +163,11 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
 
         if (normalizedError.code !== "cancelled") {
-          setError(normalizedError);
+          if (normalizedError.message.includes("402") || normalizedError.message.includes("Not enough hearts")) {
+            setHeartsExhausted(true);
+          } else {
+            setError(normalizedError);
+          }
         } else {
           setError(null);
         }
@@ -267,6 +273,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     isLoading,
     isSendingMessage,
     error,
+    heartsExhausted,
     conversationId,
     isHealthy,
     conversations,

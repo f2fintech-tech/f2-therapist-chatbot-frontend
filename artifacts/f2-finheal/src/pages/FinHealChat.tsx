@@ -62,6 +62,15 @@ export default function FinHealChat() {
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
   const chat = useBackendChat(userId);
 
+  // Show signup modal automatically when hearts run out
+  useEffect(() => {
+    if (chat.heartsExhausted && authSession?.isGuest) {
+      setAuthMode("signup");
+      clearStoredAuthSession();
+      setAuthSession(null);
+    }
+  }, [chat.heartsExhausted, authSession]);
+
   const [showQuizPopup, setShowQuizPopup] = useState(false);
 
   useEffect(() => {
@@ -397,6 +406,11 @@ export default function FinHealChat() {
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onLogout={handleLogout}
+          onSignupPrompt={() => {
+            setAuthMode("signup");
+            clearStoredAuthSession();
+            setAuthSession(null);
+          }}
         />
       ) : mainView === "tests" ? (
         <FinancialHealthTestCatalog
