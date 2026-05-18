@@ -31,10 +31,10 @@ const testCards: TestCard[] = [
   {
     id: "financial-literacy",
     title: "Financial Literacy Test",
-    description: "25 scenario-based MCQs covering literacy, leverage, liquidity, resilience, and behavior.",
-    duration: "10-12 min",
-    focus: "Scenario reasoning and personal finance judgment",
-    result: "Saved locally + score on finish",
+    description: "A 3-level assessment covering budgeting, credit, investing, taxes, and long-term planning.",
+    duration: "30 min total",
+    focus: "Level-based financial reasoning and practical money decisions",
+    result: "Level score, badge, and category insights",
     accent: "from-[#10b981] to-[#34d399]",
   },
   {

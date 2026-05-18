@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import FinancialLiteracyAssessment from "@/components/FinancialLiteracyAssessment";
 
 interface FinancialLiteracyTestViewProps {
   userId: string;
@@ -15,6 +16,7 @@ type QuestionItem = {
   question: string;
   options: [string, string, string, string];
   correctAnswer: AnswerLetter;
+  level: 1 | 2 | 3;
 };
 
 type ShuffledOption = {
@@ -38,12 +40,14 @@ type StoredAttempt = {
   isFinished: boolean;
   questions: ShuffledQuestion[];
   selectedAnswers: Record<number, AnswerLetter>;
+  level: number;
 };
 
 type LiteracyTestStorage = {
   version: 1;
   currentAttempt: StoredAttempt | null;
   history: StoredAttempt[];
+  selectedLevel?: number;
 };
 
 const STORAGE_PREFIX = "finheal_financial_literacy_test";
@@ -61,8 +65,9 @@ function shuffleArray<T>(items: T[]): T[] {
   return next;
 }
 
-function createShuffledQuestions(): ShuffledQuestion[] {
-  const shuffledQuestions = shuffleArray(questions);
+function createShuffledQuestions(level = 1): ShuffledQuestion[] {
+  const filtered = questions.filter((q) => q.level === level);
+  const shuffledQuestions = shuffleArray(filtered);
 
   return shuffledQuestions.map((question) => {
     const shuffledOptions = shuffleArray(
@@ -84,7 +89,7 @@ function createShuffledQuestions(): ShuffledQuestion[] {
   });
 }
 
-function createNewAttempt(): StoredAttempt {
+function createNewAttempt(level = 1): StoredAttempt {
   const now = new Date().toISOString();
   return {
     attemptId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -93,7 +98,8 @@ function createNewAttempt(): StoredAttempt {
     startedAt: null,
     finishedAt: null,
     isFinished: false,
-    questions: createShuffledQuestions(),
+    questions: createShuffledQuestions(level),
+    level,
     selectedAnswers: {},
   };
 }
@@ -116,7 +122,7 @@ function readStorage(userId: string): LiteracyTestStorage {
   try {
     const raw = window.localStorage.getItem(getStorageKey(userId));
     if (!raw) {
-      return { version: 1, currentAttempt: null, history: [] };
+      return { version: 1, currentAttempt: null, history: [], selectedLevel: 1 };
     }
 
     const parsed = JSON.parse(raw) as Partial<LiteracyTestStorage>;
@@ -128,9 +134,10 @@ function readStorage(userId: string): LiteracyTestStorage {
       version: 1,
       currentAttempt: parsed.currentAttempt ?? null,
       history: Array.isArray(parsed.history) ? parsed.history : [],
+      selectedLevel: typeof parsed.selectedLevel === "number" ? parsed.selectedLevel : 1,
     };
   } catch {
-    return { version: 1, currentAttempt: null, history: [] };
+    return { version: 1, currentAttempt: null, history: [], selectedLevel: 1 };
   }
 }
 
@@ -166,6 +173,7 @@ function getAttemptSummary(attempt: StoredAttempt) {
 const questions: QuestionItem[] = [
   {
     id: 1,
+    level: 1,
     question: "Rohan earns ₹1.2 lakh monthly but saves less than ₹5,000 because his expenses rise every time his salary increases. Which financial issue BEST explains his situation?",
     options: [
       "Liquidity imbalance caused by underinvestment",
@@ -177,6 +185,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 2,
+    level: 1,
     question: "A person keeps all savings in a low-interest account because they fear market volatility. Inflation consistently remains above the savings return rate. What is the MOST accurate interpretation?",
     options: [
       "The person is prioritizing nominal capital stability over real wealth preservation",
@@ -188,6 +197,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 3,
+    level: 1,
     question: "Priya pays only minimum dues on her credit card despite having sufficient income to pay more. Over time, what becomes the MOST financially damaging consequence?",
     options: [
       "Reduction in available credit utilization flexibility",
@@ -199,6 +209,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 4,
+    level: 1,
     question: "A salaried employee invests aggressively in equities but has no emergency fund and significant EMI obligations. Which risk is MOST immediate during an unexpected job loss?",
     options: [
       "Mark-to-market volatility exposure",
@@ -210,6 +221,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 5,
+    level: 1,
     question: "Which scenario BEST reflects healthy financial leverage?",
     options: [
       "Borrowing to fund recurring lifestyle upgrades during salary growth",
@@ -221,6 +233,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 6,
+    level: 1,
     question: "An investor exits all investments during a market crash to avoid further losses, but misses the eventual recovery. Which bias MOST likely influenced the decision?",
     options: [
       "Anchoring bias toward historical highs",
@@ -232,6 +245,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 7,
+    level: 1,
     question: "A person has high salary, expensive assets, minimal savings, and high monthly obligations. Which statement is MOST accurate?",
     options: [
       "Strong cash flow automatically offsets solvency concerns",
@@ -243,6 +257,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 8,
+    level: 1,
     question: "Which individual is MOST exposed to concentration risk?",
     options: [
       "Investor holding diversified mutual funds across sectors",
@@ -254,6 +269,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 9,
+    level: 2,
     question: "A freelancer earns irregular but high income and spends aggressively during strong earning months without reserve planning. Which financial weakness is MOST evident?",
     options: [
       "Cyclical income volatility without liquidity buffering",
@@ -265,6 +281,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 10,
+    level: 2,
     question: "Why is an emergency fund generally recommended before aggressive investing?",
     options: [
       "It improves portfolio diversification mathematically",
@@ -276,6 +293,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 11,
+    level: 2,
     question: "A person takes a personal loan for discretionary purchases while already struggling with existing EMIs. Which risk is MOST likely increasing?",
     options: [
       "Behavioral overleveraging combined with repayment fragility",
@@ -287,6 +305,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 12,
+    level: 2,
     question: "Two investors behave differently during volatility. Investor A pauses SIPs during market declines. Investor B continues investing systematically. Who is MORE likely benefiting from long-term wealth accumulation dynamics?",
     options: [
       "Investor A due to downside risk minimization",
@@ -298,6 +317,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 13,
+    level: 2,
     question: "Which scenario BEST demonstrates poor liquidity management?",
     options: [
       "Holding diversified long-term retirement investments",
@@ -309,6 +329,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 14,
+    level: 2,
     question: "A person frequently spends to maintain social status despite financial stress. Which behavioral factor MOST likely drives this?",
     options: [
       "Utility-maximizing consumption rationality",
@@ -320,6 +341,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 15,
+    level: 2,
     question: "Why can consistently high credit utilization become problematic?",
     options: [
       "It may signal repayment dependence and weaken financial flexibility",
@@ -331,6 +353,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 16,
+    level: 2,
     question: "Which individual demonstrates the STRONGEST financial resilience?",
     options: [
       "High earner with multiple luxury liabilities and limited liquidity",
@@ -342,6 +365,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 17,
+    level: 2,
     question: "A person invests solely based on influencer recommendations without understanding the underlying asset. Which risk is MOST relevant?",
     options: [
       "Behavioral and informational decision-making risk",
@@ -353,6 +377,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 18,
+    level: 3,
     question: "Which statement BEST explains the danger of lifestyle inflation?",
     options: [
       "Increased discretionary spending can suppress future wealth accumulation despite income growth",
@@ -364,6 +389,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 19,
+    level: 3,
     question: "An individual consistently delays reviewing bills, statements, and loan balances because finances create anxiety. This MOST likely reflects:",
     options: [
       "Risk-adjusted spending optimization",
@@ -375,6 +401,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 20,
+    level: 3,
     question: "Why is diversification considered important in investing?",
     options: [
       "It guarantees stable positive returns across market cycles",
@@ -386,6 +413,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 21,
+    level: 3,
     question: "A person earns well but depends entirely on future salary growth to manage current obligations. Which risk is MOST underestimated?",
     options: [
       "Inflationary capital appreciation mismatch",
@@ -397,6 +425,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 22,
+    level: 3,
     question: "Which behavior MOST strongly supports long-term financial stability?",
     options: [
       "Increasing spending proportionately with every salary increase",
@@ -408,6 +437,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 23,
+    level: 3,
     question: "A person chooses to invest all available cash while ignoring insurance coverage entirely. Which financial principle is being neglected MOST?",
     options: [
       "Return maximization hierarchy",
@@ -419,6 +449,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 24,
+    level: 3,
     question: "Which situation BEST reflects opportunity cost in personal finance?",
     options: [
       "Choosing between liquidity and leverage optimization",
@@ -430,6 +461,7 @@ const questions: QuestionItem[] = [
   },
   {
     id: 25,
+    level: 3,
     question: "Which statement BEST reflects true financial literacy?",
     options: [
       "Understanding financial terminology and market jargon thoroughly",
@@ -442,17 +474,27 @@ const questions: QuestionItem[] = [
 ];
 
 export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyTestViewProps) {
+  return (
+    <FinancialLiteracyAssessment
+      userId={userId}
+      onToggleSidebar={onToggleSidebar}
+      onToggleInsights={onToggleInsights}
+      onBackToCatalog={onBackToCatalog}
+    />
+  );
+
   const [storageState, setStorageState] = useState<LiteracyTestStorage>(() => {
     const stored = readStorage(userId);
     if (stored.currentAttempt) {
       return stored;
     }
-
-    const currentAttempt = createNewAttempt();
+    const level = stored.selectedLevel ?? 1;
+    const currentAttempt = createNewAttempt(level);
     const nextState: LiteracyTestStorage = {
       version: 1,
       currentAttempt,
       history: stored.history,
+      selectedLevel: level,
     };
     writeStorage(userId, nextState);
     return nextState;
@@ -465,12 +507,13 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
       setStorageState(stored);
       return;
     }
-
-    const currentAttempt = createNewAttempt();
+    const level = stored.selectedLevel ?? 1;
+    const currentAttempt = createNewAttempt(level);
     const nextState: LiteracyTestStorage = {
       version: 1,
       currentAttempt,
       history: stored.history,
+      selectedLevel: level,
     };
     setStorageState(nextState);
     writeStorage(userId, nextState);
@@ -480,7 +523,7 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
     writeStorage(userId, storageState);
   }, [storageState, userId]);
 
-  const currentAttempt = storageState.currentAttempt ?? createNewAttempt();
+  const currentAttempt = storageState.currentAttempt ?? createNewAttempt(storageState.selectedLevel ?? 1);
   const isTestStarted = Boolean(currentAttempt.startedAt);
   const elapsedSeconds = useMemo(() => {
     if (!currentAttempt.startedAt) {
@@ -516,9 +559,31 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
     }
   }, [currentAttempt.isFinished, isTestStarted, remainingSeconds]);
 
+  const handleSelectLevel = (level: number) => {
+    setStorageState((current) => {
+      const next: LiteracyTestStorage = {
+        ...current,
+        selectedLevel: level,
+      };
+
+      // If a test is not started and not finished, regenerate questions for the new level.
+      if (!current.currentAttempt || current.currentAttempt.isFinished || current.currentAttempt.startedAt) {
+        return next;
+      }
+
+      next.currentAttempt = createNewAttempt(level);
+      return next;
+    });
+  };
+
   const currentSummary = useMemo(() => getAttemptSummary(currentAttempt), [currentAttempt]);
   const latestHistoryAttempt = storageState.history[0] ?? null;
   const latestHistorySummary = latestHistoryAttempt ? getAttemptSummary(latestHistoryAttempt) : null;
+
+  const availableCount = useMemo(() => {
+    const level = storageState.selectedLevel ?? 1;
+    return questions.filter((q) => q.level === level).length;
+  }, [storageState.selectedLevel]);
 
   const handleStartTest = () => {
     setStorageState((current) => {
@@ -580,11 +645,12 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
   };
 
   const handleStartNewAttempt = () => {
-    const nextAttempt = createNewAttempt();
+    const nextAttempt = createNewAttempt(storageState.selectedLevel ?? 1);
     setStorageState((current) => ({
       version: 1,
       currentAttempt: nextAttempt,
       history: current.history,
+      selectedLevel: current.selectedLevel ?? 1,
     }));
   };
 
@@ -763,9 +829,23 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
               Scenario-based questions designed to separate surface familiarity from real financial judgment. Pick the best answer even when the options look close.
             </p>
             <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">25 MCQs</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">{availableCount} MCQs</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Scenario-based</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Saved locally</span>
+            </div>
+            <div className="mt-[12px] flex items-center gap-[8px]">
+              <div className="text-[12px] text-gray-600">Level</div>
+              <div className="flex items-center gap-[8px]">
+                <button type="button" onClick={() => handleSelectLevel(1)} className={`h-[32px] px-[10px] rounded-[999px] text-[12px] font-semibold ${storageState.selectedLevel === 1 ? "bg-primary text-white" : "bg-white border"}`}>
+                  1
+                </button>
+                <button type="button" onClick={() => handleSelectLevel(2)} className={`h-[32px] px-[10px] rounded-[999px] text-[12px] font-semibold ${storageState.selectedLevel === 2 ? "bg-primary text-white" : "bg-white border"}`}>
+                  2
+                </button>
+                <button type="button" onClick={() => handleSelectLevel(3)} className={`h-[32px] px-[10px] rounded-[999px] text-[12px] font-semibold ${storageState.selectedLevel === 3 ? "bg-primary text-white" : "bg-white border"}`}>
+                  3
+                </button>
+              </div>
             </div>
             {!isTestStarted && (
               <div className="mt-[16px] flex flex-col gap-[10px] rounded-[18px] border border-[#d4d8fa] bg-white/80 p-[14px] shadow-[0_8px_20px_rgba(50,68,230,0.06)] sm:flex-row sm:items-center sm:justify-between">
