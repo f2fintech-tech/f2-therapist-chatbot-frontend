@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -57,6 +57,7 @@ export default function FinHealChat() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit" | "debt-balance">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
   const chat = useBackendChat(userId);
@@ -64,13 +65,23 @@ export default function FinHealChat() {
   const [showQuizPopup, setShowQuizPopup] = useState(false);
 
   useEffect(() => {
+    mainViewRef.current = mainView;
+  }, [mainView]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
-      if (!window.localStorage.getItem("finheal_quiz_completed")) {
+      if (mainViewRef.current === "chat" && !window.localStorage.getItem("finheal_quiz_completed")) {
         setShowQuizPopup(true);
       }
     }, 1200);
     return () => window.clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    if (mainView !== "chat") {
+      setShowQuizPopup(false);
+    }
+  }, [mainView]);
 
   const handleQuizComplete = (tierName: string, score: number) => {
     window.localStorage.setItem("finheal_quiz_completed", "true");
@@ -188,6 +199,7 @@ export default function FinHealChat() {
   }, []);
 
   const handleConversationSelect = useCallback(async (conversationId: string) => {
+    setMainView("chat");
     await chat.loadConversation(conversationId);
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1535px)").matches) {
@@ -351,7 +363,7 @@ export default function FinHealChat() {
   return (
     <>
       <QuizPopup
-        visible={showQuizPopup}
+        visible={showQuizPopup && mainView === "chat"}
         onDismiss={() => setShowQuizPopup(false)}
         onComplete={handleQuizComplete}
       />

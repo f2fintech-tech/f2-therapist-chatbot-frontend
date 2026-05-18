@@ -33,6 +33,7 @@ type StoredAttempt = {
   attemptId: string;
   createdAt: string;
   updatedAt: string;
+  startedAt: string | null;
   finishedAt: string | null;
   isFinished: boolean;
   questions: ShuffledQuestion[];
@@ -89,11 +90,22 @@ function createNewAttempt(): StoredAttempt {
     attemptId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     createdAt: now,
     updatedAt: now,
+    startedAt: null,
     finishedAt: null,
     isFinished: false,
     questions: createShuffledQuestions(),
     selectedAnswers: {},
   };
+}
+
+const TEST_DURATION_SECONDS = 10 * 60;
+
+function getElapsedSeconds(startedAt: string | null) {
+  if (!startedAt) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
 }
 
 function readStorage(userId: string): LiteracyTestStorage {
@@ -445,6 +457,7 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
     writeStorage(userId, nextState);
     return nextState;
   });
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
     const stored = readStorage(userId);
@@ -468,13 +481,66 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
   }, [storageState, userId]);
 
   const currentAttempt = storageState.currentAttempt ?? createNewAttempt();
+  const isTestStarted = Boolean(currentAttempt.startedAt);
+  const elapsedSeconds = useMemo(() => {
+    if (!currentAttempt.startedAt) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor((nowTs - new Date(currentAttempt.startedAt).getTime()) / 1000));
+  }, [currentAttempt.startedAt, nowTs]);
+  const remainingSeconds = Math.max(0, TEST_DURATION_SECONDS - elapsedSeconds);
+  const hasTimeExpired = isTestStarted && remainingSeconds <= 0 && !currentAttempt.isFinished;
+
+  useEffect(() => {
+    if (!isTestStarted || currentAttempt.isFinished) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [currentAttempt.finishedAt, currentAttempt.isFinished, currentAttempt.startedAt, isTestStarted]);
+
+  useEffect(() => {
+    if (!isTestStarted || currentAttempt.isFinished) {
+      return;
+    }
+
+    if (remainingSeconds <= 0) {
+      handleFinishTest();
+    }
+  }, [currentAttempt.isFinished, isTestStarted, remainingSeconds]);
+
   const currentSummary = useMemo(() => getAttemptSummary(currentAttempt), [currentAttempt]);
   const latestHistoryAttempt = storageState.history[0] ?? null;
   const latestHistorySummary = latestHistoryAttempt ? getAttemptSummary(latestHistoryAttempt) : null;
 
+  const handleStartTest = () => {
+    setStorageState((current) => {
+      if (!current.currentAttempt || current.currentAttempt.isFinished || current.currentAttempt.startedAt) {
+        return current;
+      }
+
+      const now = new Date().toISOString();
+      return {
+        ...current,
+        currentAttempt: {
+          ...current.currentAttempt,
+          startedAt: now,
+          updatedAt: now,
+        },
+      };
+    });
+  };
+
   const handleSelectAnswer = (questionId: number, answer: AnswerLetter) => {
     setStorageState((current) => {
-      if (!current.currentAttempt || current.currentAttempt.isFinished) {
+      if (!current.currentAttempt || current.currentAttempt.isFinished || !current.currentAttempt.startedAt) {
         return current;
       }
 
@@ -682,8 +748,9 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
-        <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+        <div className="min-h-0 flex-1 overflow-y-auto pb-[12px] pr-[2px]">
+          <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
           <div className="absolute right-[-28px] top-[-28px] h-[120px] w-[120px] rounded-full bg-primary opacity-10" />
           <div className="relative z-10 max-w-[780px]">
             <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
@@ -700,140 +767,196 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Scenario-based</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Saved locally</span>
             </div>
-          </div>
-        </section>
-
-        <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
-          <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Answered</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.answered}</div>
-          </div>
-          <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Status</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentAttempt.isFinished ? "Finished" : "In progress"}</div>
-          </div>
-          <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Attempts saved</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">{storageState.history.length}</div>
-          </div>
-        </section>
-
-        <section className="mt-[18px]">
-          <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)]">
-            <CardContent className="flex flex-col gap-[12px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Local persistence</div>
-                <div className="mt-[4px] text-[16px] font-semibold text-gray-900">
-                  {currentAttempt.isFinished ? `${currentSummary.correct} / ${currentSummary.total} correct` : `${currentSummary.answered} / ${currentSummary.total} answered`}
+            {!isTestStarted && (
+              <div className="mt-[16px] flex flex-col gap-[10px] rounded-[18px] border border-[#d4d8fa] bg-white/80 p-[14px] shadow-[0_8px_20px_rgba(50,68,230,0.06)] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Not started yet</div>
+                  <div className="mt-[4px] text-[13px] text-gray-600">
+                    Click Start Test to begin a 10 minute timed attempt. The test will auto submit when time ends.
+                  </div>
                 </div>
-                <div className="mt-[2px] text-[12px] text-gray-500">
+                <div className="flex gap-[8px]">
+                  <button
+                    type="button"
+                    onClick={handleStartTest}
+                    className="h-[40px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
+                  >
+                    Start Test
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onBackToCatalog}
+                    className="h-[40px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)]"
+                  >
+                    End Test
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          </section>
+
+          <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Answered</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentSummary.answered}</div>
+            </div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Status</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{currentAttempt.isFinished ? "Finished" : "In progress"}</div>
+            </div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Attempts saved</div>
+              <div className="mt-[4px] text-[24px] font-serif text-gray-900">{storageState.history.length}</div>
+            </div>
+          </section>
+
+          <section className="mt-[18px]">
+            <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)]">
+              <CardContent className="px-[16px] py-[16px] sm:px-[18px]">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Local persistence</div>
+                <div className="mt-[10px] text-[12px] text-gray-500">
                   {currentAttempt.isFinished
                     ? "Marks are shown only after finishing the test."
-                    : "Selections are saved locally and scored only when you click Finish Test."}
+                    : !isTestStarted
+                      ? "The test is paused until you click Start Test."
+                      : "Selections are saved locally and scored when you click End Test or time runs out."}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="sticky top-[12px] z-30 mt-[14px]">
+            <div className="flex items-center justify-between gap-[10px] rounded-[16px] border border-gray-200 bg-white/95 px-[14px] py-[12px] shadow-[0_8px_20px_rgba(15,23,42,0.05)] backdrop-blur supports-[backdrop-filter]:bg-white/85">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Answered</div>
+                <div className="mt-[4px] text-[16px] font-semibold text-gray-900">
+                  {currentAttempt.isFinished
+                    ? `${currentSummary.correct} / ${currentSummary.total} correct`
+                    : !isTestStarted
+                      ? "Not started"
+                      : `${currentSummary.answered} / ${currentSummary.total} answered`}
                 </div>
               </div>
               <div className="flex items-center gap-[10px] rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[10px]">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{currentAttempt.isFinished ? "Accuracy" : "Saved"}</div>
-                <div className="text-[22px] font-serif text-gray-900">{currentAttempt.isFinished ? `${currentSummary.score}%` : "Yes"}</div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="mt-[18px] space-y-[12px]">
-          {currentAttempt.questions.map((item, questionIndex) => (
-            <Card key={item.id} className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-              <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Question {questionIndex + 1}</div>
-                    <CardTitle className="mt-[4px] text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">
-                      {item.question}
-                    </CardTitle>
-                  </div>
-                  <span className="rounded-[999px] border border-[#d4d8fa] bg-[#f6f7fe] px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.7px] text-primary">
-                    MCQ
-                  </span>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">
+                  {currentAttempt.isFinished ? "Accuracy" : isTestStarted ? "Time left" : "Saved"}
                 </div>
-                <CardDescription className="text-[12px] text-gray-500">
-                  Pick one answer. Your selection is saved locally and scored only on finish.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-[8px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
-                {item.options.map((option) => {
-                  const letter = option.letter;
-                  const selectedAnswer = currentAttempt.selectedAnswers[item.id];
-                  const isSelected = selectedAnswer === letter;
-                  const isAnswered = Boolean(selectedAnswer);
-                  const showResultStyling = currentAttempt.isFinished;
-                  const optionStateClass = showResultStyling
-                    ? isSelected
-                      ? option.isCorrect
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-rose-200 bg-rose-50"
-                      : isAnswered && option.isCorrect
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-gray-200 bg-white"
-                    : isSelected
-                      ? "border-primary bg-[#eef0fd] shadow-[0_10px_30px_rgba(50,68,230,0.12)]"
-                      : "border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f8f9ff]";
+                <div className="text-[22px] font-serif text-gray-900">
+                  {currentAttempt.isFinished
+                    ? `${currentSummary.score}%`
+                    : isTestStarted
+                      ? `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")}`
+                      : "Yes"}
+                </div>
+              </div>
+            </div>
+          </section>
 
-                  return (
-                    <button
-                      key={letter}
-                      type="button"
-                      onClick={() => handleSelectAnswer(item.id, letter)}
-                      disabled={currentAttempt.isFinished}
-                      className={`group flex w-full items-center justify-between rounded-[14px] border px-[12px] py-[10px] text-left transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary/10 ${optionStateClass}`}
-                    >
-                      <div className="flex items-start gap-[10px] flex-1">
-                        <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${showResultStyling && isSelected && option.isCorrect ? "bg-emerald-600 text-white" : showResultStyling && isSelected && !option.isCorrect ? "bg-rose-600 text-white" : showResultStyling && isAnswered && option.isCorrect ? "bg-emerald-600 text-white" : isSelected ? "bg-[#eef0fd] text-primary" : "bg-[#eef0fd] text-primary"}`}>
-                          {letter}
+          {isTestStarted && (
+            <>
+              <section className="mt-[18px] space-y-[12px]">
+                {currentAttempt.questions.map((item, questionIndex) => (
+                  <Card key={item.id} className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                    <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Question {questionIndex + 1}</div>
+                          <CardTitle className="mt-[4px] text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">
+                            {item.question}
+                          </CardTitle>
                         </div>
-                        <div className={`flex-1 text-[13px] leading-[1.6] ${showResultStyling ? "text-gray-700" : isSelected ? "text-primary" : "text-gray-700"}`}>{option.text}</div>
+                        <span className="rounded-[999px] border border-[#d4d8fa] bg-[#f6f7fe] px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.7px] text-primary">
+                          MCQ
+                        </span>
                       </div>
-                      <span
-                        className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-all ml-3 ${
-                          showResultStyling && isSelected && option.isCorrect
-                            ? "border-emerald-600 bg-emerald-600 text-white"
-                            : showResultStyling && isSelected && !option.isCorrect
-                              ? "border-rose-600 bg-rose-600 text-white"
-                              : showResultStyling && isAnswered && option.isCorrect
-                                ? "border-emerald-600 bg-emerald-600 text-white"
-                                : isSelected
-                                  ? "border-primary bg-primary text-white"
-                                  : "border-gray-300 bg-white text-transparent group-hover:text-primary"
-                        }`}
-                        aria-hidden="true"
-                      >
-                        ✓
-                      </span>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ))}
-        </section>
+                      <CardDescription className="text-[12px] text-gray-500">
+                        Pick one answer. Your selection is saved locally and scored only on finish.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-[8px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
+                      {item.options.map((option) => {
+                        const letter = option.letter;
+                        const selectedAnswer = currentAttempt.selectedAnswers[item.id];
+                        const isSelected = selectedAnswer === letter;
+                        const isAnswered = Boolean(selectedAnswer);
+                        const showResultStyling = currentAttempt.isFinished;
+                        const optionStateClass = showResultStyling
+                          ? isSelected
+                            ? option.isCorrect
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-rose-200 bg-rose-50"
+                            : isAnswered && option.isCorrect
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-gray-200 bg-white"
+                          : isSelected
+                            ? "border-primary bg-[#eef0fd] shadow-[0_10px_30px_rgba(50,68,230,0.12)]"
+                            : "border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f8f9ff]";
 
-        <section className="mt-[18px] pb-[12px]">
-          <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-            <CardContent className="flex flex-col gap-[10px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
-              <div className="text-[12px] text-gray-600">
-                When you're done, click Finish Test to calculate the score and open the results page.
-              </div>
-              <div className="flex gap-[8px]">
-                <button
-                  type="button"
-                  onClick={handleFinishTest}
-                  className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
-                >
-                  Finish Test
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
+                        return (
+                          <button
+                            key={letter}
+                            type="button"
+                            onClick={() => handleSelectAnswer(item.id, letter)}
+                            disabled={currentAttempt.isFinished}
+                            className={`group flex w-full items-center justify-between rounded-[14px] border px-[12px] py-[10px] text-left transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary/10 ${optionStateClass}`}
+                          >
+                            <div className="flex items-start gap-[10px] flex-1">
+                              <div className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${showResultStyling && isSelected && option.isCorrect ? "bg-emerald-600 text-white" : showResultStyling && isSelected && !option.isCorrect ? "bg-rose-600 text-white" : showResultStyling && isAnswered && option.isCorrect ? "bg-emerald-600 text-white" : isSelected ? "bg-[#eef0fd] text-primary" : "bg-[#eef0fd] text-primary"}`}>
+                                {letter}
+                              </div>
+                              <div className={`flex-1 text-[13px] leading-[1.6] ${showResultStyling ? "text-gray-700" : isSelected ? "text-primary" : "text-gray-700"}`}>{option.text}</div>
+                            </div>
+                            <span
+                              className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-bold transition-all ml-3 ${
+                                showResultStyling && isSelected && option.isCorrect
+                                  ? "border-emerald-600 bg-emerald-600 text-white"
+                                  : showResultStyling && isSelected && !option.isCorrect
+                                    ? "border-rose-600 bg-rose-600 text-white"
+                                    : showResultStyling && isAnswered && option.isCorrect
+                                      ? "border-emerald-600 bg-emerald-600 text-white"
+                                      : isSelected
+                                        ? "border-primary bg-primary text-white"
+                                        : "border-gray-300 bg-white text-transparent group-hover:text-primary"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              ✓
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
+
+              <section className="mt-[18px] pb-[12px]">
+                <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+                  <CardContent className="flex flex-col gap-[10px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
+                    <div className="text-[12px] text-gray-600">
+                      When you're done, click End Test to calculate the score and open the results page.
+                    </div>
+                    <div className="flex gap-[8px]">
+                      <button
+                        type="button"
+                        onClick={handleFinishTest}
+                        className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
+                      >
+                        End Test
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+                {hasTimeExpired && (
+                  <div className="mt-[10px] rounded-[14px] border border-amber-200 bg-amber-50 px-[14px] py-[10px] text-[12px] text-amber-900">
+                    Time is up. Your test has been submitted automatically.
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+        </div>
       </div>
     </main>
   );
