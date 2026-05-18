@@ -205,19 +205,19 @@ export default function ChatArea({
   }, [inputValue]);
 
   return (
-    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
-        <div className="flex items-start gap-[10px] sm:items-center">
+    <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
+      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[56px] lg:pl-0 pt-[12px] lg:pt-0">
+        <div className="flex items-start gap-[10px] pr-[13px]sm:items-center">
           <button
             onClick={onToggleSidebar}
-            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
+            className="fixed left-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
             aria-label="Toggle sidebar"
           >
             ☰
           </button>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Financial Wellness Chat</div>
-            <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
+          <div className="flex-1 min-w-3 lg:pl-0">
+            <div className="text-[18px] font-bold text-gray-900 pl-[13px] pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
+            <div className="text-[10px] text-gray-400 pl-[12px] flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
               <span
                 className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
               />
@@ -225,7 +225,7 @@ export default function ChatArea({
             </div>
 
             {typeof remainingHearts === "number" && (
-              <div className="mt-[10px] rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px]">
+              <div className="mt-[10px] rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] w-full max-w-[900px] mx-auto">
                 <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
@@ -283,7 +283,7 @@ export default function ChatArea({
 
       <button
         onClick={onToggleInsights}
-        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
+        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
         aria-label="Toggle insights panel"
       >
         ☰
