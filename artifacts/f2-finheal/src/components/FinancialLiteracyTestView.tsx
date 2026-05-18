@@ -735,6 +735,10 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
 
           {latestHistorySummary && latestHistoryAttempt && (
             <section className="mt-[18px]">
+              {(() => {
+                const summary = latestHistorySummary!;
+
+                return (
               <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
                 <CardHeader className="space-y-2 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
                   <CardTitle className="text-[16px] text-gray-900">Saved attempt</CardTitle>
@@ -744,16 +748,18 @@ export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onT
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-center gap-[10px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
                   <span className="rounded-[999px] bg-[#eef0fd] px-[10px] py-[5px] text-[11px] font-semibold text-primary">
-                    {latestHistorySummary.correct} / {latestHistorySummary.total} correct
+                    {summary.correct} / {summary.total} correct
                   </span>
                   <span className="rounded-[999px] bg-gray-100 px-[10px] py-[5px] text-[11px] font-medium text-gray-600">
-                    Accuracy {latestHistorySummary.score}%
+                    Accuracy {summary.score}%
                   </span>
                   <span className="rounded-[999px] bg-gray-100 px-[10px] py-[5px] text-[11px] font-medium text-gray-600">
                     Finished {new Date(latestHistoryAttempt.finishedAt || latestHistoryAttempt.updatedAt).toLocaleString()}
                   </span>
                 </CardContent>
               </Card>
+                );
+              })()}
             </section>
           )}
 
