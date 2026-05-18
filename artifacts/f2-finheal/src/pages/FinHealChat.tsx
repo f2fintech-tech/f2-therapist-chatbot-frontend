@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
+import EmergencyFundCheckView from "@/components/EmergencyFundCheckView";
 import LoanFitTestView from "@/components/LoanFitTestView";
 import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
 import InsightsPanel from "@/components/InsightsPanel";
@@ -31,6 +32,10 @@ export default function FinHealChat() {
       return "financial-literacy" as const;
     }
 
+    if (view === "emergency-fund") {
+      return "emergency-fund" as const;
+    }
+
     if (view === "tests") {
       return "tests" as const;
     }
@@ -55,7 +60,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "loan-fit" | "debt-balance">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
@@ -249,6 +254,7 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
+  const openEmergencyFundCheck = () => setMainView("emergency-fund");
   const openLoanFitTest = () => setMainView("loan-fit");
   const openDebtBalanceReview = () => setMainView("debt-balance");
   const openFreshChat = () => {
@@ -417,8 +423,17 @@ export default function FinHealChat() {
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+          onOpenEmergencyFundCheck={openEmergencyFundCheck}
           onOpenLoanFitTest={openLoanFitTest}
           onOpenDebtBalanceReview={openDebtBalanceReview}
+        />
+      ) : mainView === "emergency-fund" ? (
+        <EmergencyFundCheckView
+          userId={userId}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onBackToCatalog={openTestCatalog}
+          onOpenFinancialWellnessAssistant={openChatView}
         />
       ) : mainView === "financial-literacy" ? (
         <FinancialLiteracyTestView
