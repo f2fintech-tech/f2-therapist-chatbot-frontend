@@ -2,17 +2,32 @@ import {
   emergencyFundMaximumScore,
   emergencyFundMinimumScore,
   emergencyFundQuestions,
-  emergencyFundQuestionsBySection,
   emergencyFundSectionMeta,
   type EmergencyFundAnswerMap,
-  type EmergencyFundInsightTone,
   type EmergencyFundQuestion,
-  type EmergencyFundSectionId,
+  type EmergencyFundInsightTone,
 } from "./emergencyFundConfig";
 
-export type EmergencyFundResultLevel = "Strong Emergency Preparedness" | "Moderately Prepared" | "Limited Emergency Cushion" | "Financial Vulnerability Risk" | "Critical Emergency Preparedness Gap";
-export type EmergencyFundRiskLevel = "Low Risk" | "Moderate-Low Risk" | "Moderate Risk" | "High Risk" | "Very High Risk";
-export type EmergencyFundStabilityRating = "Strong" | "Stable" | "Developing" | "Fragile" | "Critical";
+export type RecommendationTone =
+  | "supportive"
+  | "motivational"
+  | "warning"
+  | "educational";
+
+export type EmergencyFundResultLevel =
+  | "Strong Emergency Preparedness"
+  | "Moderately Prepared"
+  | "Limited Emergency Cushion"
+  | "Financial Vulnerability Risk"
+  | "Critical Emergency Preparedness Gap";
+
+export type Recommendation = {
+  id: string;
+  text: string;
+  priority?: number;
+  tone?: RecommendationTone;
+  tags?: string[];
+};
 
 export type EmergencyFundInsight = {
   title: string;
@@ -21,17 +36,16 @@ export type EmergencyFundInsight = {
 };
 
 export type EmergencyFundSectionScore = {
-  sectionId: EmergencyFundSectionId;
+  sectionId: string;
   title: string;
   score: number;
   max: number;
   percentage: number;
 };
 
-export type EmergencyFundQuestionReview = {
+export type EmergencyFundQuestionReviewItem = {
   question: EmergencyFundQuestion;
   selectedAnswer: string | null;
-  selectedScore: number;
   isStrong: boolean;
 };
 
@@ -39,134 +53,465 @@ export type EmergencyFundResult = {
   rawScore: number;
   percentageScore: number;
   category: EmergencyFundResultLevel;
-  risk: EmergencyFundRiskLevel;
+  risk: "Low Risk" | "Moderate-Low Risk" | "Moderate Risk" | "High Risk";
   summary: string;
-  savingsStabilityRating: EmergencyFundStabilityRating;
+  coverageProgressPercent: number;
   emergencyCoverageEstimate: string;
-  emergencyCoverageMonths: number;
+  savingsStabilityRating: string;
+  emotionalStressLevel: string;
+  targetCoverageMonths: number;
   emergencyPreparednessScore: number;
-  emergencyPreparednessLabel: string;
-  financialResilienceIndicator: string;
+  suggestedEmergencyFundTarget: string;
   savingsDisciplineIndicator: string;
   emergencyDependencyRisk: string;
-  emotionalStressLevel: string;
-  suggestedEmergencyFundTarget: string;
-  targetCoverageMonths: number;
-  coverageProgressPercent: number;
   insights: EmergencyFundInsight[];
   recommendations: string[];
-  questionReview: EmergencyFundQuestionReview[];
   sectionScores: EmergencyFundSectionScore[];
+  questionReview: EmergencyFundQuestionReviewItem[];
 };
 
-function getScoreForQuestion(question: EmergencyFundQuestion, answers: EmergencyFundAnswerMap) {
-  const selectedAnswer = answers[question.id] ?? null;
-  const selectedOption = question.options.find((option) => option.label === selectedAnswer) ?? null;
-  return {
-    selectedAnswer,
-    selectedScore: selectedOption?.score ?? 0,
-    isStrong: (selectedOption?.score ?? 0) >= 4,
+type RecommendationPools = {
+  strongPreparedness: Recommendation[];
+  moderatePreparedness: Recommendation[];
+  limitedCushion: Recommendation[];
+  vulnerabilityRisk: Recommendation[];
+  criticalRisk: Recommendation[];
+  triggers: {
+    creditReliance: Recommendation[];
+    emotionalStress: Recommendation[];
+    unstableIncome: Recommendation[];
+    weakSavingsHabit: Recommendation[];
+    spendingLeakage: Recommendation[];
   };
+};
+
+const recommendationPools: RecommendationPools = {
+  strongPreparedness: [
+    {
+      id: "strong-1",
+      text: "You’ve built a strong financial cushion. That consistency creates real stability during uncertainty.",
+      priority: 4,
+      tone: "supportive",
+    },
+    {
+      id: "strong-2",
+      text: "Maintaining liquidity while investing excess savings is a healthy long-term balance.",
+      priority: 3,
+      tone: "educational",
+    },
+    {
+      id: "strong-3",
+      text: "Your saving habits suggest thoughtful financial planning and disciplined behavior.",
+      priority: 4,
+      tone: "supportive",
+    },
+    {
+      id: "strong-4",
+      text: "Continue reviewing your emergency target periodically as responsibilities and expenses evolve.",
+      priority: 3,
+      tone: "educational",
+    },
+    {
+      id: "strong-5",
+      text: "Strong emergency preparedness often reduces emotional stress during difficult periods.",
+      priority: 4,
+      tone: "supportive",
+    },
+    {
+      id: "strong-6",
+      text: "Keeping emergency reserves separate from daily spending may help preserve financial flexibility.",
+      priority: 3,
+      tone: "educational",
+    },
+    {
+      id: "strong-7",
+      text: "Your responses suggest healthy financial boundaries around spending and savings.",
+      priority: 3,
+      tone: "supportive",
+    },
+    {
+      id: "strong-8",
+      text: "Preparedness is not just financial. It also creates psychological breathing room.",
+      priority: 4,
+      tone: "supportive",
+    },
+  ],
+
+  moderatePreparedness: [
+    {
+      id: "moderate-1",
+      text: "You appear to have a reasonable financial foundation, though additional consistency could strengthen resilience.",
+      priority: 4,
+      tone: "supportive",
+    },
+    {
+      id: "moderate-2",
+      text: "Increasing liquid savings gradually may improve your ability to handle uncertainty comfortably.",
+      priority: 5,
+      tone: "educational",
+    },
+    {
+      id: "moderate-3",
+      text: "Small improvements in saving consistency can compound into meaningful financial stability.",
+      priority: 4,
+      tone: "motivational",
+    },
+    {
+      id: "moderate-4",
+      text: "Tracking recurring expenses more closely may create additional savings room over time.",
+      priority: 3,
+      tone: "educational",
+    },
+    {
+      id: "moderate-5",
+      text: "Your financial base appears promising, though stronger emergency coverage could reduce future stress.",
+      priority: 5,
+      tone: "supportive",
+    },
+    {
+      id: "moderate-6",
+      text: "Avoiding lifestyle inflation while income grows may help strengthen your savings cushion faster.",
+      priority: 3,
+      tone: "educational",
+    },
+    {
+      id: "moderate-7",
+      text: "Preparedness is built gradually. Consistency matters more than perfection.",
+      priority: 4,
+      tone: "motivational",
+    },
+    {
+      id: "moderate-8",
+      text: "Separating emergency savings from everyday spending may improve long-term stability.",
+      priority: 3,
+      tone: "educational",
+    },
+  ],
+
+  limitedCushion: [
+    {
+      id: "limited-1",
+      text: "Your current emergency reserves may not fully protect against prolonged financial disruptions.",
+      priority: 7,
+      tone: "warning",
+    },
+    {
+      id: "limited-2",
+      text: "Building even a small emergency reserve can reduce pressure during difficult months.",
+      priority: 6,
+      tone: "motivational",
+    },
+    {
+      id: "limited-3",
+      text: "Reducing dependency on borrowing during emergencies may strengthen long-term financial resilience.",
+      priority: 7,
+      tone: "educational",
+    },
+    {
+      id: "limited-4",
+      text: "Small automatic transfers often build savings consistency more sustainably than large irregular deposits.",
+      priority: 5,
+      tone: "educational",
+    },
+    {
+      id: "limited-5",
+      text: "Your responses suggest that unexpected expenses could currently create noticeable financial pressure.",
+      priority: 7,
+      tone: "warning",
+    },
+    {
+      id: "limited-6",
+      text: "Building one month of essential expense coverage first can be a practical starting goal.",
+      priority: 6,
+      tone: "motivational",
+    },
+    {
+      id: "limited-7",
+      text: "Emergency savings are meant to create breathing room, not financial perfection.",
+      priority: 5,
+      tone: "supportive",
+    },
+    {
+      id: "limited-8",
+      text: "Improving emergency preparedness gradually is often more sustainable than aggressive short-term changes.",
+      priority: 5,
+      tone: "supportive",
+    },
+  ],
+
+  vulnerabilityRisk: [
+    {
+      id: "risk-1",
+      text: "Your responses suggest that financial emergencies may currently feel emotionally and financially overwhelming.",
+      priority: 9,
+      tone: "warning",
+    },
+    {
+      id: "risk-2",
+      text: "Starting with very small savings goals is still meaningful progress toward stability.",
+      priority: 8,
+      tone: "motivational",
+    },
+    {
+      id: "risk-3",
+      text: "Building even a modest reserve may reduce stress during unexpected situations.",
+      priority: 8,
+      tone: "supportive",
+    },
+    {
+      id: "risk-4",
+      text: "Reducing unnecessary debt expansion could help create more financial breathing room.",
+      priority: 7,
+      tone: "educational",
+    },
+    {
+      id: "risk-5",
+      text: "Your current financial cushion appears limited, which may increase pressure during disruptions.",
+      priority: 9,
+      tone: "warning",
+    },
+    {
+      id: "risk-6",
+      text: "Consistency matters more than saving large amounts immediately.",
+      priority: 6,
+      tone: "motivational",
+    },
+    {
+      id: "risk-7",
+      text: "Protecting even small amounts of savings consistently can gradually improve resilience.",
+      priority: 7,
+      tone: "supportive",
+    },
+    {
+      id: "risk-8",
+      text: "Emergency preparedness is often built through stability-focused habits rather than aggressive goals.",
+      priority: 6,
+      tone: "educational",
+    },
+  ],
+
+  criticalRisk: [
+    {
+      id: "critical-1",
+      text: "Your responses suggest that unexpected expenses could currently create serious financial strain.",
+      priority: 10,
+      tone: "warning",
+    },
+    {
+      id: "critical-2",
+      text: "Starting small is completely valid. Even a modest reserve can create some financial breathing room.",
+      priority: 8,
+      tone: "supportive",
+    },
+    {
+      id: "critical-3",
+      text: "Protecting essential expenses may be the healthiest financial priority right now.",
+      priority: 9,
+      tone: "educational",
+    },
+    {
+      id: "critical-4",
+      text: "Financial recovery usually happens gradually rather than through sudden transformation.",
+      priority: 7,
+      tone: "motivational",
+    },
+    {
+      id: "critical-5",
+      text: "Reducing avoidable financial pressure may help create space for even basic savings.",
+      priority: 8,
+      tone: "educational",
+    },
+    {
+      id: "critical-6",
+      text: "Your current emergency preparedness may not yet provide enough protection against sudden disruptions.",
+      priority: 10,
+      tone: "warning",
+    },
+    {
+      id: "critical-7",
+      text: "Consistency and stability matter more right now than aggressive financial targets.",
+      priority: 8,
+      tone: "supportive",
+    },
+    {
+      id: "critical-8",
+      text: "Even limited emergency savings may help reduce dependency on debt during difficult periods.",
+      priority: 8,
+      tone: "motivational",
+    },
+  ],
+
+  triggers: {
+    creditReliance: [
+      {
+        id: "credit-1",
+        text: "Relying heavily on credit during emergencies may increase long-term financial pressure.",
+        priority: 10,
+        tone: "warning",
+      },
+      {
+        id: "credit-2",
+        text: "Reducing emergency borrowing gradually may strengthen financial confidence over time.",
+        priority: 8,
+        tone: "supportive",
+      },
+      {
+        id: "credit-3",
+        text: "Frequent emergency borrowing can sometimes delay long-term savings progress.",
+        priority: 8,
+        tone: "educational",
+      },
+    ],
+
+    emotionalStress: [
+      {
+        id: "stress-1",
+        text: "Your responses suggest that financial uncertainty may currently feel emotionally exhausting.",
+        priority: 10,
+        tone: "supportive",
+      },
+      {
+        id: "stress-2",
+        text: "Building financial structure gradually may help reduce emotional pressure over time.",
+        priority: 8,
+        tone: "supportive",
+      },
+      {
+        id: "stress-3",
+        text: "Emergency preparedness often improves emotional peace of mind alongside financial stability.",
+        priority: 7,
+        tone: "motivational",
+      },
+    ],
+
+    unstableIncome: [
+      {
+        id: "income-1",
+        text: "Income unpredictability makes emergency savings even more important for financial stability.",
+        priority: 9,
+        tone: "warning",
+      },
+      {
+        id: "income-2",
+        text: "Building additional buffers may help reduce stress caused by variable income.",
+        priority: 8,
+        tone: "supportive",
+      },
+      {
+        id: "income-3",
+        text: "Maintaining higher liquidity can be especially valuable when income is inconsistent.",
+        priority: 7,
+        tone: "educational",
+      },
+    ],
+
+    weakSavingsHabit: [
+      {
+        id: "habit-1",
+        text: "Creating a very small automatic transfer may feel more sustainable than aggressive targets.",
+        priority: 9,
+        tone: "motivational",
+      },
+      {
+        id: "habit-2",
+        text: "Consistency in saving usually matters more than the initial amount.",
+        priority: 8,
+        tone: "supportive",
+      },
+      {
+        id: "habit-3",
+        text: "Building savings habits gradually may strengthen long-term financial confidence.",
+        priority: 7,
+        tone: "motivational",
+      },
+    ],
+
+    spendingLeakage: [
+      {
+        id: "spending-1",
+        text: "Frequent withdrawals from savings for lifestyle spending may weaken emergency preparedness over time.",
+        priority: 8,
+        tone: "warning",
+      },
+      {
+        id: "spending-2",
+        text: "Protecting emergency savings from non-essential spending may improve resilience.",
+        priority: 7,
+        tone: "educational",
+      },
+      {
+        id: "spending-3",
+        text: "Creating stronger boundaries around discretionary spending may help savings grow more steadily.",
+        priority: 6,
+        tone: "supportive",
+      },
+    ],
+  },
+};
+
+function shuffleArray<T>(array: T[]): T[] {
+  return [...array].sort(() => Math.random() - 0.5);
 }
 
-function scoreBand(rawScore: number): EmergencyFundResultLevel {
-  if (rawScore >= 63) return "Strong Emergency Preparedness";
-  if (rawScore >= 50) return "Moderately Prepared";
-  if (rawScore >= 38) return "Limited Emergency Cushion";
-  if (rawScore >= 25) return "Financial Vulnerability Risk";
+function getOptionScore(question: EmergencyFundQuestion, answer: string | null | undefined) {
+  const option = question.options.find((entry) => entry.label === answer);
+  return option?.score ?? 0;
+}
+
+function getCategory(rawScore: number): EmergencyFundResultLevel {
+  if (rawScore >= 63) {
+    return "Strong Emergency Preparedness";
+  }
+
+  if (rawScore >= 51) {
+    return "Moderately Prepared";
+  }
+
+  if (rawScore >= 39) {
+    return "Limited Emergency Cushion";
+  }
+
+  if (rawScore >= 27) {
+    return "Financial Vulnerability Risk";
+  }
+
   return "Critical Emergency Preparedness Gap";
 }
 
-function riskForBand(category: EmergencyFundResultLevel): EmergencyFundRiskLevel {
-  if (category === "Strong Emergency Preparedness") return "Low Risk";
-  if (category === "Moderately Prepared") return "Moderate-Low Risk";
-  if (category === "Limited Emergency Cushion") return "Moderate Risk";
-  if (category === "Financial Vulnerability Risk") return "High Risk";
-  return "Very High Risk";
-}
-
-function stabilityForBand(category: EmergencyFundResultLevel): EmergencyFundStabilityRating {
-  if (category === "Strong Emergency Preparedness") return "Strong";
-  if (category === "Moderately Prepared") return "Stable";
-  if (category === "Limited Emergency Cushion") return "Developing";
-  if (category === "Financial Vulnerability Risk") return "Fragile";
-  return "Critical";
-}
-
-function coverageMonthsFromQuestion(answer: string | null) {
-  switch (answer) {
-    case "More than 12 months":
-      return 12;
-    case "6-12 months":
-      return 9;
-    case "3-6 months":
-      return 4.5;
-    case "1-3 months":
-      return 2;
-    case "Less than 1 month":
-      return 0.5;
+function getRiskLevel(category: EmergencyFundResultLevel): EmergencyFundResult["risk"] {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return "Low Risk";
+    case "Moderately Prepared":
+      return "Moderate-Low Risk";
+    case "Limited Emergency Cushion":
+      return "Moderate Risk";
     default:
-      return 0;
+      return "High Risk";
   }
 }
 
-function coverageLabel(months: number) {
-  if (months >= 12) return "12+ months";
-  if (months >= 6) return "6-12 months";
-  if (months >= 3) return "3-6 months";
-  if (months >= 1) return "1-3 months";
-  if (months > 0) return "Less than 1 month";
-  return "Unavailable";
-}
-
-function targetCoverageMonths(category: EmergencyFundResultLevel, answers: EmergencyFundAnswerMap) {
-  const incomeStability = answers["income-stability"];
-  const creditReliance = answers["credit-reliance"];
-
-  if (category === "Strong Emergency Preparedness") {
-    return incomeStability === "Highly uncertain" ? 6 : 6;
+function getSummary(category: EmergencyFundResultLevel) {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return "Your emergency fund looks robust and well positioned to absorb unexpected shocks.";
+    case "Moderately Prepared":
+      return "You have a workable cushion, with room to strengthen resilience and access speed.";
+    case "Limited Emergency Cushion":
+      return "Your current buffer may handle smaller disruptions, but bigger shocks could feel tight.";
+    case "Financial Vulnerability Risk":
+      return "Your responses suggest limited shock absorption, so rebuilding a cushion should be a priority.";
+    default:
+      return "Your finances may be especially exposed to disruption right now, so start with small protection steps.";
   }
-
-  if (category === "Moderately Prepared") {
-    return creditReliance === "Frequently" || creditReliance === "Almost always" ? 6 : 5;
-  }
-
-  if (category === "Limited Emergency Cushion") {
-    return 6;
-  }
-
-  if (category === "Financial Vulnerability Risk") {
-    return 3;
-  }
-
-  return 1;
-}
-
-function targetLabel(months: number, category: EmergencyFundResultLevel) {
-  if (category === "Strong Emergency Preparedness") {
-    return "Maintain 3-6 months of essential expenses, keeping the fund liquid and easy to access.";
-  }
-
-  if (category === "Moderately Prepared") {
-    return `Build toward ${months === 6 ? "6" : "4-6"} months of essential expenses.`;
-  }
-
-  if (category === "Limited Emergency Cushion") {
-    return "Build toward 3-6 months of essential expenses and keep the money fully liquid.";
-  }
-
-  if (category === "Financial Vulnerability Risk") {
-    return "Start with 1-3 months of essentials, then move toward a 3-6 month safety cushion.";
-  }
-
-  return "Start with your first small buffer, then work toward 1 month of essential expenses before expanding further.";
 }
 
 function buildSectionScores(answers: EmergencyFundAnswerMap): EmergencyFundSectionScore[] {
   return emergencyFundSectionMeta.map((section) => {
-    const questions = emergencyFundQuestionsBySection[section.sectionId];
-    const score = questions.reduce((total, question) => total + getScoreForQuestion(question, answers).selectedScore, 0);
+    const questions = emergencyFundQuestions.filter((question) => question.sectionId === section.sectionId);
+    const score = questions.reduce((total, question) => total + getOptionScore(question, answers[question.id]), 0);
     const max = questions.length * 5;
+
     return {
       sectionId: section.sectionId,
       title: section.title,
@@ -177,221 +522,302 @@ function buildSectionScores(answers: EmergencyFundAnswerMap): EmergencyFundSecti
   });
 }
 
-function buildInsights(answers: EmergencyFundAnswerMap, sectionScores: EmergencyFundSectionScore[]): EmergencyFundInsight[] {
+function buildInsights(answers: EmergencyFundAnswerMap, category: EmergencyFundResultLevel, sectionScores: EmergencyFundSectionScore[]): EmergencyFundInsight[] {
+  const coverageScore = sectionScores.find((section) => section.sectionId === "coverage")?.percentage ?? 0;
+  const confidenceScore = sectionScores.find((section) => section.sectionId === "confidence")?.percentage ?? 0;
+  const behaviorScore = sectionScores.find((section) => section.sectionId === "behavior")?.percentage ?? 0;
+  const disruptionScore = sectionScores.find((section) => section.sectionId === "disruption")?.percentage ?? 0;
+
   const insights: EmergencyFundInsight[] = [];
 
-  const noSavings = answers["coverage-months"] === "Less than 1 month" || answers["savings-location"] === "I do not have emergency savings";
-  const unstableIncome = answers["income-stability"] === "Unpredictable" || answers["income-stability"] === "Highly uncertain";
-  const frequentBorrowing = answers["credit-reliance"] === "Frequently" || answers["credit-reliance"] === "Almost always";
-  const stressed = answers["emotional-stress"] === "Very stressful" || answers["emotional-stress"] === "Extremely overwhelming";
-  const disciplinedSaving = answers["save-regularly"] === "Every month consistently" || answers["saving-habit"] === "Automated and disciplined";
-  const lifestyleLeakage = answers["savings-withdrawals"] === "Frequently" || answers["savings-withdrawals"] === "Very often";
-  const rapidAccess = answers["access-speed"] === "Immediately" || answers["access-speed"] === "Within 1 day";
-  const disruptionPressure = answers["three-month-shock"] === "Need borrowing or debt" || answers["three-month-shock"] === "Unable to manage properly";
-
-  if (noSavings && unstableIncome) {
+  if (coverageScore >= 80) {
     insights.push({
-      title: "Savings plus income uncertainty",
-      description: "Limited savings combined with income uncertainty may increase financial vulnerability during unexpected disruptions.",
-      tone: "critical",
-    });
-  }
-
-  if (frequentBorrowing) {
-    insights.push({
-      title: "Credit dependence during emergencies",
-      description: "Dependency on credit during emergencies may increase long-term financial pressure.",
-      tone: "warning",
-    });
-  }
-
-  if (stressed) {
-    insights.push({
-      title: "Emotional strain",
-      description: "Your responses suggest that financial uncertainty may currently be contributing to emotional stress.",
-      tone: "warning",
-    });
-  }
-
-  if (disciplinedSaving) {
-    insights.push({
-      title: "Consistent saving behavior",
-      description: "Consistent saving behavior is one of the strongest indicators of long-term financial resilience.",
+      title: "Strong coverage base",
+      description: "Your liquid reserves and access speed suggest you can absorb disruptions with less short-term pressure.",
       tone: "positive",
     });
+  } else if (coverageScore <= 40) {
+    insights.push({
+      title: "Coverage needs attention",
+      description: "Your buffer may be too small or too hard to access quickly when a real emergency happens.",
+      tone: "warning",
+    });
   }
 
-  if (lifestyleLeakage) {
+  if (confidenceScore <= 40) {
     insights.push({
-      title: "Savings leakage",
-      description: "Regularly using savings for non-essential spending may weaken emergency preparedness over time.",
+      title: "Emergency anxiety is elevated",
+      description: "Financial surprises may feel stressful enough that planning and automation could help a lot.",
       tone: "caution",
     });
   }
 
-  if (rapidAccess && answers["savings-location"] === "Easily accessible savings account") {
+  if (behaviorScore >= 75) {
     insights.push({
-      title: "Good liquidity setup",
-      description: "Your savings appear easy to reach, which is a practical strength during short-notice emergencies.",
+      title: "Healthy savings habits",
+      description: "Your answers show disciplined saving behavior, which is one of the strongest predictors of resilience.",
       tone: "positive",
+    });
+  } else if (behaviorScore <= 40) {
+    insights.push({
+      title: "Savings habits are fragile",
+      description: "Inconsistent saving can make the emergency fund harder to grow and easier to dip into.",
+      tone: "warning",
     });
   }
 
-  if (disruptionPressure) {
+  if (disruptionScore <= 40) {
     insights.push({
-      title: "Recovery runway is tight",
-      description: "A 3-month cost shock could require borrowing or create strain, so extending your runway would help stability.",
+      title: "Shock absorption looks weak",
+      description: "Unexpected expenses, income gaps, or borrowing pressure may be difficult to handle right now.",
       tone: "critical",
-    });
-  }
-
-  if (sectionScores.find((section) => section.sectionId === "behavior")?.percentage ?? 0 >= 80) {
-    insights.push({
-      title: "Behavioral strength",
-      description: "Your saving habits point to strong day-to-day discipline, which supports long-term resilience.",
-      tone: "positive",
     });
   }
 
   if (insights.length === 0) {
     insights.push({
-      title: "Balanced starting point",
-      description: "Your answers show a workable foundation, with a few areas that could benefit from more liquidity and consistency.",
-      tone: "caution",
+      title: "Balanced emergency profile",
+      description: "No single area appears extreme, so steady improvement should be enough to strengthen resilience.",
+      tone: "positive",
     });
   }
 
-  return insights.slice(0, 6);
+  if (category === "Critical Emergency Preparedness Gap") {
+    insights.unshift({
+      title: "Immediate protection needed",
+      description: "Your current setup may not provide enough protection against sudden expense shocks.",
+      tone: "critical",
+    });
+  }
+
+  return insights.slice(0, 4);
 }
 
-function buildRecommendations(category: EmergencyFundResultLevel, answers: EmergencyFundAnswerMap): string[] {
-  const recommendations: string[] = [];
+function buildQuestionReview(answers: EmergencyFundAnswerMap): EmergencyFundQuestionReviewItem[] {
+  return emergencyFundQuestions.map((question) => {
+    const selectedAnswer = answers[question.id] ?? null;
+    const score = getOptionScore(question, selectedAnswer);
 
-  if (category === "Strong Emergency Preparedness") {
-    recommendations.push("Continue maintaining disciplined savings habits.");
-    recommendations.push("Review your emergency target every few months to keep it aligned with expenses.");
-    recommendations.push("Keep emergency money liquid while directing extra savings toward longer-term goals.");
-    recommendations.push("Avoid taking avoidable financial risks that could weaken your cushion.");
-  } else if (category === "Moderately Prepared") {
-    recommendations.push("Increase savings consistency so emergency coverage grows steadily.");
-    recommendations.push("Strengthen liquid savings and keep it separate from everyday spending.");
-    recommendations.push("Reduce unnecessary financial leakage that slows cushion building.");
-    recommendations.push("Aim for a more reliable buffer before adding extra lifestyle spending.");
-  } else if (category === "Limited Emergency Cushion") {
-    recommendations.push("Build 3-6 months of essential expense coverage.");
-    recommendations.push("Reduce dependency on credit during emergencies.");
-    recommendations.push("Create a simple automatic monthly savings plan.");
-    recommendations.push("Reassess discretionary spending so more cash can stay in reserve.");
-  } else if (category === "Financial Vulnerability Risk") {
-    recommendations.push("Prioritize building emergency savings immediately, even if the first steps are small.");
-    recommendations.push("Avoid unnecessary debt expansion while your safety cushion is thin.");
-    recommendations.push("Set a structured monthly transfer into a separate savings account.");
-    recommendations.push("Improve cash flow management so one surprise does not derail your budget.");
-  } else {
-    recommendations.push("Start with a small starter reserve and build from there.");
-    recommendations.push("Reduce avoidable spending pressure so you can protect even a modest cash cushion.");
-    recommendations.push("Avoid relying heavily on debt for emergencies.");
-    recommendations.push("Stabilize monthly habits before aiming for a larger long-term target.");
-  }
-
-  if (answers["credit-reliance"] === "Frequently" || answers["credit-reliance"] === "Almost always") {
-    recommendations.unshift("Try to break the habit of using credit as the first response to emergencies.");
-  }
-
-  if (answers["save-regularly"] === "Never" || answers["saving-habit"] === "No saving habit") {
-    recommendations.unshift("Create a very small automatic transfer first so the habit becomes easier to repeat.");
-  }
-
-  return Array.from(new Set(recommendations)).slice(0, 5);
-}
-
-export function calculateEmergencyFundResult(answers: EmergencyFundAnswerMap) {
-  const questionReview = emergencyFundQuestions.map((question) => {
-    const scored = getScoreForQuestion(question, answers);
     return {
       question,
-      selectedAnswer: scored.selectedAnswer,
-      selectedScore: scored.selectedScore,
-      isStrong: scored.isStrong,
+      selectedAnswer,
+      isStrong: score >= 4,
     };
   });
+}
 
-  const rawScore = questionReview.reduce((total, item) => total + item.selectedScore, 0);
-  const percentageScore = Math.round((rawScore / emergencyFundMaximumScore) * 100);
-  const category = scoreBand(rawScore);
-  const risk = riskForBand(category);
-  const savingsStabilityRating = stabilityForBand(category);
+function buildCoverageEstimate(rawScore: number) {
+  if (rawScore >= 63) return "6+ months";
+  if (rawScore >= 51) return "3-6 months";
+  if (rawScore >= 39) return "1-3 months";
+  if (rawScore >= 27) return "Less than 1 month";
+  return "No reliable cushion";
+}
+
+function buildStabilityRating(rawScore: number) {
+  if (rawScore >= 63) return "Very steady";
+  if (rawScore >= 51) return "Fairly steady";
+  if (rawScore >= 39) return "Uneven";
+  if (rawScore >= 27) return "Fragile";
+  return "Highly fragile";
+}
+
+function buildEmotionalStressLevel(category: EmergencyFundResultLevel) {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return "Low";
+    case "Moderately Prepared":
+      return "Mild";
+    case "Limited Emergency Cushion":
+      return "Moderate";
+    case "Financial Vulnerability Risk":
+      return "High";
+    default:
+      return "Very high";
+  }
+}
+
+function buildTargetCoverageMonths(category: EmergencyFundResultLevel) {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return 6;
+    case "Moderately Prepared":
+      return 4;
+    case "Limited Emergency Cushion":
+      return 3;
+    case "Financial Vulnerability Risk":
+      return 1;
+    default:
+      return 1;
+  }
+}
+
+function buildSavingsDisciplineIndicator(answers: EmergencyFundAnswerMap, category: EmergencyFundResultLevel) {
+  const regularSaving = answers["save-regularly"] === "Every month consistently" || answers["saving-habit"] === "Automated and disciplined";
+  if (category === "Strong Emergency Preparedness" && regularSaving) return "Disciplined and consistent";
+  if (regularSaving) return "Promising but uneven";
+  if (category === "Critical Emergency Preparedness Gap") return "Needs immediate structure";
+  return "Inconsistent";
+}
+
+function buildDependencyRisk(answers: EmergencyFundAnswerMap) {
+  if (answers["credit-reliance"] === "Frequently" || answers["credit-reliance"] === "Almost always") {
+    return "High dependency on borrowing";
+  }
+  if (answers["credit-reliance"] === "Sometimes") {
+    return "Moderate borrowing dependency";
+  }
+  return "Low borrowing dependency";
+}
+
+function buildSuggestedTarget(category: EmergencyFundResultLevel) {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return "Maintain 6 months of essentials and review annually";
+    case "Moderately Prepared":
+      return "Build toward 4-6 months of essentials";
+    case "Limited Emergency Cushion":
+      return "Aim for a 1-3 month starter buffer";
+    case "Financial Vulnerability Risk":
+      return "Start with a 1-month protection goal";
+    default:
+      return "Start with a small starter buffer and protect essentials first";
+  }
+}
+
+function deduplicateRecommendations(
+  recommendations: Recommendation[]
+): Recommendation[] {
+  return Array.from(
+    new Map(recommendations.map((item) => [item.id, item])).values()
+  );
+}
+
+function getCategoryPool(
+  category: EmergencyFundResultLevel
+): Recommendation[] {
+  switch (category) {
+    case "Strong Emergency Preparedness":
+      return recommendationPools.strongPreparedness;
+
+    case "Moderately Prepared":
+      return recommendationPools.moderatePreparedness;
+
+    case "Limited Emergency Cushion":
+      return recommendationPools.limitedCushion;
+
+    case "Financial Vulnerability Risk":
+      return recommendationPools.vulnerabilityRisk;
+
+    default:
+      return recommendationPools.criticalRisk;
+  }
+}
+
+export function buildRecommendations(
+  category: EmergencyFundResultLevel,
+  answers: EmergencyFundAnswerMap
+): string[] {
+  const recommendations: Recommendation[] = [];
+
+  const categoryRecommendations = shuffleArray(
+    getCategoryPool(category)
+  ).slice(0, 5);
+
+  recommendations.push(...categoryRecommendations);
+
+  const frequentCreditReliance =
+    answers["credit-reliance"] === "Frequently" ||
+    answers["credit-reliance"] === "Almost always";
+
+  const emotionallyStressed =
+    answers["emotional-stress"] === "Very stressful" ||
+    answers["emotional-stress"] === "Extremely overwhelming";
+
+  const unstableIncome =
+    answers["income-stability"] === "Unpredictable" ||
+    answers["income-stability"] === "Highly uncertain";
+
+  const weakSavingHabit =
+    answers["save-regularly"] === "Never" ||
+    answers["saving-habit"] === "No saving habit";
+
+  const spendingLeakage =
+    answers["savings-withdrawals"] === "Frequently" ||
+    answers["savings-withdrawals"] === "Very often";
+
+  if (frequentCreditReliance) {
+    recommendations.push(
+      ...shuffleArray(
+        recommendationPools.triggers.creditReliance
+      ).slice(0, 2)
+    );
+  }
+
+  if (emotionallyStressed) {
+    recommendations.push(
+      ...shuffleArray(
+        recommendationPools.triggers.emotionalStress
+      ).slice(0, 2)
+    );
+  }
+
+  if (unstableIncome) {
+    recommendations.push(
+      ...shuffleArray(
+        recommendationPools.triggers.unstableIncome
+      ).slice(0, 2)
+    );
+  }
+
+  if (weakSavingHabit) {
+    recommendations.push(
+      ...shuffleArray(
+        recommendationPools.triggers.weakSavingsHabit
+      ).slice(0, 2)
+    );
+  }
+
+  if (spendingLeakage) {
+    recommendations.push(
+      ...shuffleArray(
+        recommendationPools.triggers.spendingLeakage
+      ).slice(0, 2)
+    );
+  }
+
+  const finalRecommendations = deduplicateRecommendations(recommendations)
+    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+  return shuffleArray(finalRecommendations)
+    .slice(0, 8)
+    .map((item) => item.text);
+}
+
+export function calculateEmergencyFundResult(answers: EmergencyFundAnswerMap): EmergencyFundResult {
+  const rawScore = emergencyFundQuestions.reduce((total, question) => total + getOptionScore(question, answers[question.id]), 0);
+  const percentageScore = Math.max(0, Math.min(100, Math.round(((rawScore - emergencyFundMinimumScore) / (emergencyFundMaximumScore - emergencyFundMinimumScore)) * 100)));
+  const category = getCategory(rawScore);
   const sectionScores = buildSectionScores(answers);
-  const currentCoverageAnswer = answers["coverage-months"] ?? null;
-  const emergencyCoverageMonths = coverageMonthsFromQuestion(currentCoverageAnswer);
-  const emergencyCoverageEstimate = coverageLabel(emergencyCoverageMonths);
-  const targetCoverageMonthsValue = targetCoverageMonths(category, answers);
-  const suggestedEmergencyFundTarget = targetLabel(targetCoverageMonthsValue, category);
-  const coverageProgressPercent = targetCoverageMonthsValue > 0 ? Math.min(100, Math.round((emergencyCoverageMonths / targetCoverageMonthsValue) * 100)) : 0;
-
-  const confidenceScore = sectionScores.find((section) => section.sectionId === "confidence")?.percentage ?? 0;
-  const behaviorScore = sectionScores.find((section) => section.sectionId === "behavior")?.percentage ?? 0;
-  const disruptionScore = sectionScores.find((section) => section.sectionId === "disruption")?.percentage ?? 0;
-  const coverageScore = sectionScores.find((section) => section.sectionId === "coverage")?.percentage ?? 0;
-
-  const financialResilienceIndicator =
-    coverageScore >= 80 && disruptionScore >= 70 ? "Strong emergency resilience" :
-    coverageScore >= 60 && disruptionScore >= 50 ? "Developing resilience" :
-    "Needs more cushioning";
-
-  const savingsDisciplineIndicator =
-    behaviorScore >= 80 ? "Highly disciplined" :
-    behaviorScore >= 60 ? "Steady but improvable" :
-    "Inconsistent savings behavior";
-
-  const emergencyDependencyRisk =
-    answers["credit-reliance"] === "Never" || answers["credit-reliance"] === "Rarely"
-      ? "Low dependency on emergency borrowing"
-      : answers["credit-reliance"] === "Sometimes"
-        ? "Some credit dependence during shocks"
-        : "High dependency on credit during emergencies";
-
-  const emotionalStressLevel =
-    confidenceScore >= 80 ? "Calm under pressure" :
-    confidenceScore >= 60 ? "Manageable stress" :
-    confidenceScore >= 40 ? "Elevated stress" :
-    "High emotional strain";
-
-  const summary =
-    category === "Strong Emergency Preparedness"
-      ? "You appear financially prepared to handle unexpected situations with relatively strong stability and savings resilience."
-      : category === "Moderately Prepared"
-        ? "Your emergency preparedness is reasonably stable, though certain financial situations could create temporary pressure."
-        : category === "Limited Emergency Cushion"
-          ? "Your current emergency reserves may not fully support prolonged financial disruptions or major unexpected expenses."
-          : category === "Financial Vulnerability Risk"
-            ? "Unexpected financial situations may currently create noticeable stress and instability."
-            : "Your current financial safety cushion may not adequately support emergency situations or temporary income disruptions.";
-
-  const insights = buildInsights(answers, sectionScores);
-  const recommendations = buildRecommendations(category, answers);
 
   return {
     rawScore,
     percentageScore,
     category,
-    risk,
-    summary,
-    savingsStabilityRating,
-    emergencyCoverageEstimate,
-    emergencyCoverageMonths,
+    risk: getRiskLevel(category),
+    summary: getSummary(category),
+    coverageProgressPercent: percentageScore,
+    emergencyCoverageEstimate: buildCoverageEstimate(rawScore),
+    savingsStabilityRating: buildStabilityRating(rawScore),
+    emotionalStressLevel: buildEmotionalStressLevel(category),
+    targetCoverageMonths: buildTargetCoverageMonths(category),
     emergencyPreparednessScore: rawScore,
-    emergencyPreparednessLabel: `${rawScore} / ${emergencyFundMaximumScore}`,
-    financialResilienceIndicator,
-    savingsDisciplineIndicator,
-    emergencyDependencyRisk,
-    emotionalStressLevel,
-    suggestedEmergencyFundTarget,
-    targetCoverageMonths: targetCoverageMonthsValue,
-    coverageProgressPercent,
-    insights,
-    recommendations,
-    questionReview,
+    suggestedEmergencyFundTarget: buildSuggestedTarget(category),
+    savingsDisciplineIndicator: buildSavingsDisciplineIndicator(answers, category),
+    emergencyDependencyRisk: buildDependencyRisk(answers),
+    insights: buildInsights(answers, category, sectionScores),
+    recommendations: buildRecommendations(category, answers),
     sectionScores,
-  } satisfies EmergencyFundResult;
+    questionReview: buildQuestionReview(answers),
+  };
 }
