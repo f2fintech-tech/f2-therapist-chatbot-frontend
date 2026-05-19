@@ -215,7 +215,7 @@ export default function ChatArea({
           >
             ☰
           </button>
-          <div className="flex-1 min-w-3 lg:pl-0">
+          <div className="flex-1 min-w-3 lg:pl-5">
             <div className="text-[18px] font-bold text-gray-900 pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
             <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
               <span
@@ -225,7 +225,7 @@ export default function ChatArea({
             </div>
 
             {typeof remainingHearts === "number" && (
-              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px]">
+              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] lg:w-[calc(100%-32px)] lg:mx-auto">
                 <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
