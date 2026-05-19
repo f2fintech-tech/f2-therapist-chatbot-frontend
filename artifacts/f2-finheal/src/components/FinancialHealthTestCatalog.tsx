@@ -32,7 +32,7 @@ const featuredTest = {
 const testCards: TestCard[] = [
   {
     id: "financial-literacy",
-    title: "Financial Literacy Test",
+    title: "Money IQ Arena",
     description: "A 3-level assessment covering budgeting, credit, investing, taxes, and long-term planning.",
     duration: "30 min total",
     focus: "Level-based financial reasoning and practical money decisions",
@@ -41,7 +41,7 @@ const testCards: TestCard[] = [
   },
   {
     id: "debt-balance",
-    title: "Debt Balance Review",
+    title: "Debt Pressure Analysis",
     description: "See how your debt load compares with your current repayment capacity.",
     duration: "3 min",
     focus: "EMIs, balances, and debt mix",
@@ -50,7 +50,7 @@ const testCards: TestCard[] = [
   },
   {
     id: "emergency-fund",
-    title: "Emergency Fund Check",
+    title: "Financial Safety Score",
     description: "Measure how many months of essential spending you can cover today.",
     duration: "2 min",
     focus: "Savings buffer and stability",
@@ -59,7 +59,7 @@ const testCards: TestCard[] = [
   },
   {
     id: "credit-readiness",
-    title: "Credit Readiness Review",
+    title: "Credit Health Analyzer",
     description: "Look at the signals lenders care about before you apply for new credit.",
     duration: "4 min",
     focus: "Credit health and repayment behavior",
@@ -68,7 +68,7 @@ const testCards: TestCard[] = [
   },
   {
     id: "goal-progress",
-    title: "Goal Progress Check",
+    title: "Financial Growth Tracker",
     description: "Track how close you are to the money goals you already set in FinHeal.",
     duration: "2 min",
     focus: "Savings goals and momentum",
@@ -77,7 +77,7 @@ const testCards: TestCard[] = [
   },
   {
     id: "loan-fit",
-    title: "Loan Fit Test",
+    title: "Loan Comfort Analysis",
     description: "Estimate whether a new loan or EMI plan fits comfortably in your budget.",
     duration: "3 min",
     focus: "Affordability and loan planning",
