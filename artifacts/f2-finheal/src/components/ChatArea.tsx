@@ -283,7 +283,7 @@ export default function ChatArea({
 
       <button
         onClick={onToggleInsights}
-        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
+        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
         aria-label="Toggle insights panel"
       >
         ☰
