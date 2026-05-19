@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateLoanFitResult,
@@ -27,6 +28,7 @@ type LoanFitProgressState = {
   result: LoanFitResult | null;
   completed: boolean;
   updatedAt: string;
+  startAt?: string;
 };
 
 type OptionButtonProps = {
@@ -37,7 +39,7 @@ type OptionButtonProps = {
 
 const STORAGE_PREFIX = "finheal_loan_fit_test";
 const TOTAL_STEPS = loanFitTotalQuestions + 1;
-const TARGET_DURATION_MINUTES = 3;
+const TARGET_DURATION_MINUTES = 5;
 
 function getStorageKey(userId: string) {
   return `${STORAGE_PREFIX}:${userId || "anonymous"}`;
@@ -51,6 +53,7 @@ function createEmptyState(): LoanFitProgressState {
     result: null,
     completed: false,
     updatedAt: new Date().toISOString(),
+    startAt: new Date().toISOString(),
   };
 }
 
@@ -77,6 +80,7 @@ function readState(userId: string): LoanFitProgressState {
       result: parsed.result ?? null,
       completed: Boolean(parsed.completed),
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      startAt: parsed.startAt ?? new Date().toISOString(),
     };
   } catch {
     return createEmptyState();
@@ -224,6 +228,15 @@ export default function LoanFitTestView({
   const [answers, setAnswers] = useState<LoanFitAnswerMap>({});
   const [result, setResult] = useState<LoanFitResult | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [timeLeftText, setTimeLeftText] = useState(() => {
+    const start = new Date(readState(userId).startAt ?? new Date().toISOString()).getTime();
+    const end = start + TARGET_DURATION_MINUTES * 60 * 1000;
+    const diff = Math.max(0, end - Date.now());
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${String(mins)}:${String(secs).padStart(2, "0")} left`;
+  });
 
   const currentQuestion = stepIndex < loanFitQuestions.length ? loanFitQuestions[stepIndex] : null;
   const isReviewStep = stepIndex === loanFitQuestions.length;
@@ -241,11 +254,30 @@ export default function LoanFitTestView({
     setHydrated(true);
   }, [userId]);
 
+  // Live countdown for loan fit
   useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
+    if (result) return;
+    const tick = () => {
+      const start = new Date(readState(userId).startAt ?? new Date().toISOString()).getTime();
+      const end = start + TARGET_DURATION_MINUTES * 60 * 1000;
+      const diff = Math.max(0, end - Date.now());
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeftText(`${String(mins)}:${String(secs).padStart(2, "0")} left`);
+      if (diff <= 0 && !result) {
+        const nextResult = calculateLoanFitResult(answers);
+        setResult(nextResult);
+        setStepIndex(loanFitQuestions.length + 1);
+      }
+    };
 
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [answers, result, userId]);
+
+  useEffect(() => {
+    // Persist progress to localStorage whenever answers/step/result/loaded state changes.
     writeState(userId, {
       version: 1,
       answers,
@@ -253,6 +285,7 @@ export default function LoanFitTestView({
       result,
       completed: Boolean(result),
       updatedAt: new Date().toISOString(),
+      startAt: readState(userId).startAt ?? new Date().toISOString(),
     });
   }, [answers, hydrated, result, stepIndex, userId]);
 
@@ -312,6 +345,24 @@ export default function LoanFitTestView({
     setValidationMessage(null);
     setStepIndex(0);
   }, [userId]);
+
+  const handleStopTest = useCallback(() => {
+    const nextResult = calculateLoanFitResult(answers);
+    setResult(nextResult);
+    setStepIndex(loanFitQuestions.length + 1);
+  }, [answers]);
+
+  const stopConfirmDialog = (
+    <ConfirmDeleteDialog
+      isOpen={showStopConfirm}
+      title="Stop Test"
+      description="Stop the test and compute partial scoring for the answers you've provided so far?"
+      onConfirm={() => { handleStopTest(); setShowStopConfirm(false); }}
+      onCancel={() => setShowStopConfirm(false)}
+      confirmLabel="Stop"
+      processingLabel="Stopping..."
+    />
+  );
 
   const handleJumpToQuestion = useCallback((questionIndex: number) => {
     setResult(null);

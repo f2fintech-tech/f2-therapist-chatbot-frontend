@@ -16,6 +16,9 @@ interface ConfirmDeleteDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  processingLabel?: string;
 }
 
 export default function ConfirmDeleteDialog({
@@ -25,6 +28,9 @@ export default function ConfirmDeleteDialog({
   onConfirm,
   onCancel,
   isLoading = false,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  processingLabel = "Processing...",
 }: ConfirmDeleteDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -64,7 +70,7 @@ export default function ConfirmDeleteDialog({
             disabled={isDeleting || isLoading}
             className="flex-1"
           >
-            {isDeleting || isLoading ? "Deleting..." : "Delete"}
+            {isDeleting || isLoading ? processingLabel : confirmLabel}
           </Button>
           <Button
             variant="outline"
@@ -72,7 +78,7 @@ export default function ConfirmDeleteDialog({
             disabled={isDeleting || isLoading}
             className="flex-1"
           >
-            Cancel
+            {cancelLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

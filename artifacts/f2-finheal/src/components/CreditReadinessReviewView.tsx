@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   creditReadinessDurationMinutes,
@@ -101,6 +102,7 @@ function OptionButton({ label, selected, onClick }: { label: string; selected: b
 
 export default function CreditReadinessReviewView({ userId, onToggleSidebar, onToggleInsights, onBackToCatalog, onOpenFinancialWellnessAssistant }: CreditReadinessProps) {
   const [state, setState] = useState<ProgressState>(() => readState(userId));
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
@@ -123,6 +125,34 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
     }
     return undefined;
   }, [state.completed]);
+
+  // auto-stop when time runs out
+  useEffect(() => {
+    if (state.completed) return;
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000));
+    const remaining = Math.max(0, TARGET_SECONDS - elapsedSeconds);
+    if (remaining <= 0) {
+      const result = calculateCreditReadinessResult(state.answers);
+      setState((s) => ({ ...s, result, completed: true, completedAt: new Date().toISOString(), stepIndex: creditReadinessQuestions.length, updatedAt: new Date().toISOString() }));
+    }
+  }, [nowTs, state.startedAt, state.completed]);
+
+  const handleStopTest = useCallback(() => {
+    const result = calculateCreditReadinessResult(state.answers);
+    setState((s) => ({ ...s, result, completed: true, completedAt: new Date().toISOString(), stepIndex: creditReadinessQuestions.length, updatedAt: new Date().toISOString() }));
+  }, [state.answers]);
+
+  const stopConfirmDialog = (
+    <ConfirmDeleteDialog
+      isOpen={showStopConfirm}
+      title="Stop Test"
+      description="Stop the test and compute partial scoring for the answers you've provided so far?"
+      onConfirm={() => { handleStopTest(); setShowStopConfirm(false); }}
+      onCancel={() => setShowStopConfirm(false)}
+      confirmLabel="Stop"
+      processingLabel="Stopping..."
+    />
+  );
 
   useEffect(() => {
     if (state.completed && currentResult) {
@@ -208,7 +238,16 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden rounded-[16px] border bg-white dark:bg-slate-950">
-      <div className="sticky top-0 z-10 bg-white p-3 border-b"><div className="flex items-center justify-between"><div className="font-bold">Credit Readiness Review</div><div className="text-sm text-gray-500">{progressPercent}% · {Math.max(0, Math.ceil(remainingSeconds / 60))} min</div></div></div>
+      <div className="sticky top-0 z-10 bg-white p-3 border-b">
+        <div className="flex items-center justify-between">
+          <div className="font-bold">Credit Readiness Review</div>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-500">{progressPercent}% · {Math.max(0, Math.ceil(remainingSeconds / 60))} min</div>
+            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[32px] rounded-[6px] bg-rose-600 px-3 text-[12px] font-semibold text-white hover:bg-rose-700">Stop</button>
+          </div>
+        </div>
+      </div>
+      {stopConfirmDialog}
       <div className="p-6 overflow-auto">
         <section><Card><CardHeader><div className="text-sm text-gray-500">Question {questionNumber}</div><CardTitle className="mt-2">{currentQuestion?.prompt}</CardTitle><CardDescription className="mt-2">Take your time — there are no right or wrong answers.</CardDescription></CardHeader><CardContent className="mt-4 space-y-3">{currentQuestion?.options.map((opt) => <OptionButton key={opt.label} label={opt.label} selected={state.answers[currentQuestion.id] === opt.label} onClick={() => handleSelect(currentQuestion.id, opt.label)} />)}</CardContent></Card></section>
 

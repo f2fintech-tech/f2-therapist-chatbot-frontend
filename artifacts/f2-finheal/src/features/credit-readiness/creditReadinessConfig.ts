@@ -28,7 +28,7 @@ export type CreditReadinessQuestion = {
 
 export type CreditReadinessAnswerMap = Partial<Record<CreditReadinessQuestionId, string>>;
 
-export const creditReadinessDurationMinutes = 4;
+export const creditReadinessDurationMinutes = 5;
 export const creditReadinessStorageVersion = 1;
 export const creditReadinessTotalQuestions = 15;
 export const creditReadinessMaximumScore = 75;

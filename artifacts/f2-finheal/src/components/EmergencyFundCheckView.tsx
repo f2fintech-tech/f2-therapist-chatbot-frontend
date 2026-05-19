@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateEmergencyFundResult,
@@ -261,6 +262,7 @@ export default function EmergencyFundCheckView({
   onOpenFinancialWellnessAssistant,
 }: EmergencyFundCheckViewProps) {
   const [storageState, setStorageState] = useState<EmergencyFundProgressState>(() => readState(userId));
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
@@ -300,6 +302,32 @@ export default function EmergencyFundCheckView({
 
     return () => window.clearInterval(intervalId);
   }, [storageState.completed]);
+
+  // Auto-stop when time runs out
+  useEffect(() => {
+    if (storageState.completed) return;
+    if (remainingSeconds <= 0) {
+      const nextResult = calculateEmergencyFundResult(storageState.answers);
+      setStorageState((current) => ({ ...current, result: nextResult, completed: true, completedAt: new Date().toISOString(), stepIndex: emergencyFundQuestions.length, updatedAt: new Date().toISOString() }));
+    }
+  }, [remainingSeconds, storageState.completed]);
+
+  const handleStopTest = useCallback(() => {
+    const nextResult = calculateEmergencyFundResult(storageState.answers);
+    setStorageState((current) => ({ ...current, result: nextResult, completed: true, completedAt: new Date().toISOString(), stepIndex: emergencyFundQuestions.length, updatedAt: new Date().toISOString() }));
+  }, [storageState.answers]);
+
+  const stopConfirmDialog = (
+    <ConfirmDeleteDialog
+      isOpen={showStopConfirm}
+      title="Stop Test"
+      description="Stop the test and compute partial scoring for the answers you've provided so far?"
+      onConfirm={() => { handleStopTest(); setShowStopConfirm(false); }}
+      onCancel={() => setShowStopConfirm(false)}
+      confirmLabel="Stop"
+      processingLabel="Stopping..."
+    />
+  );
 
   useEffect(() => {
     if (storageState.completed && currentResult) {
@@ -611,9 +639,9 @@ export default function EmergencyFundCheckView({
         <div className="flex items-center gap-3 px-[16px] py-[14px] sm:px-[20px] sm:py-[12px]">
           <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">☰</button>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Emergency Fund Check</div>
-            <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400">A calm 2 minute diagnostic for your safety cushion and resilience.</div>
-          </div>
+              <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Emergency Fund Check</div>
+              <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400">A calm 5 minute diagnostic for your safety cushion and resilience.</div>
+            </div>
           <button type="button" onClick={onToggleInsights} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle insights panel">☰</button>
         </div>
         <div className="px-[16px] pb-[14px] sm:px-[20px] sm:pb-[12px]">
@@ -628,8 +656,10 @@ export default function EmergencyFundCheckView({
             <Badge tone={currentResult ? (currentResult.risk === "Low Risk" ? "positive" : currentResult.risk === "Moderate-Low Risk" ? "neutral" : currentResult.risk === "Moderate Risk" ? "warning" : "critical") : "neutral"}>{resultBand}</Badge>
             <Badge tone={answeredCount === totalQuestions ? "positive" : "neutral"}>{answeredCount} answered</Badge>
             <Badge tone={remainingSeconds <= 30 ? "warning" : "neutral"}>{timeLabel} remaining</Badge>
+            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[28px] rounded-[6px] bg-rose-600 px-3 text-[12px] font-semibold text-white hover:bg-rose-700">Stop</button>
           </div>
         </div>
+        {stopConfirmDialog}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">

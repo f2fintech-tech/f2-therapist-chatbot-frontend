@@ -44,7 +44,7 @@ export type EmergencyFundSectionMeta = {
   description: string;
 };
 
-export const emergencyFundDurationMinutes = 2;
+export const emergencyFundDurationMinutes = 5;
 export const emergencyFundStorageVersion = 1;
 export const emergencyFundTotalQuestions = 15;
 export const emergencyFundMaximumScore = 75;
