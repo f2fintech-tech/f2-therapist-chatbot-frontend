@@ -8,7 +8,6 @@ interface FinancialHealthTestCatalogProps {
   onOpenLoanFitTest: () => void;
   onOpenDebtBalanceReview: () => void;
   onOpenCreditReadiness?: () => void;
-  onOpenGoalProgress?: () => void;
 }
 
 type TestCard = {
@@ -68,15 +67,6 @@ const testCards: TestCard[] = [
     accent: "from-[#8b5cf6] to-[#a78bfa]",
   },
   {
-    id: "goal-progress",
-    title: "Financial Growth Tracker",
-    description: "Track how close you are to the money goals you already set in FinHeal.",
-    duration: "2 min",
-    focus: "Savings goals and momentum",
-    result: "Goal completion + pacing insight",
-    accent: "from-[#ec4899] to-[#f472b6]",
-  },
-  {
     id: "loan-fit",
     title: "Loan Comfort Analysis",
     description: "Estimate whether a new loan or EMI plan fits comfortably in your budget.",
@@ -87,7 +77,7 @@ const testCards: TestCard[] = [
   },
 ];
 
-export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenEmergencyFundCheck, onOpenLoanFitTest, onOpenDebtBalanceReview, onOpenCreditReadiness, onOpenGoalProgress }: FinancialHealthTestCatalogProps) {
+export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenEmergencyFundCheck, onOpenLoanFitTest, onOpenDebtBalanceReview, onOpenCreditReadiness }: FinancialHealthTestCatalogProps) {
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
@@ -226,13 +216,11 @@ export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleIn
                           ? onOpenDebtBalanceReview
                           : test.id === "credit-readiness"
                           ? onOpenCreditReadiness
-                          : test.id === "goal-progress"
-                          ? onOpenGoalProgress
                           : undefined
                       }
                       className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
-                        {test.id === "financial-literacy" ? "Open in new tab" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" || test.id === "goal-progress" ? "Start test" : "Open"}
+                        {test.id === "financial-literacy" ? "Open in new tab" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : "Open"}
                     </button>
                   </div>
                 </CardContent>

@@ -4,7 +4,6 @@ import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
 import EmergencyFundCheckView from "@/components/EmergencyFundCheckView";
-import FinancialGrowthTrackerView from "@/components/FinancialGrowthTrackerView";
 import LoanFitTestView from "@/components/LoanFitTestView";
 import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
 import CreditReadinessReviewView from "@/components/CreditReadinessReviewView";
@@ -54,9 +53,7 @@ export default function FinHealChat() {
       return "debt-balance" as const;
     }
 
-    if (view === "goal-progress") {
-      return "goal-progress" as const;
-    }
+    
 
     return "chat" as const;
   };
@@ -70,7 +67,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "goal-progress">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
@@ -288,7 +285,7 @@ export default function FinHealChat() {
   const openLoanFitTest = () => setMainView("loan-fit");
   const openDebtBalanceReview = () => setMainView("debt-balance");
   const openCreditReadiness = () => setMainView("credit-readiness");
-  const openGoalProgress = () => setMainView("goal-progress");
+  
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -459,7 +456,7 @@ export default function FinHealChat() {
           onOpenLoanFitTest={openLoanFitTest}
           onOpenDebtBalanceReview={openDebtBalanceReview}
           onOpenCreditReadiness={openCreditReadiness}
-          onOpenGoalProgress={openGoalProgress}
+          
         />
       ) : mainView === "emergency-fund" ? (
         <EmergencyFundCheckView
@@ -486,14 +483,6 @@ export default function FinHealChat() {
         />
       ) : mainView === "credit-readiness" ? (
         <CreditReadinessReviewView
-          userId={userId}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onToggleInsights={() => setInsightsOpen((open) => !open)}
-          onBackToCatalog={openTestCatalog}
-          onOpenFinancialWellnessAssistant={openChatView}
-        />
-      ) : mainView === "goal-progress" ? (
-        <FinancialGrowthTrackerView
           userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
