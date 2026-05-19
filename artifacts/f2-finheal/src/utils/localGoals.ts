@@ -1,6 +1,7 @@
 // Goals CRUD utility for localStorage persistence.
 
 const GOALS_STORAGE_KEY = "finheal_user_goals";
+const GOALS_UPDATED_EVENT = "finheal:goals-updated";
 
 export interface Goal {
   id: string;
@@ -30,6 +31,9 @@ function _readGoalsStore(): Goal[] {
 function _writeGoalsStore(goals: Goal[]) {
   try {
     localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(GOALS_UPDATED_EVENT));
+    }
   } catch {
     // ignore quota errors
   }
