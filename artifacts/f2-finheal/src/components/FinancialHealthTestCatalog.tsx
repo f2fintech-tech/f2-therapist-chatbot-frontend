@@ -43,7 +43,7 @@ const testCards: TestCard[] = [
     id: "debt-balance",
     title: "Debt Pressure Analysis",
     description: "See how your debt load compares with your current repayment capacity.",
-    duration: "3 min",
+    duration: "5 min",
     focus: "EMIs, balances, and debt mix",
     result: "Debt risk rating + repayment guidance",
     accent: "from-[#f59e0b] to-[#fbbf24]",

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateDebtBalanceResult,
@@ -27,6 +28,7 @@ type DebtBalanceProgressState = {
   result: DebtBalanceResult | null;
   completed: boolean;
   updatedAt: string;
+  startAt?: string;
 };
 
 type OptionButtonProps = {
@@ -37,7 +39,7 @@ type OptionButtonProps = {
 
 const STORAGE_PREFIX = "finheal_debt_balance_review";
 const TOTAL_STEPS = debtBalanceTotalQuestions + 1;
-const TARGET_DURATION_MINUTES = 3;
+const TARGET_DURATION_MINUTES = 5;
 
 function getStorageKey(userId: string) {
   return `${STORAGE_PREFIX}:${userId || "anonymous"}`;
@@ -51,6 +53,7 @@ function createEmptyState(): DebtBalanceProgressState {
     result: null,
     completed: false,
     updatedAt: new Date().toISOString(),
+    startAt: new Date().toISOString(),
   };
 }
 
@@ -77,6 +80,7 @@ function readState(userId: string): DebtBalanceProgressState {
       result: parsed.result ?? null,
       completed: Boolean(parsed.completed),
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      startAt: parsed.startAt ?? new Date().toISOString(),
     };
   } catch {
     return createEmptyState();
@@ -327,6 +331,73 @@ export default function DebtBalanceReviewView({
     setValidationMessage("");
   };
 
+  const handleStopTest = () => {
+    // Stop the test early and compute scoring with current answers
+    const result = calculateDebtBalanceResult(storageState.answers);
+    setStorageState((prev) => ({
+      ...prev,
+      result,
+      completed: true,
+      stepIndex: TOTAL_STEPS,
+      updatedAt: new Date().toISOString(),
+    }));
+  };
+
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
+
+  const stopConfirmDialog = (
+    <ConfirmDeleteDialog
+      isOpen={showStopConfirm}
+      title="Stop Test"
+      description="Stop the test and compute partial scoring for the answers you've provided so far?"
+      onConfirm={() => {
+        handleStopTest();
+        setShowStopConfirm(false);
+      }}
+      onCancel={() => setShowStopConfirm(false)}
+      isLoading={false}
+    />
+  );
+
+  // Live countdown timer
+  const [timeLeftText, setTimeLeftText] = useState<string>(() => {
+    // initial text based on startAt if available
+    const start = new Date(storageState.startAt ?? new Date().toISOString()).getTime();
+    const end = start + TARGET_DURATION_MINUTES * 60 * 1000;
+    const diff = Math.max(0, end - Date.now());
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return `${String(mins)}:${String(secs).padStart(2, "0")} left`;
+  });
+
+  const storageRef = useMemo(() => ({ get: () => storageState }), [storageState]);
+
+  useEffect(() => {
+    if (storageState.completed) {
+      setTimeLeftText("0:00 left");
+      return;
+    }
+
+    const tick = () => {
+      const start = new Date(storageState.startAt ?? new Date().toISOString()).getTime();
+      const end = start + TARGET_DURATION_MINUTES * 60 * 1000;
+      const diff = Math.max(0, end - Date.now());
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeftText(`${String(mins)}:${String(secs).padStart(2, "0")} left`);
+
+      if (diff <= 0 && !storageRef.get().completed) {
+        // Time's up — stop the test and compute results
+        const result = calculateDebtBalanceResult(storageRef.get().answers);
+        setStorageState((prev) => ({ ...prev, result, completed: true, stepIndex: TOTAL_STEPS, updatedAt: new Date().toISOString() }));
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [storageState.startAt, storageState.completed]);
+
   // Review step
   if (storageState.stepIndex === debtBalanceTotalQuestions) {
     return (
@@ -419,7 +490,9 @@ export default function DebtBalanceReviewView({
               </CardContent>
             </Card>
           </section>
+          {stopConfirmDialog}
         </div>
+        {stopConfirmDialog}
       </main>
     );
   }
@@ -680,7 +753,7 @@ export default function DebtBalanceReviewView({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Question {storageState.stepIndex + 1} of {debtBalanceTotalQuestions}</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">·</span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{getTimeRemainingText(storageState.stepIndex)}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{timeLeftText}</span>
           </div>
           <div className="mt-[4px] h-[4px] w-full rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -739,13 +812,20 @@ export default function DebtBalanceReviewView({
 
       <div className="border-t border-gray-100 px-[16px] py-[14px] shrink-0 bg-white sm:px-[20px]">
         <div className="flex gap-[8px]">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-gray-50"
-          >
-            {storageState.stepIndex === 0 ? "Exit" : "Back"}
-          </button>
+            <button
+              type="button"
+              onClick={handleBack}
+              className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-gray-50"
+            >
+              {storageState.stepIndex === 0 ? "Exit" : "Back"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStopConfirm(true)}
+              className="h-[38px] rounded-[12px] bg-rose-600 px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(220,38,38,0.18)] hover:bg-rose-700"
+            >
+              Stop test
+            </button>
           {storageState.stepIndex < debtBalanceTotalQuestions - 1 ? (
             <button
               type="button"
@@ -765,6 +845,9 @@ export default function DebtBalanceReviewView({
           )}
         </div>
       </div>
+      {stopConfirmDialog}
     </main>
   );
 }
+
+// Confirmation dialog is rendered within component tree so import above and used via state
