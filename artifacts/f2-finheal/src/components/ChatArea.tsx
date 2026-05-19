@@ -206,7 +206,7 @@ export default function ChatArea({
 
   return (
     <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[56px] sm:pl-[64px] lg:pl-0 pt-[12px] lg:pt-0">
+      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
         <div className="flex items-start gap-[10px] sm:items-center">
           <button
             onClick={onToggleSidebar}
@@ -225,7 +225,7 @@ export default function ChatArea({
             </div>
 
             {typeof remainingHearts === "number" && (
-              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] sm:w-[calc(100%+24px)] sm:-ml-[24px] lg:w-full lg:ml-0">
+              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px]">
                 <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
@@ -263,7 +263,7 @@ export default function ChatArea({
             )}
           </div>
         </div>
-        <div className="flex w-full flex-wrap justify-end gap-[6px] lg:w-[calc(100%-16px)] lg:mx-auto">
+        <div className="flex w-full flex-wrap gap-[6px] justify-end">
           <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]" title="Clear draft text">
             🗑 Clear
           </button>
