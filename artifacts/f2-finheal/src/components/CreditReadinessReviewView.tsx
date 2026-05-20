@@ -174,7 +174,17 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
     setState((s) => ({ ...s, answers: { ...s.answers, [questionId]: label }, updatedAt: new Date().toISOString() }));
   }, []);
 
-  const handleBack = useCallback(() => setState((s) => ({ ...s, stepIndex: Math.max(0, s.stepIndex - 1), updatedAt: new Date().toISOString() })), []);
+  const handleBack = useCallback(() => {
+    setValidationMessage(null);
+    setState((s) => {
+      if (s.stepIndex === 0) {
+        onBackToCatalog();
+        return s;
+      }
+
+      return { ...s, stepIndex: s.stepIndex - 1, updatedAt: new Date().toISOString() };
+    });
+  }, [onBackToCatalog]);
 
   const handleContinue = useCallback(() => {
     if (!currentQuestion) return;
