@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
+import QuestionNavigator from "@/components/QuestionNavigator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateDebtBalanceResult,
@@ -295,6 +296,15 @@ export default function DebtBalanceReviewView({
     setValidationMessage("");
   };
 
+  const handleJumpToQuestion = (questionIndex: number) => {
+    setValidationMessage("");
+    setStorageState((prev) => ({
+      ...prev,
+      stepIndex: Math.max(0, Math.min(questionIndex, debtBalanceTotalQuestions - 1)),
+      updatedAt: new Date().toISOString(),
+    }));
+  };
+
   const handleBack = () => {
     if (storageState.stepIndex > 0) {
       setStorageState((prev) => ({
@@ -428,6 +438,20 @@ export default function DebtBalanceReviewView({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+          <section className="mb-[18px]">
+            <QuestionNavigator
+              title="PROGRESS"
+              totalQuestions={debtBalanceTotalQuestions}
+              activeIndex={Math.min(storageState.stepIndex, debtBalanceTotalQuestions - 1)}
+              answeredCount={answeredCount}
+                timeLeftLabel={timeLeftText}
+                showTime={false}
+                showSummary={false}
+              onSelectQuestion={handleJumpToQuestion}
+              isAnswered={(index) => Boolean(storageState.answers[debtBalanceQuestions[index].id])}
+            />
+          </section>
+
           <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
             <div className="absolute right-[-28px] top-[-28px] h-[120px] w-[120px] rounded-full bg-primary opacity-10" />
             <div className="relative z-10 max-w-[780px]">
@@ -490,7 +514,6 @@ export default function DebtBalanceReviewView({
               </CardContent>
             </Card>
           </section>
-          {stopConfirmDialog}
         </div>
         {stopConfirmDialog}
       </main>
@@ -771,6 +794,22 @@ export default function DebtBalanceReviewView({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+        {currentQuestion && (
+          <div className="mb-[18px]">
+            <QuestionNavigator
+              title="PROGRESS"
+              totalQuestions={debtBalanceTotalQuestions}
+              activeIndex={storageState.stepIndex}
+              answeredCount={answeredCount}
+              timeLeftLabel={timeLeftText}
+              showTime={false}
+              showSummary={false}
+              onSelectQuestion={handleJumpToQuestion}
+              isAnswered={(index) => Boolean(storageState.answers[debtBalanceQuestions[index].id])}
+            />
+          </div>
+        )}
+
         {currentQuestion && (
           <>
             <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
