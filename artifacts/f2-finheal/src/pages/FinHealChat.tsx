@@ -289,10 +289,17 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
-  const openEmergencyFundCheck = () => setMainView("emergency-fund");
-  const openLoanFitTest = () => setMainView("loan-fit");
-  const openDebtBalanceReview = () => setMainView("debt-balance");
-  const openCreditReadiness = () => setMainView("credit-readiness");
+  const openTestInNewTab = (view: string) => {
+    if (typeof window === "undefined") return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("view", view);
+    window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+  };
+
+  const openEmergencyFundCheck = () => openTestInNewTab("emergency-fund");
+  const openLoanFitTest = () => openTestInNewTab("loan-fit");
+  const openDebtBalanceReview = () => openTestInNewTab("debt-balance");
+  const openCreditReadiness = () => openTestInNewTab("credit-readiness");
   
   const openFreshChat = () => {
     setMainView("chat");
