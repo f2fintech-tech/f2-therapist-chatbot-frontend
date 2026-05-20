@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
+// QuestionNavigator intentionally not used here — remove import
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateLoanFitResult,
@@ -371,32 +372,27 @@ export default function LoanFitTestView({
   }, []);
 
   const renderQuestionCard = (question: LoanFitQuestion) => (
-    <Card className="overflow-hidden border-[#d7dcfb] shadow-[0_18px_60px_rgba(50,68,230,0.08)]">
-      <div className="h-[5px] bg-gradient-to-r from-[#3344e6] via-[#4f6cf7] to-[#7c8cff]" />
-      <CardHeader className="space-y-3 px-[18px] pb-0 pt-[18px] sm:px-[24px] sm:pt-[22px]">
-        <div className="flex flex-wrap items-center gap-[8px]">
-          <Badge tone="neutral">Question {question.number} of {loanFitTotalQuestions}</Badge>
-          <Badge tone="neutral">{question.sectionLabel}</Badge>
+    <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 mb-[4px]">{question.sectionLabel}</div>
+            <CardTitle className="text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">{question.prompt}</CardTitle>
+          </div>
         </div>
-        <CardTitle className="font-serif text-[22px] leading-[1.3] text-gray-900 sm:text-[26px]">{question.prompt}</CardTitle>
-        <p className="max-w-[620px] text-[13px] leading-[1.7] text-gray-500 sm:text-[14px]">
-          Choose the option that feels closest to your current situation. There is no right or wrong answer here.
-        </p>
       </CardHeader>
-      <CardContent className="space-y-[12px] px-[18px] pb-[18px] pt-[18px] sm:px-[24px] sm:pb-[24px]">
-        <div className="grid gap-[10px]">
-          {question.options.map((option) => (
-            <OptionButton
-              key={option.id}
-              label={option.label}
-              selected={selectedAnswer === option.id}
-              onClick={() => handleSelectOption(question.id, option.id)}
-            />
-          ))}
-        </div>
+      <CardContent className="grid gap-[10px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
+        {question.options.map((option) => (
+          <OptionButton
+            key={option.id}
+            label={option.label}
+            selected={selectedAnswer === option.id}
+            onClick={() => handleSelectOption(question.id, option.id)}
+          />
+        ))}
 
         {validationMessage && currentQuestion?.id === question.id && (
-          <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-[14px] py-[12px] text-[13px] text-amber-800">
+          <div className="rounded-[12px] border border-rose-200 bg-rose-50 px-[14px] py-[12px] text-[13px] text-rose-700">
             {validationMessage}
           </div>
         )}
@@ -405,19 +401,16 @@ export default function LoanFitTestView({
   );
 
   const renderReviewStep = () => (
-    <Card className="overflow-hidden border-[#d7dcfb] shadow-[0_18px_60px_rgba(50,68,230,0.08)]">
-      <div className="h-[5px] bg-gradient-to-r from-[#3344e6] via-[#4f6cf7] to-[#7c8cff]" />
-      <CardHeader className="space-y-3 px-[18px] pb-0 pt-[18px] sm:px-[24px] sm:pt-[22px]">
-        <div className="flex flex-wrap items-center gap-[8px]">
-          <Badge tone="good">Final review</Badge>
-          <Badge tone={missingAnswers.length === 0 ? "good" : "warn"}>{completedCount}/{loanFitTotalQuestions} answered</Badge>
+    <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 mb-[4px]">Review</div>
+            <CardTitle className="text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">Review your responses before we calculate your fit score</CardTitle>
+          </div>
         </div>
-        <CardTitle className="font-serif text-[22px] leading-[1.3] text-gray-900 sm:text-[26px]">Review your responses before we calculate your fit score</CardTitle>
-        <p className="max-w-[640px] text-[13px] leading-[1.7] text-gray-500 sm:text-[14px]">
-          This final step is here to keep the experience calm and deliberate. You can go back and adjust anything before submitting.
-        </p>
       </CardHeader>
-      <CardContent className="space-y-[18px] px-[18px] pb-[18px] pt-[18px] sm:px-[24px] sm:pb-[24px]">
+      <CardContent className="space-y-[18px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
         <div className="grid gap-[10px] sm:grid-cols-2 xl:grid-cols-4">
           {loanFitSectionMeta.map((section, index) => (
             <div key={section.sectionId} className="rounded-[16px] border border-gray-200 bg-white p-[14px] shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
@@ -441,7 +434,7 @@ export default function LoanFitTestView({
         </div>
 
         {validationMessage && (
-          <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-[14px] py-[12px] text-[13px] text-amber-800">
+          <div className="rounded-[12px] border border-rose-200 bg-rose-50 px-[14px] py-[12px] text-[13px] text-rose-700">
             {validationMessage}
           </div>
         )}
@@ -583,125 +576,72 @@ export default function LoanFitTestView({
   };
 
   return (
-    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 px-[16px] py-[14px] backdrop-blur-sm sm:px-[20px] sm:py-[12px]">
-        <div className="flex flex-col gap-[10px]">
-          <div className="flex items-start gap-[10px] sm:items-center">
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              className="h-[32px] w-[32px] shrink-0 rounded-[6px] bg-gray-100 text-[18px] text-gray-600 transition-all hover:bg-gray-200 xl:hidden"
-              aria-label="Toggle sidebar"
-            >
-              ☰
-            </button>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-[8px]">
-                <h1 className="text-[14px] font-bold text-gray-900 sm:text-[16px]">Loan Fit Test</h1>
-                <Badge tone="neutral">3 minutes</Badge>
-                <Badge tone="neutral">Affordability + emotional readiness</Badge>
-              </div>
-              <p className="mt-[2px] text-[10px] text-gray-400 sm:text-[11px]">
-                A calm, non-judgmental check on whether a new loan or EMI commitment fits your current situation.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onToggleInsights}
-              className="h-[32px] w-[32px] shrink-0 rounded-[6px] bg-gray-100 text-[18px] text-gray-600 transition-all hover:bg-gray-200 2xl:hidden"
-              aria-label="Toggle insights panel"
-            >
-              ☰
-            </button>
+    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100">
+      <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="flex items-center gap-3 px-[16px] py-[14px] sm:px-[20px] sm:py-[12px]">
+          <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0" aria-label="Toggle sidebar">☰</button>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Loan Fit Test</div>
+            <div className="text-[10px] text-gray-400 sm:text-[11px]">A calm check on whether a new loan or EMI commitment fits your current situation.</div>
           </div>
-
-          <div className="space-y-[8px]">
-            <div className="flex items-center justify-between gap-[10px] text-[11px] text-gray-500">
-              <span>Progress {progressPercent}%</span>
-              <span>{timeRemaining}</span>
-            </div>
-            <div className="h-[8px] overflow-hidden rounded-full bg-gray-100">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#3344e6] via-[#4f6cf7] to-[#7c8cff] transition-all duration-500 ease-out"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+          <button type="button" onClick={onToggleInsights} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0" aria-label="Toggle insights panel">☰</button>
+        </div>
+        <div className="px-[16px] pb-[14px] sm:px-[20px] sm:pb-[12px]">
+          <div className="flex items-center justify-between gap-3 text-[11px] text-gray-500">
+            <span>Question {Math.min(stepIndex + 1, loanFitTotalQuestions)} of {loanFitTotalQuestions}</span>
+            <span>{timeLeftText}</span>
+          </div>
+          <div className="mt-[8px] h-[8px] rounded-full bg-gray-100">
+            <div className="h-full rounded-full bg-gradient-to-r from-[#3344e6] via-[#4f6cf7] to-[#7c8cff] transition-all duration-300" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
-        <section className="mb-[16px] grid gap-[10px] sm:grid-cols-2 lg:grid-cols-4">
-          <MetricPill label="Question" value={isReviewStep || result ? "Final review" : `${Math.min(stepIndex + 1, loanFitTotalQuestions)}/${loanFitTotalQuestions}`} />
-          <MetricPill label="Answered" value={`${completedCount}/${loanFitTotalQuestions}`} />
-          <MetricPill label="Estimated duration" value="3 min" />
-          <MetricPill label="Focus" value="Affordability planning" />
-        </section>
-
-        {!result && !isReviewStep && currentQuestion && renderQuestionCard(currentQuestion)}
+        {currentQuestion && !result && !isReviewStep && renderQuestionCard(currentQuestion)}
         {!result && isReviewStep && renderReviewStep()}
         {result && renderResultPage()}
 
         {!result && (
-          <div className="mt-[16px] flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="rounded-[14px] border border-gray-200 bg-white px-[16px] py-[12px] text-[13px] font-semibold text-gray-700 transition-all hover:bg-gray-50"
-            >
-              Back
-            </button>
-
-            {!isReviewStep ? (
+          <div className="mt-[18px] border-t border-gray-100 pt-[14px]">
+            <div className="flex gap-[8px]">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-gray-50"
+              >
+                {stepIndex === 0 ? 'Exit' : 'Back'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowStopConfirm(true)}
+                className="h-[38px] rounded-[12px] bg-rose-600 px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(220,38,38,0.18)] hover:bg-rose-700"
+              >
+                Stop test
+              </button>
               <button
                 type="button"
                 onClick={handleContinue}
-                className="rounded-[14px] bg-primary px-[18px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]"
+                disabled={!currentQuestion || !selectedAnswer}
+                className="flex-1 h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Continue
+                {isReviewStep ? 'Submit and see result' : 'Continue'}
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                className="rounded-[14px] bg-primary px-[18px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]"
-              >
-                Submit and see result
-              </button>
-            )}
+            </div>
           </div>
         )}
 
         {result && (
           <div className="mt-[16px] flex flex-col gap-[10px] sm:flex-row sm:flex-wrap sm:items-center">
-            <button
-              type="button"
-              onClick={handleRetake}
-              className="rounded-[14px] border border-gray-200 bg-white px-[16px] py-[12px] text-[13px] font-semibold text-gray-700 transition-all hover:bg-gray-50"
-            >
-              Retake Test
-            </button>
+            <button type="button" onClick={handleRetake} className="rounded-[14px] border border-gray-200 bg-white px-[16px] py-[12px] text-[13px] font-semibold text-gray-700 transition-all hover:bg-gray-50">Retake Test</button>
             {onOpenFinancialWellnessAssistant && (
-              <button
-                type="button"
-                onClick={onOpenFinancialWellnessAssistant}
-                className="rounded-[14px] border border-primary/20 bg-[#eef0fd] px-[16px] py-[12px] text-[13px] font-semibold text-primary transition-all hover:bg-[#e3e7ff]"
-              >
-                Talk to Financial Wellness Assistant
-              </button>
+              <button type="button" onClick={onOpenFinancialWellnessAssistant} className="rounded-[14px] border border-primary/20 bg-[#eef0fd] px-[16px] py-[12px] text-[13px] font-semibold text-primary transition-all hover:bg-[#e3e7ff]">Talk to Financial Wellness Assistant</button>
             )}
-            <button
-              type="button"
-              onClick={onBackToCatalog}
-              className="rounded-[14px] bg-primary px-[16px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]"
-            >
-              Explore Safer EMI Plans
-            </button>
+            <button type="button" onClick={onBackToCatalog} className="rounded-[14px] bg-primary px-[16px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]">Explore Safer EMI Plans</button>
           </div>
         )}
       </div>
+      {stopConfirmDialog}
     </main>
   );
 }
