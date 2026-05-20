@@ -362,12 +362,19 @@ export default function EmergencyFundCheckView({
 
   const handleBack = useCallback(() => {
     setValidationMessage(null);
-    setStorageState((current) => ({
-      ...current,
-      stepIndex: Math.max(0, current.stepIndex - 1),
-      updatedAt: new Date().toISOString(),
-    }));
-  }, []);
+    setStorageState((current) => {
+      if (current.stepIndex === 0) {
+        onBackToCatalog();
+        return current;
+      }
+
+      return {
+        ...current,
+        stepIndex: current.stepIndex - 1,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }, [onBackToCatalog]);
 
   const handleContinue = useCallback(() => {
     if (!currentQuestion) {
