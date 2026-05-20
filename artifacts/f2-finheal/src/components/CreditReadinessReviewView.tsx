@@ -237,23 +237,77 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
   const questionNumber = state.stepIndex + 1;
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden rounded-[16px] border bg-white dark:bg-slate-950">
-      <div className="sticky top-0 z-10 bg-white p-3 border-b">
-        <div className="flex items-center justify-between">
-          <div className="font-bold">Credit Readiness Review</div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-500">{progressPercent}% · {Math.max(0, Math.ceil(remainingSeconds / 60))} min</div>
-            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[32px] rounded-[6px] bg-rose-600 px-3 text-[12px] font-semibold text-white hover:bg-rose-700">Stop</button>
+    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100 dark:border-slate-800 dark:bg-slate-950">
+      <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="flex items-center gap-3 px-[16px] py-[14px] sm:px-[20px] sm:py-[12px]">
+          <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">☰</button>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Credit Readiness Review</div>
+            <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400">A calm 5 minute diagnostic for credit habits and repayment readiness.</div>
+          </div>
+          <button type="button" onClick={onToggleInsights} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle insights panel">☰</button>
+        </div>
+        <div className="px-[16px] pb-[14px] sm:px-[20px] sm:pb-[12px]">
+          <div className="flex items-center justify-between gap-3 text-[11px] text-gray-500 dark:text-slate-400">
+            <span>Question {questionNumber} of {creditReadinessQuestions.length}</span>
+            <span>{progressPercent}% complete · {Math.max(0, Math.ceil(remainingSeconds / 60))}:{String(remainingSeconds % 60).padStart(2, '0')} left</span>
+          </div>
+          <div className="mt-[8px] h-[8px] rounded-full bg-gray-100 dark:bg-slate-900">
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+          </div>
+          <div className="mt-[8px] flex flex-wrap items-center gap-[8px]">
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-[10px] py-[5px] text-[11px] font-semibold text-gray-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{currentResult?.category ?? 'Credit Readiness'}</span>
+            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-[10px] py-[5px] text-[11px] font-semibold text-gray-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{answeredCount} answered</span>
           </div>
         </div>
+        {stopConfirmDialog}
       </div>
-      {stopConfirmDialog}
-      <div className="p-6 overflow-auto">
-        <section><Card><CardHeader><div className="text-sm text-gray-500">Question {questionNumber}</div><CardTitle className="mt-2">{currentQuestion?.prompt}</CardTitle><CardDescription className="mt-2">Take your time — there are no right or wrong answers.</CardDescription></CardHeader><CardContent className="mt-4 space-y-3">{currentQuestion?.options.map((opt) => <OptionButton key={opt.label} label={opt.label} selected={state.answers[currentQuestion.id] === opt.label} onClick={() => handleSelect(currentQuestion.id, opt.label)} />)}</CardContent></Card></section>
 
-        {validationMessage && <div className="mt-4 rounded p-3 bg-amber-50 border">{validationMessage}</div>}
+      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+        {currentQuestion && (
+          <>
+            <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 mb-[4px]">Question {questionNumber}</div>
+                    <CardTitle className="text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">{currentQuestion.prompt}</CardTitle>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-[10px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
+                {currentQuestion.options.map((option) => (
+                  <OptionButton
+                    key={option.label}
+                    label={option.label}
+                    selected={state.answers[currentQuestion.id] === option.label}
+                    onClick={() => handleSelect(currentQuestion.id, option.label)}
+                  />
+                ))}
+              </CardContent>
+            </Card>
 
-        <section className="mt-6 flex items-center justify-between"><div className="flex gap-2"><button type="button" onClick={handleBack} disabled={state.stepIndex === 0} className="px-4 py-2 rounded border disabled:opacity-50">Back</button><button type="button" onClick={handleContinue} className="px-4 py-2 rounded bg-cyan-500 text-white">{state.stepIndex === creditReadinessQuestions.length - 1 ? 'Finish' : 'Continue'}</button></div><div className="text-sm text-gray-500">{answeredCount} answered</div></section>
+            {validationMessage && (
+              <div className="mt-[12px] rounded-[12px] border border-rose-200 bg-rose-50 px-[14px] py-[12px]">
+                <div className="text-[12px] font-semibold text-rose-700">{validationMessage}</div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="mt-[18px] border-t border-gray-100 pt-[14px]">
+          <div className="flex gap-[8px]">
+            <button type="button" onClick={handleBack} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-gray-50">
+              {state.stepIndex === 0 ? 'Exit' : 'Back'}
+            </button>
+            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[38px] rounded-[12px] bg-rose-600 px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(220,38,38,0.18)] hover:bg-rose-700">
+              Stop test
+            </button>
+            <button type="button" onClick={handleContinue} disabled={!currentQuestion || !state.answers[currentQuestion.id]} className="flex-1 h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+              {state.stepIndex === creditReadinessQuestions.length - 1 ? 'Finish' : 'Continue'}
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );
