@@ -653,81 +653,72 @@ export default function EmergencyFundCheckView({
             <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
           </div>
           <div className="mt-[8px] flex flex-wrap items-center gap-[8px]">
-            <Badge tone={currentResult ? (currentResult.risk === "Low Risk" ? "positive" : currentResult.risk === "Moderate-Low Risk" ? "neutral" : currentResult.risk === "Moderate Risk" ? "warning" : "critical") : "neutral"}>{resultBand}</Badge>
             <Badge tone={answeredCount === totalQuestions ? "positive" : "neutral"}>{answeredCount} answered</Badge>
-            <Badge tone={remainingSeconds <= 30 ? "warning" : "neutral"}>{timeLabel} remaining</Badge>
-            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[28px] rounded-[6px] bg-rose-600 px-3 text-[12px] font-semibold text-white hover:bg-rose-700">Stop</button>
           </div>
         </div>
         {stopConfirmDialog}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
-        <section className="rounded-[24px] border border-cyan-100 bg-[linear-gradient(135deg,#f0fdff_0%,#ecfeff_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(14,165,233,0.08)] sm:p-[24px] dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a_0%,#111827_48%,#020617_100%)]">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Calm financial wellness check</div>
-          <h1 className="mt-[6px] font-serif text-[28px] leading-[1.1] text-gray-900 dark:text-slate-50">How resilient is your emergency cushion today?</h1>
-          <p className="mt-[10px] max-w-[760px] text-[13px] leading-[1.7] text-gray-600 dark:text-slate-300">Choose the option that feels closest to your current reality. This assessment is designed to help you build stability, not to judge your finances.</p>
-          <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600 dark:text-slate-300">
-            <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-800 dark:bg-slate-900">Supportive tone</span>
-            <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-800 dark:bg-slate-900">Liquid savings focus</span>
-            <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-800 dark:bg-slate-900">Short and practical</span>
-          </div>
-        </section>
-
-        <section className="mt-[18px]">
-          <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-950">
-            <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Question {questionNumber}</div>
-                  <CardTitle className="mt-[4px] text-[18px] leading-[1.5] text-gray-900 dark:text-slate-100">{currentQuestion?.prompt}</CardTitle>
+        {currentQuestion && (
+          <>
+            <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <CardHeader className="space-y-3 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 mb-[4px]">{currentQuestion.sectionId.replace("-", " ")}</div>
+                    <CardTitle className="text-[16px] leading-[1.5] text-gray-900 sm:text-[17px]">
+                      {currentQuestion.prompt}
+                    </CardTitle>
+                  </div>
                 </div>
-                <span className="rounded-[999px] border border-gray-200 bg-gray-50 px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.7px] text-gray-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{currentQuestion ? emergencyFundSectionMeta.find((section) => section.sectionId === currentQuestion.sectionId)?.title ?? "Section" : "Section"}</span>
-              </div>
-              <CardDescription className="text-[12px] leading-[1.7] text-gray-600 dark:text-slate-400">Choose the answer that best reflects your current situation. Every answer helps shape a more accurate safety cushion estimate.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-[10px] px-[16px] pb-[16px] pt-[16px] sm:px-[18px]">
-              {currentQuestion?.options.map((option) => {
-                const selected = currentAnswer === option.label;
-                return (
-                  <OptionButton key={option.label} label={option.label} selected={selected} onClick={() => handleSelectOption(currentQuestion.id, option.label)} />
-                );
-              })}
-            </CardContent>
-          </Card>
-        </section>
+              </CardHeader>
+              <CardContent className="grid gap-[10px] px-[16px] pb-[16px] pt-[12px] sm:px-[18px]">
+                {currentQuestion.options.map((option) => (
+                  <OptionButton
+                    key={option.label}
+                    label={option.label}
+                    selected={storageState.answers[currentQuestion.id] === option.label}
+                    onClick={() => handleSelectOption(currentQuestion.id, option.label)}
+                  />
+                ))}
+              </CardContent>
+            </Card>
 
-        {validationMessage && (
-          <section className="mt-[12px] rounded-[16px] border border-amber-200 bg-amber-50 px-[14px] py-[12px] text-[12px] leading-[1.7] text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-            {validationMessage}
-          </section>
+            {validationMessage && (
+              <div className="mt-[12px] rounded-[12px] border border-rose-200 bg-rose-50 px-[14px] py-[12px]">
+                <div className="text-[12px] font-semibold text-rose-700">{validationMessage}</div>
+              </div>
+            )}
+          </>
         )}
 
-        <section className="mt-[18px] grid gap-[12px] lg:grid-cols-[1.2fr_0.8fr]">
-          <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(14,165,233,0.08)] dark:border-slate-800 dark:bg-slate-950">
-            <CardContent className="flex flex-col gap-[10px] px-[16px] py-[16px] sm:flex-row sm:items-center sm:justify-between sm:px-[18px]">
-              <div className="text-[12px] text-gray-600 dark:text-slate-300">Use back if you want to rethink an answer. Continue moves you one step forward.</div>
-              <div className="flex gap-[8px] flex-wrap">
-                <button type="button" onClick={handleBack} disabled={storageState.stepIndex === 0} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Back</button>
-                <button type="button" onClick={handleContinue} disabled={!currentAnswer} className="h-[38px] rounded-[12px] bg-cyan-500 px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(14,165,233,0.18)] disabled:cursor-not-allowed disabled:opacity-60">{storageState.stepIndex === emergencyFundQuestions.length - 1 ? "Finish" : "Continue"}</button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-950">
-            <CardContent className="px-[16px] py-[16px] sm:px-[18px]">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Saved locally</div>
-              <div className="mt-[4px] text-[15px] font-semibold text-gray-900 dark:text-slate-100">Your progress is stored on this device.</div>
-              <div className="mt-[2px] text-[12px] text-gray-500 dark:text-slate-400">You can leave and return without losing answered questions.</div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
-          <MetricPill label="Answered" value={answeredCount} subtext={`${missingQuestions.length} left`} />
-          <MetricPill label="Estimated duration" value={`${emergencyFundDurationMinutes} min`} subtext="Designed for a quick check" />
-          <MetricPill label="Coverage target" value={currentResult ? currentResult.suggestedEmergencyFundTarget : "3-6 months"} subtext="What to work toward" />
-        </section>
+        <div className="mt-[18px] border-t border-gray-100 pt-[14px]">
+          <div className="flex gap-[8px]">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-gray-50"
+            >
+              {storageState.stepIndex === 0 ? "Exit" : "Back"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStopConfirm(true)}
+              className="h-[38px] rounded-[12px] bg-rose-600 px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(220,38,38,0.18)] hover:bg-rose-700"
+            >
+              Stop test
+            </button>
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={!currentAnswer}
+              className="flex-1 h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {storageState.stepIndex === emergencyFundQuestions.length - 1 ? "Finish" : "Continue"}
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );
