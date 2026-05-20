@@ -91,10 +91,10 @@ export async function signInUser(email: string, password: string): Promise<AuthS
   };
 }
 
-export async function signUpUser(email: string, password: string, guestUserId?: string): Promise<AuthSession> {
+export async function signUpUser(email: string, password: string, guestUserId?: string, name?: string): Promise<AuthSession> {
   const result = await authRequest<AuthResponse>("auth/signup", {
     method: "POST",
-    body: JSON.stringify({ email, password, name: email, guest_user_id: guestUserId }),
+    body: JSON.stringify({ email, password, name: name || email, guest_user_id: guestUserId }),
   });
 
   return {

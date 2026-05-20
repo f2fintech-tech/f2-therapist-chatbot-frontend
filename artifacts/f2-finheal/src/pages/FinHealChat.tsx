@@ -10,7 +10,7 @@ import CreditReadinessReviewView from "@/components/CreditReadinessReviewView";
 import InsightsPanel from "@/components/InsightsPanel";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
-import { deleteLocalConversation } from "@/utils/localConversations";
+import { deleteLocalConversation, migrateConversationsFromUserId } from "@/utils/localConversations";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
@@ -60,6 +60,8 @@ export default function FinHealChat() {
 
   const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
   const [loginUsername, setLoginUsername] = useState(loginDefaults.username);
+  const [loginDisplayName, setLoginDisplayName] = useState("");
+  const [loginLastName, setLoginLastName] = useState("");
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -165,9 +167,15 @@ export default function FinHealChat() {
     setIsSubmitting(true);
 
     try {
+      const guestUserId = authSession?.isGuest ? authSession.userId : null;
       const payload = authMode === "signup"
-        ? await signUpUser(loginUsername.trim(), loginPassword, authSession?.isGuest ? authSession.userId : undefined)
+        ? await signUpUser(loginUsername.trim(), loginPassword, guestUserId ?? undefined, [loginDisplayName.trim(), loginLastName.trim()].filter(Boolean).join(' ') || loginUsername.trim())
         : await signInUser(loginUsername.trim(), loginPassword);
+
+      // Migrate any local guest conversations to the real user ID
+      if (guestUserId && payload.userId && guestUserId !== payload.userId) {
+        migrateConversationsFromUserId(guestUserId, payload.userId);
+      }
 
       persistSession(payload);
       setCurrentMoodDims(null);
@@ -339,6 +347,32 @@ export default function FinHealChat() {
           </div>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
+            {authMode === "signup" && (
+              <div className="flex gap-3">
+                <label className="block flex-1">
+                  <span className="mb-2 block text-sm font-medium text-gray-700">First name <span className="text-red-500">*</span></span>
+                  <input
+                    value={loginDisplayName}
+                    onChange={(event) => setLoginDisplayName(event.target.value)}
+                    className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    placeholder="e.g. John"
+                    autoComplete="given-name"
+                    required
+                  />
+                </label>
+                <label className="block flex-1">
+                  <span className="mb-2 block text-sm font-medium text-gray-700">Last name</span>
+                  <input
+                    value={loginLastName}
+                    onChange={(event) => setLoginLastName(event.target.value)}
+                    className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    placeholder="e.g. Smith"
+                    autoComplete="family-name"
+                  />
+                </label>
+              </div>
+            )}
+
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-gray-700">Email</span>
               <input
