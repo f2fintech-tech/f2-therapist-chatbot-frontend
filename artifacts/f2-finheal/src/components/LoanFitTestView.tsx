@@ -13,6 +13,7 @@ import {
   type LoanFitQuestion,
   type LoanFitResult,
 } from "@/features/loan-fit/loanFitConfig";
+import { submitWellnessTestResult } from "@/lib/backendChat";
 
 interface LoanFitTestViewProps {
   userId: string;
@@ -230,6 +231,7 @@ export default function LoanFitTestView({
   const [result, setResult] = useState<LoanFitResult | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [submittedAttemptKey, setSubmittedAttemptKey] = useState<string | null>(null);
   const [timeLeftText, setTimeLeftText] = useState(() => {
     const start = new Date(readState(userId).startAt ?? new Date().toISOString()).getTime();
     const end = start + TARGET_DURATION_MINUTES * 60 * 1000;
@@ -290,6 +292,40 @@ export default function LoanFitTestView({
     });
   }, [answers, hydrated, result, stepIndex, userId]);
 
+  useEffect(() => {
+    if (!result) {
+      return;
+    }
+
+    const attemptKey = `${userId}:${result.rawScore}:${result.percentageScore}:${Object.keys(answers).length}:${stepIndex}`;
+    if (submittedAttemptKey === attemptKey) {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        await submitWellnessTestResult({
+          user_id: userId,
+          test_type: "loan_fit",
+          raw_score: result.percentageScore,
+          normalized_score: result.percentageScore,
+          completed_at: new Date().toISOString(),
+          insights: result.insights.map((item) => item.title),
+          category_breakdown: {
+            category: result.category,
+            riskLevel: result.riskLevel,
+            affordabilityStatus: result.affordabilityStatus,
+          },
+        });
+        setSubmittedAttemptKey(attemptKey);
+      } catch (error) {
+        console.error("Failed to submit loan fit result to wellness engine", error);
+      }
+    };
+
+    void run();
+  }, [answers, result, stepIndex, submittedAttemptKey, userId]);
+
   const handleSelectOption = useCallback(
     (questionId: string, optionId: string) => {
       setValidationMessage(null);
@@ -311,20 +347,6 @@ export default function LoanFitTestView({
     });
   }, [onBackToCatalog]);
 
-  const handleContinue = useCallback(() => {
-    if (!currentQuestion) {
-      return;
-    }
-
-    if (!selectedAnswer) {
-      setValidationMessage("Please choose an option to continue.");
-      return;
-    }
-
-    setValidationMessage(null);
-    setStepIndex((current) => Math.min(current + 1, loanFitQuestions.length));
-  }, [currentQuestion, selectedAnswer]);
-
   const handleSubmit = useCallback(() => {
     const unanswered = loanFitQuestions.filter((question) => !answers[question.id]);
     if (unanswered.length > 0) {
@@ -338,6 +360,25 @@ export default function LoanFitTestView({
     setValidationMessage(null);
     setStepIndex(loanFitQuestions.length + 1);
   }, [answers]);
+
+  const handleContinue = useCallback(() => {
+    if (isReviewStep) {
+      handleSubmit();
+      return;
+    }
+
+    if (!currentQuestion) {
+      return;
+    }
+
+    if (!selectedAnswer) {
+      setValidationMessage("Please choose an option to continue.");
+      return;
+    }
+
+    setValidationMessage(null);
+    setStepIndex((current) => Math.min(current + 1, loanFitQuestions.length));
+  }, [currentQuestion, isReviewStep, selectedAnswer, handleSubmit]);
 
   const handleRetake = useCallback(() => {
     clearState(userId);
