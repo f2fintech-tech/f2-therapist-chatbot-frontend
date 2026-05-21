@@ -17,6 +17,7 @@ import {
   type FinancialLiteracyAnswers,
   type FinancialLiteracyResult,
 } from "@/features/financial-literacy/financialLiteracyScoring";
+import { submitWellnessTestResult } from "@/lib/backendChat";
 
 interface FinancialLiteracyAssessmentProps {
   userId: string;
@@ -268,6 +269,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   const [storageState, setStorageState] = useState<AssessmentStorage>(() => readStorage(userId));
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
+  const [submittedAttemptIds, setSubmittedAttemptIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const stored = readStorage(userId);
@@ -353,6 +355,40 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
       requestAnimationFrame(animate);
     }
   }, [stage, currentResult?.percentageScore]);
+
+  useEffect(() => {
+    if (!currentAttempt || stage !== "results" || !currentResult) {
+      return;
+    }
+
+    const attemptId = currentAttempt.attemptId;
+    if (!attemptId || submittedAttemptIds[attemptId]) {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        await submitWellnessTestResult({
+          user_id: userId,
+          test_type: "financial_literacy",
+          raw_score: currentResult.percentageScore,
+          normalized_score: currentResult.percentageScore,
+          completed_at: currentAttempt.submittedAt ?? currentAttempt.updatedAt,
+          insights: currentResult.behavioralInsights,
+          category_breakdown: {
+            levelId: currentAttempt.levelId,
+            correctAnswers: currentResult.rawScore,
+            totalQuestions: currentResult.totalQuestions,
+          },
+        });
+        setSubmittedAttemptIds((current) => ({ ...current, [attemptId]: true }));
+      } catch (error) {
+        console.error("Failed to submit financial literacy result to wellness engine", error);
+      }
+    };
+
+    void run();
+  }, [currentAttempt, currentResult, stage, submittedAttemptIds, userId]);
 
   const unlockState = useMemo(() => {
     const completedLevels = new Set<FinancialLiteracyLevelId>();
