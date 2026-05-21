@@ -68,7 +68,7 @@ export default function ConfirmDeleteDialog({
             variant="destructive"
             onClick={handleConfirm}
             disabled={isDeleting || isLoading}
-            className="flex-1"
+            className="flex-1 cursor-pointer"
           >
             {isDeleting || isLoading ? processingLabel : confirmLabel}
           </Button>
@@ -76,7 +76,7 @@ export default function ConfirmDeleteDialog({
             variant="outline"
             onClick={onCancel}
             disabled={isDeleting || isLoading}
-            className="flex-1"
+            className="flex-1 cursor-pointer"
           >
             {cancelLabel}
           </Button>

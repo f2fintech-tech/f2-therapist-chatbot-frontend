@@ -173,7 +173,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
         className="w-full px-[16px] py-[18px] pb-[14px] flex items-center gap-[11px] border-b border-gray-100 text-left transition-colors hover:bg-gray-50 sm:px-[18px] sm:py-[20px] sm:pb-[16px]"
         aria-label="Start a new chat"
       >
-        <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
+        <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center cursor-pointer text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
           💙
           <div className="absolute -top-[10px] -right-[10px] w-[30px] h-[30px] bg-white/15 rounded-full" />
         </div>
@@ -241,14 +241,14 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
           <div>
             <button
               onClick={() => setActiveNav("Talk to FinHeal")}
-              className="text-[12px] text-primary font-semibold mb-[12px] hover:underline"
+              className="text-[12px] text-primary font-semibold mb-[12px] hover:underline cursor-pointer"
             >
               ← Back
             </button>
             <div className="mb-[12px]">
               <button
                 onClick={() => setShowGoalForm(!showGoalForm)}
-                className="w-full bg-primary text-white font-semibold py-[10px] rounded-[10px] hover:opacity-90 transition-opacity text-[13px]"
+                className="w-full bg-primary text-white font-semibold py-[10px] rounded-[10px] hover:opacity-90 transition-opacity text-[13px] cursor-pointer"
               >
                 {showGoalForm ? "Cancel" : "+ Add New Goal"}
               </button>
@@ -350,7 +350,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                                   <button
                                     type="button"
                                     onClick={() => handleEditGoal(goal)}
-                                    className="text-[11px] text-gray-400 hover:text-primary font-semibold transition-colors"
+                                    className="text-[11px] text-gray-400 hover:text-primary font-semibold transition-colors cursor-pointer"
                                     aria-label={`Edit goal ${goal.name}`}
                                   >
                                     ✏️
@@ -359,7 +359,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                                 <TooltipContent
                                   side="top"
                                   sideOffset={8}
-                                  className="rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] text-[10px] font-medium text-gray-700 shadow-[0_10px_24px_rgba(17,24,39,0.12)]"
+                                  className="rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] text-[10px] cursor-pointer font-medium text-gray-700 shadow-[0_10px_24px_rgba(17,24,39,0.12)]"
                                 >
                                   Edit goal
                                 </TooltipContent>
@@ -369,7 +369,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteGoal(goal.id)}
-                                    className="text-[11px] text-gray-400 hover:text-red-500 font-semibold transition-colors"
+                                    className="text-[11px] text-gray-400 hover:text-red-500 font-semibold transition-colors cursor-pointer"
                                     aria-label={`Delete goal ${goal.name}`}
                                   >
                                     ✕

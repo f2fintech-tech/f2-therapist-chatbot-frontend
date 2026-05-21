@@ -210,7 +210,7 @@ export default function ChatArea({
         <div className="flex items-start gap-[10px] sm:items-center">
           <button
             onClick={onToggleSidebar}
-            className="fixed left-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
+            className="fixed left-[12px] top-[12px] h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden shrink-0 z-50 shadow-sm"
             aria-label="Toggle sidebar"
           >
             ☰
@@ -264,11 +264,11 @@ export default function ChatArea({
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-[6px] justify-end">
-          <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]" title="Clear draft text">
+          <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer" title="Clear draft text">
             🗑 Clear
           </button>
           {onLogout && (
-            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px]">
+            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer">
               🚪 Sign out
             </button>
           )}
@@ -283,7 +283,7 @@ export default function ChatArea({
 
       <button
         onClick={onToggleInsights}
-        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
+        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
         aria-label="Toggle insights panel"
       >
         ☰
@@ -421,7 +421,7 @@ export default function ChatArea({
                 type="button"
                 onClick={() => (isRecording ? stopRecording() : void startRecording())}
                 disabled={isLoading || isSendingMessage}
-                className={`w-[32px] h-[32px] rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
+                className={`w-[32px] h-[32px] cursor-pointer rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${isLoading || isSendingMessage ? "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-gray-400" : ""}`}
                 aria-pressed={isRecording}
                 aria-label={isRecording ? "Stop recording" : "Record audio"}
                 title={isRecording ? "Stop recording" : "Record audio"}
@@ -439,7 +439,7 @@ export default function ChatArea({
                 )}
               </button>
 
-              <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
+              <div className="cursor-pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
                 <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">{isRecording ? 'Stop recording' : 'Record audio'}</div>
                 <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
               </div>
@@ -461,7 +461,7 @@ export default function ChatArea({
                 type="button"
                 onClick={() => void handleSend(inputValue)}
                 disabled={isLoading || !inputValue.trim()}
-                className="w-[36px] h-[36px] rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-[36px] h-[36px] cursor-pointer rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14M12 5l7 7-7 7"/>

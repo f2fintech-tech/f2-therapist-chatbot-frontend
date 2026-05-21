@@ -197,7 +197,7 @@ export default function InsightsPanel({
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-semibold text-gray-700 truncate">{goal.name}</div>
                     </div>
-                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
+                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] cursor-pointer text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
                   </div>
                   <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
                     <div className="h-full rounded-[3px] transition-all" style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }} />

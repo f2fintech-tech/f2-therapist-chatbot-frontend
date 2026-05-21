@@ -323,7 +323,7 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
                           ? onOpenCreditReadiness
                           : undefined
                       }
-                      className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
+                      className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] cursor-pointer font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
                         {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : "Open"}
                     </button>
