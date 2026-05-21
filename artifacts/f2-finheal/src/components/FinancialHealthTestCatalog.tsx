@@ -128,7 +128,7 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
           if (!meta) continue;
           const score = parsed.result.percentageScore != null
             ? `${Math.round(parsed.result.percentageScore)}%`
-            : parsed.result.riskLevel || parsed.result.category || "Done";
+            : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
           const date = parsed.updatedAt
             ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
             : "Completed";
