@@ -13,6 +13,7 @@ import {
   type DebtBalanceQuestion,
   type DebtBalanceResult,
 } from "@/features/debt-balance/debtBalanceConfig";
+import { submitWellnessTestResult } from "@/lib/backendChat";
 
 interface DebtBalanceReviewViewProps {
   userId: string;
@@ -255,10 +256,47 @@ export default function DebtBalanceReviewView({
   });
 
   const [validationMessage, setValidationMessage] = useState("");
+  const [submittedAttemptKey, setSubmittedAttemptKey] = useState<string | null>(null);
 
   useEffect(() => {
     writeState(userId, storageState);
   }, [storageState, userId]);
+
+  useEffect(() => {
+    if (!storageState.completed || !storageState.result) {
+      return;
+    }
+
+    const result = storageState.result;
+
+    const attemptKey = `${userId}:${storageState.updatedAt}:${result.percentageScore}`;
+    if (submittedAttemptKey === attemptKey) {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        await submitWellnessTestResult({
+          user_id: userId,
+          test_type: "debt_balance",
+          raw_score: result.percentageScore,
+          normalized_score: result.percentageScore,
+          completed_at: storageState.updatedAt,
+          insights: result.insights.map((item) => item.title),
+          category_breakdown: {
+            category: result.category,
+            risk: result.risk,
+            debtStressIndicator: result.debtStressIndicator,
+          },
+        });
+        setSubmittedAttemptKey(attemptKey);
+      } catch (error) {
+        console.error("Failed to submit debt balance result to wellness engine", error);
+      }
+    };
+
+    void run();
+  }, [storageState.completed, storageState.result, storageState.updatedAt, submittedAttemptKey, userId]);
 
   const currentQuestion: DebtBalanceQuestion | undefined =
     storageState.stepIndex < debtBalanceTotalQuestions ? debtBalanceQuestions[storageState.stepIndex] : undefined;
