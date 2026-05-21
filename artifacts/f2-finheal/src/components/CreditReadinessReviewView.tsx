@@ -135,13 +135,17 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
     const remaining = Math.max(0, TARGET_SECONDS - elapsedSeconds);
     if (remaining <= 0) {
       const result = calculateCreditReadinessResult(state.answers);
-      saveTestResult({
+      void submitWellnessTestResult({
         user_id: userId,
-        test_type: "credit_readiness",
-        percentage_score: result.percentageScore != null ? Math.round(result.percentageScore) : undefined,
-        risk_level: result.riskLevel,
-        category: result.category,
-        result_data: result as unknown as Record<string, unknown>,
+        test_type: 'credit_readiness',
+        raw_score: result.percentageScore,
+        normalized_score: result.percentageScore,
+        completed_at: new Date().toISOString(),
+        insights: result.insights.map((item) => item.title),
+        category_breakdown: {
+          category: result.category,
+          risk: result.risk,
+        },
       }).catch(() => {});
       setState((s) => ({ ...s, result, completed: true, completedAt: new Date().toISOString(), stepIndex: creditReadinessQuestions.length, updatedAt: new Date().toISOString() }));
     }
