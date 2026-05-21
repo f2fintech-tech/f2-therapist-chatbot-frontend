@@ -15,6 +15,7 @@ import {
   type EmergencyFundAnswerMap,
   type EmergencyFundQuestion,
 } from "@/features/emergency-fund/emergencyFundConfig";
+import { submitWellnessTestResult } from "@/lib/backendChat";
 
 interface EmergencyFundCheckViewProps {
   userId: string;
@@ -266,6 +267,7 @@ export default function EmergencyFundCheckView({
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [submittedAttemptKey, setSubmittedAttemptKey] = useState<string | null>(null);
 
   useEffect(() => {
     setStorageState(readState(userId));
@@ -347,6 +349,47 @@ export default function EmergencyFundCheckView({
       requestAnimationFrame(animate);
     }
   }, [currentResult?.rawScore, storageState.completed]);
+
+  useEffect(() => {
+    if (!storageState.completed || !currentResult) {
+      return;
+    }
+
+    const attemptKey = `${userId}:${storageState.completedAt ?? storageState.updatedAt}:${currentResult.rawScore}`;
+    if (submittedAttemptKey === attemptKey) {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        await submitWellnessTestResult({
+          user_id: userId,
+          test_type: "emergency_fund",
+          raw_score: currentResult.percentageScore,
+          normalized_score: currentResult.percentageScore,
+          completed_at: storageState.completedAt ?? storageState.updatedAt,
+          insights: currentResult.insights.map((item) => item.title),
+          category_breakdown: {
+            category: currentResult.category,
+            risk: currentResult.risk,
+            emergencyPreparednessScore: currentResult.emergencyPreparednessScore,
+          },
+        });
+        setSubmittedAttemptKey(attemptKey);
+      } catch (error) {
+        console.error("Failed to submit emergency fund result to wellness engine", error);
+      }
+    };
+
+    void run();
+  }, [
+    currentResult,
+    storageState.completed,
+    storageState.completedAt,
+    storageState.updatedAt,
+    submittedAttemptKey,
+    userId,
+  ]);
 
   const handleSelectOption = useCallback((questionId: string, optionLabel: string) => {
     setValidationMessage(null);
