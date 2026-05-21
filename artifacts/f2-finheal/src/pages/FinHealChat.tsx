@@ -189,7 +189,20 @@ export default function FinHealChat() {
       setCurrentMoodDims(null);
       setMainView("chat");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to authenticate. Please try again.";
+      let message = error instanceof Error ? error.message : "Unable to authenticate. Please try again.";
+      
+      // Check for our specific error or try to parse the JSON
+      if (message.includes("Invalid email or password")) {
+        message = "Incorrect password or email. Please check and try again.";
+      } else if (message.includes("{")) {
+        try {
+          const parsed = JSON.parse(message);
+          message = parsed.detail || parsed.error || message;
+        } catch (e) {
+          // If it fails to parse, just keep the original message
+        }
+      }
+      
       setLoginError(message);
     } finally {
       setIsSubmitting(false);
