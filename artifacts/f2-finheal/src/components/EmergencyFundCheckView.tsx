@@ -310,13 +310,17 @@ export default function EmergencyFundCheckView({
     if (storageState.completed) return;
     if (remainingSeconds <= 0) {
       const nextResult = calculateEmergencyFundResult(storageState.answers);
-      saveTestResult({
+      void submitWellnessTestResult({
         user_id: userId,
-        test_type: "emergency_fund",
-        percentage_score: nextResult.percentageScore != null ? Math.round(nextResult.percentageScore) : undefined,
-        risk_level: nextResult.riskLevel,
-        category: nextResult.category,
-        result_data: nextResult as unknown as Record<string, unknown>,
+        test_type: 'emergency_fund',
+        raw_score: nextResult.percentageScore,
+        normalized_score: nextResult.percentageScore,
+        completed_at: new Date().toISOString(),
+        insights: nextResult.insights.map((item) => item.title),
+        category_breakdown: {
+          category: nextResult.category,
+          risk: nextResult.risk,
+        },
       }).catch(() => {});
       setStorageState((current) => ({ ...current, result: nextResult, completed: true, completedAt: new Date().toISOString(), stepIndex: emergencyFundQuestions.length, updatedAt: new Date().toISOString() }));
     }
