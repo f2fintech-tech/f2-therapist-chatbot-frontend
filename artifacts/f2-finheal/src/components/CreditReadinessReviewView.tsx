@@ -11,6 +11,7 @@ import {
   type CreditReadinessQuestion,
 } from '@/features/credit-readiness/creditReadinessConfig';
 import { calculateCreditReadinessResult, type CreditReadinessResult, buildCreditRecommendations } from '@/features/credit-readiness/creditReadinessScoring';
+import { submitWellnessTestResult } from '@/lib/backendChat';
 
 interface CreditReadinessProps {
   userId: string;
@@ -106,6 +107,7 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [submittedAttemptKey, setSubmittedAttemptKey] = useState<string | null>(null);
 
   useEffect(() => setState(readState(userId)), [userId]);
   useEffect(() => writeState(userId, state), [state, userId]);
@@ -168,6 +170,39 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
       requestAnimationFrame(step);
     }
   }, [state.completed, currentResult?.rawScore]);
+
+  useEffect(() => {
+    if (!state.completed || !currentResult) {
+      return;
+    }
+
+    const attemptKey = `${userId}:${state.completedAt ?? state.updatedAt}:${currentResult.rawScore}`;
+    if (submittedAttemptKey === attemptKey) {
+      return;
+    }
+
+    const run = async () => {
+      try {
+        await submitWellnessTestResult({
+          user_id: userId,
+          test_type: 'credit_readiness',
+          raw_score: currentResult.percentageScore,
+          normalized_score: currentResult.percentageScore,
+          completed_at: state.completedAt ?? state.updatedAt,
+          insights: currentResult.insights.map((item) => item.title),
+          category_breakdown: {
+            category: currentResult.category,
+            risk: currentResult.risk,
+          },
+        });
+        setSubmittedAttemptKey(attemptKey);
+      } catch (error) {
+        console.error('Failed to submit credit readiness result to wellness engine', error);
+      }
+    };
+
+    void run();
+  }, [currentResult, state.completed, state.completedAt, state.updatedAt, submittedAttemptKey, userId]);
 
   const handleSelect = useCallback((questionId: string, label: string) => {
     setValidationMessage(null);
