@@ -27,7 +27,7 @@ const featuredTest = {
   title: "Financial Health Snapshot",
   description:
     "A fast overview that combines spending pressure, savings resilience, and repayment comfort into one simple score.",
-  duration: "3 min",
+  duration: "5-10 minutes",
   result: "Instant score, plain-language summary, and next-step suggestions.",
   accent: "from-[#3344e6] to-[#4f6cf7]",
 };
@@ -55,7 +55,7 @@ const testCards: TestCard[] = [
     id: "emergency-fund",
     title: "Financial Safety Score",
     description: "Measure how many months of essential spending you can cover today.",
-    duration: "2 min",
+    duration: "5 min",
     focus: "Savings buffer and stability",
     result: "Coverage estimate + savings target",
     accent: "from-[#06b6d4] to-[#22d3ee]",
@@ -206,11 +206,11 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
         </section>
 
         {pastResults.length > 0 && (
-          <section className="mt-[18px]">
+          <section className="mt-[18px] cursor-pointer">
             <button
               type="button"
               onClick={() => setShowPastResults((v) => !v)}
-              className="w-full flex items-center justify-between rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] px-[18px] py-[14px] text-left transition hover:bg-[#eef0fd]"
+              className="w-full cursor-pointer flex items-center justify-between rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] px-[18px] py-[14px] text-left transition hover:bg-[#eef0fd]"
             >
               <div className="flex items-center gap-[10px]">
                 <span className="text-[20px]">📋</span>
