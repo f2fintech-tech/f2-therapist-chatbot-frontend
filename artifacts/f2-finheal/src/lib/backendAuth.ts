@@ -114,3 +114,32 @@ export async function fetchHearts(userId: string): Promise<number> {
   });
   return response.hearts;
 }
+
+export interface TestResultPayload {
+  user_id: string;
+  test_type: string;
+  score?: number;
+  percentage_score?: number;
+  risk_level?: string;
+  category?: string;
+  result_data?: Record<string, unknown>;
+}
+
+export async function saveTestResult(payload: TestResultPayload): Promise<void> {
+  await authRequest<unknown>("test-results/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchTestResults(userId: string): Promise<{
+  id: string;
+  test_type: string;
+  score: number | null;
+  percentage_score: number | null;
+  risk_level: string | null;
+  category: string | null;
+  completed_at: string;
+}[]> {
+  return authRequest(`test-results/${encodeURIComponent(userId)}`, { method: "GET" });
+}

@@ -175,6 +175,14 @@ export default function FinHealChat() {
       // Migrate any local guest conversations to the real user ID
       if (guestUserId && payload.userId && guestUserId !== payload.userId) {
         migrateConversationsFromUserId(guestUserId, payload.userId);
+        // Also migrate test results in backend
+        try {
+          await fetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/test-results/migrate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ from_user_id: guestUserId, to_user_id: payload.userId }),
+          });
+        } catch {}
       }
 
       persistSession(payload);
@@ -490,6 +498,7 @@ export default function FinHealChat() {
         />
       ) : mainView === "tests" ? (
         <FinancialHealthTestCatalog
+          userId={userId}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleInsights={() => setInsightsOpen((open) => !open)}
           onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}

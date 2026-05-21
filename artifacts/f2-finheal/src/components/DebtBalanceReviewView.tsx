@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { saveTestResult } from "@/lib/backendAuth";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import QuestionNavigator from "@/components/QuestionNavigator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -364,6 +365,14 @@ export default function DebtBalanceReviewView({
     }
 
     const result = calculateDebtBalanceResult(storageState.answers);
+    saveTestResult({
+      user_id: userId,
+      test_type: "debt_balance",
+      percentage_score: result.percentageScore != null ? Math.round(result.percentageScore) : undefined,
+      risk_level: result.riskLevel,
+      category: result.category,
+      result_data: result as unknown as Record<string, unknown>,
+    }).catch(() => {});
     setStorageState((prev) => ({
       ...prev,
       result,

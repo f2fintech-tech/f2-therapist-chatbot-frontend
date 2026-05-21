@@ -310,6 +310,14 @@ export default function EmergencyFundCheckView({
     if (storageState.completed) return;
     if (remainingSeconds <= 0) {
       const nextResult = calculateEmergencyFundResult(storageState.answers);
+      saveTestResult({
+        user_id: userId,
+        test_type: "emergency_fund",
+        percentage_score: nextResult.percentageScore != null ? Math.round(nextResult.percentageScore) : undefined,
+        risk_level: nextResult.riskLevel,
+        category: nextResult.category,
+        result_data: nextResult as unknown as Record<string, unknown>,
+      }).catch(() => {});
       setStorageState((current) => ({ ...current, result: nextResult, completed: true, completedAt: new Date().toISOString(), stepIndex: emergencyFundQuestions.length, updatedAt: new Date().toISOString() }));
     }
   }, [remainingSeconds, storageState.completed]);

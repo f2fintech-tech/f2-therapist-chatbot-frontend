@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchTestResults } from "@/lib/backendAuth";
 
 interface FinancialHealthTestCatalogProps {
+  userId?: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onOpenFinancialLiteracyTest: () => void;
@@ -77,7 +80,68 @@ const testCards: TestCard[] = [
   },
 ];
 
-export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenEmergencyFundCheck, onOpenLoanFitTest, onOpenDebtBalanceReview, onOpenCreditReadiness }: FinancialHealthTestCatalogProps) {
+export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenEmergencyFundCheck, onOpenLoanFitTest, onOpenDebtBalanceReview, onOpenCreditReadiness }: FinancialHealthTestCatalogProps) {
+  const [pastResults, setPastResults] = useState<{title: string; score: string; date: string; accent: string}[]>([]);
+  const [showPastResults, setShowPastResults] = useState(false);
+
+  useEffect(() => {
+    const uid = userId || "anonymous";
+    const testMeta: Record<string, { title: string; accent: string }> = {
+      loan_fit: { title: "Loan Comfort Analysis", accent: "from-[#3344e6] to-[#7c8cff]" },
+      debt_balance: { title: "Debt Pressure Analysis", accent: "from-[#f59e0b] to-[#fbbf24]" },
+      credit_readiness: { title: "Credit Health Analyzer", accent: "from-[#8b5cf6] to-[#a78bfa]" },
+      emergency_fund: { title: "Financial Safety Score", accent: "from-[#06b6d4] to-[#22d3ee]" },
+      financial_literacy: { title: "Money IQ Arena", accent: "from-[#10b981] to-[#34d399]" },
+    };
+
+    async function loadResults() {
+      const results: { title: string; score: string; date: string; accent: string }[] = [];
+      const seen = new Set<string>();
+
+      try {
+        const backendResults = await fetchTestResults(uid);
+        for (const r of backendResults) {
+          const meta = testMeta[r.test_type];
+          if (!meta || seen.has(r.test_type)) continue;
+          seen.add(r.test_type);
+          const score = r.percentage_score != null ? `${r.percentage_score}%` : r.risk_level || r.category || "Done";
+          const date = new Date(r.completed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+          results.push({ title: meta.title, score, date, accent: meta.accent });
+        }
+      } catch {}
+
+      const localTests = [
+        { key: `finheal_loan_fit_test:${uid}`, type: "loan_fit" },
+        { key: `finheal_debt_balance_review:${uid}`, type: "debt_balance" },
+        { key: `finheal_credit_readiness:${uid}`, type: "credit_readiness" },
+        { key: `finheal_emergency_fund_check:${uid}`, type: "emergency_fund" },
+        { key: `finheal_financial_literacy_test:${uid}`, type: "financial_literacy" },
+      ];
+      for (const t of localTests) {
+        if (seen.has(t.type)) continue;
+        try {
+          const raw = localStorage.getItem(t.key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          if (!parsed?.completed || !parsed?.result) continue;
+          const meta = testMeta[t.type];
+          if (!meta) continue;
+          const score = parsed.result.percentageScore != null
+            ? `${Math.round(parsed.result.percentageScore)}%`
+            : parsed.result.riskLevel || parsed.result.category || "Done";
+          const date = parsed.updatedAt
+            ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+            : "Completed";
+          results.push({ title: meta.title, score, date, accent: meta.accent });
+        } catch {}
+      }
+
+      setPastResults(results);
+    }
+
+    void loadResults();
+  }, [userId]);
+
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
@@ -140,6 +204,47 @@ export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleIn
             <div className="mt-[4px] text-[24px] font-serif text-gray-900">Instant</div>
           </div>
         </section>
+
+        {pastResults.length > 0 && (
+          <section className="mt-[18px]">
+            <button
+              type="button"
+              onClick={() => setShowPastResults((v) => !v)}
+              className="w-full flex items-center justify-between rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] px-[18px] py-[14px] text-left transition hover:bg-[#eef0fd]"
+            >
+              <div className="flex items-center gap-[10px]">
+                <span className="text-[20px]">📋</span>
+                <div>
+                  <div className="text-[14px] font-semibold text-gray-900">Your past test results</div>
+                  <div className="text-[11px] text-gray-500">{pastResults.length} test{pastResults.length > 1 ? "s" : ""} completed — tap to {showPastResults ? "hide" : "view"}</div>
+                </div>
+              </div>
+              <span className="text-[18px] text-primary">{showPastResults ? "▲" : "▼"}</span>
+            </button>
+
+            {showPastResults && (
+              <div className="mt-[10px] grid gap-[8px] grid-cols-2 xl:grid-cols-3">
+                {pastResults.map((r, i) => (
+                  <div key={i} className="overflow-hidden rounded-[14px] border border-gray-200 bg-white shadow-sm">
+                    <div className={`h-[3px] bg-gradient-to-r ${r.accent}`} />
+                    <div className="flex items-center justify-between gap-2 px-[12px] py-[10px]">
+                      <div className="min-w-0">
+                        <div className="text-[12px] font-semibold text-gray-900 truncate">{r.title}</div>
+                        <div className="text-[10px] text-gray-400">{r.date}</div>
+                        <div className="mt-[4px] text-[10px] font-medium text-emerald-600 flex items-center gap-[3px]">
+                          <span>✅</span> Completed
+                        </div>
+                      </div>
+                      <div className="rounded-[10px] bg-[#eef0fd] px-[10px] py-[5px] text-[14px] font-bold text-primary shrink-0">
+                        {r.score}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="mt-[18px]">
           <div className="mb-[10px] flex items-baseline justify-between gap-3">
@@ -228,6 +333,7 @@ export default function FinancialHealthTestCatalog({ onToggleSidebar, onToggleIn
             ))}
           </div>
         </section>
+
       </div>
     </main>
   );

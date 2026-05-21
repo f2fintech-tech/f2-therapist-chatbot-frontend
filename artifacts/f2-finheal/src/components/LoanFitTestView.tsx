@@ -270,6 +270,15 @@ export default function LoanFitTestView({
       if (diff <= 0 && !result) {
         const nextResult = calculateLoanFitResult(answers);
         setResult(nextResult);
+        saveTestResult({
+          user_id: userId,
+          test_type: "loan_fit",
+          score: nextResult.rawScore,
+          percentage_score: Math.round(nextResult.percentageScore),
+          risk_level: nextResult.riskLevel,
+          category: nextResult.category,
+          result_data: nextResult as unknown as Record<string, unknown>,
+        }).catch(() => {});
         setStepIndex(loanFitQuestions.length + 1);
       }
     };

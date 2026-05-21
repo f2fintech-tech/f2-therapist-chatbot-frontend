@@ -11,7 +11,11 @@ import {
   type CreditReadinessQuestion,
 } from '@/features/credit-readiness/creditReadinessConfig';
 import { calculateCreditReadinessResult, type CreditReadinessResult, buildCreditRecommendations } from '@/features/credit-readiness/creditReadinessScoring';
+<<<<<<< HEAD
 import { submitWellnessTestResult } from '@/lib/backendChat';
+=======
+import { saveTestResult } from '@/lib/backendAuth';
+>>>>>>> aeb67d8 (connect the test results to backend)
 
 interface CreditReadinessProps {
   userId: string;
@@ -135,6 +139,14 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
     const remaining = Math.max(0, TARGET_SECONDS - elapsedSeconds);
     if (remaining <= 0) {
       const result = calculateCreditReadinessResult(state.answers);
+      saveTestResult({
+        user_id: userId,
+        test_type: "credit_readiness",
+        percentage_score: result.percentageScore != null ? Math.round(result.percentageScore) : undefined,
+        risk_level: result.riskLevel,
+        category: result.category,
+        result_data: result as unknown as Record<string, unknown>,
+      }).catch(() => {});
       setState((s) => ({ ...s, result, completed: true, completedAt: new Date().toISOString(), stepIndex: creditReadinessQuestions.length, updatedAt: new Date().toISOString() }));
     }
   }, [nowTs, state.startedAt, state.completed]);
