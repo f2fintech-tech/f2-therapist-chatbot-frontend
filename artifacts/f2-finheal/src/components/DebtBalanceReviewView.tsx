@@ -369,7 +369,7 @@ export default function DebtBalanceReviewView({
       user_id: userId,
       test_type: "debt_balance",
       percentage_score: result.percentageScore != null ? Math.round(result.percentageScore) : undefined,
-      risk_level: result.riskLevel,
+      risk_level: result.risk,
       category: result.category,
       result_data: result as unknown as Record<string, unknown>,
     }).catch(() => {});
