@@ -132,6 +132,16 @@ export interface BackendRequestError extends Error {
   isTimeout?: boolean;
 }
 
+export interface WellnessTestResultInput {
+  user_id: string;
+  test_type: string;
+  raw_score: number;
+  normalized_score?: number;
+  completed_at?: string;
+  insights?: string[];
+  category_breakdown?: Record<string, unknown>;
+}
+
 interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   expectJson?: boolean;
@@ -455,6 +465,15 @@ export async function getConversationMessages(
 export async function deleteConversation(conversationId: string, userId: string): Promise<void> {
   const params = new URLSearchParams({ user_id: userId });
   await request<void>(`conversations/${conversationId}?${params.toString()}`, { method: "DELETE", expectJson: false });
+}
+
+export async function submitWellnessTestResult(payload: WellnessTestResultInput): Promise<void> {
+  await request<void>("wellness/test-results", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    expectJson: false,
+  });
 }
 
 export function getApiBaseUrl(): string {
