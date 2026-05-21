@@ -11,11 +11,7 @@ import {
   type CreditReadinessQuestion,
 } from '@/features/credit-readiness/creditReadinessConfig';
 import { calculateCreditReadinessResult, type CreditReadinessResult, buildCreditRecommendations } from '@/features/credit-readiness/creditReadinessScoring';
-<<<<<<< HEAD
 import { submitWellnessTestResult } from '@/lib/backendChat';
-=======
-import { saveTestResult } from '@/lib/backendAuth';
->>>>>>> aeb67d8 (connect the test results to backend)
 
 interface CreditReadinessProps {
   userId: string;
