@@ -339,162 +339,115 @@ export default function FinHealChat() {
     nextUrl.searchParams.set("view", "financial-literacy");
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
-
   if (!authSession || !userProfile) {
     return (
-      <div className="flex min-h-[100dvh] w-full items-center justify-center bg-[radial-gradient(circle_at_top,_#eef0fd_0%,_#f8fafc_42%,_#ffffff_100%)] p-4">
-        <div className="w-full max-w-[520px] rounded-[28px] border border-gray-200 bg-white p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] sm:p-8">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-primary text-2xl text-white shadow-[0_10px_24px_rgba(50,68,230,0.22)]">
-              💙
-            </div>
-            <div>
-              <div className="text-[22px] font-bold text-gray-900">Login or sign up</div>
-              <div className="text-sm text-gray-500">Access the FinHeal chat with persistent account authentication.</div>
-            </div>
-          </div>
+      <div style={{minHeight:"100dvh",width:"100%",position:"relative",display:"grid",gridTemplateColumns:"1fr 1fr",background:"#f0f2ff"}}>
 
-          <div className="mb-6 rounded-[18px] border border-[#d4d8fa] bg-[#f6f7fe] p-4 text-sm text-gray-600">
-            Create a new account, sign in with existing credentials, or continue as a guest. Your session token is stored securely in browser storage.
-          </div>
+        {/* Full page grid background */}
+        <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(99,102,241,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.08) 1px,transparent 1px)",backgroundSize:"32px 32px",zIndex:0}} />
 
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setAuthMode("login")}
-              className={`rounded-[14px] px-4 py-3 text-[14px] font-semibold transition ${authMode === "login" ? "bg-primary text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode("signup")}
-              className={`rounded-[14px] px-4 py-3 text-[14px] font-semibold transition ${authMode === "signup" ? "bg-primary text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
-            >
-              Create account
-            </button>
+        {/* Left content */}
+        <div style={{position:"relative",zIndex:1,padding:"60px 64px",display:"flex",flexDirection:"column",justifyContent:"center",gap:"48px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+            <div style={{width:"42px",height:"42px",background:"#3344e6",borderRadius:"12px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}}>💙</div>
+            <span style={{fontSize:"17px",fontWeight:700,color:"#1e1b4b"}}>F2 FinHeal</span>
           </div>
-
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
-            {authMode === "signup" && (
-              <div className="flex gap-3">
-                <label className="block flex-1">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">First name <span className="text-red-500">*</span></span>
-                  <input
-                    value={loginDisplayName}
-                    onChange={(event) => setLoginDisplayName(event.target.value)}
-                    className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                    placeholder="e.g. John"
-                    autoComplete="given-name"
-                    required
-                  />
-                </label>
-                <label className="block flex-1">
-                  <span className="mb-2 block text-sm font-medium text-gray-700">Last name</span>
-                  <input
-                    value={loginLastName}
-                    onChange={(event) => setLoginLastName(event.target.value)}
-                    className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                    placeholder="e.g. Smith"
-                    autoComplete="family-name"
-                  />
-                </label>
+          <div>
+            <div style={{fontSize:"52px",fontWeight:800,lineHeight:1.1,color:"#1e1b4b",letterSpacing:"-1px"}}>Your financial<br/>wellness <span style={{color:"#3344e6"}}>companion</span></div>
+            <p style={{marginTop:"18px",fontSize:"17px",lineHeight:1.7,color:"#6b7280",maxWidth:"440px"}}>Navigate money stress with empathy-first guidance — no judgment, just real support and practical steps.</p>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:"20px"}}>
+            {[
+              {icon:"🧠",title:"AI-powered financial therapy",desc:"Understands your stress and adapts to your situation"},
+              {icon:"🎯",title:"Goal tracking that works",desc:"Set goals, track progress, and get nudges that keep you on track"},
+              {icon:"🔒",title:"Safe and private",desc:"Your conversations are encrypted and never shared"},
+            ].map((f,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:"14px"}}>
+                <div style={{width:"40px",height:"40px",background:"rgba(51,68,230,0.08)",borderRadius:"10px",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"18px"}}>{f.icon}</div>
+                <div>
+                  <div style={{fontSize:"15px",fontWeight:600,color:"#1e1b4b",marginBottom:"3px"}}>{f.title}</div>
+                  <div style={{fontSize:"13px",color:"#9ca3af"}}>{f.desc}</div>
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+          <div style={{fontSize:"12px",color:"#9ca3af"}}>F2 Fintech · f2fintech.com · Instant loans with fast approval</div>
+        </div>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Email</span>
-              <input
-                value={loginUsername}
-                onChange={(event) => setLoginUsername(event.target.value)}
-                className="w-full rounded-[14px] border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                placeholder="you@example.com"
-                autoComplete="username"
-              />
-            </label>
+        {/* Right form card */}
+        <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 48px"}}>
+          <div style={{background:"#fff",borderRadius:"24px",padding:"44px 48px",width:"100%",maxWidth:"480px",boxShadow:"0 24px 80px rgba(15,23,42,0.10)",border:"1px solid rgba(99,102,241,0.1)",display:"flex",flexDirection:"column",gap:"24px"}}>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Password</span>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={loginPassword}
-                  onChange={(event) => setLoginPassword(event.target.value)}
-                  className="w-full rounded-[14px] border border-gray-200 bg-white py-3 pl-4 pr-12 text-[15px] text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                  placeholder="Enter your password"
-                  autoComplete={authMode === "signup" ? "new-password" : "current-password"}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-                >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                    </svg>
-                  )}
+            <div style={{display:"flex",overflow:"hidden",borderRadius:"10px",border:"1px solid #e5e7eb",width:"fit-content"}}>
+              <button type="button" onClick={()=>setAuthMode("login")} style={{padding:"9px 22px",fontSize:"14px",fontWeight:600,cursor:"pointer",border:"none",background:authMode==="login"?"#3344e6":"#fff",color:authMode==="login"?"#fff":"#6b7280",transition:"all 0.15s"}}>Sign in</button>
+              <button type="button" onClick={()=>setAuthMode("signup")} style={{padding:"9px 22px",fontSize:"14px",fontWeight:600,cursor:"pointer",border:"none",background:authMode==="signup"?"#3344e6":"#fff",color:authMode==="signup"?"#fff":"#6b7280",transition:"all 0.15s"}}>Create account</button>
+            </div>
+
+            <div>
+              <div style={{fontSize:"26px",fontWeight:700,color:"#111827"}}>{authMode==="signup"?"Create your account":"Welcome back"}</div>
+              <div style={{marginTop:"5px",fontSize:"14px",color:"#6b7280"}}>{authMode==="signup"?"Join FinHeal and start your financial wellness journey":"Sign in to continue your financial wellness journey"}</div>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} style={{display:"flex",flexDirection:"column",gap:"16px"}}>
+              {authMode==="signup" && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+                  <label style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                    <span style={{fontSize:"13px",fontWeight:500,color:"#374151"}}>First name <span style={{color:"#ef4444"}}>*</span></span>
+                    <input value={loginDisplayName} onChange={(e)=>setLoginDisplayName(e.target.value)} placeholder="Priya" autoComplete="given-name" required style={{height:"46px",padding:"0 14px",border:"1px solid #e5e7eb",borderRadius:"10px",fontSize:"14px",outline:"none",fontFamily:"inherit",background:"#f9fafb"}} />
+                  </label>
+                  <label style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                    <span style={{fontSize:"13px",fontWeight:500,color:"#374151"}}>Last name</span>
+                    <input value={loginLastName} onChange={(e)=>setLoginLastName(e.target.value)} placeholder="Sharma" autoComplete="family-name" style={{height:"46px",padding:"0 14px",border:"1px solid #e5e7eb",borderRadius:"10px",fontSize:"14px",outline:"none",fontFamily:"inherit",background:"#f9fafb"}} />
+                  </label>
+                </div>
+              )}
+              <label style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                <span style={{fontSize:"13px",fontWeight:500,color:"#374151"}}>Email</span>
+                <input value={loginUsername} onChange={(e)=>setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{height:"46px",padding:"0 14px",border:"1px solid #e5e7eb",borderRadius:"10px",fontSize:"14px",outline:"none",fontFamily:"inherit",background:"#f9fafb"}} />
+              </label>
+              <label style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                <span style={{fontSize:"13px",fontWeight:500,color:"#374151"}}>Password</span>
+                <div style={{position:"relative"}}>
+                  <input type={showPassword?"text":"password"} value={loginPassword} onChange={(e)=>setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete={authMode==="signup"?"new-password":"current-password"} style={{height:"46px",padding:"0 44px 0 14px",border:"1px solid #e5e7eb",borderRadius:"10px",fontSize:"14px",outline:"none",fontFamily:"inherit",width:"100%",background:"#f9fafb"}} />
+                  <button type="button" onClick={()=>setShowPassword(!showPassword)} style={{position:"absolute",right:"12px",top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9ca3af",padding:0}}>
+                    {showPassword?(
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width:"18px",height:"18px"}}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                    ):(
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width:"18px",height:"18px"}}><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                    )}
+                  </button>
+                </div>
+              </label>
+              {loginError && (
+                <div style={{padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"10px",fontSize:"13px",color:"#b91c1c"}}>{loginError}</div>
+              )}
+              <button type="submit" disabled={isSubmitting} style={{height:"50px",background:"#3344e6",border:"none",borderRadius:"12px",color:"#fff",fontSize:"15px",fontWeight:600,cursor:"pointer",fontFamily:"inherit",opacity:isSubmitting?0.7:1,marginTop:"4px"}}>
+                {isSubmitting?"Processing...":(authMode==="signup"?"Create account":"Sign in")}
+              </button>
+            </form>
+
+            <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+                <div style={{flex:1,height:"1px",background:"#f3f4f6"}} />
+                <span style={{fontSize:"12px",color:"#d1d5db"}}>or</span>
+                <div style={{flex:1,height:"1px",background:"#f3f4f6"}} />
+              </div>
+              <button type="button" onClick={handleGuestLogin} disabled={isSubmitting} style={{height:"50px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:"12px",fontSize:"14px",fontWeight:600,color:"#374151",cursor:"pointer",fontFamily:"inherit"}}>
+                Continue as guest
+              </button>
+              <div style={{textAlign:"center",fontSize:"13px",color:"#9ca3af"}}>
+                {authMode==="signup"?"Already have an account? ":"No account yet? "}
+                <button type="button" onClick={()=>setAuthMode(authMode==="signup"?"login":"signup")} style={{background:"none",border:"none",color:"#3344e6",fontWeight:600,cursor:"pointer",fontFamily:"inherit",fontSize:"13px"}}>
+                  {authMode==="signup"?"Sign in":"Create account"}
                 </button>
               </div>
-            </label>
-
-            {loginError && (
-              <div className="rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
-                {loginError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="relative flex h-12 w-full items-center justify-center rounded-[14px] bg-primary font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition hover:bg-[#1e2db8] disabled:cursor-not-allowed disabled:opacity-70 active:scale-[0.98]"
-            >
-              {isSubmitting ? (
-                <>
-                  <svg className="-ml-1 mr-2 h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </>
-              ) : (
-                authMode === "signup" ? "Create account" : "Sign in"
-              )}
-            </button>
-          </form>
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="button"
-              onClick={handleGuestLogin}
-              disabled={isSubmitting}
-              className="h-12 w-full rounded-[14px] border border-gray-200 bg-white text-gray-700 font-semibold transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto px-4"
-            >
-              Continue as guest
-            </button>
-            <div className="text-sm text-gray-500">
-              {authMode === "signup"
-                ? "Already have an account? "
-                : "No account yet? "}
-              <button
-                type="button"
-                onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")}
-                className="text-primary font-semibold hover:underline"
-              >
-                {authMode === "signup" ? "Sign in" : "Create account"}
-              </button>
             </div>
+
           </div>
         </div>
       </div>
     );
   }
-
   return (
     <>
       <QuizPopup
