@@ -329,19 +329,8 @@ export default function FinHealChat() {
           onDeleteConversation={handleConversationDelete}
           sessionId={chat.conversationId ?? "new-conversation"}
           userId={userId}
-<<<<<<< Updated upstream
           isOpen={insightsOpen}
           onClose={closeInsights}
-=======
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onToggleInsights={() => setInsightsOpen((open) => !open)}
-          onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
-          onOpenEmergencyFundCheck={openEmergencyFundCheck}
-          onOpenLoanFitTest={openLoanFitTest}
-          onOpenDebtBalanceReview={openDebtBalanceReview}
-          onOpenCreditReadiness={openCreditReadiness}
-            onViewPastResult={viewPastResultInCurrentTab}
->>>>>>> Stashed changes
         />
       </div>
     </>
