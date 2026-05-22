@@ -47,7 +47,7 @@ export interface SendBackendMessageInput {
   conversation_id?: string;
 }
 
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 120000;
 
 function getApiBaseUrl(): string {
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
