@@ -532,6 +532,7 @@ export default function EmergencyFundCheckView({
       <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100 dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center gap-3 border-b border-gray-100 bg-white px-[16px] py-[14px] shrink-0 rounded-t-[20px] dark:border-slate-800 dark:bg-slate-950 sm:px-[20px] sm:py-[12px]">
           <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">☰</button>
+          <button type="button" onClick={onBackToCatalog} className="h-[32px] w-[32px] rounded-[6px] border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] transition-all hover:bg-gray-50 shrink-0 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900" aria-label="Back to test catalog">←</button>
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Emergency Fund Check Results</div>
             <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400">A calm snapshot of your financial safety cushion and resilience.</div>

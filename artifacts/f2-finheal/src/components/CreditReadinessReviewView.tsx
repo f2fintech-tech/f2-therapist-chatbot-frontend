@@ -267,7 +267,12 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
   if (state.completed && currentResult) {
     return (
       <main className="flex-1 flex flex-col overflow-hidden rounded-[16px] border bg-white dark:bg-slate-950">
-        <div className="p-4 border-b"><div className="font-bold">Credit Readiness Review Results</div></div>
+        <div className="flex items-center gap-3 border-b p-4">
+          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] hover:bg-gray-50" aria-label="Back to test catalog">
+            ←
+          </button>
+          <div className="font-bold">Credit Readiness Review Results</div>
+        </div>
         <div className="p-6 overflow-auto">
           <div className="grid gap-6 lg:grid-cols-2">
             <Card><CardContent><ScoreRing score={displayScore} max={creditReadinessMaximumScore} /><div className="mt-4 text-center"><div className="text-sm font-semibold">{currentResult.category}</div><div className="text-xs text-gray-500 mt-1">{currentResult.risk}</div><div className="mt-2 text-sm">{currentResult.summary}</div></div></CardContent></Card>

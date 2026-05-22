@@ -1,7 +1,7 @@
 import { getStoredAuthToken } from "@/utils/authSession";
 
 const DEFAULT_API_BASE_URL = "/api/v1";
-const DEFAULT_TIMEOUT_MS = 45000;
+const DEFAULT_TIMEOUT_MS = 120000;
 
 function resolveCodespacesBackendFromCurrentHost(): string | null {
   if (typeof window === "undefined") {

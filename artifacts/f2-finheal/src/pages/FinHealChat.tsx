@@ -19,6 +19,7 @@ import { fetchHearts } from "@/lib/backendAuth";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 
 export default function FinHealChat() {
+
   const getInitialMainView = () => {
     if (typeof window === "undefined") return "chat" as const;
     const view = new URLSearchParams(window.location.search).get("view");
@@ -200,9 +201,21 @@ export default function FinHealChat() {
     setMainView("chat");
     chat.clearConversation();
   };
-  
-  const activeSidebarNav = mainView === "chat" ? "Talk to FinHeal" : "Financial Health Test";
-  
+  const viewPastResultInCurrentTab = useCallback((testId: string) => {
+    const map: Record<string, string> = {
+      financial_literacy: "financial-literacy",
+      emergency_fund: "emergency-fund",
+      loan_fit: "loan-fit",
+      debt_balance: "debt-balance",
+      credit_readiness: "credit-readiness",
+    };
+    const view = map[testId] ?? testId;
+    setMainView(view as any);
+  }, []);
+
+  const activeSidebarNav = mainView === "chat"
+    ? "Talk to FinHeal"
+    : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -316,8 +329,19 @@ export default function FinHealChat() {
           onDeleteConversation={handleConversationDelete}
           sessionId={chat.conversationId ?? "new-conversation"}
           userId={userId}
+<<<<<<< Updated upstream
           isOpen={insightsOpen}
           onClose={closeInsights}
+=======
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onToggleInsights={() => setInsightsOpen((open) => !open)}
+          onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+          onOpenEmergencyFundCheck={openEmergencyFundCheck}
+          onOpenLoanFitTest={openLoanFitTest}
+          onOpenDebtBalanceReview={openDebtBalanceReview}
+          onOpenCreditReadiness={openCreditReadiness}
+            onViewPastResult={viewPastResultInCurrentTab}
+>>>>>>> Stashed changes
         />
       </div>
     </>

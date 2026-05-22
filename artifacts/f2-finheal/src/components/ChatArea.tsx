@@ -229,7 +229,7 @@ export default function ChatArea({
                 <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
-                    <div className="mt-[6px] text-[12px] text-slate-500">Each chat uses 10 hearts. Refresh or sign up for more access.</div>
+                    <div className="mt-[6px] text-[12px] text-slate-500">Each chat uses 10 hearts. Sign up for more access.</div>
                   </div>
                   <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
                     <span>❤️</span>

@@ -499,6 +499,16 @@ export default function LoanFitTestView({
 
     return (
       <div className="space-y-[16px]">
+        <div className="flex items-center gap-3 rounded-[16px] border border-gray-200 bg-white px-[14px] py-[10px] shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] hover:bg-gray-50" aria-label="Back to test catalog">
+            ←
+          </button>
+          <div>
+            <div className="text-[13px] font-bold text-gray-900">Loan Comfort Analysis Results</div>
+            <div className="text-[10px] text-gray-400">Return to the test catalogue</div>
+          </div>
+        </div>
+
         <section className="overflow-hidden rounded-[24px] border border-[#d7dcfb] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_18px_60px_rgba(50,68,230,0.08)] sm:p-[24px]">
           <div className="grid gap-[20px] lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
             <div className="rounded-[22px] border border-white/70 bg-white/80 p-[18px] shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm">

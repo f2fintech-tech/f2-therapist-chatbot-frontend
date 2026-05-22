@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   financialLiteracyLevelDurationMinutes,
@@ -196,12 +197,16 @@ function LevelCard({
   levelId,
   selected,
   attemptedResult,
+  locked,
   onSelect,
+  onStart,
 }: {
   levelId: FinancialLiteracyLevelId;
   selected: boolean;
   attemptedResult: FinancialLiteracyResult | null;
+  locked: boolean;
   onSelect: (levelId: FinancialLiteracyLevelId) => void;
+  onStart: (levelId: FinancialLiteracyLevelId) => void;
 }) {
   const meta = getLevelMeta(levelId);
   const latestScore = attemptedResult?.percentageScore ?? 0;
@@ -210,9 +215,23 @@ function LevelCard({
   return (
     <button
       type="button"
-      onClick={() => onSelect(levelId)}
+      onClick={() => {
+        if (locked) {
+          return;
+        }
+
+        if (selected) {
+          onStart(levelId);
+          return;
+        }
+
+        onSelect(levelId);
+      }}
+      disabled={locked}
       className={`text-left rounded-[22px] border p-[18px] shadow-[0_10px_28px_rgba(15,23,42,0.04)] transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] ${
-        selected ? "border-primary bg-[#f6f7fe]" : "border-gray-200 bg-white"
+        locked
+          ? "border-dashed border-gray-200 bg-gray-50 opacity-80 cursor-not-allowed hover:translate-y-0 hover:shadow-[0_10px_28px_rgba(15,23,42,0.04)]"
+          : selected ? "border-primary bg-[#f6f7fe]" : "border-gray-200 bg-white"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -256,9 +275,20 @@ function LevelCard({
       </div>
 
       <div className="mt-[14px] flex items-center justify-between gap-3 rounded-[14px] border border-dashed border-gray-200 bg-white px-[12px] py-[10px]">
-        <div className="text-[12px] text-gray-500">{selected ? "Selected for your next attempt" : attempts > 0 ? "You can review or retake this level" : "Start here or skip ahead"}</div>
-        <div className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]">
-          {selected ? "Selected" : "Choose"}
+        <div className="text-[12px] text-gray-500">
+          {(() => {
+            if (locked) {
+              if (levelId === 3) return "Locked until intermediate is passed with 85%";
+              if (levelId === 2) return "Locked until beginner is passed with 85%";
+              return "Locked";
+            }
+            if (selected) return "Ready to start the test";
+            if (attempts > 0) return "You can review or retake this level";
+            return "Start here or skip ahead";
+          })()}
+        </div>
+        <div className={`rounded-[999px] px-[12px] py-[6px] text-[11px] font-semibold shadow-[0_8px_20px_rgba(50,68,230,0.18)] ${locked ? "bg-gray-200 text-gray-600 shadow-none" : "bg-primary text-white"}`}>
+          {locked ? "Locked" : selected ? "Start Test" : "Choose"}
         </div>
       </div>
     </button>
@@ -270,6 +300,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [submittedAttemptIds, setSubmittedAttemptIds] = useState<Record<string, boolean>>({});
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   useEffect(() => {
     const stored = readStorage(userId);
@@ -391,13 +422,36 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   }, [currentAttempt, currentResult, stage, submittedAttemptIds, userId]);
 
   const unlockState = useMemo(() => {
-    const completedLevels = new Set<FinancialLiteracyLevelId>();
-    for (const attempt of storageState.history) {
-      if (attempt.stage === "results") {
-        completedLevels.add(attempt.levelId);
-      }
+    const beginnerAttempts = storageState.history.filter((attempt) => attempt.levelId === 1 && attempt.stage === "results");
+    const bestBeginnerScore = beginnerAttempts.reduce((best, attempt) => {
+      const result = calculateFinancialLiteracyResult(attempt, []);
+      return Math.max(best, result.percentageScore);
+    }, 0);
+
+    const intermediateAttempts = storageState.history.filter((attempt) => attempt.levelId === 2 && attempt.stage === "results");
+    const bestIntermediateScore = intermediateAttempts.reduce((best, attempt) => {
+      const result = calculateFinancialLiteracyResult(attempt, []);
+      return Math.max(best, result.percentageScore);
+    }, 0);
+
+    const beginnerPassed = bestBeginnerScore > 85;
+    const intermediatePassed = bestIntermediateScore > 85;
+    const advancedPassed = intermediatePassed;
+    const unlockedLevels: FinancialLiteracyLevelId[] = [1 as FinancialLiteracyLevelId];
+    if (beginnerPassed) {
+      unlockedLevels.push(2 as FinancialLiteracyLevelId);
     }
-    return completedLevels;
+    if (advancedPassed) {
+      unlockedLevels.push(3 as FinancialLiteracyLevelId);
+    }
+    return {
+      beginnerPassed,
+      intermediatePassed,
+      advancedPassed,
+      unlockedLevels: new Set<FinancialLiteracyLevelId>(unlockedLevels),
+      bestBeginnerScore,
+      bestIntermediateScore,
+    };
   }, [storageState.history]);
 
   const attemptedResultsByLevel = useMemo(() => {
@@ -429,6 +483,10 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   }
 
   function handleSelectLevel(levelId: FinancialLiteracyLevelId) {
+    if (!unlockState.unlockedLevels.has(levelId)) {
+      return;
+    }
+
     setStorageState((current) => ({
       ...current,
       selectedLevel: levelId,
@@ -436,6 +494,10 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   }
 
   function handleStartLevel(levelId: FinancialLiteracyLevelId) {
+    if (!unlockState.unlockedLevels.has(levelId)) {
+      return;
+    }
+
     const nextAttempt = createAttempt(levelId);
     setStorageState((current) => ({
       ...current,
@@ -550,6 +612,25 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
     });
   }
 
+  function handleStopAttempt() {
+    handleSubmitAttempt();
+  }
+
+  const stopConfirmDialog = (
+    <ConfirmDeleteDialog
+      isOpen={showStopConfirm}
+      title="Stop Test"
+      description="Stop the test and compute partial scoring for the answers you've provided so far?"
+      onConfirm={() => {
+        handleStopAttempt();
+        setShowStopConfirm(false);
+      }}
+      onCancel={() => setShowStopConfirm(false)}
+      confirmLabel="Stop"
+      processingLabel="Stopping..."
+    />
+  );
+
   function handleStartNextLevel() {
     const nextLevel = Math.min(3, (currentAttempt?.levelId ?? selectedLevel) + 1) as FinancialLiteracyLevelId;
     handleStartLevel(nextLevel);
@@ -605,6 +686,13 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">3 levels</span>
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">{selectedLevelMeta.questionCount} questions per level</span>
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">10 minutes each</span>
+                <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">
+                  {unlockState.advancedPassed
+                    ? "All levels unlocked"
+                    : unlockState.beginnerPassed
+                      ? "Intermediate unlocked; Advanced locked until Intermediate is 85%+"
+                      : "Intermediate locked until Beginner is 85%+; Advanced locked until Intermediate is 85%+"}
+                </span>
               </div>
             </div>
           </section>
@@ -625,46 +713,14 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
                 levelId={levelId}
                 selected={selectedLevel === levelId}
                 attemptedResult={attemptedResultsByLevel.get(levelId) ?? null}
+                locked={levelId === 2 ? !unlockState.beginnerPassed : levelId === 3 ? !unlockState.advancedPassed : false}
                 onSelect={handleSelectLevel}
+                onStart={handleStartLevel}
               />
             ))}
           </section>
 
-          <section className="mt-[18px] grid gap-[12px] lg:grid-cols-2">
-            <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)] dark:border-slate-800 dark:bg-slate-950">
-              <CardHeader className="space-y-2 px-[18px] pb-0 pt-[18px]">
-                <CardTitle className="text-[18px] text-gray-900 dark:text-slate-50">Start selected level</CardTitle>
-                <CardDescription className="text-[13px] leading-[1.7] text-gray-600 dark:text-slate-300">You can start with any level. The system saves progress locally and resumes later if you leave before finishing.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-[12px] px-[18px] pb-[18px] pt-[16px]">
-                <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Selected level</div>
-                  <div className="mt-[4px] text-[18px] font-semibold text-gray-900 dark:text-slate-100">{selectedLevelMeta.name}</div>
-                  <div className="mt-[4px] text-[13px] text-gray-600 dark:text-slate-300">{selectedLevelMeta.goal}</div>
-                </div>
-                <div className="flex gap-[8px]">
-                  <button type="button" onClick={() => handleStartLevel(selectedLevel)} className="h-[40px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]">
-                    Start {selectedLevelMeta.name}
-                  </button>
-                  <button type="button" onClick={onBackToCatalog} className="h-[40px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    Back to tests
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden border-[#d4d8fa] shadow-[0_14px_34px_rgba(50,68,230,0.08)] dark:border-slate-800 dark:bg-slate-950">
-              <CardHeader className="space-y-2 px-[18px] pb-0 pt-[18px]">
-                <CardTitle className="text-[18px] text-gray-900 dark:text-slate-50">What you will get</CardTitle>
-                <CardDescription className="text-[13px] leading-[1.7] text-gray-600 dark:text-slate-300">A learning-focused score with strengths, weak areas, and recommendations after each level.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-[8px] px-[18px] pb-[18px] pt-[16px]">
-                <div className="rounded-[14px] bg-gray-50 px-[12px] py-[10px] text-[13px] text-gray-700 dark:bg-slate-900 dark:text-slate-200">Sticky progress indicator and question tracker</div>
-                <div className="rounded-[14px] bg-gray-50 px-[12px] py-[10px] text-[13px] text-gray-700 dark:bg-slate-900 dark:text-slate-200">One question per screen with review before submission</div>
-                <div className="rounded-[14px] bg-gray-50 px-[12px] py-[10px] text-[13px] text-gray-700 dark:bg-slate-900 dark:text-slate-200">Badge, category strengths, improvement areas, and tips</div>
-              </CardContent>
-            </Card>
-          </section>
+          {/* Removed the 'Start selected level' and 'What you will get' info panels per request */}
         </div>
       </main>
     );
@@ -676,6 +732,9 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
         <div className="flex items-center gap-3 border-b border-gray-100 bg-white px-[16px] py-[14px] shrink-0 rounded-t-[20px] dark:border-slate-800 dark:bg-slate-950 sm:px-[20px] sm:py-[12px]">
           <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">
             ☰
+          </button>
+          <button type="button" onClick={onBackToCatalog} className="h-[32px] w-[32px] rounded-[6px] border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] transition-all hover:bg-gray-50 shrink-0 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900" aria-label="Back to test catalog">
+            ←
           </button>
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Financial Literacy Test Results</div>
@@ -901,6 +960,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
                 <div className="flex gap-[8px] flex-wrap">
                   <button type="button" onClick={handleBackQuestion} disabled={currentAttemptIndex === 0} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Back</button>
                   <button type="button" onClick={handleOpenReview} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Review</button>
+                  <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[38px] rounded-[12px] border border-rose-200 bg-white px-[14px] text-[12px] font-semibold text-rose-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-rose-50">Stop test</button>
                   <button type="button" onClick={handleNextQuestion} className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]">{currentAttemptIndex === orderedQuestions.length - 1 ? "Finish" : "Next"}</button>
                 </div>
               </CardContent>
@@ -914,6 +974,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
             </Card>
           </section>
         </div>
+        {stopConfirmDialog}
       </main>
     );
   }
@@ -924,6 +985,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
       <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100 dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center gap-3 border-b border-gray-100 bg-white px-[16px] py-[14px] shrink-0 rounded-t-[20px] dark:border-slate-800 dark:bg-slate-950 sm:px-[20px] sm:py-[12px]">
           <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">☰</button>
+          <button type="button" onClick={onBackToCatalog} className="h-[32px] w-[32px] rounded-[6px] border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] transition-all hover:bg-gray-50 shrink-0 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900" aria-label="Back to test catalog">←</button>
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-bold text-gray-900 sm:text-[14px] dark:text-slate-100">Financial Literacy Test Review</div>
             <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400">Review every answer before submitting the level.</div>
@@ -980,8 +1042,10 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
           <section className="mt-[18px] flex flex-wrap gap-[8px]">
             <button type="button" onClick={handleBackQuestion} disabled={currentAttemptIndex === 0} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] disabled:opacity-40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Back</button>
             <button type="button" onClick={() => updateCurrentAttempt({ stage: "quiz" } as Partial<FinancialLiteracyAttempt>)} className="h-[38px] rounded-[12px] border border-gray-200 bg-white px-[14px] text-[12px] font-semibold text-gray-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Return to quiz</button>
+            <button type="button" onClick={() => setShowStopConfirm(true)} className="h-[38px] rounded-[12px] border border-rose-200 bg-white px-[14px] text-[12px] font-semibold text-rose-700 shadow-[0_8px_20px_rgba(15,23,42,0.05)] hover:bg-rose-50">Stop test</button>
             <button type="button" onClick={handleSubmitAttempt} className="h-[38px] rounded-[12px] bg-primary px-[14px] text-[12px] font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]">Submit level</button>
           </section>
+          {stopConfirmDialog}
         </div>
       </main>
     );

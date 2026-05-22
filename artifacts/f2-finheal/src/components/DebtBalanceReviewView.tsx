@@ -583,6 +583,15 @@ export default function DebtBalanceReviewView({
             ☰
           </button>
 
+          <button
+            type="button"
+            onClick={onBackToCatalog}
+            className="h-[32px] w-[32px] rounded-[6px] border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] transition-all hover:bg-gray-50 shrink-0"
+            aria-label="Back to test catalog"
+          >
+            ←
+          </button>
+
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Your Debt Health Report</div>
             <div className="text-[10px] text-gray-400 sm:text-[11px]">Personalized analysis and guidance based on your responses.</div>

@@ -11,6 +11,7 @@ interface FinancialHealthTestCatalogProps {
   onOpenLoanFitTest: () => void;
   onOpenDebtBalanceReview: () => void;
   onOpenCreditReadiness?: () => void;
+  onViewPastResult?: (testId: string) => void;
 }
 
 type TestCard = {
@@ -21,6 +22,16 @@ type TestCard = {
   focus: string;
   result: string;
   accent: string;
+};
+
+type PastResult = {
+  testId: string;
+  title: string;
+  score: string;
+  date: string;
+  accent: string;
+  category?: string | null;
+  riskLevel?: string | null;
 };
 
 const featuredTest = {
@@ -80,8 +91,18 @@ const testCards: TestCard[] = [
   },
 ];
 
-export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, onToggleInsights, onOpenFinancialLiteracyTest, onOpenEmergencyFundCheck, onOpenLoanFitTest, onOpenDebtBalanceReview, onOpenCreditReadiness }: FinancialHealthTestCatalogProps) {
-  const [pastResults, setPastResults] = useState<{title: string; score: string; date: string; accent: string}[]>([]);
+export default function FinancialHealthTestCatalog({
+  userId,
+  onToggleSidebar,
+  onToggleInsights,
+  onOpenFinancialLiteracyTest,
+  onOpenEmergencyFundCheck,
+  onOpenLoanFitTest,
+  onOpenDebtBalanceReview,
+  onOpenCreditReadiness,
+  onViewPastResult,
+}: FinancialHealthTestCatalogProps) {
+  const [pastResults, setPastResults] = useState<PastResult[]>([]);
   const [showPastResults, setShowPastResults] = useState(false);
 
   useEffect(() => {
@@ -95,18 +116,30 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
     };
 
     async function loadResults() {
-      const results: { title: string; score: string; date: string; accent: string }[] = [];
+      const results: PastResult[] = [];
       const seen = new Set<string>();
 
       try {
         const backendResults = await fetchTestResults(uid);
-        for (const r of backendResults) {
+          for (const r of backendResults) {
           const meta = testMeta[r.test_type];
           if (!meta || seen.has(r.test_type)) continue;
           seen.add(r.test_type);
-          const score = r.percentage_score != null ? `${r.percentage_score}%` : r.risk_level || r.category || "Done";
+          const score = r.percentage_score != null
+            ? `${r.percentage_score}%`
+            : r.score != null
+            ? String(r.score)
+            : r.risk_level || r.category || "Done";
           const date = new Date(r.completed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-          results.push({ title: meta.title, score, date, accent: meta.accent });
+          results.push({
+            testId: r.test_type,
+            title: meta.title,
+            score,
+            date,
+            accent: meta.accent,
+            category: r.category,
+            riskLevel: r.risk_level,
+          });
         }
       } catch {}
 
@@ -126,13 +159,25 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
           if (!parsed?.completed || !parsed?.result) continue;
           const meta = testMeta[t.type];
           if (!meta) continue;
-          const score = parsed.result.percentageScore != null
+          const score = parsed.result?.percentageScore != null
             ? `${Math.round(parsed.result.percentageScore)}%`
+            : parsed.result?.rawScore != null
+            ? String(parsed.result.rawScore)
+            : parsed.result?.score != null
+            ? String(parsed.result.score)
             : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
           const date = parsed.updatedAt
             ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
             : "Completed";
-          results.push({ title: meta.title, score, date, accent: meta.accent });
+          results.push({
+            testId: t.type,
+            title: meta.title,
+            score,
+            date,
+            accent: meta.accent,
+            category: parsed.result.category ?? null,
+            riskLevel: parsed.result.riskLevel ?? parsed.result.risk ?? null,
+          });
         } catch {}
       }
 
@@ -193,11 +238,11 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
         <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Available tests</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">6</div>
+            <div className="mt-[4px] text-[24px] font-serif text-gray-900">5</div>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Average duration</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">2-4 min</div>
+            <div className="mt-[4px] text-[24px] font-serif text-gray-900">8-10 min</div>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Result style</div>
@@ -223,9 +268,12 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
             </button>
 
             {showPastResults && (
-              <div className="mt-[10px] grid gap-[8px] grid-cols-2 xl:grid-cols-3">
+              <div className="mt-[10px] space-y-[10px]">
+                {/* Selected result panel removed */}
+
+              <div className="grid gap-[8px] grid-cols-2 xl:grid-cols-3">
                 {pastResults.map((r, i) => (
-                  <div key={i} className="overflow-hidden rounded-[14px] border border-gray-200 bg-white shadow-sm">
+                  <div key={i} className={`overflow-hidden rounded-[14px] border bg-white shadow-sm border-gray-200`}>
                     <div className={`h-[3px] bg-gradient-to-r ${r.accent}`} />
                     <div className="flex items-center justify-between gap-2 px-[12px] py-[10px]">
                       <div className="min-w-0">
@@ -235,12 +283,32 @@ export default function FinancialHealthTestCatalog({ userId, onToggleSidebar, on
                           <span>✅</span> Completed
                         </div>
                       </div>
-                      <div className="rounded-[10px] bg-[#eef0fd] px-[10px] py-[5px] text-[14px] font-bold text-primary shrink-0">
-                        {r.score}
+                      <div className="flex shrink-0 flex-col items-end gap-[6px]">
+                        <div className="rounded-[10px] bg-[#eef0fd] px-[10px] py-[5px] text-[14px] font-bold text-primary">
+                          {r.score}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onViewPastResult) {
+                              onViewPastResult(r.testId);
+                              return;
+                            }
+                            if (typeof window === "undefined") return;
+                            const nextUrl = new URL(window.location.href);
+                            const view = r.testId.replace(/_/g, "-");
+                            nextUrl.searchParams.set("view", view);
+                            window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                          }}
+                          className="rounded-[999px] border border-[#d4d8fa] bg-white px-[9px] py-[4px] text-[10px] font-semibold text-primary transition hover:bg-[#f6f7fe]"
+                        >
+                          View Results
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             )}
           </section>
