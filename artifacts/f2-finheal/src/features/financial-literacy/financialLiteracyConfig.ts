@@ -85,7 +85,7 @@ export const financialLiteracyQuestions: FinancialLiteracyQuestion[] = [
   q("b2", 1, "budgeting", "If your monthly salary is Rs. 50,000 and expenses are Rs. 40,000, how much can you ideally save?", ["Rs. 1,000", "Rs. 5,000", "Rs. 10,000", "Rs. 20,000"], "C"),
   q("b3", 1, "banking", "Which financial product is commonly used for salary deposits and daily transactions?", ["Fixed deposit", "Savings account", "Gold bond", "Mutual fund"], "B"),
   q("b4", 1, "credit", "What usually happens if you miss a credit card payment?", ["Your savings increase", "You may pay late fees and interest", "Your bank account is closed", "Your salary is taxed more"], "B"),
-  q("b5", 1, "debt", "What does EMI stand for?", ["Easy Monthly Installment", "Equal Monthly Installment", "Expected Money Input", "Electronic Money Index"], "B"),
+  q("b5", 1, "debt", "What does EMI stand for?", ["Easy Monthly Installment", "Equated Monthly Installment", "Expected Money Input", "Electronic Money Index"], "B"),
   q("b6", 1, "budgeting", "Which expense should generally be prioritized first?", ["Needs like rent and food", "Luxury shopping", "Impulse purchases", "Travel upgrades"], "A"),
   q("b7", 1, "saving", "What is usually considered a healthy saving habit?", ["Saving only when money is left over", "Setting aside part of income every month", "Borrowing to save more", "Investing without any buffer"], "B"),
   q("b8", 1, "budgeting", "If expenses are consistently higher than income, what does that indicate?", ["Budget surplus", "Cash flow deficit", "Credit expansion", "Tax efficiency"], "B"),
