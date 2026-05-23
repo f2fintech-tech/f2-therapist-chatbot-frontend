@@ -273,6 +273,8 @@ export default function FinHealChat() {
         ) : mainView === "tests" ? (
           <FinancialHealthTestCatalog
             userId={userId}
+            isGuest={authSession?.isGuest ?? true}
+            onLoginRequired={() => { clearStoredAuthSession(); setAuthSession(null); }}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}

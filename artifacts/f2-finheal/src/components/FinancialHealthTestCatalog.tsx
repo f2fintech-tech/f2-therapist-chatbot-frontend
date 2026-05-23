@@ -4,6 +4,8 @@ import { fetchTestResults } from "@/lib/backendAuth";
 
 interface FinancialHealthTestCatalogProps {
   userId?: string;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onOpenFinancialLiteracyTest: () => void;
@@ -104,6 +106,7 @@ export default function FinancialHealthTestCatalog({
 }: FinancialHealthTestCatalogProps) {
   const [pastResults, setPastResults] = useState<PastResult[]>([]);
   const [showPastResults, setShowPastResults] = useState(false);
+  const [showLoginGate, setShowLoginGate] = useState(false);
 
   useEffect(() => {
     const uid = userId || "anonymous";
@@ -378,19 +381,17 @@ export default function FinancialHealthTestCatalog({
                     <div className="text-[11px] text-gray-500">This slot will later hold the test route and instant score output.</div>
                     <button
                       type="button"
-                      onClick={
-                        test.id === "financial-literacy"
-                          ? onOpenFinancialLiteracyTest
-                          : test.id === "emergency-fund"
-                          ? onOpenEmergencyFundCheck
-                          : test.id === "loan-fit"
-                          ? onOpenLoanFitTest
-                          : test.id === "debt-balance"
-                          ? onOpenDebtBalanceReview
-                          : test.id === "credit-readiness"
-                          ? onOpenCreditReadiness
-                          : undefined
-                      }
+                      onClick={() => {
+                        if (isGuest && test.id !== "financial-literacy") {
+                          setShowLoginGate(true);
+                          return;
+                        }
+                        if (test.id === "financial-literacy") onOpenFinancialLiteracyTest?.();
+                        else if (test.id === "emergency-fund") onOpenEmergencyFundCheck?.();
+                        else if (test.id === "loan-fit") onOpenLoanFitTest?.();
+                        else if (test.id === "debt-balance") onOpenDebtBalanceReview?.();
+                        else if (test.id === "credit-readiness") onOpenCreditReadiness?.();
+                      }}
                       className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] cursor-pointer font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
                         {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : "Open"}
@@ -403,6 +404,29 @@ export default function FinancialHealthTestCatalog({
         </section>
 
       </div>
+      {showLoginGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.2)]">
+            <div className="text-[32px] text-center mb-[12px]">🔒</div>
+            <div className="text-[18px] font-bold text-gray-900 text-center mb-[8px]">Sign in to take this test</div>
+            <div className="text-[13px] text-gray-500 text-center mb-[24px]">Create a free account to access all financial health tests and save your results.</div>
+            <div className="flex flex-col gap-[10px]">
+              <button
+                onClick={() => { setShowLoginGate(false); onLoginRequired?.(); }}
+                className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition"
+              >
+                Sign in or create account
+              </button>
+              <button
+                onClick={() => setShowLoginGate(false)}
+                className="h-[48px] w-full rounded-[14px] border border-gray-200 text-gray-600 font-semibold text-[14px] hover:bg-gray-50 transition"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
