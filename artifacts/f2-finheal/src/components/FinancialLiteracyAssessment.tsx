@@ -686,13 +686,13 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">3 levels</span>
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">{selectedLevelMeta.questionCount} questions per level</span>
                 <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">10 minutes each</span>
-                <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">
+                {/* <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] dark:border-slate-700 dark:bg-slate-900">
                   {unlockState.advancedPassed
                     ? "All levels unlocked"
                     : unlockState.beginnerPassed
                       ? "Intermediate unlocked; Advanced locked until Intermediate is 85%+"
                       : "Intermediate locked until Beginner is 85%+; Advanced locked until Intermediate is 85%+"}
-                </span>
+                </span> */}
               </div>
             </div>
           </section>
