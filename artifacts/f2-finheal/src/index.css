@@ -189,3 +189,14 @@
 }
 
 .subtitle-container { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-height: 18px; line-height: 1; }
+
+/* Heart pump animation */
+@keyframes heartPump {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.12); }
+  45% { transform: scale(0.98); }
+  70% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.heart-pump { display: inline-block; transform-origin: center center; animation: heartPump 1.2s ease-in-out infinite; }
