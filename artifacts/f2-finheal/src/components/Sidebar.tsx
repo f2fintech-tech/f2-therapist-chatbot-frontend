@@ -44,6 +44,52 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
     setActiveNav(initialActiveNav);
   }, [initialActiveNav]);
 
+  // Typewriter subtitle for "Financial Wellness AI" — continuous loop (type → pause → delete → pause)
+  const fullSubtitle = "Financial Wellness AI";
+  const [typedSubtitle, setTypedSubtitle] = useState("");
+  useEffect(() => {
+    let mounted = true;
+    let index = 0;
+    let forward = true;
+    const typeDelay = 45; // ms per character when typing
+    const deleteDelay = 30; // ms per character when deleting
+    const pauseAfterFull = 900; // pause once full string typed
+    const pauseAfterEmpty = 400; // pause once fully deleted
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const step = () => {
+      if (!mounted) return;
+      if (forward) {
+        if (index <= fullSubtitle.length - 1) {
+          setTypedSubtitle(fullSubtitle.slice(0, index + 1));
+          index += 1;
+          timeoutId = setTimeout(step, typeDelay);
+        } else {
+          forward = false;
+          timeoutId = setTimeout(step, pauseAfterFull);
+        }
+      } else {
+        if (index > 0) {
+          setTypedSubtitle(fullSubtitle.slice(0, index - 1));
+          index -= 1;
+          timeoutId = setTimeout(step, deleteDelay);
+        } else {
+          forward = true;
+          timeoutId = setTimeout(step, pauseAfterEmpty);
+        }
+      }
+    };
+
+    // kick off after a short initial delay
+    timeoutId = setTimeout(step, 200);
+
+    return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  // run once on mount
+  }, []);
+
   const handleCreateGoal = () => {
     if (!formData.name.trim() || !formData.targetAmount.trim()) {
       alert("Please fill in goal name and target amount");
@@ -178,8 +224,10 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
           <div className="absolute -top-[10px] -right-[10px] w-[30px] h-[30px] bg-white/15 rounded-full" />
         </div>
         <div className="flex flex-col gap-[1px]">
-          <div className="text-[15px] font-bold text-gray-900 tracking-tight">F2 FinHeal</div>
-          <div className="text-[10px] font-medium text-primary tracking-wide uppercase">Financial Wellness AI</div>
+          <div className="text-[15px] font-bold tracking-tight animated-gradient-text">F2 FinHeal</div>
+          <div className="text-[10px] font-medium text-primary tracking-wide uppercase subtitle-container">
+            <span className="subtitle-pulse">{typedSubtitle}</span>
+          </div>
         </div>
       </button>
 
