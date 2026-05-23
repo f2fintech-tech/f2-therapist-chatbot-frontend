@@ -33,6 +33,7 @@ export default function FinHealChat() {
   };
 
   const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
+  const [prevGuestSession, setPrevGuestSession] = useState<typeof authSession>(null);
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -46,7 +47,7 @@ export default function FinHealChat() {
   // Show signup modal automatically when hearts run out
   useEffect(() => {
     if (chat.heartsExhausted && authSession?.isGuest) {
-      clearStoredAuthSession();
+      setPrevGuestSession(authSession);
       setAuthSession(null);
     }
   }, [chat.heartsExhausted, authSession]);
@@ -224,7 +225,7 @@ export default function FinHealChat() {
   };
 
   if (!authSession || !userProfile) {
-    return <AuthScreen currentSession={authSession} onAuthSuccess={persistSession} />;
+    return <AuthScreen currentSession={prevGuestSession || authSession} onAuthSuccess={persistSession} />;
   }
 
   return (
