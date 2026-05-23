@@ -95,6 +95,7 @@ const testCards: TestCard[] = [
 
 export default function FinancialHealthTestCatalog({
   userId,
+  isGuest = false,
   onToggleSidebar,
   onToggleInsights,
   onOpenFinancialLiteracyTest,
