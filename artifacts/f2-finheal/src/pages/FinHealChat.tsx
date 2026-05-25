@@ -9,6 +9,7 @@ import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
 import CreditReadinessReviewView from "@/components/CreditReadinessReviewView";
 import InsightsPanel from "@/components/InsightsPanel";
 import AuthScreen from "@/components/AuthScreen";
+import ProfilePage from "@/components/ProfilePage";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
 import { deleteLocalConversation } from "@/utils/localConversations";
@@ -29,6 +30,7 @@ export default function FinHealChat() {
     if (view === "loan-fit") return "loan-fit" as const;
     if (view === "credit-readiness") return "credit-readiness" as const;
     if (view === "debt-balance") return "debt-balance" as const;
+    if (view === "profile") return "profile" as const;
     return "chat" as const;
   };
 
@@ -37,7 +39,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
@@ -186,6 +188,7 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
+  const openProfilePage = () => setMainView("profile");
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -216,12 +219,28 @@ export default function FinHealChat() {
 
   const activeSidebarNav = mainView === "chat"
     ? "Talk to FinHeal"
-    : "Financial Health Test";
+    : mainView === "profile"
+      ? "Settings"
+      : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("view", "financial-literacy");
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+  };
+
+  const handleProfileSave = (profile: { fullName: string; email?: string | null }) => {
+    if (!authSession) return;
+
+    const nextDisplayName = profile.fullName.trim() || authSession.displayName;
+    const nextSession = {
+      ...authSession,
+      displayName: nextDisplayName,
+      email: profile.email?.trim() || authSession.email,
+    };
+
+    setStoredAuthSession(nextSession);
+    setAuthSession(nextSession);
   };
 
   if (!authSession || !userProfile) {
@@ -245,6 +264,8 @@ export default function FinHealChat() {
           onOpenChat={openChatView}
           onStartNewChat={openFreshChat}
           onOpenFinancialHealthTests={openTestCatalog}
+          onOpenProfile={openProfilePage}
+          onLogout={handleLogout}
           initialActiveNav={activeSidebarNav}
         />
         {mainView === "chat" ? (
@@ -264,7 +285,6 @@ export default function FinHealChat() {
             onStopSendingMessage={chat.stopSendingMessage}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onLogout={handleLogout}
             onSignupPrompt={() => {
               clearStoredAuthSession();
               setAuthSession(null);
@@ -313,6 +333,14 @@ export default function FinHealChat() {
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onBackToCatalog={openTestCatalog}
             onOpenFinancialWellnessAssistant={openChatView}
+          />
+        ) : mainView === "profile" ? (
+          <ProfilePage
+            userId={userId}
+            userProfile={userProfile}
+            email={authSession.email}
+            onBackToChat={openChatView}
+            onSaveProfile={handleProfileSave}
           />
         ) : (
           <DebtBalanceReviewView
