@@ -5,6 +5,7 @@ import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/local
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Goal } from "@/utils/localGoals";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface SidebarProps {
   userId: string;
@@ -15,10 +16,12 @@ interface SidebarProps {
   onOpenChat: () => void;
   onStartNewChat: () => void;
   onOpenFinancialHealthTests: () => void;
+  onOpenProfile: () => void;
+  onLogout?: () => void;
   initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onLogout, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -476,19 +479,62 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
             <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={() => setActiveNav("Talk to an Advisor")} />
-            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={() => setActiveNav("Settings")} />
+            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={onOpenProfile} />
           </>
         )}
       </div>
 
-      <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] cursor-pointer hover:bg-gray-50 transition-colors group">
-        <div className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0">{userProfile.initials}</div>
-        <div>
-          <div className="text-[13px] font-semibold text-gray-800">{userProfile.displayName}</div>
-          <div className="text-[11px] text-gray-400">{userProfile.userTier || "Standard"} Member</div>
+      <DropdownMenu>
+        <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] hover:bg-gray-50 transition-colors group">
+          <button
+            type="button"
+            className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0"
+            aria-label="Open account menu"
+          >
+            {userProfile.initials}
+          </button>
+          <button
+            type="button"
+            className="text-left flex-1"
+            onClick={onOpenProfile}
+            aria-label="Open profile page"
+          >
+            <div className="text-[13px] font-semibold text-gray-800">{userProfile.displayName}</div>
+            <div className="text-[11px] text-gray-400">{userProfile.userTier || "Standard"} Member</div>
+          </button>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60 hover:text-gray-500"
+              aria-label="Open settings menu"
+            >
+              ⚙️
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" sideOffset={10} className="w-[180px] rounded-[14px] border border-gray-200 bg-white p-[6px] shadow-[0_20px_50px_rgba(15,23,42,0.14)]">
+            <DropdownMenuItem
+              className="cursor-pointer rounded-[10px] px-[12px] py-[10px] text-[13px] font-medium text-gray-700 outline-none transition-colors hover:bg-[#f6f7fe] hover:text-primary focus:bg-[#f6f7fe]"
+              onSelect={(event) => {
+                event.preventDefault();
+                onOpenProfile();
+              }}
+            >
+              Profile
+            </DropdownMenuItem>
+            {onLogout && (
+              <DropdownMenuItem
+                className="cursor-pointer rounded-[10px] px-[12px] py-[10px] text-[13px] font-medium text-gray-700 outline-none transition-colors hover:bg-[#fef2f2] hover:text-[#dc2626] focus:bg-[#fef2f2]"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onLogout();
+                }}
+              >
+                Sign Out
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
         </div>
-        <div className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60">⚙️</div>
-      </div>
+      </DropdownMenu>
       {/* Confirm delete dialog for goals */}
       <ConfirmDeleteDialog
         isOpen={isDeleteDialogOpen}
