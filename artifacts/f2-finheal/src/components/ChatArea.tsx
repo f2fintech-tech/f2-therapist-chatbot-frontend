@@ -17,7 +17,6 @@ interface ChatAreaProps {
   onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
   onStopSendingMessage: () => void;
-  onLogout?: () => void;
   onSignupPrompt?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
@@ -37,7 +36,6 @@ export default function ChatArea({
   onMoodUpdate,
   onSendMessage,
   onStopSendingMessage,
-  onLogout,
   onSignupPrompt,
   onToggleSidebar,
   onToggleInsights,
@@ -283,17 +281,6 @@ export default function ChatArea({
         <div className="flex w-full flex-wrap gap-[6px] justify-end">
           <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer" title="Clear draft text">
             🗑 Clear
-          </button>
-          {onLogout && (
-            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer">
-              🚪 Sign out
-            </button>
-          )}
-          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] sm:hidden">
-            📋 Notes
-          </button>
-          <button className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-primary bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:bg-[#1e2db8] hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] sm:text-[11.5px]">
-            💳 View Loan Options
           </button>
         </div>
       </div>
