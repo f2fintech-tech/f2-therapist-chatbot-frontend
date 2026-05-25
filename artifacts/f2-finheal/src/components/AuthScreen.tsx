@@ -334,17 +334,17 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
-                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" required style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb" }} />
+                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" required style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
                   </label>
                   <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Last name</span>
-                    <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb" }} />
+                    <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
                   </label>
                 </div>
               )}
               <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Email</span>
-                <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb" }} />
+                <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
               </label>
               <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Password</span>
