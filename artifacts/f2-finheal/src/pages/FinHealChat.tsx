@@ -18,6 +18,7 @@ import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
 import { fetchHearts } from "@/lib/backendAuth";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
+import WelcomeSplash from "@/components/WelcomeSplash";
 
 export default function FinHealChat() {
 
@@ -35,6 +36,7 @@ export default function FinHealChat() {
   };
 
   const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
+  const [showWelcome, setShowWelcome] = useState(false);
   const [prevGuestSession, setPrevGuestSession] = useState<typeof authSession>(null);
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -102,6 +104,7 @@ export default function FinHealChat() {
       setAuthSession(session);
       setCurrentMoodDims(null);
       setMainView("chat");
+      setShowWelcome(true);
     }
   };
 
@@ -247,6 +250,14 @@ export default function FinHealChat() {
     return <AuthScreen currentSession={prevGuestSession || authSession} onAuthSuccess={persistSession} />;
   }
 
+  if (showWelcome) {
+    return (
+      <WelcomeSplash
+        userName={authSession?.displayName?.split(" ")[0]}
+        onComplete={() => setShowWelcome(false)}
+      />
+    );
+  }
   return (
     <>
       <QuizPopup
