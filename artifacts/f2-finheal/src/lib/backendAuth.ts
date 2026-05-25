@@ -10,6 +10,27 @@ interface AuthResponse {
   is_guest?: boolean;
 }
 
+export interface BackendUserProfile {
+  user_id: string;
+  email?: string | null;
+  name: string;
+  phone?: string | null;
+  location?: string | null;
+  occupation?: string | null;
+  bio?: string | null;
+  hearts?: number;
+  is_guest?: boolean;
+}
+
+export interface BackendUserProfileUpdate {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  occupation?: string | null;
+  bio?: string | null;
+}
+
 const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
 
 function createUuid(): string {
@@ -142,4 +163,15 @@ export async function fetchTestResults(userId: string): Promise<{
   completed_at: string;
 }[]> {
   return authRequest(`test-results/${encodeURIComponent(userId)}`, { method: "GET" });
+}
+
+export async function fetchUserProfile(userId: string): Promise<BackendUserProfile> {
+  return authRequest(`auth/profile/${encodeURIComponent(userId)}`, { method: "GET" });
+}
+
+export async function saveUserProfile(userId: string, payload: BackendUserProfileUpdate): Promise<BackendUserProfile> {
+  return authRequest(`auth/profile/${encodeURIComponent(userId)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
