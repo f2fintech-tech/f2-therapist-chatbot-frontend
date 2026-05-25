@@ -44,10 +44,27 @@ export default function ChatArea({
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const greeting = useMemo(() => {
+    const hour = new Date(currentTime).getHours();
+
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  }, [currentTime]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -221,7 +238,7 @@ export default function ChatArea({
               <span
                 className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
               />
-              FinHeal AI · {statusLabel} · {latestConversation} · {conversationCount} chats
+              FinHeal AI · {latestConversation} · {conversationCount} chats
             </div>
 
             {typeof remainingHearts === "number" && (
@@ -300,7 +317,7 @@ export default function ChatArea({
           <>
             <div className="text-center px-[10px] py-[16px] pb-[24px] animate-fade-up sm:px-[32px] sm:pb-[28px]">
               <div className="w-[56px] h-[56px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[24px] mx-auto mb-[14px] animate-pulse-ring sm:w-[64px] sm:h-[64px] sm:text-[28px]">🌟</div>
-              <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">Good morning, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
+              <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">{greeting}, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
               <div className="text-[13px] text-gray-500 leading-relaxed max-w-[420px] mx-auto sm:text-[13.5px]">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
             
