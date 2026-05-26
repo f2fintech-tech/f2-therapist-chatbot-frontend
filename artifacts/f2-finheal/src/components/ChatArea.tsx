@@ -347,7 +347,9 @@ export default function ChatArea({
         {messages.map((m) => (
           <div key={m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {m.role === 'bot' ? (
-              <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
+              <div className="w-[36px] h-[36px] rounded-full shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
+                <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
+              </div>
             ) : (
               <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
             )}
@@ -391,7 +393,9 @@ export default function ChatArea({
 
         {showTypingIndicator && (
           <div className="flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto pb-[14px]">
-            <div className="w-[30px] h-[30px] rounded-full bg-primary text-white flex items-center justify-center text-[11px] font-bold shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)]">F2</div>
+            <div className="w-[36px] h-[36px] rounded-full shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
+                <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
+              </div>
             <div className="bg-white border-[1.5px] border-gray-100 rounded-[4px_14px_14px_14px] p-[14px_18px] flex gap-[5px] items-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
               <div className="w-[6px] h-[6px] rounded-full bg-primary opacity-40 animate-bounce-dot" />
               <div className="w-[6px] h-[6px] rounded-full bg-primary opacity-40 animate-bounce-dot delay-150" />
