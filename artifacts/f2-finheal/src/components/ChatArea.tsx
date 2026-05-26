@@ -204,6 +204,9 @@ export default function ChatArea({
     el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [inputValue]);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
   return (
     <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
@@ -293,7 +296,17 @@ export default function ChatArea({
         {messages.length === 0 ? (
           <>
             <div className="text-center px-[10px] py-[16px] pb-[24px] animate-fade-up sm:px-[32px] sm:pb-[28px]">
-              <div className="w-[56px] h-[56px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[24px] mx-auto mb-[14px] animate-pulse-ring sm:w-[64px] sm:h-[64px] sm:text-[28px]">🌟</div>
+              <style>{`
+                @keyframes finFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+                @keyframes bubblePop{from{opacity:0;transform:translateY(6px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+                .fin-float{animation:finFloat 3.2s ease-in-out infinite}
+              `}</style>
+              <img src="/owl-avatar.gif" alt="FinHeal" className="fin-float mx-auto mb-[4px]" style={{width:"130px",height:"auto",objectFit:"contain",mixBlendMode:"multiply"}} />
+              <div style={{background:"white",borderRadius:"16px",padding:"10px 18px",boxShadow:"0 4px 20px rgba(51,68,230,0.10)",border:"1.5px solid rgba(51,68,230,0.08)",display:"inline-block",marginBottom:"12px",animation:"bubblePop 0.5s ease-out forwards",position:"relative"}}>
+                <div style={{fontSize:"13px",fontWeight:700,color:"#1e1b4b"}}>Hey! I'm FinHeal 👋</div>
+                <div style={{fontSize:"11px",color:"#6b7280",marginTop:"3px",lineHeight:1.5}}>Share what's on your mind — I'll help you find a way forward.</div>
+                <div style={{position:"absolute",bottom:"-8px",left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"8px solid transparent",borderRight:"8px solid transparent",borderTop:"8px solid white"}} />
+              </div>
               <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">{greeting}, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
               <div className="text-[13px] text-gray-500 leading-relaxed max-w-[420px] mx-auto sm:text-[13.5px]">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
