@@ -189,6 +189,8 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     let isCancelled = false;
 
     async function bootstrap() {
+      setHeartsExhausted(false);
+
       if (!userId) {
         setMessages([]);
         setConversations([]);
