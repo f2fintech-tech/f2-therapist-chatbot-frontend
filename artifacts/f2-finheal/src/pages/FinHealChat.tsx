@@ -100,8 +100,9 @@ export default function FinHealChat() {
 
   const persistSession = (session: typeof authSession) => {
     if (session) {
-      setStoredAuthSession(session);
-      setAuthSession(session);
+      const nextSession = session.isGuest ? session : { ...session, hearts: null };
+      setStoredAuthSession(nextSession);
+      setAuthSession(nextSession);
       setCurrentMoodDims(null);
       setMainView("chat");
       setShowWelcome(true);
@@ -109,7 +110,7 @@ export default function FinHealChat() {
   };
 
   const refreshHearts = useCallback(async () => {
-    if (!authSession?.userId) return;
+    if (!authSession?.userId || !authSession.isGuest) return;
     try {
       const hearts = await fetchHearts(authSession.userId);
       const nextSession = { ...authSession, hearts };
@@ -119,7 +120,7 @@ export default function FinHealChat() {
   }, [authSession]);
 
   useEffect(() => {
-    if (authSession?.userId && authSession.hearts == null) {
+    if (authSession?.userId && authSession.isGuest && authSession.hearts == null) {
       void refreshHearts();
     }
   }, [authSession, refreshHearts]);
@@ -141,8 +142,10 @@ export default function FinHealChat() {
 
   const handleSendMessage = useCallback(async (text: string) => {
     await chat.sendMessage(text);
-    await refreshHearts();
-  }, [chat, refreshHearts]);
+    if (authSession?.isGuest) {
+      await refreshHearts();
+    }
+  }, [authSession?.isGuest, chat, refreshHearts]);
 
   const handleMoodUpdate = useCallback((dims: MoodDimensions | null) => {
     setCurrentMoodDims((prev) => {
@@ -289,7 +292,7 @@ export default function FinHealChat() {
             isSendingMessage={chat.isSendingMessage}
             messages={chat.messages}
             userProfile={userProfile}
-            remainingHearts={authSession?.hearts ?? null}
+            remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
             onClearChat={chat.clearMessages}
             onMoodUpdate={handleMoodUpdate}
             onSendMessage={handleSendMessage}
