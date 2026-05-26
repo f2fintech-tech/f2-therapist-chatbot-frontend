@@ -266,25 +266,27 @@ export default function ChatArea({
             )}
           </div>
         </div>
-        <div className="flex w-full flex-wrap gap-[6px] justify-end">
-          <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer" title="Clear draft text">
-            🗑 Clear
-          </button>
-          {onLogout && (
+        {onLogout && (
+          <div className="flex w-full flex-wrap gap-[6px] justify-end">
             <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer">
               🚪 Sign out
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <button
-        onClick={onToggleInsights}
-        className="fixed right-[12px] top-[12px] h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 z-50 shadow-sm"
-        aria-label="Toggle insights panel"
-      >
-        ☰
-      </button>
+      <div className="fixed right-[12px] top-[12px] flex items-center gap-[6px] z-50 2xl:hidden">
+        <button onClick={handleClearDraft} className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary cursor-pointer shadow-sm" title="Clear draft text">
+          🗑 Clear
+        </button>
+        <button
+          onClick={onToggleInsights}
+          className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 shadow-sm"
+          aria-label="Toggle insights panel"
+        >
+          ☰
+        </button>
+      </div>
 
       {error && (
         <div className="mx-[16px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c] sm:mx-[20px]">
