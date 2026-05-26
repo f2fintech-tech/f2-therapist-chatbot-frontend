@@ -91,6 +91,11 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
     setIsSaved(false);
   };
 
+  const saveButtonLabel = isSaved ? "Saved" : "Save profile";
+  const saveButtonClassName = isSaved
+    ? "rounded-full px-5 bg-emerald-500 text-white shadow-[0_8px_24px_rgba(16,185,129,0.22)] hover:bg-emerald-600"
+    : "rounded-full px-5 bg-primary text-white shadow-[0_8px_24px_rgba(50,68,230,0.18)]";
+
   return (
     <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[16px]">
@@ -123,10 +128,6 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
               <div className="rounded-[12px] bg-gray-50 p-[12px]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400">Location</div>
                 <div className="mt-[4px] text-gray-800">{formData.location || "Not set"}</div>
-              </div>
-              <div className={`rounded-[12px] p-[12px] ${isSaved ? "bg-emerald-50 text-emerald-700" : "bg-gray-50"}`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400">Status</div>
-                <div className="mt-[4px] text-gray-800">{isSaved ? "Saved locally on this device" : "Unsaved changes"}</div>
               </div>
             </CardContent>
           </Card>
@@ -175,8 +176,8 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
                 <Button variant="outline" onClick={handleReset} className="rounded-full px-5" disabled={isLoading}>
                   Reset
                 </Button>
-                <Button onClick={() => void handleSave()} className="rounded-full px-5 bg-primary text-white shadow-[0_8px_24px_rgba(50,68,230,0.18)]" disabled={isLoading}>
-                  {isLoading ? "Loading..." : "Save profile"}
+                <Button onClick={() => void handleSave()} className={saveButtonClassName} disabled={isLoading}>
+                  {isLoading ? "Loading..." : saveButtonLabel}
                 </Button>
               </div>
             </CardContent>
