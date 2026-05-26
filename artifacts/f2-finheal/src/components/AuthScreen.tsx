@@ -145,30 +145,138 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const pwStrength = getPasswordStrength(loginPassword);
 
   return (
-    <div style={{ minHeight: "100dvh", width: "100%", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", position: "relative" }}>
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(99,102,241,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", zIndex: 0, WebkitMaskImage: "linear-gradient(to right,transparent 10%,black 45%)", maskImage: "linear-gradient(to right,transparent 10%,black 45%)", pointerEvents: "none" }} />
+    <div className="auth-screen-shell" style={{ position: "relative", width: "100%", minHeight: "100dvh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", overflow: "hidden" }}>
+      <div className="auth-screen-grid-overlay" style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(99,102,241,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", zIndex: 0, WebkitMaskImage: "linear-gradient(to right,transparent 10%,black 45%)", maskImage: "linear-gradient(to right,transparent 10%,black 45%)", pointerEvents: "none" }} />
 
-      <div style={{ 
+      <div className="auth-screen-grid" style={{ 
         width: "100%", 
         maxWidth: "1140px", 
         display: "grid", 
-        gridTemplateColumns: "1.12fr 0.88fr", 
-        gap: "64px", 
+        gridTemplateColumns: "minmax(0,1.05fr) minmax(360px,0.95fr)", 
+        gap: "clamp(24px, 4vw, 64px)", 
         alignItems: "center", 
-        padding: "40px 48px", 
+        alignContent: "center",
+        height: "100dvh",
+        boxSizing: "border-box",
+        padding: "clamp(16px, 3vw, 40px) clamp(16px, 4vw, 48px)", 
         position: "relative", 
         zIndex: 1 
       }}>
+        <style>{`
+          @media (max-width: 1100px) {
+            .auth-screen-shell {
+              position: fixed !important;
+              inset: 0 !important;
+              align-items: flex-start !important;
+              justify-content: flex-start !important;
+              height: 100dvh !important;
+              overflow-y: auto !important;
+              overscroll-behavior: contain !important;
+              padding: 18px 18px 28px !important;
+            }
+
+            .auth-screen-grid {
+              grid-template-columns: 1fr !important;
+              gap: 24px !important;
+              width: 100% !important;
+              height: auto !important;
+              align-content: flex-start !important;
+              padding-top: 10px !important;
+              padding-bottom: 10px !important;
+            }
+
+            .auth-screen-left {
+              height: auto !important;
+              justify-content: flex-start !important;
+              gap: 12px !important;
+            }
+
+            .auth-screen-credit-card {
+              max-width: 100% !important;
+              border-radius: 16px !important;
+              padding: 14px 16px !important;
+              gap: 10px !important;
+            }
+
+            .auth-screen-features {
+              max-width: 100% !important;
+            }
+
+            .auth-screen-form-card {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+
+            .auth-screen-grid-overlay {
+              WebkitMaskImage: none !important;
+              mask-image: none !important;
+            }
+          }
+
+          @media (max-width: 640px) {
+            .auth-screen-shell {
+              position: fixed !important;
+              inset: 0 !important;
+              align-items: flex-start !important;
+              justify-content: flex-start !important;
+              height: 100dvh !important;
+              overflow-y: auto !important;
+              overscroll-behavior: contain !important;
+              padding: 12px 12px 28px !important;
+            }
+
+            .auth-screen-grid {
+              gap: 16px !important;
+              height: auto !important;
+              align-content: flex-start !important;
+              padding-top: 6px !important;
+              padding-bottom: 12px !important;
+            }
+
+            .auth-screen-left {
+              height: auto !important;
+              justify-content: flex-start !important;
+              gap: 10px !important;
+            }
+
+            .auth-screen-credit-card {
+              border-radius: 14px !important;
+              padding: 12px 12px !important;
+              gap: 8px !important;
+            }
+
+            .auth-screen-features {
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+              max-width: 100% !important;
+            }
+
+            .auth-screen-form-card {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+              padding: 20px 16px !important;
+              gap: 14px !important;
+            }
+
+            .auth-screen-form {
+              gap: 12px !important;
+            }
+          }
+        `}</style>
         
         {/* LEFT PANEL */}
-        <div style={{ 
+        <div className="auth-screen-left" style={{ 
           display: "flex", 
           flexDirection: "column", 
-          gap: "18px", 
+          gap: "16px", 
           width: "100%",
+          minWidth: 0,
+          minHeight: 0,
+          justifyContent: "center",
           opacity: animateIn ? 1 : 0,
-          transform: animateIn ? "translateY(0px)" : "translateY(24px)",
-          transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)"
+          transform: animateIn ? "translateY(0px)" : "translateY(12px)",
+          transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ width: "36px", height: "36px", background: "#3344e6", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>💙</div>
@@ -176,13 +284,14 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           </div>
 
           <div>
-            <div style={{ fontSize: "40px", fontWeight: 800, lineHeight: 1.1, color: "#1e1b4b", letterSpacing: "-1.5px" }}>Your financial<br />wellness <span style={{ color: "#3344e6" }}>companion</span></div>
-            <p style={{ marginTop: "8px", fontSize: "14px", lineHeight: 1.5, color: "#6b7280", maxWidth: "460px" }}>Navigate money stress with empathy - first guidance - no judgment, just real support.</p>
+            <div className="auth-screen-hero" style={{ fontSize: "clamp(30px, 4.4vw, 40px)", fontWeight: 800, lineHeight: 1.08, color: "#1e1b4b", letterSpacing: "-1.5px", maxWidth: "14ch" }}>Your financial <br /> wellness <span style={{ color: "#3344e6" }}>companion</span></div>
+            <p className="auth-screen-secondary-copy" style={{ marginTop: "2px", fontSize: "14px", lineHeight: 1.5, color: "#6b7280", maxWidth: "460px" }}>Navigate money stress with empathy - first guidance - no judgment, just real support.</p>
           </div>
 
           {/* CREDIT CARD CONTAINER - SIZE IS STRICTLY UNCHANGED */}
           <div
             ref={cardRef}
+            className="auth-screen-credit-card"
             onMouseMove={handleTilt}
             onMouseLeave={() => setCardTilt({ x: 0, y: 0, active: false })}
             style={{
@@ -275,10 +384,11 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           </div>
 
           {/* ADJUSTMENT: FEATURE BLOCKS ALIGNED HORIZONTALLY */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", maxWidth: "460px", marginTop: "2px" }}>
+            <div className="auth-screen-features" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px", maxWidth: "460px", marginTop: "2px" }}>
             {features.map((f, i) => (
               <div
                 key={i}
+                className="auth-screen-feature-item"
                 onMouseEnter={() => setHoveredFeature(i)}
                 onMouseLeave={() => setHoveredFeature(null)}
                 style={{
@@ -306,7 +416,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           </div>
 
           {/* ADJUSTMENT: FOOTER LINK MOVED UP CLOSER */}
-          <a href="https://f2fintech.com/" target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#9ca3af", textDecoration: "none", marginTop: "-4px" }}>
+          <a className="auth-screen-footer-link" href="https://f2fintech.com/" target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: "#9ca3af", textDecoration: "none", marginTop: "-4px", maxWidth: "100%", overflowWrap: "anywhere" }}>
             F2 Fintech · f2fintech.com · Instant loans with fast approval
           </a>
         </div>
@@ -315,42 +425,43 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         <div style={{ 
           width: "100%", 
           display: "flex", 
-          justify: "center",
+          justifyContent: "center",
+          minWidth: 0,
           opacity: animateIn ? 1 : 0,
           transform: animateIn ? "translateY(0px)" : "translateY(24px)",
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
-          <div style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "24px", padding: "44px 48px", width: "100%", maxWidth: "450px", boxShadow: "0 24px 80px rgba(15,23,42,0.12)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content" }}>
-              <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "9px 22px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
-              <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "9px 22px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
+          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", height: "560px", boxSizing: "border-box", overflowY: "auto", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
+            <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
+              <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
+              <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
             </div>
             <div>
-              <div style={{ fontSize: "26px", fontWeight: 700, color: "#111827" }}>{authMode === "signup" ? "Create your account" : "Welcome back"}</div>
-              <div style={{ marginTop: "5px", fontSize: "14px", color: "#6b7280" }}>{authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey"}</div>
+              <div style={{ fontSize: authMode === "signup" ? "22px" : "26px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>{authMode === "signup" ? "Create your account" : "Welcome back"}</div>
+              <div style={{ marginTop: authMode === "signup" ? "2px" : "4px", fontSize: authMode === "signup" ? "12px" : "14px", lineHeight: 1.3, color: "#6b7280" }}>{authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey"}</div>
             </div>
-            <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <form className="auth-screen-form" onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "9px" : "16px", minWidth: 0 }}>
               {authMode === "signup" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
-                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" required style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
+                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" required style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
                   </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Last name</span>
-                    <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
+                  <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>
+                    <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
                   </label>
                 </div>
               )}
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Email</span>
-                <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "46px", padding: "0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", boxSizing: "border-box" as const }} />
+              <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Email</span>
+                <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>Password</span>
+              <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Password</span>
                 <div style={{ position: "relative" }}>
-                  <input type={showPassword ? "text" : "password"} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete={authMode === "signup" ? "new-password" : "current-password"} style={{ height: "46px", padding: "0 44px 0 14px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "14px", outline: "none", fontFamily: "inherit", width: "100%", background: "#f9fafb" }} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0 }}>
+                  <input type={showPassword ? "text" : "password"} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete={authMode === "signup" ? "new-password" : "current-password"} style={{ height: "40px", padding: "0 40px 0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", width: "100%", minWidth: 0, background: "#f9fafb" }} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0 }}>
                     {showPassword ? (
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: "18px", height: "18px" }}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                     ) : (
@@ -360,37 +471,37 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 </div>
                 {authMode === "signup" && loginPassword.length > 0 && (
                   <div>
-                    <div style={{ height: "3px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden", marginTop: "6px" }}>
+                    <div style={{ height: "3px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden", marginTop: "3px" }}>
                       <div style={{ height: "100%", width: `${pwStrength.width}%`, background: pwStrength.color, borderRadius: "999px", transition: "all 0.3s" }} />
                     </div>
-                    <div style={{ fontSize: "10px", color: pwStrength.color, marginTop: "4px" }}>{pwStrength.label}</div>
+                    <div style={{ fontSize: "8px", color: pwStrength.color, marginTop: "2px" }}>{pwStrength.label}</div>
                   </div>
                 )}
               </label>
-              {loginError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "13px", color: "#b91c1c" }}>{loginError}</div>}
-              <button type="submit" disabled={isSubmitting} style={{ height: "50px", background: "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "15px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: isSubmitting ? 0.7 : 1, marginTop: "4px", boxShadow: "0 4px 14px rgba(51,68,230,0.3)", transition: "all 0.2s" }}
+              {loginError && <div style={{ padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "11px", color: "#b91c1c" }}>{loginError}</div>}
+              <button type="submit" disabled={isSubmitting} style={{ height: "38px", background: "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: isSubmitting ? 0.7 : 1, marginTop: "1px", boxShadow: "0 3px 10px rgba(51,68,230,0.25)", transition: "all 0.2s" }}
                 onMouseOver={e => { if (!isSubmitting) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
                 onMouseOut={e => { if (!isSubmitting) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}>
                 {isSubmitting ? "Processing..." : authMode === "signup" ? "Create account" : "Sign in"}
               </button>
             </form>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ flex: 1, height: "1px", background: "#f3f4f6" }} />
-                <span style={{ fontSize: "12px", color: "#d1d5db" }}>or</span>
+                <span style={{ fontSize: "10px", color: "#d1d5db" }}>or</span>
                 <div style={{ flex: 1, height: "1px", background: "#f3f4f6" }} />
               </div>
-              <button type="button" onClick={handleGuestLogin} disabled={isSubmitting} style={{ height: "50px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={handleGuestLogin} disabled={isSubmitting} style={{ height: "36px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>
                 Continue as guest
               </button>
-              <div style={{ textAlign: "center", fontSize: "13px", color: "#9ca3af" }}>
+              <div style={{ textAlign: "center", fontSize: "11px", color: "#9ca3af" }}>
                 {authMode === "signup" ? "Already have an account? " : "No account yet? "}
-                <button type="button" onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")} style={{ background: "none", border: "none", color: "#3344e6", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: "13px" }}>
+                <button type="button" onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")} style={{ background: "none", border: "none", color: "#3344e6", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: "11px" }}>
                   {authMode === "signup" ? "Sign in" : "Create account"}
                 </button>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
               {[
                 { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>, label: "Bank-grade security" },
                 { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3344e6" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, label: "30 sec setup" },
