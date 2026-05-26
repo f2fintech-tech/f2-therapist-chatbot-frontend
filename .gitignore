@@ -32,3 +32,7 @@ yarn-error.log*
 # Misc
 .cache/
 coverage/
+
+# 
+FINANCIAL_TESTS.md  
+
