@@ -17,6 +17,7 @@ interface ChatAreaProps {
   onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
   onStopSendingMessage: () => void;
+  onLogout?: () => void;
   onSignupPrompt?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
@@ -36,33 +37,17 @@ export default function ChatArea({
   onMoodUpdate,
   onSendMessage,
   onStopSendingMessage,
+  onLogout,
   onSignupPrompt,
   onToggleSidebar,
   onToggleInsights,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const greeting = useMemo(() => {
-    const hour = new Date(currentTime).getHours();
-
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  }, [currentTime]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -282,6 +267,11 @@ export default function ChatArea({
           <button onClick={handleClearDraft} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer" title="Clear draft text">
             🗑 Clear
           </button>
+          {onLogout && (
+            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer">
+              🚪 Sign out
+            </button>
+          )}
         </div>
       </div>
 
@@ -304,7 +294,7 @@ export default function ChatArea({
           <>
             <div className="text-center px-[10px] py-[16px] pb-[24px] animate-fade-up sm:px-[32px] sm:pb-[28px]">
               <div className="w-[56px] h-[56px] rounded-full bg-[#eef0fd] border-[2px] border-[#d4d8fa] flex items-center justify-center text-[24px] mx-auto mb-[14px] animate-pulse-ring sm:w-[64px] sm:h-[64px] sm:text-[28px]">🌟</div>
-              <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">{greeting}, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
+              <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">Good morning, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
               <div className="text-[13px] text-gray-500 leading-relaxed max-w-[420px] mx-auto sm:text-[13.5px]">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
             
