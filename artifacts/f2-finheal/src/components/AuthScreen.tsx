@@ -48,6 +48,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [loginUsername, setLoginUsername] = useState(loginDefaults.username);
   const [loginDisplayName, setLoginDisplayName] = useState("");
   const [loginLastName, setLoginLastName] = useState("");
+  const [loginAge, setLoginAge] = useState("");
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
   const [showPassword, setShowPassword] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -450,6 +451,10 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>
                     <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "3px", gridColumn: "1 / -1" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 500, color: "#374151" }}>Age <span style={{ color: "#ef4444" }}>*</span></span>
+                    <input value={loginAge} onChange={e => setLoginAge(e.target.value)} placeholder="e.g. 28" type="number" min="18" max="100" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
                   </label>
                 </div>
               )}
