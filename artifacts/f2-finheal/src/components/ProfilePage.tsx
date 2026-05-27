@@ -20,6 +20,9 @@ interface ProfileFormState {
   phone: string;
   location: string;
   occupation: string;
+  dateOfBirth: string;
+  gender: string;
+  maritalStatus: string;
   bio: string;
 }
 
@@ -30,6 +33,9 @@ function toFormState(profile: BackendUserProfile | null | undefined, fallbackNam
     phone: profile?.phone || "",
     location: profile?.location || "",
     occupation: profile?.occupation || "",
+    dateOfBirth: profile?.dateOfBirth || "",
+    gender: profile?.gender || "",
+    maritalStatus: profile?.maritalStatus || "",
     bio: profile?.bio || "",
   };
 }
@@ -115,6 +121,9 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
       phone: formData.phone.trim() || null,
       location: formData.location.trim() || null,
       occupation: formData.occupation.trim() || null,
+      dateOfBirth: formData.dateOfBirth.trim() || null,
+      gender: formData.gender.trim() || null,
+      maritalStatus: formData.maritalStatus.trim() || null,
       bio: formData.bio.trim() || null,
     };
 
@@ -219,6 +228,63 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
 
               <div className="space-y-[6px]">
                 <label className="text-[12px] font-semibold text-gray-700">About you</label>
+                <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-2">
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Date of birth</label>
+                    <input type="date" value={formData.dateOfBirth} onChange={(event) => handleChange("dateOfBirth", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Gender <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select value={formData.gender} onChange={(event) => handleChange("gender", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none">
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non-binary">Non-binary</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Marital status <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select value={formData.maritalStatus} onChange={(event) => handleChange("maritalStatus", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none">
+                      <option value="">Select status</option>
+                      <option value="single">Single</option>
+                      <option value="married">Married</option>
+                      <option value="divorced">Divorced</option>
+                      <option value="widowed">Widowed</option>
+                    </select>
+                  </div>
+                </div>
+                <Textarea
+                  value={formData.bio}
+                  onChange={(event) => handleChange("bio", event.target.value)}
+                  placeholder="Tell FinHeal a little about your goals, habits, or preferences."
+                />
+                <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-2">
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Date of birth</label>
+                    <input type="date" value={formData.dateOfBirth} onChange={(event) => handleChange("dateOfBirth", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Gender <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select value={formData.gender} onChange={(event) => handleChange("gender", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none">
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="non-binary">Non-binary</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold text-gray-700">Marital status <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select value={formData.maritalStatus} onChange={(event) => handleChange("maritalStatus", event.target.value)} className="mt-[6px] w-full h-[40px] px-[12px] border border-input rounded-md text-[13px] bg-white outline-none">
+                      <option value="">Select status</option>
+                      <option value="single">Single</option>
+                      <option value="married">Married</option>
+                      <option value="divorced">Divorced</option>
+                      <option value="widowed">Widowed</option>
+                    </select>
+                  </div>
+                </div>
                 <Textarea
                   value={formData.bio}
                   onChange={(event) => handleChange("bio", event.target.value)}

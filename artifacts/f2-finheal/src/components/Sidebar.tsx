@@ -17,11 +17,12 @@ interface SidebarProps {
   onStartNewChat: () => void;
   onOpenFinancialHealthTests: () => void;
   onOpenProfile: () => void;
+  onOpenEducation?: () => void;
   onLogout?: () => void;
   initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onLogout, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onLogout, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -472,7 +473,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
             <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
-            <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => setActiveNav("Financial Education")} />
+            <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => { setActiveNav("Financial Education"); onOpenEducation?.(); }} />
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={() => setActiveNav("Loan Calculator")} />
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />

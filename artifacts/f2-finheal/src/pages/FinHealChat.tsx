@@ -19,6 +19,7 @@ import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } fr
 import { fetchHearts } from "@/lib/backendAuth";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
+import FinancialEducation from "@/components/FinancialEducation";
 
 export default function FinHealChat() {
 
@@ -41,7 +42,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
@@ -194,6 +195,7 @@ export default function FinHealChat() {
   const closeInsights = () => setInsightsOpen(false);
   const openChatView = () => setMainView("chat");
   const openTestCatalog = () => setMainView("tests");
+  const openEducation = () => setMainView("education");
   const openProfilePage = () => setMainView("profile");
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
@@ -280,6 +282,7 @@ export default function FinHealChat() {
           onStartNewChat={openFreshChat}
           onOpenFinancialHealthTests={openTestCatalog}
           onOpenProfile={openProfilePage}
+            onOpenEducation={openEducation}
           onLogout={handleLogout}
           initialActiveNav={activeSidebarNav}
         />
@@ -326,6 +329,8 @@ export default function FinHealChat() {
             onBackToCatalog={openTestCatalog}
             onOpenFinancialWellnessAssistant={openChatView}
           />
+        ) : mainView === "education" ? (
+          <FinancialEducation userId={userId} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
         ) : mainView === "financial-literacy" ? (
           <FinancialLiteracyTestView
             userId={userId}

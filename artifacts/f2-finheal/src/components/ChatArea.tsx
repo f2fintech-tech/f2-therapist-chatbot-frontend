@@ -321,7 +321,6 @@ export default function ChatArea({
                 <div style={{position:"absolute",bottom:"-8px",left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"8px solid transparent",borderRight:"8px solid transparent",borderTop:"8px solid white"}} />
               </div>
               <div className="font-serif text-[22px] text-gray-900 mb-[8px] sm:text-[26px]">{greeting}, <span className="text-primary italic">{userProfile.firstName || userProfile.displayName}</span></div>
-              <div className="text-[13px] text-gray-500 leading-relaxed max-w-[420px] mx-auto sm:text-[13.5px]">I'm here to help you navigate your financial journey — without judgment, with full support.</div>
             </div>
             
             <div className="flex flex-wrap gap-[8px] justify-center px-[4px] pb-[24px] animate-fade-up delay-100 sm:px-[16px]">
