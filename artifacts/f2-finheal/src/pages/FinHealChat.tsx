@@ -45,7 +45,7 @@ export default function FinHealChat() {
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
-  const userProfile = authSession ? createUserProfile(userId, authSession.displayName) : null;
+  const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
   const chat = useBackendChat(userId);
 
   // Show signup modal automatically when hearts run out
@@ -235,7 +235,7 @@ export default function FinHealChat() {
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
-  const handleProfileSave = (profile: { fullName: string; email?: string | null }) => {
+  const handleProfileSave = (profile: { fullName: string; email?: string | null; avatarUrl?: string | null }) => {
     if (!authSession) return;
 
     const nextDisplayName = profile.fullName.trim() || authSession.displayName;
@@ -243,6 +243,7 @@ export default function FinHealChat() {
       ...authSession,
       displayName: nextDisplayName,
       email: profile.email?.trim() || authSession.email,
+      avatarUrl: profile.avatarUrl ?? authSession.avatarUrl ?? null,
     };
 
     setStoredAuthSession(nextSession);

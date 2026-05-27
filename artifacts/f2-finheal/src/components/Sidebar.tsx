@@ -488,10 +488,14 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
         <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] hover:bg-gray-50 transition-colors group">
           <button
             type="button"
-            className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0"
+            className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0 overflow-hidden"
             aria-label="Open account menu"
           >
-            {userProfile.initials}
+            {userProfile.avatarUrl ? (
+              <img src={userProfile.avatarUrl} alt={userProfile.displayName} className="h-full w-full object-cover" />
+            ) : (
+              userProfile.initials
+            )}
           </button>
           <button
             type="button"

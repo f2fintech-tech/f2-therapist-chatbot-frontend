@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ interface ProfilePageProps {
   userProfile: UserProfile;
   email?: string;
   onBackToChat: () => void;
-  onSaveProfile: (profile: { fullName: string; email?: string | null }) => void;
+  onSaveProfile: (profile: { fullName: string; email?: string | null; avatarUrl?: string | null }) => void;
 }
 
 interface ProfileFormState {
@@ -36,8 +36,27 @@ function toFormState(profile: BackendUserProfile | null | undefined, fallbackNam
 
 export default function ProfilePage({ userId, userProfile, email, onBackToChat, onSaveProfile }: ProfilePageProps) {
   const [formData, setFormData] = useState<ProfileFormState>(() => toFormState(null, userProfile.displayName, email));
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(userProfile.avatarUrl ?? null);
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialAvatarUrlRef = useRef<string | null>(userProfile.avatarUrl ?? null);
+
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") {
+          resolve(result);
+        } else {
+          reject(new Error("Unable to read image file."));
+        }
+      };
+      reader.onerror = () => reject(new Error("Unable to read image file."));
+      reader.readAsDataURL(file);
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -48,10 +67,14 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
         const profile = await fetchUserProfile(userId);
         if (!mounted) return;
         setFormData(toFormState(profile, userProfile.displayName, email));
+        setAvatarUrl(userProfile.avatarUrl ?? null);
+        initialAvatarUrlRef.current = userProfile.avatarUrl ?? null;
         setIsSaved(false);
       } catch {
         if (!mounted) return;
         setFormData(toFormState(null, userProfile.displayName, email));
+        setAvatarUrl(userProfile.avatarUrl ?? null);
+        initialAvatarUrlRef.current = userProfile.avatarUrl ?? null;
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -69,6 +92,22 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
     setIsSaved(false);
   };
 
+  const handleAvatarChange = async (file: File | null) => {
+    if (!file) return;
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setAvatarUrl(dataUrl);
+      setIsSaved(false);
+    } catch {
+      // Ignore unreadable files and keep the current avatar.
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const handleSave = async () => {
     const nextProfile = {
       name: formData.fullName.trim() || userProfile.displayName,
@@ -82,12 +121,13 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
     const saved = await saveUserProfile(userId, nextProfile);
     const nextState = toFormState(saved, userProfile.displayName, email);
     setFormData(nextState);
-    onSaveProfile({ fullName: saved.name, email: saved.email });
+    onSaveProfile({ fullName: saved.name, email: saved.email, avatarUrl });
     setIsSaved(true);
   };
 
   const handleReset = () => {
     setFormData(toFormState(null, userProfile.displayName, email));
+    setAvatarUrl(initialAvatarUrlRef.current);
     setIsSaved(false);
   };
 
@@ -114,8 +154,24 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
         <div className="mx-auto grid max-w-[980px] gap-[16px] lg:grid-cols-[280px_minmax(0,1fr)]">
           <Card className="border-gray-200 shadow-[0_20px_80px_rgba(71,85,105,0.06)]">
             <CardHeader className="items-center text-center">
-              <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] text-[24px] font-bold text-white shadow-[0_12px_30px_rgba(50,68,230,0.22)]">
-                {userProfile.initials}
+              <div className="relative">
+                <div className="flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] text-[28px] font-bold text-white shadow-[0_12px_30px_rgba(50,68,230,0.22)]">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={formData.fullName || userProfile.displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    userProfile.initials
+                  )}
+                </div>
+                <label className="absolute -bottom-1 -right-1 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full border border-gray-200 bg-white text-[14px] text-gray-600 shadow-[0_8px_20px_rgba(15,23,42,0.12)] transition-all hover:bg-gray-50 hover:text-primary" title="Edit profile picture" aria-label="Edit profile picture">
+                  ✎
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.svg,image/jpeg,image/png,image/svg+xml"
+                    className="hidden"
+                    onChange={(event) => void handleAvatarChange(event.target.files ? event.target.files[0] : null)}
+                  />
+                </label>
               </div>
               <CardTitle className="text-[18px] text-gray-900">{formData.fullName || userProfile.displayName}</CardTitle>
               <CardDescription>{userProfile.userTier || "Standard"} Member</CardDescription>

@@ -9,6 +9,7 @@ export interface UserProfile {
   firstName?: string;
   lastName?: string;
   initials: string;
+  avatarUrl?: string | null;
   userTier?: string;
   email?: string;
 }
@@ -135,7 +136,8 @@ export function generateUserDisplayName(
  */
 export function createUserProfile(
   userId: string,
-  displayNameOverride?: string
+  displayNameOverride?: string,
+  avatarUrl?: string | null
 ): UserProfile {
   const displayName = generateUserDisplayName(userId, displayNameOverride);
   const { firstName, lastName } = parseName(displayName);
@@ -147,6 +149,7 @@ export function createUserProfile(
     firstName,
     lastName,
     initials,
+    avatarUrl: avatarUrl || undefined,
     userTier: "Standard", // Default tier; can be overridden per user
   };
 }

@@ -3,6 +3,7 @@ export interface AuthSession {
   token: string | null;
   email?: string;
   displayName: string;
+  avatarUrl?: string | null;
   hearts?: number | null;
   isGuest?: boolean | null;
   authenticatedAt: string;
