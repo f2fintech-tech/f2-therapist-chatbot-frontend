@@ -14,6 +14,8 @@ interface ContentItem {
   description: string;
   source: string;
   readTime?: string;
+  duration?: string;
+  views?: string;
 }
 
 const CONTENT: ContentItem[] = [
@@ -454,5 +456,6 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     </main>
   );
 }
+
 
 
