@@ -46,10 +46,10 @@ const LEVEL_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 const QUIZ_QUESTIONS = [
-  { q: "What is your biggest financial challenge right now?", opts: ["Managing debt / EMIs", "Not enough savings", "Low credit score", "Living pay-to-pay"] },
-  { q: "How would you describe your financial knowledge?", opts: ["Complete beginner", "I know the basics", "Fairly confident", "Very knowledgeable"] },
-  { q: "What is your primary financial goal?", opts: ["Clear my debt", "Build an emergency fund", "Improve credit score", "Start investing"] },
-  { q: "How much time can you spend learning each week?", opts: ["Less than 15 min", "15-30 minutes", "30-60 minutes", "More than an hour"] },
+  { q: "🎂 What is your age group?", opts: ["Under 25 - Student / just started", "25-35 - Early career", "35-50 - Mid career", "50+ - Near retirement"] },
+  { q: "💼 What is your profession?", opts: ["Salaried employee", "Business owner / Self-employed", "Doctor / Medical professional", "Freelancer / Consultant", "Student / Not working yet"] },
+  { q: "💸 What is your biggest financial challenge?", opts: ["Managing EMIs / debt", "Not enough savings", "Low credit score", "Tax planning"] },
+  { q: "🎯 What is your primary financial goal?", opts: ["Get a loan / business funding", "Build emergency fund", "Improve credit score", "Save for future / retirement"] },
 ];
 
 const STORAGE_KEY_ARTICLES = "finheal_edu_read";
@@ -149,7 +149,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
             <div style={{ fontSize: "28px", fontWeight: 900, color: "#7c3aed", lineHeight: 1 }}>{read.length} <span style={{fontSize:"14px",color:"#9ca3af",fontWeight:400}}>/ {articles.length}</span></div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "10px", color: "#9ca3af" }}>tap for history</div>
+            <div style={{ fontSize: "15px", color: "#9ca3af" }}>tap for history</div>
             <div style={{ height: "3px", width: "60px", background: "#e5e7eb", borderRadius: "999px", marginTop: "4px" }}>
               <div style={{ height: "100%", width: `${Math.min((read.length / articles.length) * 100, 100)}%`, background: "#7c3aed", borderRadius: "999px" }} />
             </div>
@@ -171,7 +171,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
                   <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
                   <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.readTime}</div>
                 </div>
-                <span style={{ fontSize: "11px", color: "#374151", flexShrink: 0 }}>↗ Re-read</span>
+                <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#3344e6", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#eef0fd", padding: "4px 10px", borderRadius: "20px" }}>↗ Re-read</a>
               </div>
             ))}
           </div>
