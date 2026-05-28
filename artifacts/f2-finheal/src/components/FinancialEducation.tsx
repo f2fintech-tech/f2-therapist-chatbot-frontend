@@ -253,7 +253,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
               allowFullScreen style={{ border: "none", display: "block" }} />
           </div>
         ) : (
-          <div onClick={() => { setPlayingVideoId(item.id); setCurrentShort(-1); }} style={{ background: item.bgColor, height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
+          <div onClick={() => setPlayingVideoId(item.id)} style={{ background: item.bgColor, height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
             <img src={"https://img.youtube.com/vi/" + item.youtubeId + "/hqdefault.jpg"} alt={item.title}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.7 }} />
             <div style={{ position: "relative", width: "56px", height: "56px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
@@ -454,3 +454,5 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     </main>
   );
 }
+
+
