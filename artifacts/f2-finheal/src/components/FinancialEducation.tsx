@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 
 interface ContentItem {
   id: string;
@@ -8,6 +8,7 @@ interface ContentItem {
   category: string;
   emoji: string;
   bgColor: string;
+  youtubeId?: string;
   articleUrl?: string;
   date?: string;
   description: string;
@@ -37,8 +38,78 @@ const CONTENT: ContentItem[] = [
     date: "Recent",
     description: "An overdraft facility gives you instant access to funds when you need them - without a separate loan application."
   },
+  {
+    id: "a4", type: "article", title: "Personal Loan for Chartered Accountants",
+    source: "f2fintech.com", readTime: "5 min read", level: "Intermediate", category: "Loans",
+    emoji: "📊", bgColor: "#E6F1FB", articleUrl: "https://f2fintech.com/blogs/Personal-Loan-for-Chartered-Accountants-Instant-Approval-Low-Interest-Rates-2026-Rates%20from-Up-to-Rs-75-Lakh",
+    date: "Recent",
+    description: "Instant approval personal loans for CAs with low interest rates and up to Rs 75 Lakh limit in 2026."
+  },
+  {
+    id: "a5", type: "article", title: "How to Get Instant Approval on Personal Loan for CAs",
+    source: "f2fintech.com", readTime: "4 min read", level: "Beginner", category: "Loans",
+    emoji: "⚡", bgColor: "#EAF3DE", articleUrl: "https://f2fintech.com/blogs/How-to-Get-Instant-Approval-on-Personal-Loan-for-Chartered-Accountants",
+    date: "Recent",
+    description: "Step by step guide for Chartered Accountants to get instant personal loan approval with minimal documents."
+  },
+  {
+    id: "a6", type: "article", title: "Festive Season Loans - Best Offers & Tips",
+    source: "f2fintech.com", readTime: "4 min read", level: "Beginner", category: "Loans",
+    emoji: "🎉", bgColor: "#FAEEDA", articleUrl: "https://f2fintech.com/blogs/loans-festiveseasonloans",
+    date: "Recent",
+    description: "Make the most of festive season loan offers with lower interest rates and special repayment terms."
+  },
+  {
+    id: "a7", type: "article", title: "Doctor Loan in India - Complete Guide",
+    source: "f2fintech.com", readTime: "6 min read", level: "Intermediate", category: "Business",
+    emoji: "👨‍⚕️", bgColor: "#EAF3DE", articleUrl: "https://f2fintech.com/blogs/doctor-loan-in-india",
+    date: "Recent",
+    description: "Everything doctors need to know about getting a professional loan in India - eligibility, rates and process."
+  },
+  {
+    id: "a8", type: "article", title: "Personal Loan - Everything You Need to Know",
+    source: "f2fintech.com", readTime: "5 min read", level: "Beginner", category: "Loans",
+    emoji: "💰", bgColor: "#EEEDFE", articleUrl: "https://f2fintech.com/blogs/personalloan-loans",
+    date: "Recent",
+    description: "A complete guide to personal loans in India - who qualifies, how to apply and what to watch out for."
+  },
+  {
+    id: "v1", type: "video", title: "F2 Fintech - Financial Tips",
+    source: "F2 Fintech", duration: "5 min", level: "Beginner", category: "Loans",
+    emoji: "🎥", bgColor: "#1e2db8", youtubeId: "kolvz4Iu_Yo",
+    views: "", date: "Recent",
+    description: "Expert financial tips and advice from F2 Fintech to help you make smarter money decisions."
+  },
+  {
+    id: "v2", type: "video", title: "F2 Fintech - Loan Guide",
+    source: "F2 Fintech", duration: "5 min", level: "Intermediate", category: "Loans",
+    emoji: "💼", bgColor: "#0f6e56", youtubeId: "xcsIh2fA7w0",
+    views: "", date: "Recent",
+    description: "Complete guide to getting the right loan for your needs with F2 Fintech."
+  },
+  {
+    id: "v3", type: "video", title: "F2 Fintech - Credit Score Tips",
+    source: "F2 Fintech", duration: "5 min", level: "Beginner", category: "Credit",
+    emoji: "⭐", bgColor: "#633806", youtubeId: "_efmpZ5k9S8",
+    views: "", date: "Recent",
+    description: "Learn how to improve your credit score and get better loan terms from F2 Fintech experts."
+  },
+  {
+    id: "v4", type: "video", title: "F2 Fintech - Business Finance",
+    source: "F2 Fintech", duration: "5 min", level: "Intermediate", category: "Business",
+    emoji: "🏢", bgColor: "#3b0764", youtubeId: "cRRmxll1tGE",
+    views: "", date: "Recent",
+    description: "Business finance strategies and funding options explained by F2 Fintech professionals."
+  },
 ];
 
+
+const SHORTS = [
+  { id: "Rlyw_vt7748", title: "Quick Finance Tip #1" },
+  { id: "2XnoYTeA1bA", title: "Quick Finance Tip #2" },
+  { id: "o8TrS5Hu3tE", title: "Quick Finance Tip #3" },
+  { id: "et_R-v_qwVM", title: "Quick Finance Tip #4" },
+];
 const LEVEL_STYLE: Record<string, { bg: string; color: string }> = {
   Beginner: { bg: "#EAF3DE", color: "#27500A" },
   Intermediate: { bg: "#FAEEDA", color: "#633806" },
@@ -68,6 +139,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [quizDone, setQuizDone] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
+  const [currentShort, setCurrentShort] = useState(0);
 
   const key = userId || "guest";
 
@@ -83,8 +155,10 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     localStorage.setItem(`${STORAGE_KEY_ARTICLES}:${key}`, JSON.stringify(updated));
   };
 
+  const videos = CONTENT.filter(c => c.type === "video");
   const articles = CONTENT.filter(c => c.type === "article");
   const categories = ["All", "Loans", "Credit", "Savings", "Debt", "Tax", "Business"];
+  const filteredVideos = categoryFilter === "All" ? videos : videos.filter(v => v.category === categoryFilter);
   const filteredArticles = categoryFilter === "All" ? articles : articles.filter(a => a.category === categoryFilter);
   const readItems = CONTENT.filter(c => c.type === "article" && read.includes(c.id));
   const progressPct = articles.length > 0 ? Math.round((read.length / articles.length) * 100) : 0;
@@ -94,6 +168,116 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     return <span style={{ background: s.bg, color: s.color, borderRadius: "20px", padding: "2px 10px", fontSize: "11px", fontWeight: 500 }}>{level}</span>;
   };
 
+
+
+  const ShortsCarousel = ({ currentShort, setCurrentShort }: { currentShort: number; setCurrentShort: (i: number) => void }) => {
+    const [activeShort, setActiveShort] = React.useState<number | null>(0);
+    return (
+    <div style={{ marginBottom: "24px" }}>
+      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "12px" }}>🎞️ Financial Shorts</div>
+
+      {activeShort !== null && (
+        <div style={{ marginBottom: "16px", borderRadius: "16px", overflow: "hidden", background: "#000", position: "relative", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+          <div style={{ aspectRatio: "9/16", maxHeight: "480px", width: "100%" }}>
+            <iframe
+              key={activeShort}
+              width="100%"
+              height="100%"
+              src={"https://www.youtube.com/embed/" + SHORTS[activeShort].id + "?autoplay=1&loop=1&playlist=" + SHORTS[activeShort].id}
+              title={SHORTS[activeShort].title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ border: "none", display: "block", width: "100%", height: "100%" }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "white", borderTop: "1px solid #e5e7eb" }}>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b" }}>{SHORTS[activeShort].title}</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>F2 Fintech · YouTube Shorts</div>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button onClick={() => setActiveShort(prev => prev !== null && prev > 0 ? prev - 1 : SHORTS.length - 1)}
+                style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "white", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>◀</button>
+              <span style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600 }}>{activeShort + 1}/{SHORTS.length}</span>
+              <button onClick={() => setActiveShort(prev => prev !== null && prev < SHORTS.length - 1 ? prev + 1 : 0)}
+                style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #e5e7eb", background: "white", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}>▶</button>
+              <button onClick={() => setActiveShort(null)}
+                style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1.5px solid #fecaca", background: "#fee2e2", cursor: "pointer", fontSize: "14px", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: "6px", padding: "8px", background: "white" }}>
+            {SHORTS.map((_, i) => (
+              <div key={i} onClick={() => setActiveShort(i)}
+                style={{ width: i === activeShort ? "20px" : "8px", height: "8px", borderRadius: "999px", background: i === activeShort ? "#ff0000" : "#e5e7eb", cursor: "pointer", transition: "all 0.3s" }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+        {SHORTS.map((s, i) => (
+          <div key={s.id} onClick={() => setActiveShort(i)}
+            style={{ textDecoration: "none", display: "block", borderRadius: "12px", overflow: "hidden", border: activeShort === i ? "2.5px solid #ff0000" : "1.5px solid #e5e7eb", background: "white", boxShadow: activeShort === i ? "0 4px 20px rgba(255,0,0,0.15)" : "0 2px 8px rgba(0,0,0,0.06)", cursor: "pointer", transition: "all 0.2s" }}>
+            <div style={{ position: "relative", background: "#000", overflow: "hidden" }}>
+              <img src={"https://img.youtube.com/vi/" + s.id + "/hqdefault.jpg"} alt={s.title}
+                style={{ width: "100%", height: "160px", objectFit: "cover", display: "block", opacity: activeShort === i ? 0.7 : 1, transition: "opacity 0.2s" }} />
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.15)" }}>
+                <div style={{ width: "36px", height: "36px", background: activeShort === i ? "rgba(255,0,0,1)" : "rgba(255,0,0,0.85)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transform: activeShort === i ? "scale(1.15)" : "scale(1)", transition: "all 0.2s" }}>
+                  {activeShort === i
+                    ? <div style={{ width: "10px", height: "10px", background: "white", borderRadius: "2px" }} />
+                    : <div style={{ width: 0, height: 0, borderTop: "8px solid transparent", borderBottom: "8px solid transparent", borderLeft: "14px solid white", marginLeft: "3px" }} />
+                  }
+                </div>
+              </div>
+              <span style={{ position: "absolute", top: "8px", right: "8px", background: activeShort === i ? "#ff0000" : "rgba(0,0,0,0.75)", color: "white", fontSize: "9px", padding: "2px 6px", borderRadius: "4px", fontWeight: 600 }}>{activeShort === i ? "▶ PLAYING" : "SHORT"}</span>
+            </div>
+            <div style={{ padding: "8px 10px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: activeShort === i ? "#ff0000" : "#1e1b4b", lineHeight: 1.3 }}>{s.title}</div>
+              <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "4px" }}>F2 Fintech · YouTube Shorts</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );}
+  const VideoCard = ({ item }: { item: ContentItem }) => {
+    const [playing, setPlaying] = React.useState(false);
+    return (
+      <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s" }}
+        onMouseOver={e => (e.currentTarget.style.transform = "translateY(-2px)")}
+        onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}>
+        {playing && item.youtubeId ? (
+          <div style={{ width: "100%", aspectRatio: "16/9" }}>
+            <iframe width="100%" height="100%" src={"https://www.youtube.com/embed/" + item.youtubeId + "?autoplay=1"}
+              title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen style={{ border: "none", display: "block" }} />
+          </div>
+        ) : (
+          <div onClick={() => setPlaying(true)} style={{ background: item.bgColor, height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
+            <img src={"https://img.youtube.com/vi/" + item.youtubeId + "/hqdefault.jpg"} alt={item.title}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.7 }} />
+            <div style={{ position: "relative", width: "56px", height: "56px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+              <div style={{ width: 0, height: 0, borderTop: "12px solid transparent", borderBottom: "12px solid transparent", borderLeft: "20px solid white", marginLeft: "4px" }} />
+            </div>
+            {item.duration && <span style={{ position: "absolute", bottom: "8px", right: "10px", background: "rgba(0,0,0,0.75)", color: "white", fontSize: "10px", padding: "2px 8px", borderRadius: "4px", zIndex: 1 }}>{item.duration}</span>}
+          </div>
+        )}
+        <div style={{ padding: "14px" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+            <span style={{ background: "#E6F1FB", color: "#0C447C", borderRadius: "20px", padding: "2px 10px", fontSize: "11px", fontWeight: 500 }}>🎥 Video</span>
+            {levelBadge(item.level)}
+          </div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e1b4b", marginBottom: "4px" }}>{item.title}</div>
+          <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>{item.description}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.source} · {item.date}</div>
+            <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: "11px", color: "#ff0000", fontWeight: 600, textDecoration: "none" }}>Watch on YouTube ↗</a>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const ArticleCard = ({ item }: { item: ContentItem }) => (
     <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }} onClick={() => markRead(item.id)}>
       <div style={{ background: "white", border: `1.5px solid ${read.includes(item.id) ? "#10b981" : "#e5e7eb"}`, borderRadius: "16px", padding: "16px", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s", cursor: "pointer", display: "flex", gap: "14px", alignItems: "flex-start" }}
@@ -213,17 +397,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
 
         {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
 
-        {tab === "videos" && (
-          <div style={{ textAlign: "center", padding: "40px 20px" }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎥</div>
-            <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b", marginBottom: "8px" }}>Videos coming soon!</div>
-            <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "20px", maxWidth: "280px", margin: "0 auto 20px" }}>We are working on bringing you great financial videos from F2 Fintech YouTube channel.</div>
-            <a href="https://www.youtube.com/@f2fintech" target="_blank" rel="noopener noreferrer"
-              style={{ display: "inline-block", padding: "10px 24px", borderRadius: "20px", background: "#ff0000", color: "white", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
-              📺 Visit F2 Fintech on YouTube
-            </a>
-          </div>
-        )}
+        {tab === "videos" && (<><ShortsCarousel currentShort={currentShort} setCurrentShort={setCurrentShort} /><div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>{filteredVideos.map(v => <VideoCard key={v.id} item={v} />)}</>)}
         {tab === "quiz" && (
           <>
             {!quizStarted && !quizDone && (
