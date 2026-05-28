@@ -140,6 +140,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
   const [quizDone, setQuizDone] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   const [currentShort, setCurrentShort] = useState(0);
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
   const key = userId || "guest";
 
@@ -240,20 +241,19 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
       </div>
     </div>
   );}
-  const VideoCard = ({ item }: { item: ContentItem }) => {
-    const [playing, setPlaying] = React.useState(false);
+  const VideoCard = ({ item, playingVideoId, setPlayingVideoId }: { item: ContentItem; playingVideoId: string | null; setPlayingVideoId: (id: string | null) => void }) => {
     return (
       <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s" }}
         onMouseOver={e => (e.currentTarget.style.transform = "translateY(-2px)")}
         onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}>
-        {playing && item.youtubeId ? (
+        {playingVideoId === item.id && item.youtubeId ? (
           <div style={{ width: "100%", aspectRatio: "16/9" }}>
             <iframe width="100%" height="100%" src={"https://www.youtube.com/embed/" + item.youtubeId + "?autoplay=1"}
               title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen style={{ border: "none", display: "block" }} />
           </div>
         ) : (
-          <div onClick={() => setPlaying(true)} style={{ background: item.bgColor, height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
+          <div onClick={() => { setPlayingVideoId(item.id); setCurrentShort(-1); }} style={{ background: item.bgColor, height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
             <img src={"https://img.youtube.com/vi/" + item.youtubeId + "/hqdefault.jpg"} alt={item.title}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.7 }} />
             <div style={{ position: "relative", width: "56px", height: "56px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
@@ -397,7 +397,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
 
         {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
 
-        {tab === "videos" && (<><ShortsCarousel currentShort={currentShort} setCurrentShort={setCurrentShort} /><div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>{filteredVideos.map(v => <VideoCard key={v.id} item={v} />)}</>)}
+        {tab === "videos" && (<><ShortsCarousel currentShort={currentShort} setCurrentShort={setCurrentShort} /><div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>{filteredVideos.map(v => <VideoCard key={v.id} item={v} playingVideoId={playingVideoId} setPlayingVideoId={setPlayingVideoId} />)}</>)}
         {tab === "quiz" && (
           <>
             {!quizStarted && !quizDone && (
