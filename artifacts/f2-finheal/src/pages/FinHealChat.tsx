@@ -44,6 +44,7 @@ export default function FinHealChat() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
@@ -303,6 +304,7 @@ export default function FinHealChat() {
             onStopSendingMessage={chat.stopSendingMessage}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
+              prefillMessage={prefillMessage ?? undefined}
             onSignupPrompt={() => {
               clearStoredAuthSession();
               setAuthSession(null);
@@ -330,7 +332,22 @@ export default function FinHealChat() {
             onOpenFinancialWellnessAssistant={openChatView}
           />
         ) : mainView === "education" ? (
-          <FinancialEducation userId={userId} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
+          <FinancialEducation
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onAskAboutContent={(payload) => {
+                setMainView("chat");
+                const context = payload.type === "article"
+                  ? "Article: \"" + payload.title + "\" (" + payload.url + ") — " + payload.description
+                  : "Video: \"" + payload.title + "\" — " + payload.description;
+                setTimeout(() => {
+                  setPrefillMessage({
+                    text: "I have a question about this " + payload.type + ": \"" + payload.title + "\" — ",
+                    card: context
+                  });
+                }, 200);
+              }}
+            />
         ) : mainView === "financial-literacy" ? (
           <FinancialLiteracyTestView
             userId={userId}

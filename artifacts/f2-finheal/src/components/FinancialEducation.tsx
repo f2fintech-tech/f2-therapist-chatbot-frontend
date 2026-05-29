@@ -58,9 +58,10 @@ const STORAGE_KEY_ARTICLES = "finheal_edu_read";
 interface Props {
   userId?: string;
   onToggleSidebar?: () => void;
+  onAskAboutContent?: (payload: { title: string; description: string; url?: string; type: string; category: string }) => void;
 }
 
-export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
+export default function FinancialEducation({ userId, onToggleSidebar, onAskAboutContent }: Props) {
   const [tab, setTab] = useState<"all" | "articles" | "videos" | "quiz">("all");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [read, setRead] = useState<string[]>([]);
@@ -72,12 +73,15 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
   const [quizHistory, setQuizHistory] = useState<number[]>([]);
   const [otherGoal, setOtherGoal] = useState("");
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  const [watchedVideos, setWatchedVideos] = useState<string[]>([]);
 
   const key = userId || "guest";
 
   useEffect(() => {
     const r = localStorage.getItem(STORAGE_KEY_ARTICLES + ":" + key);
     if (r) setRead(JSON.parse(r));
+    const w = localStorage.getItem("finheal_watched:" + key);
+    if (w) setWatchedVideos(JSON.parse(w));
   }, [key]);
 
   const markRead = (id: string) => {
@@ -87,13 +91,39 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     localStorage.setItem(STORAGE_KEY_ARTICLES + ":" + key, JSON.stringify(updated));
   };
 
+  const markWatched = (id: string) => {
+    if (watchedVideos.includes(id)) return;
+    const updated = [...watchedVideos, id];
+    setWatchedVideos(updated);
+    localStorage.setItem("finheal_watched:" + key, JSON.stringify(updated));
+  };
+
   const videos = CONTENT.filter(c => c.type === "video");
   const articles = CONTENT.filter(c => c.type === "article");
   const categories = ["All", "Financial Tips", "Loans", "Credit", "Savings", "Debt", "Tax", "Business"];
   const filteredVideos = categoryFilter === "All" ? videos : videos.filter(v => v.category === categoryFilter);
   const filteredArticles = categoryFilter === "All" ? articles : articles.filter(a => a.category === categoryFilter);
   const readItems = CONTENT.filter(c => c.type === "article" && read.includes(c.id));
-  const progressPct = articles.length > 0 ? Math.round((read.length / articles.length) * 100) : 0;
+  const totalItems = articles.length + videos.length;
+  const progressPct = totalItems > 0 ? Math.round(((read.length + watchedVideos.length) / totalItems) * 100) : 0;
+
+  const askAboutContent = (item: ContentItem) => {
+    const payload = {
+      title: item.title,
+      description: item.description,
+      url: item.articleUrl || ("https://www.youtube.com/watch?v=" + item.youtubeId),
+      type: item.type,
+      category: item.category,
+    };
+    if (onAskAboutContent) {
+      onAskAboutContent(payload);
+    } else {
+      const msg = item.type === "article"
+        ? "Can you summarize this article for me? Title: " + item.title + ". Description: " + item.description + ". URL: " + item.articleUrl
+        : "Can you explain the key financial concepts from this video? Title: " + item.title + ". Description: " + item.description;
+      window.dispatchEvent(new CustomEvent("finheal:ask", { detail: { message: msg, contentItem: payload } }));
+    }
+  };
 
   const levelBadge = (level: string) => {
     const s = LEVEL_STYLE[level] || { bg: "#f3f4f6", color: "#374151" };
@@ -136,29 +166,39 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", marginBottom: "12px" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                 <button onClick={goPrev}
-                  style={{ width: "36px", height: "36px", borderRadius: "50%", background: "#1e1b4b", border: "none", color: "white", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>⬆</button>
+                  style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#1e1b4b", border: "none", color: "white", cursor: "pointer", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>◀</button>
                 <span style={{ fontSize: "9px", color: "#9ca3af", fontWeight: 500 }}>Prev</span>
               </div>
               <div
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
                 onWheel={handleWheel}
-                style={{ borderRadius: "10px", overflow: "hidden", position: "relative", width: "200px", flexShrink: 0 }}>
+                style={{ borderRadius: "10px", overflow: "hidden", position: "relative", width: "300px", flexShrink: 0 }}>
                 <button onClick={() => setPlayingShort(null)}
                   style={{ position: "absolute", top: "6px", right: "6px", width: "22px", height: "22px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", cursor: "pointer", fontSize: "10px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
-                <div style={{ position: "relative", paddingTop: "177%", background: "#000" }}>
+                <div style={{ position: "relative", paddingTop: "177%", background: "#000", overflow: "hidden" }}>
                   <iframe key={playingShort}
-                    src={"https://www.youtube.com/embed/" + playingShort + "?autoplay=1&loop=1&playlist=" + playingShort + "&modestbranding=1&rel=0"}
+                    src={"https://www.youtube.com/embed/" + playingShort + "?autoplay=1&loop=1&playlist=" + playingShort + "&modestbranding=1&rel=0&controls=0&showinfo=0"}
                     title="Financial Short"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                    style={{ position: "absolute", top: "-8%", left: 0, width: "100%", height: "116%", border: "none" }} />
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "14%", background: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "10%", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
+                  <a href={"https://www.youtube.com/shorts/" + playingShort} target="_blank" rel="noopener noreferrer"
+                    style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,0,0,0.92)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                    <svg width="14" height="10" viewBox="0 0 24 17" fill="white" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z"/>
+                      <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000"/>
+                    </svg>
+                    <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>YouTube</span>
+                  </a>
                 </div>
-                <div style={{ textAlign: "center", padding: "4px", background: "#f9fafb", fontSize: "9px", color: "#6b7280", fontWeight: 600 }}>{currentIdx + 1} / {SHORTS.length} · {SHORTS[currentIdx].title}</div>
+                <div style={{ textAlign: "center", padding: "6px 8px", background: "#f9fafb", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {SHORTS[currentIdx].title}</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                 <button onClick={goNext}
-                  style={{ width: "36px", height: "36px", borderRadius: "50%", background: "#3344e6", border: "none", color: "white", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(51,68,230,0.3)" }}>⬇</button>
+                  style={{ width: "44px", height: "44px", borderRadius: "50%", background: "#3344e6", border: "none", color: "white", cursor: "pointer", fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(51,68,230,0.3)" }}>▶</button>
                 <span style={{ fontSize: "9px", color: "#9ca3af", fontWeight: 500 }}>Next</span>
               </div>
             </div>
@@ -202,7 +242,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
             allowFullScreen style={{ border: "none", display: "block", width: "100%", height: "100%" }} />
         </div>
       ) : (
-        <div onClick={() => setPlayingVideoId(item.id)} style={{ height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
+        <div onClick={() => { setPlayingVideoId(item.id); markWatched(item.id); }} style={{ height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
           <img src={"https://img.youtube.com/vi/" + item.youtubeId + "/hqdefault.jpg"} alt={item.title}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
           <div style={{ position: "relative", width: "56px", height: "56px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
@@ -223,6 +263,11 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
           <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer"
             style={{ fontSize: "11px", color: "#ff0000", fontWeight: 600, textDecoration: "none" }}>Watch on YouTube ↗</a>
         </div>
+        <button
+          onClick={() => askAboutContent(item)}
+          style={{ marginTop: "10px", width: "100%", padding: "8px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#3344e6,#7c3aed)", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+          🤖 Ask Chatbot About This
+        </button>
       </div>
     </div>
   );
@@ -244,6 +289,11 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
             <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.source} · {item.readTime} · {item.date}</div>
             <span style={{ fontSize: "11px", background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "20px" }}>{item.readTime}</span>
           </div>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); askAboutContent(item); }}
+            style={{ marginTop: "10px", width: "100%", padding: "8px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#3344e6,#7c3aed)", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+            🤖 Ask Chatbot About This
+          </button>
         </div>
       </div>
     </a>
@@ -268,8 +318,8 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
             <div style={{ height: "100%", width: progressPct + "%", background: progressPct === 100 ? "#10b981" : "linear-gradient(90deg,#3344e6,#7c3aed)", borderRadius: "999px", transition: "width 0.6s ease" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
-            <span style={{ fontSize: "10px", color: "#9ca3af" }}>{read.length} of {articles.length} articles read</span>
-            <span style={{ fontSize: "10px", color: progressPct === 100 ? "#10b981" : "#9ca3af" }}>{progressPct === 100 ? "All done!" : (articles.length - read.length) + " remaining"}</span>
+            <span style={{ fontSize: "10px", color: "#9ca3af" }}>{read.length} articles · {watchedVideos.length} videos watched</span>
+            <span style={{ fontSize: "10px", color: progressPct === 100 ? "#10b981" : "#9ca3af" }}>{progressPct === 100 ? "All done!" : (totalItems - read.length - watchedVideos.length) + " remaining"}</span>
           </div>
         </div>
         <div onClick={() => setHistoryOpen(!historyOpen)}
@@ -285,7 +335,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
         {historyOpen && (
           <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "12px", overflow: "hidden" }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles you read</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles read & Videos watched</span>
               <button onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px" }}>✕ Close</button>
             </div>
             {readItems.length === 0 ? (
@@ -300,6 +350,21 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
                 <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#3344e6", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#eef0fd", padding: "4px 10px", borderRadius: "20px" }}>↗ Re-read</a>
               </div>
             ))}
+            {watchedVideos.length > 0 && (
+              <div style={{ padding: "8px 14px", background: "#f9fafb", borderTop: "1px solid #f3f4f6" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#1e1b4b", marginBottom: "6px" }}>🎥 Videos Watched</div>
+                {videos.filter(v => watchedVideos.includes(v.id)).map(item => (
+                  <div key={item.id} style={{ display: "flex", gap: "10px", padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
+                    <div style={{ width: "36px", height: "36px", background: item.bgColor, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{item.emoji}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.duration}</div>
+                    </div>
+                    <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#ff0000", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#fff0f0", padding: "4px 10px", borderRadius: "20px" }}>▶ Watch</a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: "flex", gap: "4px" }}>
