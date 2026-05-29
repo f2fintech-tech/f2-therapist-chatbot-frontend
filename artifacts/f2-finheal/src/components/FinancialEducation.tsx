@@ -119,10 +119,10 @@ const LEVEL_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 const QUIZ_QUESTIONS = [
-  { q: "🎂 What is your age group?", opts: ["Under 25 - Student / just started", "25-35 - Early career", "35-50 - Mid career", "50+ - Near retirement"] },
-  { q: "💼 What is your profession?", opts: ["Salaried employee", "Business owner / Self-employed", "Doctor / Medical professional", "Freelancer / Consultant", "Student / Not working yet"] },
+  { q: "🎂 What is your age group?", opts: ["Below 18 - Just Started", "18-25 - Students", "25-35 - Early Career Professionals", "35-50 - Mid-Career Professionals", "50-60 - Near Retirement", "60+ - Retired"] },
+  { q: "💼 What is your profession?", opts: ["Salaried employee", "Business owner", "Doctor / Medical professional", "Chartered Accountant", "Freelancer / Consultant", "Student / Not working yet"] },
   { q: "💸 What is your biggest financial challenge?", opts: ["Managing EMIs / debt", "Not enough savings", "Low credit score", "Tax planning"] },
-  { q: "🎯 What is your primary financial goal?", opts: ["Get a loan / business funding", "Build emergency fund", "Improve credit score", "Save for future / retirement"] },
+  { q: "🎯 What is your primary financial goal?", opts: ["Get a loan / business funding", "Build emergency fund", "Improve credit score", "Save for future / retirement", "Tax planning", "Other - I will describe my goal"] },
 ];
 
 const STORAGE_KEY_ARTICLES = "finheal_edu_read";
@@ -141,6 +141,8 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [quizDone, setQuizDone] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
+  const [quizHistory, setQuizHistory] = useState([]);
+  const [otherGoal, setOtherGoal] = useState('');
   const [currentShort, setCurrentShort] = useState(0);
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
@@ -243,6 +245,51 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
       </div>
     </div>
   );}
+
+  const FinancialTipsColumn = () => {
+    const [localShort, setLocalShort] = React.useState(0);
+    return (
+      <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "20px", overflow: "hidden", marginBottom: "24px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+        <div style={{ background: "linear-gradient(135deg,#1e1b4b,#3344e6)", padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "20px" }}>💡</span>
+          <div>
+            <div style={{ fontSize: "15px", fontWeight: 800, color: "white" }}>Financial Tips</div>
+            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>Quick shorts from F2 Fintech</div>
+          </div>
+          <div style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", borderRadius: "20px", padding: "3px 10px" }}>
+            <span style={{ fontSize: "11px", color: "white", fontWeight: 600 }}>{localShort + 1} / {SHORTS.length}</span>
+          </div>
+        </div>
+        <div style={{ width: "100%", background: "#000", position: "relative", paddingTop: "177%" }}>
+          <iframe key={localShort}
+            src={"https://www.youtube.com/embed/" + SHORTS[localShort].id + "?autoplay=1&loop=1&playlist=" + SHORTS[localShort].id + "&modestbranding=1&rel=0"}
+            title={SHORTS[localShort].title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+        </div>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #f3f4f6" }}>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>{SHORTS[localShort].title}</div>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
+            {SHORTS.map((s, i) => (
+              <button key={s.id} onClick={() => setLocalShort(i)}
+                style={{ flex: 1, padding: "0", border: "none", background: "none", cursor: "pointer", borderRadius: "8px", overflow: "hidden", outline: i === localShort ? "2.5px solid #3344e6" : "1.5px solid #e5e7eb" }}>
+                <img src={"https://img.youtube.com/vi/" + s.id + "/default.jpg"} alt={s.title}
+                  style={{ width: "100%", height: "48px", objectFit: "cover", display: "block", opacity: i === localShort ? 1 : 0.6 }} />
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={() => setLocalShort(prev => prev > 0 ? prev - 1 : SHORTS.length - 1)}
+              style={{ flex: 1, padding: "9px", borderRadius: "10px", border: "1.5px solid #e5e7eb", background: "white", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "#374151" }}>Prev</button>
+            <button onClick={() => setLocalShort(prev => prev < SHORTS.length - 1 ? prev + 1 : 0)}
+              style={{ flex: 1, padding: "9px", borderRadius: "10px", border: "none", background: "#3344e6", cursor: "pointer", fontSize: "13px", fontWeight: 600, color: "white" }}>Next</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const VideoCard = ({ item, playingVideoId, setPlayingVideoId }: { item: ContentItem; playingVideoId: string | null; setPlayingVideoId: (id: string | null) => void }) => {
     return (
       <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s" }}
@@ -399,7 +446,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
 
         {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
 
-        {tab === "videos" && (<><ShortsCarousel currentShort={currentShort} setCurrentShort={setCurrentShort} /><div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>{filteredVideos.map(v => <VideoCard key={v.id} item={v} playingVideoId={playingVideoId} setPlayingVideoId={setPlayingVideoId} />)}</>)}
+        {tab === "videos" && (<><FinancialTipsColumn /><div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>{filteredVideos.map(v => <VideoCard key={v.id} item={v} playingVideoId={playingVideoId} setPlayingVideoId={setPlayingVideoId} />)}</>)}
         {tab === "quiz" && (
           <>
             {!quizStarted && !quizDone && (
@@ -431,10 +478,27 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
                     {opt}
                   </button>
                 ))}
-                <button onClick={() => { if (!selected) return; if (qIdx + 1 >= QUIZ_QUESTIONS.length) setQuizDone(true); else { setQIdx(qIdx + 1); setSelected(null); } }} disabled={!selected}
-                  style={{ width: "100%", padding: "12px", borderRadius: "20px", background: selected ? "#3344e6" : "#e5e7eb", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: selected ? "pointer" : "not-allowed" }}>
+                {qIdx + 1 === QUIZ_QUESTIONS.length && selected === "Other - I will describe my goal" && (
+                  <textarea
+                    placeholder="Describe your financial goal or requirement..."
+                    value={otherGoal}
+                    onChange={e => setOtherGoal(e.target.value)}
+                    style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "2px solid #3344e6", fontSize: "13px", color: "#374151", marginBottom: "10px", minHeight: "80px", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+                  />
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                {quizHistory.length > 0 && (
+                  <button onClick={() => { const prev = quizHistory[quizHistory.length - 1]; setQuizHistory(h => h.slice(0, -1)); setQIdx(prev); setSelected(null); setOtherGoal(''); }}
+                    style={{ padding: "12px 20px", borderRadius: "20px", background: "white", color: "#374151", border: "1.5px solid #e5e7eb", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>
+                    Back
+                  </button>
+                )}
+                <button onClick={() => { if (!selected) return; if (qIdx + 1 >= QUIZ_QUESTIONS.length) setQuizDone(true); else { setQuizHistory(h => [...h, qIdx]); setQIdx(qIdx + 1); setSelected(null); setOtherGoal(''); } }} disabled={!selected}
+                  style={{ flex: 1, padding: "12px", borderRadius: "20px", background: selected ? "#3344e6" : "#e5e7eb", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: selected ? "pointer" : "not-allowed" }}>
                   {qIdx + 1 === QUIZ_QUESTIONS.length ? "See my results" : "Next"}
                 </button>
+              </div>
+              
               </div>
             )}
             {quizDone && (
@@ -444,7 +508,7 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b", marginBottom: "4px" }}>🎉 Your picks are ready!</div>
                 </div>
                 {articles.slice(0, 2).map(a => <ArticleCard key={a.id} item={a} />)}
-                <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); }}
+                <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); setQuizHistory([]); setOtherGoal(''); }}
                   style={{ width: "100%", padding: "10px", borderRadius: "20px", border: "1px solid #e5e7eb", background: "white", color: "#374151", fontSize: "13px", cursor: "pointer", marginTop: "8px" }}>
                   Retake quiz
                 </button>
@@ -456,6 +520,8 @@ export default function FinancialEducation({ userId, onToggleSidebar }: Props) {
     </main>
   );
 }
+
+
 
 
 
