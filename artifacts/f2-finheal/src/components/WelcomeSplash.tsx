@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 
 interface WelcomeSplashProps {
   userName?: string;
@@ -144,7 +144,7 @@ export default function WelcomeSplash({ userName, onComplete }: WelcomeSplashPro
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "18px",
             boxShadow: "0 4px 16px rgba(51,68,230,0.5)",
-          }}>💙</div>
+          }}><img src="/finheal-logo.gif" alt="F2 FinHeal" style={{ width: "100%", height: "100%", borderRadius: "inherit", objectFit: "cover" }} /></div>
           <span style={{
             fontSize: "18px", fontWeight: 700, color: "white",
             textShadow: "0 1px 8px rgba(0,0,0,0.4)",

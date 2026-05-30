@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+﻿import { useState, useEffect, useRef, type FormEvent } from "react";
 import { signInUser, signUpUser, signInGuest } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 
@@ -280,7 +280,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transition: "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "36px", height: "36px", background: "#3344e6", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>💙</div>
+            <img src="/finheal-logo.gif" alt="F2 FinHeal" style={{ width: "36px", height: "36px", borderRadius: "10px", objectFit: "cover" }} />
             <span style={{ fontSize: "18px", fontWeight: 700, color: "#1e1b4b" }}>F2 FinHeal</span>
           </div>
 

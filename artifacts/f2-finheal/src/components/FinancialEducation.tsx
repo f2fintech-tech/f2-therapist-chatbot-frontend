@@ -476,6 +476,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                   <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b" }}>Your picks are ready!</div>
                 </div>
                 {articles.slice(0, 2).map(a => <ArticleCard key={a.id} item={a} />)}
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "12px 0 10px" }}>🎥 Recommended Videos</div>
+                {videos.slice(0, 2).map(v => <VideoCard key={v.id} item={v} />)}
                 <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); setQuizHistory([]); setOtherGoal(""); }}
                   style={{ width: "100%", padding: "10px", borderRadius: "20px", border: "1px solid #e5e7eb", background: "white", color: "#374151", fontSize: "13px", cursor: "pointer", marginTop: "8px" }}>
                   Retake quiz

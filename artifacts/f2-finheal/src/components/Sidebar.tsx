@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
@@ -224,7 +224,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
         aria-label="Start a new chat"
       >
         <div className="w-[38px] h-[38px] bg-primary rounded-[10px] flex items-center justify-center cursor-pointer text-[20px] shadow-[0_8px_24px_rgba(50,68,230,0.22)] shrink-0 relative overflow-hidden">
-          💙
+          <img src="/finheal-logo.gif" alt="F2 FinHeal" style={{ width: "32px", height: "32px", borderRadius: "8px", objectFit: "cover" }} />
           <div className="absolute -top-[10px] -right-[10px] w-[30px] h-[30px] bg-white/15 rounded-full" />
         </div>
         <div className="flex flex-col gap-[1px]">
