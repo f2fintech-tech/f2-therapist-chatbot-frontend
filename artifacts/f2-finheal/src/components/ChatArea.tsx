@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
@@ -21,7 +21,9 @@ interface ChatAreaProps {
   onSignupPrompt?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  prefillMessage?: { text: string; card: string };
 }
+
 
 export default function ChatArea({
   conversationId,
@@ -41,9 +43,12 @@ export default function ChatArea({
   onSignupPrompt,
   onToggleSidebar,
   onToggleInsights,
+  prefillMessage,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
+  useEffect(() => { if (prefillMessage?.text) { setInputValue(prefillMessage.text); } }, [prefillMessage]);
   const [isRecording, setIsRecording] = useState(false);
+  useEffect(() => { if (prefillMessage?.text) { setInputValue(prefillMessage.text); } }, [prefillMessage]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,9 +124,10 @@ export default function ChatArea({
     if (!text.trim() || isLoading || isSendingMessage) return;
 
     setInputValue("");
-
     try {
-      await onSendMessage(text.trim());
+
+      await onSendMessage(prefillMessage?.card ? prefillMessage.card + "\n\nUser question: " + text.trim() : text.trim());
+
     } catch {
       // The hook already normalizes and stores the error state.
     }
@@ -403,9 +409,10 @@ export default function ChatArea({
           </div>
         )}
       </div>
-
-      <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
+        <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
+        {prefillMessage?.card && (<div style={{ background: "#eef0fd", border: "1.5px solid #d4d8fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "8px", maxWidth: "800px", margin: "0 auto 8px", display: "flex", alignItems: "flex-start", gap: "10px" }}><span style={{ fontSize: "18px" }}>📎</span><div style={{ flex: 1 }}><div style={{ fontSize: "11px", fontWeight: 700, color: "#3344e6", marginBottom: "2px" }}>ATTACHED CONTENT</div><div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>{prefillMessage.card}</div></div></div>)}
         <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-col items-stretch p-[10px] gap-[8px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:flex-row sm:items-end sm:p-[10px_10px_10px_18px]">
+
           <textarea
             ref={inputRef}
             value={inputValue}
