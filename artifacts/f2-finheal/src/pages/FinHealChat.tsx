@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -304,7 +304,8 @@ export default function FinHealChat() {
             onStopSendingMessage={chat.stopSendingMessage}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
-              prefillMessage={prefillMessage ?? undefined}
+            prefillMessage={prefillMessage ?? undefined}
+            onClearPrefill={() => setPrefillMessage(null)}
             onSignupPrompt={() => {
               clearStoredAuthSession();
               setAuthSession(null);
@@ -341,11 +342,11 @@ export default function FinHealChat() {
                   ? "Article: \"" + payload.title + "\" (" + payload.url + ") — " + payload.description
                   : "Video: \"" + payload.title + "\" — " + payload.description;
                 setTimeout(() => {
-                  setPrefillMessage({
-                    text: "I have a question about this " + payload.type + ": \"" + payload.title + "\" — ",
-                    card: context
-                  });
+
+                  setPrefillMessage({ text: "", card: context });
                 }, 200);
+
+
               }}
             />
         ) : mainView === "financial-literacy" ? (
@@ -404,3 +405,5 @@ export default function FinHealChat() {
     </>
   );
 }
+
+

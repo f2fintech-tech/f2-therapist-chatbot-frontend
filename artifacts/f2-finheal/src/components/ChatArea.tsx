@@ -22,6 +22,7 @@ interface ChatAreaProps {
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   prefillMessage?: { text: string; card: string };
+  onClearPrefill?: () => void;
 }
 
 
@@ -44,6 +45,7 @@ export default function ChatArea({
   onToggleSidebar,
   onToggleInsights,
   prefillMessage,
+  onClearPrefill,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   useEffect(() => { if (prefillMessage?.text) { setInputValue(prefillMessage.text); } }, [prefillMessage]);
@@ -410,7 +412,7 @@ export default function ChatArea({
         )}
       </div>
         <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
-        {prefillMessage?.card && (<div style={{ background: "#eef0fd", border: "1.5px solid #d4d8fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "8px", maxWidth: "800px", margin: "0 auto 8px", display: "flex", alignItems: "flex-start", gap: "10px" }}><span style={{ fontSize: "18px" }}>📎</span><div style={{ flex: 1 }}><div style={{ fontSize: "11px", fontWeight: 700, color: "#3344e6", marginBottom: "2px" }}>ATTACHED CONTENT</div><div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>{prefillMessage.card}</div></div></div>)}
+        {prefillMessage?.card && (<div style={{ background: "#eef0fd", border: "1.5px solid #d4d8fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "8px", maxWidth: "800px", margin: "0 auto 8px", display: "flex", alignItems: "flex-start", gap: "10px" }}><span style={{ fontSize: "18px" }}>📎</span><div style={{ flex: 1 }}><div style={{ fontSize: "11px", fontWeight: 700, color: "#3344e6", marginBottom: "2px" }}>ATTACHED CONTENT</div><div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>{prefillMessage.card}</div></div><button onClick={() => onClearPrefill?.()} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "16px", lineHeight: 1, padding: "0 0 0 8px", flexShrink: 0 }}>✕</button></div>)}
         <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-col items-stretch p-[10px] gap-[8px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:flex-row sm:items-end sm:p-[10px_10px_10px_18px]">
 
           <textarea
@@ -507,3 +509,4 @@ export default function ChatArea({
     </main>
   );
 }
+
