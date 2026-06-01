@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
+import Confetti from "react-confetti";
 
 interface ContentItem {
   id: string;
@@ -75,6 +76,12 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const [watchedVideos, setWatchedVideos] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window !== "undefined" ? window.innerWidth : 0,
+    height: typeof window !== "undefined" ? window.innerHeight : 0,
+  }));
+  const previousProgressRef = useRef(0);
 
   const key = userId || "guest";
 
@@ -84,6 +91,17 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     const w = localStorage.getItem("finheal_watched:" + key);
     if (w) setWatchedVideos(JSON.parse(w));
   }, [key]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const markRead = (id: string) => {
     if (read.includes(id)) return;
@@ -107,6 +125,18 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   const readItems = CONTENT.filter(c => c.type === "article" && read.includes(c.id));
   const totalItems = articles.length + videos.length;
   const progressPct = totalItems > 0 ? Math.round(((read.length + watchedVideos.length) / totalItems) * 100) : 0;
+
+  useEffect(() => {
+    const wasBelowComplete = previousProgressRef.current < 100;
+    previousProgressRef.current = progressPct;
+
+    if (!wasBelowComplete || progressPct !== 100) return;
+
+    setShowConfetti(true);
+    const timer = window.setTimeout(() => setShowConfetti(false), 7000);
+
+    return () => window.clearTimeout(timer);
+  }, [progressPct]);
 
   const askAboutContent = (item: ContentItem) => {
     const payload = {
@@ -302,6 +332,19 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
 
   return (
     <main style={{ flex: 1, overflowY: "auto", background: "#f9fafb", borderRadius: "20px", border: "1px solid #e5e7eb" }}>
+      {showConfetti && viewport.width > 0 && viewport.height > 0 && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}>
+          <Confetti
+            width={viewport.width}
+            height={viewport.height}
+            recycle={false}
+            numberOfPieces={420}
+            gravity={0.18}
+            tweenDuration={7000}
+            colors={["#3344e6", "#7c3aed", "#10b981", "#f59e0b", "#ef4444"]}
+          />
+        </div>
+      )}
       <div style={{ padding: "20px 24px 0", borderBottom: "1px solid #f3f4f6", background: "white", borderRadius: "20px 20px 0 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
           <div>
