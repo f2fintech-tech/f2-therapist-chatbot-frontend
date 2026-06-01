@@ -308,7 +308,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             <div style={{ fontSize: "20px", fontWeight: 800, color: "#1e1b4b" }}>📚 Financial Education</div>
             <div style={{ fontSize: "13px", color: "#6b7280" }}>✨ Your journey to smarter money decisions starts here</div>
           </div>
-          {onToggleSidebar && <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><div style={{ display: "flex", alignItems: "center", background: "#f3f4f6", borderRadius: "20px", padding: "6px 14px", border: "1px solid #e5e7eb", gap: "6px" }}><span style={{ fontSize: "13px", color: "#9ca3af" }}>🔍</span><input placeholder="Search articles & videos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: "none", background: "transparent", outline: "none", fontSize: "12px", color: "#374151", width: "160px" }} /></div><button onClick={onToggleSidebar} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px" }}>☰</button></div>}
+          {onToggleSidebar && <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><div style={{ display: "flex", alignItems: "center", background: "#f3f4f6", borderRadius: "20px", padding: "6px 14px", border: "1px solid #e5e7eb", gap: "6px" }}><span style={{ fontSize: "13px", color: "#9ca3af" }}>🔍</span><input placeholder="Search articles & videos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: "none", background: "transparent", outline: "none", fontSize: "12px", color: "#374151", width: "160px" }} /></div></div>}
         </div>
         <div style={{ margin: "14px 0 10px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "14px", padding: "12px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
@@ -491,3 +491,4 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     </main>
   );
 }
+
