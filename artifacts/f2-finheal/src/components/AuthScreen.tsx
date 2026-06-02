@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { signInUser, signUpUser, signInGuest } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 
@@ -432,7 +432,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transform: animateIn ? "translateY(0px)" : "translateY(24px)",
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
-          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", height: "560px", boxSizing: "border-box", overflowY: "auto", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
+          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", minHeight: "560px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
             <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
               <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
               <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
