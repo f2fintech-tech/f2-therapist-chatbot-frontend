@@ -20,6 +20,9 @@ export interface BackendUserProfile {
   bio?: string | null;
   hearts?: number;
   is_guest?: boolean;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  maritalStatus?: string | null;
 }
 
 export interface BackendUserProfileUpdate {
@@ -29,6 +32,9 @@ export interface BackendUserProfileUpdate {
   location?: string | null;
   occupation?: string | null;
   bio?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  maritalStatus?: string | null;
 }
 
 const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();

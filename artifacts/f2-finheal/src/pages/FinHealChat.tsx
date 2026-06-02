@@ -70,7 +70,11 @@ export default function FinHealChat() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      if (mainViewRef.current === "chat" && !window.localStorage.getItem("finheal_quiz_completed")) {
+      const completed = window.localStorage.getItem("finheal_quiz_completed");
+      const dismissedTime = window.localStorage.getItem("finheal_quiz_dismissed_time");
+      const isCooldownActive = dismissedTime && (Date.now() - Number(dismissedTime) < 24 * 60 * 60 * 1000);
+
+      if (mainViewRef.current === "chat" && !completed && !isCooldownActive) {
         setShowQuizPopup(true);
       }
     }, 1200);
@@ -101,6 +105,11 @@ export default function FinHealChat() {
     window.localStorage.setItem("finheal_quiz_completed", "true");
     window.localStorage.setItem("finheal_user_tier", tierName);
     window.localStorage.setItem("finheal_quiz_score", String(score));
+    setShowQuizPopup(false);
+  };
+
+  const handleQuizDismiss = () => {
+    window.localStorage.setItem("finheal_quiz_dismissed_time", String(Date.now()));
     setShowQuizPopup(false);
   };
 
@@ -139,6 +148,7 @@ export default function FinHealChat() {
       window.localStorage.removeItem("finheal_quiz_completed");
       window.localStorage.removeItem("finheal_user_tier");
       window.localStorage.removeItem("finheal_quiz_score");
+      window.localStorage.removeItem("finheal_quiz_dismissed_time");
     }
     setCurrentMoodDims(null);
     setSidebarOpen(false);
@@ -281,7 +291,7 @@ export default function FinHealChat() {
     <>
       <QuizPopup
         visible={showQuizPopup && mainView === "chat"}
-        onDismiss={() => setShowQuizPopup(false)}
+        onDismiss={handleQuizDismiss}
         onComplete={handleQuizComplete}
       />
       <div className="grid h-[100dvh] w-full min-w-0 grid-cols-1 gap-[6px] overflow-hidden bg-[#f3f4f6] p-[6px] lg:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)] 2xl:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)_clamp(250px,18vw,300px)]">

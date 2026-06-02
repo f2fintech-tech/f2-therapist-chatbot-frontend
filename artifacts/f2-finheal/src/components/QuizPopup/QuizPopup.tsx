@@ -127,6 +127,7 @@ export default function QuizPopup({ visible, onDismiss, onComplete }: QuizPopupP
             onNext={handleNext}
             showNextButton={showNextButton}
             elapsedSeconds={elapsedSeconds}
+            onStop={onDismiss}
           />
         )}
         {screen === 'result' && (

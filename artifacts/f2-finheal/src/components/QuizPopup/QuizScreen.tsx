@@ -9,6 +9,7 @@ interface QuizScreenProps {
   onNext: () => void;
   showNextButton: boolean;
   elapsedSeconds: number;
+  onStop: () => void;
 }
 
 export default function QuizScreen({
@@ -19,7 +20,9 @@ export default function QuizScreen({
   onNext,
   showNextButton,
   elapsedSeconds,
+  onStop,
 }: QuizScreenProps) {
+  const [isStopHovered, setIsStopHovered] = React.useState(false);
   const question = quizQuestions[currentQuestionIndex];
   const isLast = currentQuestionIndex === quizQuestions.length - 1;
 
@@ -81,11 +84,23 @@ export default function QuizScreen({
           {isLast ? 'See my result →' : 'Next →'}
         </button>
       )}
+
+      <button 
+        style={{
+          ...styles.stopButton,
+          ...(isStopHovered ? { backgroundColor: '#fee2e2', borderColor: '#f87171' } : {})
+        }} 
+        onClick={onStop}
+        onMouseEnter={() => setIsStopHovered(true)}
+        onMouseLeave={() => setIsStopHovered(false)}
+      >
+        ✕ Stop Quiz
+      </button>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, any> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -219,5 +234,23 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     fontSize: '15px',
     cursor: 'pointer',
+  },
+  stopButton: {
+    marginTop: '8px',
+    width: '100%',
+    padding: '12px 18px',
+    borderRadius: '14px',
+    border: '1px solid #fca5a5',
+    backgroundColor: '#fff5f5',
+    color: '#dc2626',
+    fontWeight: 600,
+    fontSize: '14px',
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'background-color 200ms ease, border-color 200ms ease',
   },
 };
