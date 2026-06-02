@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Confetti from "react-confetti";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ContentItem {
   id: string;
@@ -263,9 +264,12 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   };
 
   const VideoCard = ({ item }: { item: ContentItem }) => (
-    <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s" }}
-      onMouseOver={e => (e.currentTarget.style.transform = "translateY(-2px)")}
-      onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+      transition={{ duration: 0.15 }}
+      style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
       {playingVideoId === item.id && item.youtubeId ? (
         <div style={{ width: "100%", aspectRatio: "16/9" }}>
           <iframe width="100%" height="100%" src={"https://www.youtube.com/embed/" + item.youtubeId + "?autoplay=1"}
@@ -300,13 +304,17 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           🤖 Ask Chatbot About This
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 
   const ArticleCard = ({ item }: { item: ContentItem }) => (
-    <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }} onClick={() => markRead(item.id)}>
-      <div style={{ background: "white", border: "1.5px solid " + (read.includes(item.id) ? "#10b981" : "#e5e7eb"), borderRadius: "16px", padding: "16px", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", transition: "transform 0.2s", cursor: "pointer", display: "flex", gap: "14px", alignItems: "flex-start" }}
-        onMouseOver={e => (e.currentTarget.style.transform = "translateY(-2px)")} onMouseOut={e => (e.currentTarget.style.transform = "translateY(0)")}>
+    <motion.a 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+      transition={{ duration: 0.15 }}
+      href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }} onClick={() => markRead(item.id)}>
+      <div style={{ background: "white", border: "1.5px solid " + (read.includes(item.id) ? "#10b981" : "#e5e7eb"), borderRadius: "16px", padding: "16px", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", display: "flex", gap: "14px", alignItems: "flex-start" }}>
         <div style={{ width: "52px", height: "52px", background: item.bgColor, borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{item.emoji}</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
@@ -327,7 +335,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           </button>
         </div>
       </div>
-    </a>
+    </motion.a>
   );
 
   return (
@@ -376,8 +384,14 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             <div style={{ fontSize: "13px", color: "#9ca3af" }}>tap for history</div>
           </div>
         </div>
+        <AnimatePresence>
         {historyOpen && (
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "12px", overflow: "hidden" }}>
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "12px", overflow: "hidden" }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles read & Videos watched</span>
               <button onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px" }}>✕ Close</button>
@@ -409,14 +423,18 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                 ))}
               </div>
             )}
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
         <div style={{ display: "flex", gap: "4px" }}>
           {(["all", "articles", "videos", "quiz"]).map(t => (
-            <button key={t} onClick={() => setTab(t as "all" | "articles" | "videos" | "quiz")}
+            <motion.button 
+              whileHover={{ backgroundColor: tab === t ? "#3344e6" : "#f3f4f6" }}
+              whileTap={{ scale: 0.95 }}
+              key={t} onClick={() => setTab(t as "all" | "articles" | "videos" | "quiz")}
               style={{ padding: "8px 16px", borderRadius: "12px 12px 0 0", border: "none", fontSize: "12px", fontWeight: 600, cursor: "pointer", background: tab === t ? "#3344e6" : "transparent", color: tab === t ? "white" : "#6b7280" }}>
               {t === "all" ? "✨ All" : t === "articles" ? "📄 Articles" : t === "videos" ? "🎥 Videos" : "🧠 Quiz"}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -433,6 +451,14 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           </div>
         )}
 
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.15 }}
+          >
         {tab === "all" && (
           <>
             <div style={{ background: "linear-gradient(135deg,#eef0fd,#f5f3ff)", border: "1px solid #d4d8fa", borderRadius: "16px", padding: "16px", marginBottom: "20px" }}>
@@ -530,6 +556,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             )}
           </>
         )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </main>
   );
