@@ -20,6 +20,11 @@ interface Appointment {
   notes?: string;
   clientEmail?: string;
   bookedAt: string;
+  completed?: boolean;
+  rating?: number;
+  feedback?: string;
+  meetUrl?: string;
+  joined?: boolean;
 }
 
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
@@ -71,7 +76,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     category: "wealth" as any,
     rating: 4.8,
     reviewsCount: 45,
-    nextSlot: "Tomorrow, 10:00 AM"
+    nextSlot: "Tomorrow, 10:00 AM",
+    fee: 899
   });
 
   // Education form state
@@ -145,6 +151,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
     // 4. Appointments across all users
     loadGlobalAppointments();
+
+    const handleUpdate = () => {
+      const stored = localStorage.getItem("finheal_advisors_list");
+      if (stored) {
+        try { setAdvisors(JSON.parse(stored)); } catch {}
+      }
+      loadGlobalAppointments();
+    };
+    window.addEventListener("finheal:advisors_update", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("finheal:advisors_update", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
   // Sync specific Advisor next slot
@@ -197,7 +217,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       category: "wealth",
       rating: 4.8,
       reviewsCount: 15,
-      nextSlot: "Tomorrow, 10:00 AM"
+      nextSlot: "Tomorrow, 10:00 AM",
+      fee: 899
     });
     setExpertModalOpen(true);
   };
@@ -215,7 +236,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       category: adv.category,
       rating: adv.rating,
       reviewsCount: adv.reviewsCount,
-      nextSlot: adv.nextSlot
+      nextSlot: adv.nextSlot,
+      fee: adv.fee || 899
     });
     setExpertModalOpen(true);
   };
@@ -238,7 +260,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       category: expertForm.category,
       rating: expertForm.rating,
       reviewsCount: expertForm.reviewsCount,
-      nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM"
+      nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM",
+      fee: Number(expertForm.fee) || 899
     };
 
     let updatedList;
@@ -665,6 +688,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         <th className="p-[12px]">Expert info</th>
                         <th className="p-[12px]">Designation</th>
                         <th className="p-[12px]">Category</th>
+                        <th className="p-[12px]">Hourly Fee</th>
                         <th className="p-[12px]">Availability</th>
                         <th className="p-[12px] text-right">Actions</th>
                       </tr>
@@ -681,6 +705,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           </td>
                           <td className="p-[12px] text-gray-600 font-medium">{adv.designation}</td>
                           <td className="p-[12px] uppercase font-bold text-[10.5px] text-gray-400">{adv.category}</td>
+                          <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                           <td className="p-[12px]">
                             {adv.availability === "available" ? (
                               <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
@@ -850,13 +875,40 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     {allAppointments.map((appt, idx) => (
                       <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
                         <div className="space-y-[4px]">
-                          <div className="flex items-center gap-[8px]">
+                          <div className="flex items-center gap-[8px] flex-wrap">
                             <strong className="text-[14px] text-gray-900">{appt.advisorName}</strong>
                             <span className="text-[10px] font-semibold bg-primary/10 text-primary px-[8px] py-[2px] rounded-full uppercase">Advisor ID: {appt.advisorId}</span>
+                            {appt.completed ? (
+                              <span className="text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">✓ Completed & Rated</span>
+                            ) : (
+                              <span className="text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">🕒 Active Schedule</span>
+                            )}
                           </div>
                           <div className="text-[12px] text-gray-600">
                             <strong>Client email:</strong> {appt.clientEmail}
                           </div>
+                          {appt.meetUrl && (
+                            <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px] flex-wrap">
+                              <span>🌐 <strong>Meet URL Room:</strong></span>
+                              <a
+                                href={appt.meetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-bold"
+                              >
+                                {appt.meetUrl}
+                              </a>
+                            </div>
+                          )}
+                          {appt.completed && (
+                            <div className="flex items-center gap-[6px] text-[11px] font-bold text-amber-500 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
+                              <span>{"★".repeat(appt.rating || 0)}</span>
+                              <span className="text-gray-500">({appt.rating}/5 stars)</span>
+                              {appt.feedback && (
+                                <span className="text-gray-400 font-normal italic">&quot;{appt.feedback}&quot;</span>
+                              )}
+                            </div>
+                          )}
                           {appt.notes && (
                             <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[480px] mt-[4px]">
                               &quot;{appt.notes}&quot;
@@ -965,6 +1017,19 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
                                 Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
                               </div>
+                              {appt.meetUrl && (
+                                <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
+                                  <span>🌐 <strong>Room Link:</strong></span>
+                                  <a
+                                    href={appt.meetUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline font-bold"
+                                  >
+                                    {appt.meetUrl}
+                                  </a>
+                                </div>
+                              )}
                               {appt.notes && (
                                 <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[440px] mt-[4px]">
                                   &quot;{appt.notes}&quot;
@@ -975,12 +1040,23 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
                               <div className="text-[13px] font-bold text-primary">{appt.date}</div>
                               <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
-                              <button
-                                onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
-                                className="mt-[8px] bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
-                              >
-                                Accept session
-                              </button>
+                              {appt.meetUrl ? (
+                                <a
+                                  href={appt.meetUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-[8px] inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
+                                >
+                                  Join Call Room
+                                </a>
+                              ) : (
+                                <button
+                                  onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
+                                  className="mt-[8px] bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
+                                >
+                                  Accept session
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1076,6 +1152,30 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     <option value="available">Available (Green dot)</option>
                     <option value="unavailable">Busy / Offline (Red dot)</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
+                  <input
+                    type="number"
+                    value={expertForm.fee}
+                    onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
+                    placeholder="e.g. 899"
+                    min={0}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Next Slot</label>
+                  <input
+                    type="text"
+                    value={expertForm.nextSlot}
+                    onChange={(e) => setExpertForm({ ...expertForm, nextSlot: e.target.value })}
+                    placeholder="e.g. Tomorrow, 10:00 AM"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
                 </div>
               </div>
 
