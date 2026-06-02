@@ -30,16 +30,7 @@ interface Appointment {
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
   
-  // Expert account mapping
-  const expertAccounts: Record<string, string> = {
-    "sneha@finheal.com": "sneha-reddy",
-    "aradhya@finheal.com": "aradhya-sharma",
-    "vikram@finheal.com": "vikram-malhotra",
-    "rohan@finheal.com": "rohan-mehta",
-    "priya@finheal.com": "priya-nair"
-  };
-  
-  const currentExpertId = expertAccounts[userEmail] || null;
+
 
   // Active Admin Tabs: stats, experts, education, tests, appointments
   const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments">("stats");
@@ -109,6 +100,19 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
 
+  // Dynamically map logged-in email prefix to advisor ID based on name slug
+  const getExpertIdFromEmail = (email: string) => {
+    if (!email) return null;
+    const prefix = email.split("@")[0].toLowerCase().replace(".", "-");
+    const found = advisors.find(a => {
+      const slug = a.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      return slug.startsWith(prefix) || slug.includes(prefix) || prefix.includes(slug);
+    });
+    return found ? found.id : null;
+  };
+  
+  const currentExpertId = getExpertIdFromEmail(userEmail);
+
   // Load backend stats
   useEffect(() => {
     if (isAdmin) {
@@ -122,10 +126,54 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // Load local storage states
   useEffect(() => {
-    // 1. Advisors List
+    // 1. Advisors List & One-time dynamic ID self-healing migration
     const storedAdvisors = localStorage.getItem("finheal_advisors_list");
     if (storedAdvisors) {
-      setAdvisors(JSON.parse(storedAdvisors));
+      try {
+        const parsedAdvisors = JSON.parse(storedAdvisors) as Advisor[];
+        let advisorsModified = false;
+        
+        const migratedAdvisors = parsedAdvisors.map(adv => {
+          const expectedId = adv.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+          if (adv.id !== expectedId) {
+            advisorsModified = true;
+            const oldId = adv.id;
+            
+            // Migrate all existing appointments mapped to the old ID across all users
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith("finheal_advisor_appointments:")) {
+                try {
+                  const appts = JSON.parse(localStorage.getItem(key) || "[]");
+                  let apptsModified = false;
+                  const updatedAppts = appts.map((appt: any) => {
+                    if (appt.advisorId === oldId) {
+                      apptsModified = true;
+                      return { ...appt, advisorId: expectedId, advisorName: adv.name };
+                    }
+                    return appt;
+                  });
+                  if (apptsModified) {
+                    localStorage.setItem(key, JSON.stringify(updatedAppts));
+                  }
+                } catch (e) {}
+              }
+            }
+            return { ...adv, id: expectedId };
+          }
+          return adv;
+        });
+
+        if (advisorsModified) {
+          localStorage.setItem("finheal_advisors_list", JSON.stringify(migratedAdvisors));
+          setAdvisors(migratedAdvisors);
+          dispatchUpdateEvent("finheal:advisors_update");
+        } else {
+          setAdvisors(parsedAdvisors);
+        }
+      } catch (e) {
+        setAdvisors(advisorsData);
+      }
     } else {
       localStorage.setItem("finheal_advisors_list", JSON.stringify(advisorsData));
       setAdvisors(advisorsData);
@@ -248,8 +296,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       return;
     }
 
+    const newId = expertForm.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+
     const item: Advisor = {
-      id: editingExpert ? editingExpert.id : `adv-${Date.now()}`,
+      id: newId,
       name: expertForm.name.trim(),
       designation: expertForm.designation.trim(),
       avatarUrl: expertForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
@@ -263,6 +317,33 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM",
       fee: Number(expertForm.fee) || 899
     };
+
+    // Scan all appointments in localStorage and dynamically update old advisor ID to the new ID and name
+    if (editingExpert && editingExpert.id !== item.id) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("finheal_advisor_appointments:")) {
+          try {
+            const appts = JSON.parse(localStorage.getItem(key) || "[]");
+            let modified = false;
+            const updatedAppts = appts.map((appt: any) => {
+              if (appt.advisorId === editingExpert.id) {
+                modified = true;
+                return {
+                  ...appt,
+                  advisorId: item.id,
+                  advisorName: item.name
+                };
+              }
+              return appt;
+            });
+            if (modified) {
+              localStorage.setItem(key, JSON.stringify(updatedAppts));
+            }
+          } catch (e) {}
+        }
+      }
+    }
 
     let updatedList;
     if (editingExpert) {
