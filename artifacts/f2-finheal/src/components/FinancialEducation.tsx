@@ -263,12 +263,12 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     );
   };
 
-  const VideoCard = ({ item }: { item: ContentItem }) => (
+  const VideoCard = ({ item, delay = 0 }: { item: ContentItem; delay?: number }) => (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
-      transition={{ duration: 0.15 }}
+      transition={{ type: "spring", stiffness: 80, damping: 12, delay }}
       style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
       {playingVideoId === item.id && item.youtubeId ? (
         <div style={{ width: "100%", aspectRatio: "16/9" }}>
@@ -307,12 +307,12 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     </motion.div>
   );
 
-  const ArticleCard = ({ item }: { item: ContentItem }) => (
+  const ArticleCard = ({ item, delay = 0 }: { item: ContentItem; delay?: number }) => (
     <motion.a
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
-      transition={{ duration: 0.15 }}
+      transition={{ type: "spring", stiffness: 80, damping: 12, delay }}
       href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "block" }} onClick={() => markRead(item.id)}>
       <div style={{ background: "white", border: "1.5px solid " + (read.includes(item.id) ? "#10b981" : "#e5e7eb"), borderRadius: "16px", padding: "16px", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", display: "flex", gap: "14px", alignItems: "flex-start" }}>
         <div style={{ width: "52px", height: "52px", background: item.bgColor, borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>{item.emoji}</div>
@@ -519,11 +519,11 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     <button onClick={() => setTab("quiz")} style={{ padding: "8px 20px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>🚀 Take quiz</button>
                   </div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px" }}>📰 Latest articles</div>
-                  {filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
+                  {filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)}
                 </>
               )}
 
-              {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
+              {tab === "articles" && filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)}
 
               {tab === "videos" && (
                 <>
@@ -532,7 +532,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                   ) : (
                     <>
                       <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
-                      {filteredVideos.map(v => <VideoCard key={v.id} item={v} />)}
+                      {filteredVideos.map((v, idx) => <VideoCard key={v.id} item={v} delay={Math.min(idx * 0.05, 0.3)} />)}
                     </>
                   )}
                 </>
@@ -597,9 +597,9 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                         <div style={{ fontSize: "40px", marginBottom: "8px" }}>🎉</div>
                         <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b" }}>Your picks are ready!</div>
                       </div>
-                      {articles.slice(0, 2).map(a => <ArticleCard key={a.id} item={a} />)}
+                      {articles.slice(0, 2).map((a, idx) => <ArticleCard key={a.id} item={a} delay={0.1 + idx * 0.18} />)}
                       <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "12px 0 10px" }}>🎥 Recommended Videos</div>
-                      {videos.slice(0, 2).map(v => <VideoCard key={v.id} item={v} />)}
+                      {videos.slice(0, 2).map((v, idx) => <VideoCard key={v.id} item={v} delay={0.46 + idx * 0.18} />)}
                       <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); setQuizHistory([]); setOtherGoal(""); }}
                         style={{ width: "100%", padding: "10px", borderRadius: "20px", border: "1px solid #e5e7eb", background: "white", color: "#374151", fontSize: "13px", cursor: "pointer", marginTop: "8px" }}>
                         Retake quiz
