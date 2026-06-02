@@ -135,7 +135,47 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
     const stored = localStorage.getItem("finheal_advisors_list");
     if (stored) {
       try {
-        setAdvisors(JSON.parse(stored));
+        const parsedAdvisors = JSON.parse(stored) as Advisor[];
+        let advisorsModified = false;
+        
+        const migratedAdvisors = parsedAdvisors.map(adv => {
+          const expectedId = adv.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+          if (adv.id !== expectedId) {
+            advisorsModified = true;
+            const oldId = adv.id;
+            
+            // Migrate all existing appointments mapped to the old ID across all users
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith("finheal_advisor_appointments:")) {
+                try {
+                  const appts = JSON.parse(localStorage.getItem(key) || "[]");
+                  let apptsModified = false;
+                  const updatedAppts = appts.map((appt: any) => {
+                    if (appt.advisorId === oldId) {
+                      apptsModified = true;
+                      return { ...appt, advisorId: expectedId, advisorName: adv.name };
+                    }
+                    return appt;
+                  });
+                  if (apptsModified) {
+                    localStorage.setItem(key, JSON.stringify(updatedAppts));
+                  }
+                } catch (e) {}
+              }
+            }
+            return { ...adv, id: expectedId };
+          }
+          return adv;
+        });
+
+        if (advisorsModified) {
+          localStorage.setItem("finheal_advisors_list", JSON.stringify(migratedAdvisors));
+          setAdvisors(migratedAdvisors);
+          window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+        } else {
+          setAdvisors(parsedAdvisors);
+        }
       } catch (e) {
         setAdvisors(advisorsData);
       }
