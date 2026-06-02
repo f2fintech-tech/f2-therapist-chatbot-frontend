@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 interface SidebarProps {
   userId: string;
   userProfile: UserProfile;
+  userEmail?: string;
   sessionId: string;
   isOpen: boolean;
   onClose: () => void;
@@ -19,11 +20,12 @@ interface SidebarProps {
   onOpenProfile: () => void;
   onOpenEducation?: () => void;
   onOpenAdvisor?: () => void;
+  onOpenAdmin?: () => void;
   onLogout?: () => void;
   initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onLogout, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -202,6 +204,15 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
   const handleOpenAdvisor = () => {
     setActiveNav("Talk to an Advisor");
     onOpenAdvisor?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenAdmin = () => {
+    setActiveNav(userEmail && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(userEmail) ? "Advisor Workspace" : "Admin Portal");
+    onOpenAdmin?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -490,6 +501,17 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
             <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
+            
+            {/* If Admin */}
+            {(userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com") && (
+              <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
+            )}
+
+            {/* If Expert */}
+            {userEmail && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(userEmail) && (
+              <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
+            )}
+
             <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={onOpenProfile} />
           </>
         )}

@@ -16,7 +16,7 @@ interface FinancialHealthTestCatalogProps {
   onViewPastResult?: (testId: string) => void;
 }
 
-type TestCard = {
+export type TestCard = {
   id: string;
   title: string;
   description: string;
@@ -45,7 +45,7 @@ const featuredTest = {
   accent: "from-[#3344e6] to-[#4f6cf7]",
 };
 
-const testCards: TestCard[] = [
+export const testCards: TestCard[] = [
   {
     id: "financial-literacy",
     title: "Money IQ Arena",
@@ -96,6 +96,7 @@ const testCards: TestCard[] = [
 export default function FinancialHealthTestCatalog({
   userId,
   isGuest = false,
+  onLoginRequired,
   onToggleSidebar,
   onToggleInsights,
   onOpenFinancialLiteracyTest,
@@ -108,6 +109,34 @@ export default function FinancialHealthTestCatalog({
   const [pastResults, setPastResults] = useState<PastResult[]>([]);
   const [showPastResults, setShowPastResults] = useState(false);
   const [showLoginGate, setShowLoginGate] = useState(false);
+  const [tests, setTests] = useState<TestCard[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("finheal_health_tests_list");
+    if (stored) {
+      try {
+        setTests(JSON.parse(stored));
+      } catch (e) {
+        setTests(testCards);
+      }
+    } else {
+      localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
+      setTests(testCards);
+    }
+
+    const handleUpdate = () => {
+      const nextStored = localStorage.getItem("finheal_health_tests_list");
+      if (nextStored) {
+        try { setTests(JSON.parse(nextStored)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("finheal:tests_update", handleUpdate);
+    return () => {
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("finheal:tests_update", handleUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const uid = userId || "anonymous";
@@ -355,7 +384,7 @@ export default function FinancialHealthTestCatalog({
           </div>
 
           <div className="grid gap-[12px] md:grid-cols-2 xl:grid-cols-2">
-            {testCards.map((test) => (
+            {tests.map((test) => (
               <Card key={test.id} className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-transform duration-200 hover:-translate-y-[2px] hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
                 <div className={`h-[5px] bg-gradient-to-r ${test.accent}`} />
                 <CardHeader className="space-y-2 px-[16px] pb-0 pt-[16px]">

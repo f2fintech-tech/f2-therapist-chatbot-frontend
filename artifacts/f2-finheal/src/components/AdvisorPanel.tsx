@@ -31,7 +31,7 @@ interface AdvisorPanelProps {
   onToggleInsights: () => void;
 }
 
-const advisorsData: Advisor[] = [
+export const advisorsData: Advisor[] = [
   {
     id: "sneha-reddy",
     name: "Sneha Reddy",
@@ -107,6 +107,34 @@ const advisorsData: Advisor[] = [
 export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights }: AdvisorPanelProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
+  const [advisors, setAdvisors] = useState<Advisor[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        setAdvisors(JSON.parse(stored));
+      } catch (e) {
+        setAdvisors(advisorsData);
+      }
+    } else {
+      localStorage.setItem("finheal_advisors_list", JSON.stringify(advisorsData));
+      setAdvisors(advisorsData);
+    }
+
+    const handleUpdate = () => {
+      const nextStored = localStorage.getItem("finheal_advisors_list");
+      if (nextStored) {
+        try { setAdvisors(JSON.parse(nextStored)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("finheal:advisors_update", handleUpdate);
+    return () => {
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("finheal:advisors_update", handleUpdate);
+    };
+  }, []);
   
   // Interactive calendar and selection states
   const [dateList, setDateList] = useState<{ dayName: string; dayNum: number; fullStr: string }[]>([]);
@@ -207,8 +235,8 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
 
   // Filtered advisor list based on specialty category
   const filteredAdvisors = activeCategory === "all" 
-    ? advisorsData 
-    : advisorsData.filter(a => a.category === activeCategory);
+    ? advisors 
+    : advisors.filter(a => a.category === activeCategory);
 
   const categories = [
     { id: "all", label: "All Experts", icon: "🧑‍💼" },
@@ -285,7 +313,7 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
             </h2>
             <div className="grid gap-[12px] sm:grid-cols-2 lg:grid-cols-3">
               {appointments.map((appt) => {
-                const advisor = advisorsData.find(a => a.id === appt.advisorId);
+                const advisor = advisors.find(a => a.id === appt.advisorId);
                 return (
                   <div key={appt.advisorId} className="bg-[linear-gradient(135deg,#ffffff_0%,#f9faff_100%)] border border-primary/20 rounded-[18px] p-[16px] shadow-sm flex flex-col justify-between hover:border-primary/40 transition">
                     <div>

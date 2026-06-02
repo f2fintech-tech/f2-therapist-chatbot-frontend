@@ -175,3 +175,14 @@ export async function saveUserProfile(userId: string, payload: BackendUserProfil
     body: JSON.stringify(payload),
   });
 }
+
+export interface BackendStats {
+  total_users: number;
+  registered_users: number;
+  guest_users: number;
+  total_conversations: number;
+}
+
+export async function fetchAdminStats(): Promise<BackendStats> {
+  return authRequest<BackendStats>("auth/admin/stats", { method: "GET" });
+}

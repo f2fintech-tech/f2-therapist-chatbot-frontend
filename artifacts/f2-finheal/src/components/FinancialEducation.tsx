@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Confetti from "react-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface ContentItem {
+export interface ContentItem {
   id: string;
   type: "video" | "article";
   title: string;
@@ -20,7 +20,7 @@ interface ContentItem {
   views?: string;
 }
 
-const CONTENT: ContentItem[] = [
+export const CONTENT: ContentItem[] = [
   { id: "a1", type: "article", title: "How to Get a Business Loan in India", source: "f2fintech.com", readTime: "6 min read", level: "Intermediate", category: "Loans", emoji: "💼", bgColor: "#E6F1FB", articleUrl: "https://f2fintech.com/blogs/blogs-businessloan", date: "Recent", description: "A complete guide to getting a business loan in India - eligibility, documents, and tips to get approved faster." },
   { id: "a2", type: "article", title: "GST 2.0 and Its Impact on Your Loans", source: "f2fintech.com", readTime: "5 min read", level: "Intermediate", category: "Loans", emoji: "📋", bgColor: "#EAF3DE", articleUrl: "https://f2fintech.com/blogs/loans-gst2.0", date: "Recent", description: "GST 2.0 changes are here - find out how they affect your loan applications and what you need to do now." },
   { id: "a3", type: "article", title: "What is an Overdraft (OD) Facility?", source: "f2fintech.com", readTime: "4 min read", level: "Beginner", category: "Credit", emoji: "🏦", bgColor: "#FAEEDA", articleUrl: "https://f2fintech.com/blogs/blog-OD", date: "Recent", description: "An overdraft facility gives you instant access to funds when you need them - without a separate loan application." },
@@ -83,6 +83,35 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     height: typeof window !== "undefined" ? window.innerHeight : 0,
   }));
   const previousProgressRef = useRef(0);
+  
+  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("finheal_education_content");
+    if (stored) {
+      try {
+        setContentItems(JSON.parse(stored));
+      } catch (e) {
+        setContentItems(CONTENT);
+      }
+    } else {
+      localStorage.setItem("finheal_education_content", JSON.stringify(CONTENT));
+      setContentItems(CONTENT);
+    }
+
+    const handleUpdate = () => {
+      const nextStored = localStorage.getItem("finheal_education_content");
+      if (nextStored) {
+        try { setContentItems(JSON.parse(nextStored)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("finheal:education_update", handleUpdate);
+    return () => {
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("finheal:education_update", handleUpdate);
+    };
+  }, []);
 
   const key = userId || "guest";
 
@@ -118,12 +147,12 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     localStorage.setItem("finheal_watched:" + key, JSON.stringify(updated));
   };
 
-  const videos = CONTENT.filter(c => c.type === "video");
-  const articles = CONTENT.filter(c => c.type === "article");
+  const videos = contentItems.filter(c => c.type === "video");
+  const articles = contentItems.filter(c => c.type === "article");
   const categories = ["All", "Financial Tips", "Loans", "Credit", "Savings", "Debt", "Tax", "Business"];
   const filteredVideos = (categoryFilter === "All" ? videos : videos.filter(v => v.category === categoryFilter)).filter(v => searchQuery === "" || v.title.toLowerCase().includes(searchQuery.toLowerCase()) || v.description.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredArticles = (categoryFilter === "All" ? articles : articles.filter(a => a.category === categoryFilter)).filter(a => searchQuery === "" || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.description.toLowerCase().includes(searchQuery.toLowerCase()));
-  const readItems = CONTENT.filter(c => c.type === "article" && read.includes(c.id));
+  const readItems = contentItems.filter(c => c.type === "article" && read.includes(c.id));
   const totalItems = articles.length + videos.length;
   const progressPct = totalItems > 0 ? Math.round(((read.length + watchedVideos.length) / totalItems) * 100) : 0;
 

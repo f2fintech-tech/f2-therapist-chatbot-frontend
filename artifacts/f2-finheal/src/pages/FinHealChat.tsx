@@ -21,6 +21,7 @@ import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
 import FinancialEducation from "@/components/FinancialEducation";
 import AdvisorPanel from "@/components/AdvisorPanel";
+import AdminPortal from "@/components/AdminPortal"; // Dynamic admin/expert workspace portal
 
 export default function FinHealChat() {
 
@@ -35,6 +36,7 @@ export default function FinHealChat() {
     if (view === "debt-balance") return "debt-balance" as const;
     if (view === "profile") return "profile" as const;
     if (view === "advisor") return "advisor" as const;
+    if (view === "admin") return "admin" as const;
     return "chat" as const;
   };
 
@@ -44,7 +46,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -201,6 +203,7 @@ export default function FinHealChat() {
   const openEducation = () => setMainView("education");
   const openProfilePage = () => setMainView("profile");
   const openAdvisor = () => setMainView("advisor");
+  const openAdmin = () => setMainView("admin");
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -234,10 +237,12 @@ export default function FinHealChat() {
     : mainView === "profile"
       ? "Settings"
       : mainView === "advisor"
-        ? "Talk to an Advisor"
-        : mainView === "education"
-          ? "Financial Education"
-          : "Financial Health Test";
+        ? "Advisor Workspace"
+        : mainView === "admin"
+          ? "Admin Portal"
+          : mainView === "education"
+            ? "Financial Education"
+            : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -283,6 +288,7 @@ export default function FinHealChat() {
         <Sidebar 
           userId={userId} 
           userProfile={userProfile}
+          userEmail={authSession.email}
           sessionId={chat.conversationId ?? "new-conversation"}
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -292,6 +298,7 @@ export default function FinHealChat() {
           onOpenProfile={openProfilePage}
           onOpenEducation={openEducation}
           onOpenAdvisor={openAdvisor}
+          onOpenAdmin={openAdmin}
           onLogout={handleLogout}
           initialActiveNav={activeSidebarNav}
         />
@@ -391,6 +398,13 @@ export default function FinHealChat() {
         ) : mainView === "advisor" ? (
           <AdvisorPanel
             userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
+          />
+        ) : mainView === "admin" ? (
+          <AdminPortal
+            userId={userId}
+            userEmail={authSession.email || ""}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
           />
