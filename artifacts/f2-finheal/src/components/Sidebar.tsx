@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
@@ -18,11 +18,12 @@ interface SidebarProps {
   onOpenFinancialHealthTests: () => void;
   onOpenProfile: () => void;
   onOpenEducation?: () => void;
+  onOpenAdvisor?: () => void;
   onLogout?: () => void;
   initialActiveNav: string;
 }
 
-export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onLogout, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onLogout, initialActiveNav }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -192,6 +193,15 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
   const handleOpenFinancialHealthTests = () => {
     setActiveNav("Financial Health Test");
     onOpenFinancialHealthTests();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenAdvisor = () => {
+    setActiveNav("Talk to an Advisor");
+    onOpenAdvisor?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -479,7 +489,7 @@ export default function Sidebar({ userId, userProfile, sessionId, isOpen, onClos
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
-            <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={() => setActiveNav("Talk to an Advisor")} />
+            <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
             <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={onOpenProfile} />
           </>
         )}
