@@ -339,29 +339,78 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   );
 
   return (
-    <main style={{ flex: 1, overflowY: "auto", background: "#f9fafb", borderRadius: "20px", border: "1px solid #e5e7eb" }}>
-      {showConfetti && viewport.width > 0 && viewport.height > 0 && (
-        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}>
-          <Confetti
-            width={viewport.width}
-            height={viewport.height}
-            recycle={false}
-            numberOfPieces={420}
-            gravity={0.18}
-            tweenDuration={7000}
-            colors={["#3344e6", "#7c3aed", "#10b981", "#f59e0b", "#ef4444"]}
-          />
+    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
+      {/* HEADER SECTION */}
+      <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">📚 Financial Education</div>
+          <div className="text-[10px] text-gray-400 sm:text-[11px]">✨ Your journey to smarter money decisions starts here</div>
         </div>
-      )}
-      <div style={{ padding: "20px 24px 0", borderBottom: "1px solid #f3f4f6", background: "white", borderRadius: "20px 20px 0 0" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-          <div>
-            <div style={{ fontSize: "20px", fontWeight: 800, color: "#1e1b4b" }}>📚 Financial Education</div>
-            <div style={{ fontSize: "13px", color: "#6b7280" }}>✨ Your journey to smarter money decisions starts here</div>
+
+        {onToggleSidebar && (
+          <div className="flex items-center gap-[8px]">
+            <div className="flex items-center bg-gray-100 rounded-[20px] px-[14px] py-[6px] border border-gray-200 gap-[6px]">
+              <span className="text-[13px] text-gray-400">🔍</span>
+              <input 
+                placeholder="Search articles & videos..." 
+                value={searchQuery} 
+                onChange={e => setSearchQuery(e.target.value)} 
+                className="border-none bg-transparent outline-none text-[12px] text-gray-700 w-[160px]" 
+              />
+            </div>
           </div>
-          {onToggleSidebar && <div style={{ display: "flex", alignItems: "center", gap: "8px" }}><div style={{ display: "flex", alignItems: "center", background: "#f3f4f6", borderRadius: "20px", padding: "6px 14px", border: "1px solid #e5e7eb", gap: "6px" }}><span style={{ fontSize: "13px", color: "#9ca3af" }}>🔍</span><input placeholder="Search articles & videos..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ border: "none", background: "transparent", outline: "none", fontSize: "12px", color: "#374151", width: "160px" }} /></div></div>}
-        </div>
-        <div style={{ margin: "14px 0 10px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "14px", padding: "12px 16px" }}>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px] scrollbar-thin">
+        {showConfetti && viewport.width > 0 && viewport.height > 0 && (
+          <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}>
+            <Confetti
+              width={viewport.width}
+              height={viewport.height}
+              recycle={false}
+              numberOfPieces={420}
+              gravity={0.18}
+              tweenDuration={7000}
+              colors={["#3344e6", "#7c3aed", "#10b981", "#f59e0b", "#ef4444"]}
+            />
+          </div>
+        )}
+
+        {/* BANNER PROMO */}
+        <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px] mb-[20px]">
+          <div className="absolute right-[-24px] top-[-24px] h-[120px] w-[120px] rounded-full bg-gradient-to-br from-primary to-[#7c8cff] opacity-10" />
+          <div className="relative z-10 max-w-[640px]">
+            <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
+              Learning Hub
+            </div>
+            <h1 className="font-serif text-[28px] leading-[1.1] text-gray-900 sm:text-[34px]">
+              Master your money with structured learning.
+            </h1>
+            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-gray-600 sm:text-[14px]">
+              Explore expert-curated articles, video guides, and interactive quizzes to build your financial intelligence.
+            </p>
+            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">📖 Articles & Guides</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🎥 Expert Videos</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🧠 Interactive Quizzes</span>
+            </div>
+          </div>
+        </section>
+
+        {/* PROGRESS BAR */}
+        <div style={{ margin: "0 0 16px", background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", padding: "16px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>📊 Your learning progress</span>
             <span style={{ fontSize: "12px", fontWeight: 800, color: progressPct === 100 ? "#10b981" : "#3344e6" }}>{progressPct}%</span>
@@ -374,8 +423,10 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             <span style={{ fontSize: "10px", color: progressPct === 100 ? "#10b981" : "#9ca3af" }}>{progressPct === 100 ? "All done!" : (totalItems - read.length - watchedVideos.length) + " remaining"}</span>
           </div>
         </div>
+
+        {/* ARTICLES READ HISTORY */}
         <div onClick={() => setHistoryOpen(!historyOpen)}
-          style={{ background: historyOpen ? "linear-gradient(135deg,#f5f3ff,#ede9fe)" : "linear-gradient(135deg,#f9fafb,#f3f4f6)", border: "2px solid " + (historyOpen ? "#7c3aed" : "#e5e7eb"), borderRadius: "16px", padding: "14px 18px", cursor: "pointer", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" }}>
+          style={{ background: historyOpen ? "linear-gradient(135deg,#f5f3ff,#ede9fe)" : "linear-gradient(135deg,#f9fafb,#f3f4f6)", border: "2px solid " + (historyOpen ? "#7c3aed" : "#e5e7eb"), borderRadius: "16px", padding: "14px 18px", cursor: "pointer", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" }}>
           <div>
             <div style={{ fontSize: "11px", color: "#6b7280" }}>📄 Articles read</div>
             <div style={{ fontSize: "28px", fontWeight: 900, color: "#7c3aed", lineHeight: 1 }}>{read.length} <span style={{ fontSize: "14px", color: "#9ca3af", fontWeight: 400 }}>/ {articles.length}</span></div>
@@ -391,7 +442,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.15 }}
-            style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "12px", overflow: "hidden" }}>
+            style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "16px", overflow: "hidden" }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles read & Videos watched</span>
               <button onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px" }}>✕ Close</button>
@@ -426,7 +477,9 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           </motion.div>
         )}
         </AnimatePresence>
-        <div style={{ display: "flex", gap: "4px" }}>
+
+        {/* TABS MENU */}
+        <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", marginBottom: "16px" }}>
           {(["all", "articles", "videos", "quiz"]).map(t => (
             <motion.button 
               whileHover={{ backgroundColor: tab === t ? "#3344e6" : "#f3f4f6" }}
@@ -437,9 +490,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
             </motion.button>
           ))}
         </div>
-      </div>
 
-      <div style={{ padding: "20px 24px" }}>
+      <div style={{ paddingTop: "14px" }}>
         {(tab === "all" || tab === "articles" || tab === "videos") && (
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
             {categories.map(c => (
@@ -558,6 +610,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
         )}
           </motion.div>
         </AnimatePresence>
+      </div>
       </div>
     </main>
   );
