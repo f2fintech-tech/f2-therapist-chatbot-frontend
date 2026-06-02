@@ -354,8 +354,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">📚 Financial Education</div>
-          <div className="text-[10px] text-gray-400 sm:text-[11px]">✨ Your journey to smarter money decisions starts here</div>
+          <div className="text-[13px] font-bold text-gray-900 sm:text-[20px]">📚 Financial Education</div>
+          <div className="text-[10px] text-gray-400 sm:text-[15px]">✨ Your journey to smarter money decisions starts here.......</div>
         </div>
 
         {onToggleSidebar && (
