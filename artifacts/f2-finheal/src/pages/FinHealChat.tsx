@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -20,6 +20,7 @@ import { fetchHearts } from "@/lib/backendAuth";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
 import FinancialEducation from "@/components/FinancialEducation";
+import AdvisorPanel from "@/components/AdvisorPanel";
 
 export default function FinHealChat() {
 
@@ -33,6 +34,7 @@ export default function FinHealChat() {
     if (view === "credit-readiness") return "credit-readiness" as const;
     if (view === "debt-balance") return "debt-balance" as const;
     if (view === "profile") return "profile" as const;
+    if (view === "advisor") return "advisor" as const;
     return "chat" as const;
   };
 
@@ -42,7 +44,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -198,6 +200,7 @@ export default function FinHealChat() {
   const openTestCatalog = () => setMainView("tests");
   const openEducation = () => setMainView("education");
   const openProfilePage = () => setMainView("profile");
+  const openAdvisor = () => setMainView("advisor");
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -230,7 +233,11 @@ export default function FinHealChat() {
     ? "Talk to FinHeal"
     : mainView === "profile"
       ? "Settings"
-      : "Financial Health Test";
+      : mainView === "advisor"
+        ? "Talk to an Advisor"
+        : mainView === "education"
+          ? "Financial Education"
+          : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -283,7 +290,8 @@ export default function FinHealChat() {
           onStartNewChat={openFreshChat}
           onOpenFinancialHealthTests={openTestCatalog}
           onOpenProfile={openProfilePage}
-            onOpenEducation={openEducation}
+          onOpenEducation={openEducation}
+          onOpenAdvisor={openAdvisor}
           onLogout={handleLogout}
           initialActiveNav={activeSidebarNav}
         />
@@ -379,6 +387,12 @@ export default function FinHealChat() {
             email={authSession.email}
             onBackToChat={openChatView}
             onSaveProfile={handleProfileSave}
+          />
+        ) : mainView === "advisor" ? (
+          <AdvisorPanel
+            userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
           />
         ) : (
           <DebtBalanceReviewView
