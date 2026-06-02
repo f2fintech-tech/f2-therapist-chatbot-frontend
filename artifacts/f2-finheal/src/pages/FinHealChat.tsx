@@ -121,6 +121,7 @@ export default function FinHealChat() {
       setCurrentMoodDims(null);
       setMainView("chat");
       setShowWelcome(true);
+      window.localStorage.removeItem("finheal_quiz_dismissed_time");
     }
   };
 
@@ -141,15 +142,12 @@ export default function FinHealChat() {
   }, [authSession, refreshHearts]);
 
   const handleLogout = () => {
-    const wasGuest = authSession?.isGuest ?? false;
     clearStoredAuthSession();
     setAuthSession(null);
-    if (wasGuest) {
-      window.localStorage.removeItem("finheal_quiz_completed");
-      window.localStorage.removeItem("finheal_user_tier");
-      window.localStorage.removeItem("finheal_quiz_score");
-      window.localStorage.removeItem("finheal_quiz_dismissed_time");
-    }
+    window.localStorage.removeItem("finheal_quiz_completed");
+    window.localStorage.removeItem("finheal_user_tier");
+    window.localStorage.removeItem("finheal_quiz_score");
+    window.localStorage.removeItem("finheal_quiz_dismissed_time");
     setCurrentMoodDims(null);
     setSidebarOpen(false);
     setInsightsOpen(false);

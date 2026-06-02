@@ -488,7 +488,8 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
             </p>
             <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">💬 45 Min Consultation</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🎓 SEBI / CFP Certified</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🛡️ Verified Experts</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">⭐ 4.9/5 Advisor Rating</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🔒 Private & Confidential</span>
             </div>
           </div>
