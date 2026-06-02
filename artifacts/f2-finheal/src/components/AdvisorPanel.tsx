@@ -14,6 +14,7 @@ export interface Advisor {
   reviewsCount: number;
   nextSlot: string;
   category: "tax" | "wealth" | "debt" | "property" | "insurance";
+  fee: number; // Consultation fee in INR per session
 }
 
 interface Appointment {
@@ -23,6 +24,11 @@ interface Appointment {
   time: string; // e.g., "11:00 AM"
   notes?: string;
   bookedAt: string;
+  completed?: boolean;
+  rating?: number;
+  feedback?: string;
+  meetUrl?: string; // Pre-setup Google Meet URL
+  joined?: boolean; // Unlocks rating once user clicks Join Call
 }
 
 interface AdvisorPanelProps {
@@ -44,7 +50,8 @@ export const advisorsData: Advisor[] = [
     rating: 4.9,
     reviewsCount: 142,
     nextSlot: "Today, 02:00 PM",
-    category: "debt"
+    category: "debt",
+    fee: 899
   },
   {
     id: "aradhya-sharma",
@@ -58,7 +65,8 @@ export const advisorsData: Advisor[] = [
     rating: 4.8,
     reviewsCount: 189,
     nextSlot: "Tomorrow, 10:00 AM",
-    category: "tax"
+    category: "tax",
+    fee: 999
   },
   {
     id: "vikram-malhotra",
@@ -72,7 +80,8 @@ export const advisorsData: Advisor[] = [
     rating: 4.9,
     reviewsCount: 210,
     nextSlot: "June 4, 11:30 AM",
-    category: "wealth"
+    category: "wealth",
+    fee: 1499
   },
   {
     id: "rohan-mehta",
@@ -86,7 +95,8 @@ export const advisorsData: Advisor[] = [
     rating: 4.7,
     reviewsCount: 96,
     nextSlot: "Today, 04:30 PM",
-    category: "property"
+    category: "property",
+    fee: 799
   },
   {
     id: "priya-nair",
@@ -100,9 +110,21 @@ export const advisorsData: Advisor[] = [
     rating: 4.9,
     reviewsCount: 115,
     nextSlot: "June 5, 09:30 AM",
-    category: "insurance"
+    category: "insurance",
+    fee: 1199
   }
 ];
+
+export const categories = [
+  { id: "all", label: "All Experts", icon: "🧑‍💼" },
+  { id: "wealth", label: "Wealth & Investing", icon: "📈" },
+  { id: "tax", label: "Tax & Retirement", icon: "💰" },
+  { id: "debt", label: "Debt & Credit", icon: "⚠️" },
+  { id: "property", label: "Real Estate", icon: "🏠" },
+  { id: "insurance", label: "Insurance", icon: "🛡️" }
+];
+
+export const timeSlots = ["09:30 AM", "11:00 AM", "01:30 PM", "03:00 PM", "04:30 PM", "06:00 PM"];
 
 export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights }: AdvisorPanelProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -147,6 +169,86 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
   // Load saved appointments from local storage
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
+  // Derived active and past appointments list
+  const activeAppointments = appointments.filter(a => !a.completed);
+  const pastAppointments = appointments.filter(a => a.completed);
+
+  // Paywall & Simulated secure gateway states
+  const [checkoutActive, setCheckoutActive] = useState<boolean>(false);
+  const [paymentSelected, setPaymentSelected] = useState<"upi" | "card" | "netbanking">("upi");
+  const [upiSelected, setUpiSelected] = useState<"gpay" | "phonepe" | "paytm">("gpay");
+  const [paymentProcessing, setPaymentProcessing] = useState<boolean>(false);
+  const [bankingStatus, setBankingStatus] = useState("Connecting to secure payment gateway...");
+
+  // Star Rating & Feedback Modal States
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [ratingAppt, setRatingAppt] = useState<Appointment | null>(null);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [userFeedbackText, setUserFeedbackText] = useState<string>("");
+
+  const ratingDescriptions: Record<number, string> = {
+    1: "Disappointing 😟",
+    2: "Mediocre 😐",
+    3: "Helpful 🙂",
+    4: "Great Consultation! 😄",
+    5: "Outstanding! 🏆"
+  };
+
+  const handleOpenFeedbackModal = (appt: Appointment) => {
+    setRatingAppt(appt);
+    setUserRating(0);
+    setHoverRating(0);
+    setUserFeedbackText("");
+    setFeedbackModalOpen(true);
+  };
+
+  const handleSubmitFeedback = () => {
+    if (!ratingAppt) return;
+    if (userRating === 0) {
+      alert("Please select a rating of at least 1 star.");
+      return;
+    }
+
+    // 1. Update appointment inside appointments list
+    const updatedAppointments = appointments.map(appt => {
+      if (appt.advisorId === ratingAppt.advisorId && appt.bookedAt === ratingAppt.bookedAt) {
+        return {
+          ...appt,
+          completed: true,
+          rating: userRating,
+          feedback: userFeedbackText.trim()
+        };
+      }
+      return appt;
+    });
+    saveAppointments(updatedAppointments);
+
+    // 2. Update advisor's average rating in local storage
+    const updatedAdvisors = advisors.map(adv => {
+      if (adv.id === ratingAppt.advisorId) {
+        const count = adv.reviewsCount;
+        const currentAvg = adv.rating;
+        const newAvg = parseFloat(((currentAvg * count + userRating) / (count + 1)).toFixed(1));
+        return {
+          ...adv,
+          reviewsCount: count + 1,
+          rating: newAvg
+        };
+      }
+      return adv;
+    });
+
+    setAdvisors(updatedAdvisors);
+    localStorage.setItem("finheal_advisors_list", JSON.stringify(updatedAdvisors));
+    window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+
+    setFeedbackModalOpen(false);
+    setRatingAppt(null);
+    setUserRating(0);
+    setUserFeedbackText("");
+  };
+
   useEffect(() => {
     const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
     const stored = localStorage.getItem(storageKey);
@@ -188,9 +290,52 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
     localStorage.setItem(storageKey, JSON.stringify(newAppts));
   };
 
+  // Get only available time slots (hiding past times for Today)
+  const getFilteredTimeSlots = () => {
+    if (!dateList.length || selectedDateStr !== dateList[0].fullStr) {
+      return timeSlots; // Not today, all slots available
+    }
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    return timeSlots.filter((slot) => {
+      // Parse "HH:MM AM/PM"
+      const [timePart, meridiem] = slot.split(" ");
+      let [hoursStr, minutesStr] = timePart.split(":");
+      let hours = parseInt(hoursStr, 10);
+      const minutes = parseInt(minutesStr, 10);
+
+      if (meridiem === "PM" && hours !== 12) {
+        hours += 12;
+      } else if (meridiem === "AM" && hours === 12) {
+        hours = 0;
+      }
+
+      if (hours > currentHour) return true;
+      if (hours === currentHour && minutes > currentMinute) return true;
+      return false;
+    });
+  };
+
+  const activeTimeSlots = getFilteredTimeSlots();
+
+  // Keep time slot selection valid when switching dates
+  useEffect(() => {
+    const slots = getFilteredTimeSlots();
+    if (slots.length > 0) {
+      if (!slots.includes(selectedTimeSlot)) {
+        setSelectedTimeSlot(slots[0]);
+      }
+    } else {
+      setSelectedTimeSlot("");
+    }
+  }, [selectedDateStr, selectedAdvisor]);
+
   const handleOpenBooking = (advisor: Advisor) => {
     setSelectedAdvisor(advisor);
-    setSelectedTimeSlot("10:00 AM"); // Default first slot
+    setSelectedTimeSlot(""); // Will be auto-set to first future slot by effect
     setUserNotes("");
     setBookingConfirmed(false);
   };
@@ -198,6 +343,14 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
   const handleCloseBooking = () => {
     setSelectedAdvisor(null);
     setBookingConfirmed(false);
+    setCheckoutActive(false);
+    setPaymentProcessing(false);
+  };
+
+  const generateMeetUrl = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyz";
+    const part = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `https://meet.google.com/${part(3)}-${part(4)}-${part(3)}`;
   };
 
   const handleConfirmBooking = () => {
@@ -209,7 +362,9 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
       date: selectedDateStr,
       time: selectedTimeSlot,
       notes: userNotes.trim(),
-      bookedAt: new Date().toISOString()
+      bookedAt: new Date().toISOString(),
+      meetUrl: generateMeetUrl(),
+      joined: false
     };
 
     // Filter out any previous appointment with the same advisor to replace it, or append
@@ -219,11 +374,58 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
 
     setConfirmedApptDetails(newAppt);
     setBookingConfirmed(true);
+
+    window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
     
     // Auto reset modal after a brief wow factor
     setTimeout(() => {
       handleCloseBooking();
     }, 4500);
+  };
+
+  useEffect(() => {
+    if (!paymentProcessing) {
+      setBankingStatus("Connecting to secure payment gateway...");
+      return;
+    }
+    const timer1 = setTimeout(() => {
+      setBankingStatus("Verifying 3D-Secure credentials with your bank...");
+    }, 800);
+    const timer2 = setTimeout(() => {
+      setBankingStatus("Settling UPI merchant transaction securely...");
+    }, 1600);
+    const timer3 = setTimeout(() => {
+      setBankingStatus("Confirming appointment slot in real-time...");
+    }, 2400);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, [paymentProcessing]);
+
+  const handlePayAndComplete = () => {
+    setPaymentProcessing(true);
+    setTimeout(() => {
+      handleConfirmBooking();
+    }, 3000);
+  };
+
+  const handleJoinCall = (appt: Appointment) => {
+    if (!appt.meetUrl) return;
+    window.open(appt.meetUrl, "_blank");
+
+    if (!appt.joined) {
+      const updated = appointments.map((a) => {
+        if (a.advisorId === appt.advisorId && a.bookedAt === appt.bookedAt) {
+          return { ...a, joined: true };
+        }
+        return a;
+      });
+      saveAppointments(updated);
+      window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+    }
   };
 
   const handleCancelAppointment = (advisorId: string) => {
@@ -238,16 +440,7 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
     ? advisors 
     : advisors.filter(a => a.category === activeCategory);
 
-  const categories = [
-    { id: "all", label: "All Experts", icon: "🧑‍💼" },
-    { id: "wealth", label: "Wealth & Investing", icon: "📈" },
-    { id: "tax", label: "Tax & Retirement", icon: "💰" },
-    { id: "debt", label: "Debt & Credit", icon: "⚠️" },
-    { id: "property", label: "Real Estate", icon: "🏠" },
-    { id: "insurance", label: "Insurance", icon: "🛡️" }
-  ];
 
-  const timeSlots = ["09:30 AM", "11:00 AM", "01:30 PM", "03:00 PM", "04:30 PM", "06:00 PM"];
 
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
@@ -302,17 +495,17 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
         </section>
 
         {/* UPCOMING APPOINTMENTS SECTION */}
-        {appointments.length > 0 && (
+        {activeAppointments.length > 0 && (
           <section className="mt-[20px] animate-fade-up">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-primary mb-[10px] flex items-center gap-[6px]">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
               </span>
-              Your Scheduled Consultations ({appointments.length})
+              Your Scheduled Consultations ({activeAppointments.length})
             </h2>
             <div className="grid gap-[12px] sm:grid-cols-2 lg:grid-cols-3">
-              {appointments.map((appt) => {
+              {activeAppointments.map((appt) => {
                 const advisor = advisors.find(a => a.id === appt.advisorId);
                 return (
                   <div key={appt.advisorId} className="bg-[linear-gradient(135deg,#ffffff_0%,#f9faff_100%)] border border-primary/20 rounded-[18px] p-[16px] shadow-sm flex flex-col justify-between hover:border-primary/40 transition">
@@ -345,20 +538,34 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                         )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-[8px] mt-[4px]">
-                      <button
-                        onClick={() => handleCancelAppointment(appt.advisorId)}
-                        className="flex-1 py-[8px] rounded-[10px] text-[11px] font-bold border border-rose-100 text-rose-600 hover:bg-rose-50/50 transition cursor-pointer"
-                      >
-                        Cancel Call
-                      </button>
-                      <button
-                        onClick={() => alert("The virtual conference room opens 5 minutes before your scheduled slot. We've sent a link to your email!")}
-                        className="flex-1 py-[8px] rounded-[10px] text-[11px] font-bold bg-primary text-white hover:opacity-90 transition cursor-pointer"
-                      >
-                        Join Call
-                      </button>
+ 
+                    <div className="space-y-[8px] mt-[4px]">
+                      <div className="flex items-center gap-[8px]">
+                        <button
+                          onClick={() => handleCancelAppointment(appt.advisorId)}
+                          className="flex-1 py-[8px] rounded-[10px] text-[11px] font-bold border border-rose-100 text-rose-600 hover:bg-rose-50/50 transition cursor-pointer"
+                        >
+                          Cancel Call
+                        </button>
+                        <button
+                          onClick={() => handleJoinCall(appt)}
+                          className="flex-1 py-[8px] rounded-[10px] text-[11px] font-bold bg-primary text-white hover:opacity-90 transition cursor-pointer"
+                        >
+                          Join Call
+                        </button>
+                      </div>
+                      {appt.joined ? (
+                        <button
+                          onClick={() => handleOpenFeedbackModal(appt)}
+                          className="w-full py-[8.5px] rounded-[10px] text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition cursor-pointer flex items-center justify-center gap-[4px] shadow-sm shadow-emerald-50/20 animate-fade-in"
+                        >
+                          <span>✓</span> Complete & Rate Session
+                        </button>
+                      ) : (
+                        <div className="w-full text-center py-[8.5px] text-[10.5px] font-bold text-gray-400 bg-gray-50 rounded-[10px] border border-gray-100/60 select-none">
+                          🔒 Rate unlocks once you Join Call
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -367,6 +574,63 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
           </section>
         )}
 
+        {/* PAST CONSULTATIONS HISTORY */}
+        {pastAppointments.length > 0 && (
+          <section className="mt-[24px] animate-fade-up">
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400 mb-[10px] flex items-center gap-[6px]">
+              📜 Past Consultations History ({pastAppointments.length})
+            </h2>
+            <div className="grid gap-[12px] sm:grid-cols-2 lg:grid-cols-3">
+              {pastAppointments.map((appt, idx) => {
+                const advisor = advisors.find(a => a.id === appt.advisorId);
+                return (
+                  <div key={idx} className="bg-gray-50/50 border border-gray-200 rounded-[18px] p-[16px] flex flex-col justify-between hover:bg-gray-50 transition">
+                    <div>
+                      <div className="flex items-center gap-[10px] mb-[10px]">
+                        <img 
+                          src={advisor?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60"} 
+                          alt={appt.advisorName}
+                          className="w-[40px] h-[40px] rounded-full object-cover grayscale opacity-75 border"
+                        />
+                        <div>
+                          <div className="text-[13px] font-bold text-gray-700">{appt.advisorName}</div>
+                          <div className="text-[10px] text-gray-400">{advisor?.designation}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white border border-gray-100 rounded-[12px] p-[10px] mb-[8px]">
+                        <div className="flex items-center justify-between text-[11px] mb-[2px]">
+                          <span className="text-gray-400 font-medium">Session Date:</span>
+                          <span className="text-gray-600 font-bold">{appt.date}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-400 font-medium">Time Slot:</span>
+                          <span className="text-gray-500 font-semibold">{appt.time}</span>
+                        </div>
+                      </div>
+
+                      {/* Display stars and feedback */}
+                      <div className="bg-amber-50/40 border border-amber-100/50 rounded-[12px] p-[10px]">
+                        <div className="flex items-center gap-[4px] text-[11px] font-bold text-amber-600 mb-[4px]">
+                          <span>{"★".repeat(appt.rating || 0)}</span>
+                          <span className="text-[10px] font-semibold text-gray-500">({appt.rating}/5 stars)</span>
+                        </div>
+                        {appt.feedback ? (
+                          <div className="text-[11px] text-gray-600 italic">
+                            &quot;{appt.feedback}&quot;
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic">No text review submitted.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+ 
         {/* CATEGORY FILTERS */}
         <section className="mt-[24px]">
           <div className="mb-[12px]">
@@ -389,17 +653,17 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
             ))}
           </div>
         </section>
-
+ 
         {/* EXPERTS LIST GRID */}
         <section className="mt-[20px]">
           <div className="mb-[14px] flex items-center justify-between">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400">Our Trusted Advisors</h2>
             <div className="text-[11px] text-gray-400 font-medium">Showing {filteredAdvisors.length} active experts</div>
           </div>
-
+ 
           <div className="grid gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
             {filteredAdvisors.map((advisor) => {
-              const activeAppt = appointments.find(a => a.advisorId === advisor.id);
+              const activeAppt = activeAppointments.find(a => a.advisorId === advisor.id);
               
               return (
                 <Card 
@@ -489,7 +753,7 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                             </button>
                           </div>
                           <button
-                            onClick={() => alert("The virtual conference room opens 5 minutes before your scheduled slot. We've sent a link to your email!")}
+                            onClick={() => handleJoinCall(activeAppt)}
                             className="w-full bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer text-center"
                           >
                             Join Call Room
@@ -499,8 +763,10 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                         /* Standard Book Appointment Button */
                         <>
                           <div className="text-left">
-                            <div className="text-[9.5px] text-gray-400 uppercase tracking-[0.5px]">Next Slot</div>
-                            <div className="text-[11px] font-bold text-gray-800">{advisor.nextSlot}</div>
+                            <div className="text-[9.5px] text-gray-400 uppercase tracking-[0.5px]">Next Slot • Fee</div>
+                            <div className="text-[11px] font-bold text-gray-800">
+                              {advisor.nextSlot} • <span className="text-primary font-extrabold">₹{advisor.fee}</span>
+                            </div>
                           </div>
                           <button
                             onClick={() => handleOpenBooking(advisor)}
@@ -558,6 +824,214 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                 >
                   Awesome, got it!
                 </button>
+              </div>
+            ) : checkoutActive ? (
+              /* Simulated Premium Payment Gateway Panel */
+              <div className="relative flex flex-col h-full animate-fade-in">
+                
+                {/* Secure Processing Overlay */}
+                {paymentProcessing && (
+                  <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-[24px] text-center animate-fade-in">
+                    {/* Pulsing secure lock animation */}
+                    <div className="relative flex items-center justify-center mb-[18px]">
+                      <div className="absolute inline-flex h-[80px] w-[80px] rounded-full bg-primary/10 animate-ping opacity-75" />
+                      <div className="relative h-[64px] w-[64px] rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center text-[24px]">
+                        🔒
+                      </div>
+                    </div>
+                    <h4 className="text-[15px] font-bold text-gray-900 mb-[6px]">Processing Payment...</h4>
+                    <p className="text-[12px] text-primary font-semibold animate-pulse">{bankingStatus}</p>
+                    <div className="mt-[20px] w-[140px] h-[4px] bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary animate-loading-bar rounded-full opacity-75" style={{ width: "65%" }} />
+                    </div>
+                    <div className="mt-[16px] text-[10px] text-gray-400 font-medium">PCI-DSS Compliant • 256-bit SSL Encryption</div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-gradient-to-r from-primary/5 to-transparent">
+                  <div className="flex items-center gap-[10px]">
+                    <span className="text-[18px]">💳</span>
+                    <div>
+                      <h3 className="text-[14px] font-bold text-gray-900">Secure Checkout</h3>
+                      <p className="text-[10.5px] font-semibold text-gray-400 leading-none">Consultation with {selectedAdvisor.name}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseBooking}
+                    className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+                    aria-label="Close checkout"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-[20px] space-y-[16px] overflow-y-auto max-h-[60vh] scrollbar-thin">
+                  
+                  {/* Order summary banner */}
+                  <div className="bg-[#f6f7fe] border border-[#eef0fd] rounded-[16px] p-[14px]">
+                    <div className="flex items-center gap-[12px]">
+                      <img 
+                        src={selectedAdvisor.avatarUrl} 
+                        alt={selectedAdvisor.name}
+                        className="w-[44px] h-[44px] rounded-xl object-cover border-2 border-white shadow-sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <strong className="text-[13px] text-gray-900 block leading-tight">{selectedAdvisor.name}</strong>
+                        <span className="text-[10.5px] text-gray-500 block mt-[2px]">{selectedAdvisor.designation}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-[10px] pt-[10px] border-t border-gray-100 grid grid-cols-2 gap-y-[4px] text-[11.5px] text-gray-600">
+                      <div>Date: <strong className="text-gray-950">{selectedDateStr}</strong></div>
+                      <div className="text-right">Slot: <strong className="text-primary">{selectedTimeSlot}</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Pricing Breakdown */}
+                  <div className="space-y-[6px] border-b border-gray-100 pb-[12px]">
+                    <div className="flex justify-between text-[12px] text-gray-500">
+                      <span>Hourly Consultation Fee</span>
+                      <span className="font-semibold text-gray-800">₹{selectedAdvisor.fee}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-gray-400">
+                      <span>CGST (9%)</span>
+                      <span>₹{(selectedAdvisor.fee * 0.09).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-gray-400">
+                      <span>SGST (9%)</span>
+                      <span>₹{(selectedAdvisor.fee * 0.09).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-[13px] text-gray-950 font-bold pt-[6px] border-t border-dashed border-gray-100">
+                      <span>Total Amount Payable</span>
+                      <span className="text-primary text-[14px]">₹{(selectedAdvisor.fee * 1.18).toFixed(0)}</span>
+                    </div>
+                  </div>
+
+                  {/* Payment Selectors */}
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[8px]">
+                      Choose Payment Method
+                    </label>
+                    <div className="grid grid-cols-3 gap-[8px]">
+                      {[
+                        { id: "upi", label: "📱 UPI / GPay" },
+                        { id: "card", label: "💳 Card" },
+                        { id: "netbanking", label: "🏦 Netbanking" }
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setPaymentSelected(opt.id as any)}
+                          className={`py-[10px] px-[4px] rounded-[12px] text-[11.5px] font-bold text-center border transition cursor-pointer flex flex-col items-center justify-center gap-[4px] ${
+                            paymentSelected === opt.id
+                              ? "bg-primary/5 border-primary text-primary"
+                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sub-panels based on payment choice */}
+                  <div className="bg-gray-50/50 border border-gray-200 rounded-[16px] p-[12px] min-h-[110px] flex items-center justify-center">
+                    
+                    {paymentSelected === "upi" && (
+                      <div className="w-full text-center space-y-[8px] animate-fade-in">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Select UPI Application</span>
+                        <div className="flex justify-center gap-[12px]">
+                          {[
+                            { id: "gpay", label: "Google Pay", icon: "🟢" },
+                            { id: "phonepe", label: "PhonePe", icon: "🟣" },
+                            { id: "paytm", label: "Paytm", icon: "🔵" }
+                          ].map((upi) => (
+                            <button
+                              key={upi.id}
+                              type="button"
+                              onClick={() => setUpiSelected(upi.id as any)}
+                              className={`px-[12px] py-[6px] rounded-[8px] text-[11px] font-bold border transition cursor-pointer flex items-center gap-[4px] ${
+                                upiSelected === upi.id
+                                  ? "bg-white border-primary text-primary shadow-xs"
+                                  : "bg-transparent border-gray-200 text-gray-500 hover:bg-white"
+                              }`}
+                            >
+                              <span>{upi.icon}</span>
+                              <span>{upi.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="yourname@okhdfcbank"
+                          defaultValue={`${userId.split("@")[0] || "user"}@paytm`}
+                          className="w-full max-w-[280px] mx-auto block text-center px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11.5px] mt-[10px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
+                        />
+                      </div>
+                    )}
+
+                    {paymentSelected === "card" && (
+                      <div className="w-full space-y-[10px] animate-fade-in text-left">
+                        <div className="space-y-[4px]">
+                          <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Card Number</label>
+                          <input
+                            type="text"
+                            placeholder="4111 2222 3333 4444"
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11.5px] focus:outline-none focus:border-primary font-medium"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-[8px]">
+                          <div className="space-y-[4px]">
+                            <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Expiry Date</label>
+                            <input
+                              type="text"
+                              placeholder="MM/YY"
+                              className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11.5px] focus:outline-none focus:border-primary font-medium text-center"
+                            />
+                          </div>
+                          <div className="space-y-[4px]">
+                            <label className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[0.5px] block">CVV</label>
+                            <input
+                              type="password"
+                              placeholder="***"
+                              maxLength={3}
+                              className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11.5px] focus:outline-none focus:border-primary font-medium text-center"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentSelected === "netbanking" && (
+                      <div className="w-full text-center space-y-[8px] animate-fade-in">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Select Your Bank</span>
+                        <select className="w-full max-w-[280px] mx-auto block px-[10px] py-[8px] border border-gray-300 rounded-[8px] text-[12px] bg-white focus:outline-none focus:border-primary font-semibold text-gray-700">
+                          <option>HDFC Bank</option>
+                          <option>ICICI Bank</option>
+                          <option>State Bank of India (SBI)</option>
+                          <option>Axis Bank</option>
+                          <option>Kotak Mahindra Bank</option>
+                        </select>
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px] shrink-0">
+                  <button
+                    onClick={() => setCheckoutActive(false)}
+                    className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  >
+                    Back to Form
+                  </button>
+                  <button
+                    onClick={handlePayAndComplete}
+                    className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 transition cursor-pointer shadow-md shadow-primary/10 flex items-center justify-center gap-[4px]"
+                  >
+                    <span>🔒 Pay ₹{(selectedAdvisor.fee * 1.18).toFixed(0)}</span>
+                  </button>
+                </div>
               </div>
             ) : (
               /* Core Booking Selection Form */
@@ -618,19 +1092,26 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                       Available Time Slots (IST)
                     </label>
                     <div className="grid grid-cols-3 gap-[8px]">
-                      {timeSlots.map((slot) => (
-                        <button
-                          key={slot}
-                          onClick={() => setSelectedTimeSlot(slot)}
-                          className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition cursor-pointer ${
-                            selectedTimeSlot === slot
-                              ? "bg-primary/10 border-primary text-primary font-bold"
-                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                          }`}
-                        >
-                          {slot}
-                        </button>
-                      ))}
+                      {activeTimeSlots.length === 0 ? (
+                        <div className="col-span-3 text-center py-[16px] bg-amber-50/70 border border-amber-100/60 rounded-[14px]">
+                          <span className="text-[12px] font-bold text-amber-700">⚠️ No slots remaining today. Please select a future date.</span>
+                        </div>
+                      ) : (
+                        activeTimeSlots.map((slot) => (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => setSelectedTimeSlot(slot)}
+                            className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition cursor-pointer ${
+                              selectedTimeSlot === slot
+                                ? "bg-primary/10 border-primary text-primary font-bold"
+                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {slot}
+                          </button>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -658,14 +1139,124 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
                     Cancel
                   </button>
                   <button
-                    onClick={handleConfirmBooking}
+                    onClick={() => {
+                      if (!selectedTimeSlot) {
+                        alert("Please select a time slot first.");
+                        return;
+                      }
+                      setCheckoutActive(true);
+                    }}
                     className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 transition cursor-pointer shadow-md shadow-primary/10"
                   >
-                    Confirm Booking
+                    Proceed to Payment
                   </button>
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK & STAR RATING MODAL */}
+      {feedbackModalOpen && ratingAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[460px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.25)] border border-gray-100 overflow-hidden animate-fade-up-fast flex flex-col">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-gradient-to-r from-amber-50/50 to-emerald-50/30">
+              <div className="flex items-center gap-[10px]">
+                <span className="text-[20px]">⭐</span>
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-900">Rate Consultation Session</h3>
+                  <p className="text-[10.5px] font-semibold text-gray-400 leading-none">Share your feedback on {ratingAppt.advisorName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setFeedbackModalOpen(false)}
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+                aria-label="Close feedback modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[24px] space-y-[18px]">
+              <div className="text-center">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[1px] block mb-[8px]">
+                  How was your call with {ratingAppt.advisorName}?
+                </span>
+                
+                {/* 5-Star Interactive Selector */}
+                <div className="flex justify-center gap-[14px] my-[12px]">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      onClick={() => setUserRating(star)}
+                      className="text-[38px] cursor-pointer transition-all duration-150 hover:scale-120 border-none bg-transparent outline-none focus:outline-none select-none p-0"
+                      aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                    >
+                      <span 
+                        className={`transition-colors duration-150 ${
+                          star <= (hoverRating || userRating) 
+                            ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]" 
+                            : "text-gray-200"
+                        }`}
+                      >
+                        ★
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Rating description visual feedback */}
+                <div className="h-[20px]">
+                  {userRating > 0 ? (
+                    <span className="text-[12.5px] font-bold text-primary bg-[#eef0fd] px-[12px] py-[4px] rounded-full animate-fade-in">
+                      {ratingDescriptions[userRating]}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-gray-400 italic">Select a star rating to complete the consultation</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Text review field */}
+              <div className="space-y-[6px]">
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block">
+                  Write a Short Review (Optional)
+                </label>
+                <textarea
+                  value={userFeedbackText}
+                  onChange={(e) => setUserFeedbackText(e.target.value)}
+                  placeholder="e.g. Sneha was incredibly clear and helped me identify three immediate structural tax deductions. High-value call!"
+                  rows={3}
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-gray-400 leading-relaxed"
+                />
+              </div>
+            </div>
+
+            {/* Modal submit footer */}
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button
+                onClick={() => setFeedbackModalOpen(false)}
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitFeedback}
+                disabled={userRating === 0}
+                className={`flex-1 py-[11px] font-bold rounded-[12px] text-[12px] transition shadow-md ${
+                  userRating > 0
+                    ? "bg-primary text-white hover:opacity-90 cursor-pointer shadow-primary/10"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                }`}
+              >
+                Submit Feedback
+              </button>
+            </div>
           </div>
         </div>
       )}
