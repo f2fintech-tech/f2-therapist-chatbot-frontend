@@ -220,8 +220,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                   <a href={"https://www.youtube.com/shorts/" + playingShort} target="_blank" rel="noopener noreferrer"
                     style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,0,0,0.92)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
                     <svg width="14" height="10" viewBox="0 0 24 17" fill="white" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z"/>
-                      <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000"/>
+                      <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z" />
+                      <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000" />
                     </svg>
                     <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>YouTube</span>
                   </a>
@@ -308,7 +308,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   );
 
   const ArticleCard = ({ item }: { item: ContentItem }) => (
-    <motion.a 
+    <motion.a
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
@@ -362,11 +362,11 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           <div className="flex items-center gap-[8px]">
             <div className="flex items-center bg-gray-100 rounded-[20px] px-[14px] py-[6px] border border-gray-200 gap-[6px]">
               <span className="text-[13px] text-gray-400">🔍</span>
-              <input 
-                placeholder="Search articles & videos..." 
-                value={searchQuery} 
-                onChange={e => setSearchQuery(e.target.value)} 
-                className="border-none bg-transparent outline-none text-[12px] text-gray-700 w-[160px]" 
+              <input
+                placeholder="Search articles & videos..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="border-none bg-transparent outline-none text-[12px] text-gray-700 w-[160px]"
               />
             </div>
           </div>
@@ -436,52 +436,52 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           </div>
         </div>
         <AnimatePresence>
-        {historyOpen && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "16px", overflow: "hidden" }}>
-            <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles read & Videos watched</span>
-              <button onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px" }}>✕ Close</button>
-            </div>
-            {readItems.length === 0 ? (
-              <div style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>Nothing here yet - start reading!</div>
-            ) : readItems.map(item => (
-              <div key={item.id} style={{ display: "flex", gap: "10px", padding: "10px 14px", borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
-                <div style={{ width: "36px", height: "36px", background: item.bgColor, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{item.emoji}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
-                  <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.readTime}</div>
-                </div>
-                <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#3344e6", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#eef0fd", padding: "4px 10px", borderRadius: "20px" }}>↗ Re-read</a>
+          {historyOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e1b4b" }}>Articles read & Videos watched</span>
+                <button onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px" }}>✕ Close</button>
               </div>
-            ))}
-            {watchedVideos.length > 0 && (
-              <div style={{ padding: "8px 14px", background: "#f9fafb", borderTop: "1px solid #f3f4f6" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#1e1b4b", marginBottom: "6px" }}>🎥 Videos Watched</div>
-                {videos.filter(v => watchedVideos.includes(v.id)).map(item => (
-                  <div key={item.id} style={{ display: "flex", gap: "10px", padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
-                    <div style={{ width: "36px", height: "36px", background: item.bgColor, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{item.emoji}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
-                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.duration}</div>
-                    </div>
-                    <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#ff0000", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#fff0f0", padding: "4px 10px", borderRadius: "20px" }}>▶ Watch</a>
+              {readItems.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>Nothing here yet - start reading!</div>
+              ) : readItems.map(item => (
+                <div key={item.id} style={{ display: "flex", gap: "10px", padding: "10px 14px", borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
+                  <div style={{ width: "36px", height: "36px", background: item.bgColor, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{item.emoji}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.readTime}</div>
                   </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
+                  <a href={item.articleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#3344e6", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#eef0fd", padding: "4px 10px", borderRadius: "20px" }}>↗ Re-read</a>
+                </div>
+              ))}
+              {watchedVideos.length > 0 && (
+                <div style={{ padding: "8px 14px", background: "#f9fafb", borderTop: "1px solid #f3f4f6" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#1e1b4b", marginBottom: "6px" }}>🎥 Videos Watched</div>
+                  {videos.filter(v => watchedVideos.includes(v.id)).map(item => (
+                    <div key={item.id} style={{ display: "flex", gap: "10px", padding: "8px 0", borderBottom: "1px solid #f3f4f6", alignItems: "center" }}>
+                      <div style={{ width: "36px", height: "36px", background: item.bgColor, borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{item.emoji}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
+                        <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.duration}</div>
+                      </div>
+                      <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#ff0000", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#fff0f0", padding: "4px 10px", borderRadius: "20px" }}>▶ Watch</a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* TABS MENU */}
         <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", marginBottom: "16px" }}>
           {(["all", "articles", "videos", "quiz"]).map(t => (
-            <motion.button 
+            <motion.button
               whileHover={{ backgroundColor: tab === t ? "#3344e6" : "#f3f4f6" }}
               whileTap={{ scale: 0.95 }}
               key={t} onClick={() => setTab(t as "all" | "articles" | "videos" | "quiz")}
@@ -491,126 +491,126 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           ))}
         </div>
 
-      <div style={{ paddingTop: "14px" }}>
-        {(tab === "all" || tab === "articles" || tab === "videos") && (
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
-            {categories.map(c => (
-              <button key={c} onClick={() => setCategoryFilter(c)}
-                style={{ padding: "5px 14px", borderRadius: "20px", border: "1px solid", fontSize: "12px", cursor: "pointer", borderColor: categoryFilter === c ? "#3344e6" : "#e5e7eb", background: categoryFilter === c ? "#3344e6" : "white", color: categoryFilter === c ? "white" : "#374151" }}>
-                {c === "All" ? "✨ All" : c === "Financial Tips" ? "💡 Financial Tips" : c === "Loans" ? "💼 Loans" : c === "Credit" ? "💳 Credit" : c === "Savings" ? "🏦 Savings" : c === "Debt" ? "📉 Debt" : c === "Tax" ? "🧾 Tax" : c === "Business" ? "🏢 Business" : c}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.15 }}
-          >
-        {tab === "all" && (
-          <>
-            <div style={{ background: "linear-gradient(135deg,#eef0fd,#f5f3ff)", border: "1px solid #d4d8fa", borderRadius: "16px", padding: "16px", marginBottom: "20px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 800, color: "#1e1b4b", marginBottom: "4px" }}>🎯 Get personalised content</div>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>Take our 2-min quiz and get content matched to your financial situation.</div>
-              <button onClick={() => setTab("quiz")} style={{ padding: "8px 20px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>🚀 Take quiz</button>
-            </div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px" }}>📰 Latest articles</div>
-            {filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
-          </>
-        )}
-
-        {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
-
-        {tab === "videos" && (
-          <>
-            {categoryFilter === "Financial Tips" ? (
-              <FinancialTipsColumn />
-            ) : (
-              <>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
-                {filteredVideos.map(v => <VideoCard key={v.id} item={v} />)}
-              </>
-            )}
-          </>
-        )}
-
-        {tab === "quiz" && (
-          <>
-            {!quizStarted && !quizDone && (
-              <div style={{ textAlign: "center", padding: "24px 0" }}>
-                <div style={{ fontSize: "48px", marginBottom: "12px" }}>🧠</div>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: "#1e1b4b", marginBottom: "8px" }}>2-minute financial quiz</div>
-                <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "20px" }}>Answer 4 quick questions and get articles matched to your exact financial situation.</div>
-                <div style={{ display: "flex", justifyContent: "center", gap: "8px", margin: "16px 0", flexWrap: "wrap" }}>
-                  <span style={{ background: "#eef0fd", color: "#3344e6", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>⚡ 2 minutes</span>
-                  <span style={{ background: "#EAF3DE", color: "#27500A", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>🎯 Personalised</span>
-                  <span style={{ background: "#FAEEDA", color: "#633806", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>🆓 Free</span>
-                </div>
-                <button onClick={() => setQuizStarted(true)} style={{ padding: "12px 32px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>🚀 Start quiz</button>
-              </div>
-            )}
-            {quizStarted && !quizDone && (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>Question {qIdx + 1} of {QUIZ_QUESTIONS.length}</span>
-                  <span style={{ fontSize: "12px", color: "#3344e6", fontWeight: 600 }}>{Math.round(((qIdx + 1) / QUIZ_QUESTIONS.length) * 100)}%</span>
-                </div>
-                <div style={{ height: "6px", background: "#e5e7eb", borderRadius: "999px", marginBottom: "20px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: (((qIdx + 1) / QUIZ_QUESTIONS.length) * 100) + "%", background: "linear-gradient(90deg,#3344e6,#7c3aed)", borderRadius: "999px", transition: "width 0.4s" }} />
-                </div>
-                <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b", marginBottom: "16px" }}>{QUIZ_QUESTIONS[qIdx].q}</div>
-                {QUIZ_QUESTIONS[qIdx].opts.map(opt => (
-                  <button key={opt} onClick={() => setSelected(opt)}
-                    style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: "12px", border: "2px solid " + (selected === opt ? "#3344e6" : "#e5e7eb"), background: selected === opt ? "#eef0fd" : "white", fontSize: "13px", cursor: "pointer", color: "#374151", marginBottom: "10px", fontWeight: selected === opt ? 600 : 400 }}>
-                    {opt}
-                  </button>
-                ))}
-                {qIdx + 1 === QUIZ_QUESTIONS.length && selected === "Other - I will describe my goal" && (
-                  <textarea
-                    placeholder="Describe your financial goal or requirement..."
-                    value={otherGoal}
-                    onChange={e => setOtherGoal(e.target.value)}
-                    style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "2px solid #3344e6", fontSize: "13px", color: "#374151", marginBottom: "10px", minHeight: "80px", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
-                  />
-                )}
-                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                  {quizHistory.length > 0 && (
-                    <button onClick={() => { const prev = quizHistory[quizHistory.length - 1]; setQuizHistory(h => h.slice(0, -1)); setQIdx(prev); setSelected(null); setOtherGoal(""); }}
-                      style={{ padding: "12px 20px", borderRadius: "20px", background: "white", color: "#374151", border: "1.5px solid #e5e7eb", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>
-                      Back
-                    </button>
-                  )}
-                  <button onClick={() => { if (!selected) return; if (qIdx + 1 >= QUIZ_QUESTIONS.length) setQuizDone(true); else { setQuizHistory(h => [...h, qIdx]); setQIdx(qIdx + 1); setSelected(null); setOtherGoal(""); } }} disabled={!selected}
-                    style={{ flex: 1, padding: "12px", borderRadius: "20px", background: selected ? "#3344e6" : "#e5e7eb", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: selected ? "pointer" : "not-allowed" }}>
-                    {qIdx + 1 === QUIZ_QUESTIONS.length ? "See my results" : "Next"}
-                  </button>
-                </div>
-              </div>
-            )}
-            {quizDone && (
-              <div>
-                <div style={{ textAlign: "center", background: "linear-gradient(135deg,#eef0fd,#f5f3ff)", borderRadius: "16px", padding: "20px", marginBottom: "20px" }}>
-                  <div style={{ fontSize: "40px", marginBottom: "8px" }}>🎉</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b" }}>Your picks are ready!</div>
-                </div>
-                {articles.slice(0, 2).map(a => <ArticleCard key={a.id} item={a} />)}
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "12px 0 10px" }}>🎥 Recommended Videos</div>
-                {videos.slice(0, 2).map(v => <VideoCard key={v.id} item={v} />)}
-                <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); setQuizHistory([]); setOtherGoal(""); }}
-                  style={{ width: "100%", padding: "10px", borderRadius: "20px", border: "1px solid #e5e7eb", background: "white", color: "#374151", fontSize: "13px", cursor: "pointer", marginTop: "8px" }}>
-                  Retake quiz
+        <div style={{ paddingTop: "14px" }}>
+          {(tab === "all" || tab === "articles" || tab === "videos") && (
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
+              {categories.map(c => (
+                <button key={c} onClick={() => setCategoryFilter(c)}
+                  style={{ padding: "5px 14px", borderRadius: "20px", border: "1px solid", fontSize: "12px", cursor: "pointer", borderColor: categoryFilter === c ? "#3344e6" : "#e5e7eb", background: categoryFilter === c ? "#3344e6" : "white", color: categoryFilter === c ? "white" : "#374151" }}>
+                  {c === "All" ? "✨ All" : c === "Financial Tips" ? "💡 Financial Tips" : c === "Loans" ? "💼 Loans" : c === "Credit" ? "💳 Credit" : c === "Savings" ? "🏦 Savings" : c === "Debt" ? "📉 Debt" : c === "Tax" ? "🧾 Tax" : c === "Business" ? "🏢 Business" : c}
                 </button>
-              </div>
-            )}
-          </>
-        )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+              ))}
+            </div>
+          )}
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.15 }}
+            >
+              {tab === "all" && (
+                <>
+                  <div style={{ background: "linear-gradient(135deg,#eef0fd,#f5f3ff)", border: "1px solid #d4d8fa", borderRadius: "16px", padding: "16px", marginBottom: "20px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#1e1b4b", marginBottom: "4px" }}>🎯 Get personalised content</div>
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>Take our 2-min quiz and get content matched to your financial situation.</div>
+                    <button onClick={() => setTab("quiz")} style={{ padding: "8px 20px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>🚀 Take quiz</button>
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px" }}>📰 Latest articles</div>
+                  {filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
+                </>
+              )}
+
+              {tab === "articles" && filteredArticles.map(a => <ArticleCard key={a.id} item={a} />)}
+
+              {tab === "videos" && (
+                <>
+                  {categoryFilter === "Financial Tips" ? (
+                    <FinancialTipsColumn />
+                  ) : (
+                    <>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
+                      {filteredVideos.map(v => <VideoCard key={v.id} item={v} />)}
+                    </>
+                  )}
+                </>
+              )}
+
+              {tab === "quiz" && (
+                <>
+                  {!quizStarted && !quizDone && (
+                    <div style={{ textAlign: "center", padding: "24px 0" }}>
+                      <div style={{ fontSize: "48px", marginBottom: "12px" }}>🧠</div>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: "#1e1b4b", marginBottom: "8px" }}>2-minute financial quiz</div>
+                      <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "20px" }}>Answer 4 quick questions and get articles matched to your exact financial situation.</div>
+                      <div style={{ display: "flex", justifyContent: "center", gap: "8px", margin: "16px 0", flexWrap: "wrap" }}>
+                        <span style={{ background: "#eef0fd", color: "#3344e6", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>⚡ 2 minutes</span>
+                        <span style={{ background: "#EAF3DE", color: "#27500A", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>🎯 Personalised</span>
+                        <span style={{ background: "#FAEEDA", color: "#633806", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: 500 }}>🆓 Free</span>
+                      </div>
+                      <button onClick={() => setQuizStarted(true)} style={{ padding: "12px 32px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>🚀 Start quiz</button>
+                    </div>
+                  )}
+                  {quizStarted && !quizDone && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "12px", color: "#6b7280" }}>Question {qIdx + 1} of {QUIZ_QUESTIONS.length}</span>
+                        <span style={{ fontSize: "12px", color: "#3344e6", fontWeight: 600 }}>{Math.round(((qIdx + 1) / QUIZ_QUESTIONS.length) * 100)}%</span>
+                      </div>
+                      <div style={{ height: "6px", background: "#e5e7eb", borderRadius: "999px", marginBottom: "20px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: (((qIdx + 1) / QUIZ_QUESTIONS.length) * 100) + "%", background: "linear-gradient(90deg,#3344e6,#7c3aed)", borderRadius: "999px", transition: "width 0.4s" }} />
+                      </div>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b", marginBottom: "16px" }}>{QUIZ_QUESTIONS[qIdx].q}</div>
+                      {QUIZ_QUESTIONS[qIdx].opts.map(opt => (
+                        <button key={opt} onClick={() => setSelected(opt)}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: "12px", border: "2px solid " + (selected === opt ? "#3344e6" : "#e5e7eb"), background: selected === opt ? "#eef0fd" : "white", fontSize: "13px", cursor: "pointer", color: "#374151", marginBottom: "10px", fontWeight: selected === opt ? 600 : 400 }}>
+                          {opt}
+                        </button>
+                      ))}
+                      {qIdx + 1 === QUIZ_QUESTIONS.length && selected === "Other - I will describe my goal" && (
+                        <textarea
+                          placeholder="Describe your financial goal or requirement..."
+                          value={otherGoal}
+                          onChange={e => setOtherGoal(e.target.value)}
+                          style={{ width: "100%", padding: "12px 16px", borderRadius: "12px", border: "2px solid #3344e6", fontSize: "13px", color: "#374151", marginBottom: "10px", minHeight: "80px", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+                        />
+                      )}
+                      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                        {quizHistory.length > 0 && (
+                          <button onClick={() => { const prev = quizHistory[quizHistory.length - 1]; setQuizHistory(h => h.slice(0, -1)); setQIdx(prev); setSelected(null); setOtherGoal(""); }}
+                            style={{ padding: "12px 20px", borderRadius: "20px", background: "white", color: "#374151", border: "1.5px solid #e5e7eb", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>
+                            Back
+                          </button>
+                        )}
+                        <button onClick={() => { if (!selected) return; if (qIdx + 1 >= QUIZ_QUESTIONS.length) setQuizDone(true); else { setQuizHistory(h => [...h, qIdx]); setQIdx(qIdx + 1); setSelected(null); setOtherGoal(""); } }} disabled={!selected}
+                          style={{ flex: 1, padding: "12px", borderRadius: "20px", background: selected ? "#3344e6" : "#e5e7eb", color: "white", border: "none", fontSize: "14px", fontWeight: 700, cursor: selected ? "pointer" : "not-allowed" }}>
+                          {qIdx + 1 === QUIZ_QUESTIONS.length ? "See my results" : "Next"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {quizDone && (
+                    <div>
+                      <div style={{ textAlign: "center", background: "linear-gradient(135deg,#eef0fd,#f5f3ff)", borderRadius: "16px", padding: "20px", marginBottom: "20px" }}>
+                        <div style={{ fontSize: "40px", marginBottom: "8px" }}>🎉</div>
+                        <div style={{ fontSize: "16px", fontWeight: 800, color: "#1e1b4b" }}>Your picks are ready!</div>
+                      </div>
+                      {articles.slice(0, 2).map(a => <ArticleCard key={a.id} item={a} />)}
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "12px 0 10px" }}>🎥 Recommended Videos</div>
+                      {videos.slice(0, 2).map(v => <VideoCard key={v.id} item={v} />)}
+                      <button onClick={() => { setQuizStarted(false); setQuizDone(false); setQIdx(0); setSelected(null); setQuizHistory([]); setOtherGoal(""); }}
+                        style={{ width: "100%", padding: "10px", borderRadius: "20px", border: "1px solid #e5e7eb", background: "white", color: "#374151", fontSize: "13px", cursor: "pointer", marginTop: "8px" }}>
+                        Retake quiz
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </main>
   );
