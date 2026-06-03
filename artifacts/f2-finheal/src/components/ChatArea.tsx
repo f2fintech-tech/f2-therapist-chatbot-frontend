@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
@@ -48,9 +48,13 @@ export default function ChatArea({
   onClearPrefill,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
-  useEffect(() => { if (prefillMessage?.text) { setInputValue(prefillMessage.text); } }, [prefillMessage]);
   const [isRecording, setIsRecording] = useState(false);
-  useEffect(() => { if (prefillMessage?.text) { setInputValue(prefillMessage.text); } }, [prefillMessage]);
+  useEffect(() => {
+    if (prefillMessage?.text) {
+      setInputValue(prefillMessage.text);
+      onClearPrefill?.();
+    }
+  }, [prefillMessage, onClearPrefill]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);

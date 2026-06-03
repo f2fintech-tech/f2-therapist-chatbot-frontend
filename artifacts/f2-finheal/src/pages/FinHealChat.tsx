@@ -226,12 +226,12 @@ export default function FinHealChat() {
     const messageText = `I would like to apply for a ${loanType} of ${formattedAmount} at an interest rate of ${rate}% for a tenure of ${tenure} years. Could you please guide me on the next steps, eligibility criteria, and documents required?`;
 
     setMainView("chat");
-    void chat.startNewChatWithMessage(messageText);
+    setPrefillMessage({ text: messageText, card: "" });
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       closeSidebar();
     }
-  }, [chat]);
+  }, []);
 
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
