@@ -23,6 +23,11 @@ export interface BackendUserProfile {
   dateOfBirth?: string | null;
   gender?: string | null;
   maritalStatus?: string | null;
+  financial_goal?: string | null;
+  financial_stress?: string | null;
+  risk_tolerance?: string | null;
+  monthly_income?: string | null;
+  therapy_style?: string | null;
 }
 
 export interface BackendUserProfileUpdate {
@@ -35,6 +40,11 @@ export interface BackendUserProfileUpdate {
   dateOfBirth?: string | null;
   gender?: string | null;
   maritalStatus?: string | null;
+  financial_goal?: string | null;
+  financial_stress?: string | null;
+  risk_tolerance?: string | null;
+  monthly_income?: string | null;
+  therapy_style?: string | null;
 }
 
 const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();

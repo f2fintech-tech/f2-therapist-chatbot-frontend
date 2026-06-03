@@ -551,7 +551,6 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             aria-label="Open profile page"
           >
             <div className="text-[13px] font-semibold text-gray-800">{userProfile.displayName}</div>
-            <div className="text-[11px] text-gray-400">{userProfile.userTier || "Standard"} Member</div>
           </button>
           <DropdownMenuTrigger asChild>
             <button
