@@ -217,9 +217,9 @@ export default function LoanCalculatorView({
 
   // State definitions for sub-calculators
   // Tab 1: EMI Calculator Inputs
-  const [emiAmount, setEmiAmount] = useState<number>(activeConfig.defaultAmount);
-  const [emiRate, setEmiRate] = useState<number>(activeConfig.defaultRate);
-  const [emiTenure, setEmiTenure] = useState<number>(activeConfig.defaultTenure);
+  const [emiAmount, setEmiAmount] = useState<number | "">(activeConfig.defaultAmount);
+  const [emiRate, setEmiRate] = useState<number | "">(activeConfig.defaultRate);
+  const [emiTenure, setEmiTenure] = useState<number | "">(activeConfig.defaultTenure);
   const [emiOptimize, setEmiOptimize] = useState<boolean>(false);
   const [showAmortization, setShowAmortization] = useState<boolean>(false);
   const [expandedYear, setExpandedYear] = useState<number | null>(null);
@@ -235,10 +235,10 @@ export default function LoanCalculatorView({
   }, [activeConfig]);
 
   // Tab 2: Eligibility Calculator Inputs
-  const [eligIncome, setEligIncome] = useState<number>(Math.round(100000 * currencyScale));
-  const [eligEmi, setEligEmi] = useState<number>(Math.round(10000 * currencyScale));
-  const [eligRate, setEligRate] = useState<number>(9.5);
-  const [eligTenure, setEligTenure] = useState<number>(20);
+  const [eligIncome, setEligIncome] = useState<number | "">(Math.round(100000 * currencyScale));
+  const [eligEmi, setEligEmi] = useState<number | "">(Math.round(10000 * currencyScale));
+  const [eligRate, setEligRate] = useState<number | "">(9.5);
+  const [eligTenure, setEligTenure] = useState<number | "">(20);
 
   // Sync eligibility default amounts on currency scale shifts
   useEffect(() => {
@@ -247,13 +247,13 @@ export default function LoanCalculatorView({
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
-  const [compAmountA, setCompAmountA] = useState<number>(Math.round(2000000 * currencyScale));
-  const [compRateA, setCompRateA] = useState<number>(8.5);
-  const [compTenureA, setCompTenureA] = useState<number>(20);
+  const [compAmountA, setCompAmountA] = useState<number | "">(Math.round(2000000 * currencyScale));
+  const [compRateA, setCompRateA] = useState<number | "">(8.5);
+  const [compTenureA, setCompTenureA] = useState<number | "">(20);
 
-  const [compAmountB, setCompAmountB] = useState<number>(Math.round(2000000 * currencyScale));
-  const [compRateB, setCompRateB] = useState<number>(9.2);
-  const [compTenureB, setCompTenureB] = useState<number>(15);
+  const [compAmountB, setCompAmountB] = useState<number | "">(Math.round(2000000 * currencyScale));
+  const [compRateB, setCompRateB] = useState<number | "">(9.2);
+  const [compTenureB, setCompTenureB] = useState<number | "">(15);
 
   useEffect(() => {
     setCompAmountA(Math.round(2000000 * currencyScale));
@@ -261,12 +261,12 @@ export default function LoanCalculatorView({
   }, [currencyScale]);
 
   // Tab 4: Prepayment Inputs
-  const [prepAmount, setPrepAmount] = useState<number>(activeConfig.defaultAmount);
-  const [prepRate, setPrepRate] = useState<number>(activeConfig.defaultRate);
-  const [prepTenure, setPrepTenure] = useState<number>(activeConfig.defaultTenure);
+  const [prepAmount, setPrepAmount] = useState<number | "">(activeConfig.defaultAmount);
+  const [prepRate, setPrepRate] = useState<number | "">(activeConfig.defaultRate);
+  const [prepTenure, setPrepTenure] = useState<number | "">(activeConfig.defaultTenure);
   const [prepType, setPrepType] = useState<"lump" | "monthly">("monthly");
-  const [prepVal, setPrepVal] = useState<number>(Math.round(10000 * currencyScale));
-  const [prepStartMonth, setPrepStartMonth] = useState<number>(12);
+  const [prepVal, setPrepVal] = useState<number | "">(Math.round(10000 * currencyScale));
+  const [prepStartMonth, setPrepStartMonth] = useState<number | "">(12);
 
   useEffect(() => {
     setPrepAmount(activeConfig.defaultAmount);
@@ -278,20 +278,24 @@ export default function LoanCalculatorView({
 
   // Calculations for Tab 1: EMI
   const emiCalculations = useMemo(() => {
-    const monthlyRate = emiRate / 12 / 100;
-    const totalMonths = emiTenure * 12;
+    const amountVal = Number(emiAmount) || 0;
+    const rateVal = Number(emiRate) || 0;
+    const tenureVal = Number(emiTenure) || 0;
+
+    const monthlyRate = rateVal / 12 / 100;
+    const totalMonths = tenureVal * 12;
 
     const emi =
       monthlyRate === 0
-        ? emiAmount / totalMonths
-        : (emiAmount * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
+        ? totalMonths === 0 ? 0 : amountVal / totalMonths
+        : (amountVal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
           (Math.pow(1 + monthlyRate, totalMonths) - 1);
 
     const standardTotalPayable = emi * totalMonths;
-    const standardTotalInterest = standardTotalPayable - emiAmount;
+    const standardTotalInterest = standardTotalPayable - amountVal;
 
     // Simulation for one extra EMI per year optimization
-    let balance = emiAmount;
+    let balance = amountVal;
     let totalInterestPaid = 0;
     let monthsElapsed = 0;
     const extraPaymentPerYear = emi;
@@ -326,7 +330,7 @@ export default function LoanCalculatorView({
       });
     }
 
-    const optimizedTotalPayable = emiAmount + totalInterestPaid;
+    const optimizedTotalPayable = amountVal + totalInterestPaid;
     const interestSaved = Math.max(0, standardTotalInterest - totalInterestPaid);
     const monthsSaved = Math.max(0, totalMonths - monthsElapsed);
 
@@ -365,7 +369,7 @@ export default function LoanCalculatorView({
     // Donut chart calculations
     const radius = 70;
     const circumference = 2 * Math.PI * radius;
-    const principalPct = (emiAmount / activeTotalPayable) * 100 || 0;
+    const principalPct = (amountVal / activeTotalPayable) * 100 || 0;
     const interestPct = (activeTotalInterest / activeTotalPayable) * 100 || 0;
 
     return {
@@ -388,13 +392,18 @@ export default function LoanCalculatorView({
 
   // Calculations for Tab 2: Eligibility
   const eligCalculations = useMemo(() => {
+    const incomeVal = Number(eligIncome) || 0;
+    const emiVal = Number(eligEmi) || 0;
+    const rateVal = Number(eligRate) || 0;
+    const tenureVal = Number(eligTenure) || 0;
+
     // Standard lending standard: Max 50% Fixed Obligation to Income Ratio (FOIR)
     const maxFoirPct = 50;
-    const affordableMonthlyObligation = eligIncome * (maxFoirPct / 100);
-    const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - eligEmi);
+    const affordableMonthlyObligation = incomeVal * (maxFoirPct / 100);
+    const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - emiVal);
 
-    const monthlyRate = eligRate / 12 / 100;
-    const totalMonths = eligTenure * 12;
+    const monthlyRate = rateVal / 12 / 100;
+    const totalMonths = tenureVal * 12;
 
     let eligibleAmount = 0;
     if (maxEmiAllowed > 0 && monthlyRate > 0) {
@@ -405,8 +414,8 @@ export default function LoanCalculatorView({
       eligibleAmount = maxEmiAllowed * totalMonths;
     }
 
-    const currentFoir = eligIncome > 0 ? ((eligEmi + maxEmiAllowed) / eligIncome) * 100 : 0;
-    const baseFoir = eligIncome > 0 ? (eligEmi / eligIncome) * 100 : 0;
+    const currentFoir = incomeVal > 0 ? ((emiVal + maxEmiAllowed) / incomeVal) * 100 : 0;
+    const baseFoir = incomeVal > 0 ? (emiVal / incomeVal) * 100 : 0;
 
     // Safety assessment
     let riskLevel: "low" | "medium" | "high" = "low";
@@ -424,12 +433,20 @@ export default function LoanCalculatorView({
 
   // Calculations for Tab 3: Comparison
   const compCalculations = useMemo(() => {
+    const amtAVal = Number(compAmountA) || 0;
+    const rateAVal = Number(compRateA) || 0;
+    const tenureAVal = Number(compTenureA) || 0;
+
+    const amtBVal = Number(compAmountB) || 0;
+    const rateBVal = Number(compRateB) || 0;
+    const tenureBVal = Number(compTenureB) || 0;
+
     const calculateSingle = (amt: number, r: number, ten: number) => {
       const monthlyRate = r / 12 / 100;
       const totalMonths = ten * 12;
       const emi =
         monthlyRate === 0
-          ? amt / totalMonths
+          ? totalMonths === 0 ? 0 : amt / totalMonths
           : (amt * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
             (Math.pow(1 + monthlyRate, totalMonths) - 1);
       const totalPayable = emi * totalMonths;
@@ -442,8 +459,8 @@ export default function LoanCalculatorView({
       };
     };
 
-    const loanA = calculateSingle(compAmountA, compRateA, compTenureA);
-    const loanB = calculateSingle(compAmountB, compRateB, compTenureB);
+    const loanA = calculateSingle(amtAVal, rateAVal, tenureAVal);
+    const loanB = calculateSingle(amtBVal, rateBVal, tenureBVal);
 
     const emiDiff = Math.abs(loanA.emi - loanB.emi);
     const interestDiff = Math.abs(loanA.totalInterest - loanB.totalInterest);
@@ -463,21 +480,27 @@ export default function LoanCalculatorView({
 
   // Calculations for Tab 4: Prepayment Simulation
   const prepCalculations = useMemo(() => {
-    const monthlyRate = prepRate / 12 / 100;
-    const totalMonths = prepTenure * 12;
+    const amountVal = Number(prepAmount) || 0;
+    const rateVal = Number(prepRate) || 0;
+    const tenureVal = Number(prepTenure) || 0;
+    const prepValNum = Number(prepVal) || 0;
+    const startMonthVal = Number(prepStartMonth) || 1;
+
+    const monthlyRate = rateVal / 12 / 100;
+    const totalMonths = tenureVal * 12;
 
     // Base Loan EMI
     const emi =
       monthlyRate === 0
-        ? prepAmount / totalMonths
-        : (prepAmount * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
+        ? totalMonths === 0 ? 0 : amountVal / totalMonths
+        : (amountVal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
           (Math.pow(1 + monthlyRate, totalMonths) - 1);
 
     const standardTotalPayable = emi * totalMonths;
-    const standardTotalInterest = standardTotalPayable - prepAmount;
+    const standardTotalInterest = standardTotalPayable - amountVal;
 
     // Simulate prepayment payoff
-    let balance = prepAmount;
+    let balance = amountVal;
     let totalInterestPaid = 0;
     let monthsElapsed = 0;
 
@@ -487,11 +510,11 @@ export default function LoanCalculatorView({
       let principalForMonth = emi - interestForMonth;
 
       // Apply extra prepayments
-      if (monthsElapsed >= prepStartMonth) {
+      if (monthsElapsed >= startMonthVal) {
         if (prepType === "monthly") {
-          principalForMonth += prepVal;
-        } else if (prepType === "lump" && monthsElapsed === prepStartMonth) {
-          principalForMonth += prepVal;
+          principalForMonth += prepValNum;
+        } else if (prepType === "lump" && monthsElapsed === startMonthVal) {
+          principalForMonth += prepValNum;
         }
       }
 
@@ -514,7 +537,7 @@ export default function LoanCalculatorView({
       totalMonths,
       interestSaved: Math.round(interestSaved),
       monthsSaved,
-      percentageReduced: (monthsSaved / totalMonths) * 100,
+      percentageReduced: totalMonths === 0 ? 0 : (monthsSaved / totalMonths) * 100,
     };
   }, [prepAmount, prepRate, prepTenure, prepType, prepVal, prepStartMonth]);
 
@@ -523,29 +546,35 @@ export default function LoanCalculatorView({
     let detailsStr = "";
     if (calcType === "emi") {
       detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
-        `Amount: ${formatCurrency(emiAmount)}, Rate: ${emiRate}%, Tenure: ${emiTenure} years. ` +
+        `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
         `EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo. ` +
         `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
         (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
     } else if (calcType === "eligibility") {
       detailsStr = `Checked Loan Eligibility & Affordability. ` +
-        `Monthly income: ${formatCurrency(eligIncome)}, existing monthly debt EMIs: ${formatCurrency(eligEmi)}. ` +
-        `Interest rate: ${eligRate}%, Tenure: ${eligTenure} years. ` +
+        `Monthly income: ${formatCurrency(Number(eligIncome) || 0)}, existing monthly debt EMIs: ${formatCurrency(Number(eligEmi) || 0)}. ` +
+        `Interest rate: ${Number(eligRate) || 0}%, Tenure: ${Number(eligTenure) || 0} years. ` +
         `Calculated maximum affordable EMI: ${formatCurrency(eligCalculations.maxEmiAllowed)} and total loan eligibility: ${formatCurrency(eligCalculations.eligibleAmount)}. ` +
         `Current Debt Obligation Ratio (FOIR): ${eligCalculations.baseFoir}% (Assessment: ${eligCalculations.riskLevel.toUpperCase()} RISK).`;
     } else if (calcType === "compare") {
       detailsStr = `Compared two loans side-by-side. ` +
-        `Loan A: ${formatCurrency(compAmountA)} at ${compRateA}% for ${compTenureA} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}, Total Payable: ${formatCurrency(compCalculations.loanA.totalPayable)}). ` +
-        `Loan B: ${formatCurrency(compAmountB)} at ${compRateB}% for ${compTenureB} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}, Total Payable: ${formatCurrency(compCalculations.loanB.totalPayable)}). ` +
+        `Loan A: ${formatCurrency(Number(compAmountA) || 0)} at ${Number(compRateA) || 0}% for ${Number(compTenureA) || 0} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}, Total Payable: ${formatCurrency(compCalculations.loanA.totalPayable)}). ` +
+        `Loan B: ${formatCurrency(Number(compAmountB) || 0)} at ${Number(compRateB) || 0}% for ${Number(compTenureB) || 0} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}, Total Payable: ${formatCurrency(compCalculations.loanB.totalPayable)}). ` +
         `Difference: EMI diff is ${formatCurrency(compCalculations.emiDiff)}, interest diff is ${formatCurrency(compCalculations.interestDiff)}. ` +
         `Loan ${compCalculations.betterLoan} is cheaper in total cost.`;
     } else if (calcType === "prepayment") {
-      detailsStr = `Simulated prepayment/foreclosure impact on a ${formatCurrency(prepAmount)} loan at ${prepRate}% for ${prepTenure} years. ` +
-        `Prepayment plan: ${prepType === "monthly" ? "Extra monthly payment" : "Lump sum"} of ${formatCurrency(prepVal)} starting in Month ${prepStartMonth}. ` +
+      detailsStr = `Simulated prepayment/foreclosure impact on a ${formatCurrency(Number(prepAmount) || 0)} loan at ${Number(prepRate) || 0}% for ${Number(prepTenure) || 0} years. ` +
+        `Prepayment plan: ${prepType === "monthly" ? "Extra monthly payment" : "Lump sum"} of ${formatCurrency(Number(prepVal) || 0)} starting in Month ${Number(prepStartMonth) || 1}. ` +
         `Result: Saved ${formatCurrency(prepCalculations.interestSaved)} in interest, and paid off loan ${Math.floor(prepCalculations.monthsSaved / 12)} years ${prepCalculations.monthsSaved % 12} months sooner.`;
     }
 
-    onApplyNow(activeConfig.name, emiAmount, emiRate, emiTenure, detailsStr);
+    onApplyNow(
+      activeConfig.name, 
+      Number(emiAmount) || 0, 
+      Number(emiRate) || 0, 
+      Number(emiTenure) || 0, 
+      detailsStr
+    );
   };
 
   return (
@@ -680,18 +709,19 @@ export default function LoanCalculatorView({
                 <div className="flex flex-col">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-[13px] font-semibold text-gray-700">Loan Amount ({activeConfig.name})</label>
-                    <span className="text-[13px] font-bold text-primary">{formatCurrency(emiAmount)}</span>
+                    <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(emiAmount) || 0)}</span>
                   </div>
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
                     <input
                       type="number"
-                      value={emiAmount === 0 ? "" : emiAmount}
-                      onChange={(e) => setEmiAmount(Number(e.target.value))}
+                      value={emiAmount}
+                      onChange={(e) => setEmiAmount(e.target.value === "" ? "" : Number(e.target.value))}
                       onBlur={() => {
+                        const val = Number(emiAmount) || 0;
                         const clamped = Math.max(
                           activeConfig.minAmount,
-                          Math.min(activeConfig.maxAmount, emiAmount)
+                          Math.min(activeConfig.maxAmount, val)
                         );
                         setEmiAmount(clamped);
                       }}
@@ -703,7 +733,7 @@ export default function LoanCalculatorView({
                     min={activeConfig.minAmount}
                     max={activeConfig.maxAmount}
                     step={activeConfig.amountStep}
-                    value={emiAmount}
+                    value={Number(emiAmount) || 0}
                     onChange={(e) => setEmiAmount(Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
@@ -717,18 +747,19 @@ export default function LoanCalculatorView({
                 <div className="flex flex-col">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
-                    <span className="text-[13px] font-bold text-primary">{emiRate}%</span>
+                    <span className="text-[13px] font-bold text-primary">{Number(emiRate) || 0}%</span>
                   </div>
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="number"
                       step="0.05"
-                      value={emiRate === 0 ? "" : emiRate}
-                      onChange={(e) => setEmiRate(Number(e.target.value))}
+                      value={emiRate}
+                      onChange={(e) => setEmiRate(e.target.value === "" ? "" : Number(e.target.value))}
                       onBlur={() => {
+                        const val = Number(emiRate) || 0;
                         const clamped = Math.max(
                           activeConfig.minRate,
-                          Math.min(activeConfig.maxRate, emiRate)
+                          Math.min(activeConfig.maxRate, val)
                         );
                         setEmiRate(Number(clamped.toFixed(2)));
                       }}
@@ -741,7 +772,7 @@ export default function LoanCalculatorView({
                     min={activeConfig.minRate}
                     max={activeConfig.maxRate}
                     step={activeConfig.rateStep}
-                    value={emiRate}
+                    value={Number(emiRate) || 0}
                     onChange={(e) => setEmiRate(Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
@@ -755,17 +786,18 @@ export default function LoanCalculatorView({
                 <div className="flex flex-col">
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-[13px] font-semibold text-gray-700">Loan Tenure</label>
-                    <span className="text-[13px] font-bold text-primary">{emiTenure} Years</span>
+                    <span className="text-[13px] font-bold text-primary">{Number(emiTenure) || 0} Years</span>
                   </div>
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="number"
-                      value={emiTenure === 0 ? "" : emiTenure}
-                      onChange={(e) => setEmiTenure(Number(e.target.value))}
+                      value={emiTenure}
+                      onChange={(e) => setEmiTenure(e.target.value === "" ? "" : Number(e.target.value))}
                       onBlur={() => {
+                        const val = Number(emiTenure) || 0;
                         const clamped = Math.max(
                           activeConfig.minTenure,
-                          Math.min(activeConfig.maxTenure, emiTenure)
+                          Math.min(activeConfig.maxTenure, val)
                         );
                         setEmiTenure(clamped);
                       }}
@@ -778,7 +810,7 @@ export default function LoanCalculatorView({
                     min={activeConfig.minTenure}
                     max={activeConfig.maxTenure}
                     step={1}
-                    value={emiTenure}
+                    value={Number(emiTenure) || 0}
                     onChange={(e) => setEmiTenure(Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
@@ -995,14 +1027,20 @@ export default function LoanCalculatorView({
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
-                  <span className="text-[13px] font-bold text-primary">{formatCurrency(eligIncome)}</span>
+                  <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligIncome) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
                   <input
                     type="number"
-                    value={eligIncome === 0 ? "" : eligIncome}
-                    onChange={(e) => setEligIncome(Number(e.target.value))}
+                    value={eligIncome}
+                    onChange={(e) => setEligIncome(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(eligIncome) || 0;
+                      const minVal = Math.round(10000 * currencyScale);
+                      const maxVal = Math.round(1000000 * currencyScale);
+                      setEligIncome(Math.max(minVal, Math.min(maxVal, val)));
+                    }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -1011,7 +1049,7 @@ export default function LoanCalculatorView({
                   min={Math.round(10000 * currencyScale)}
                   max={Math.round(1000000 * currencyScale)}
                   step={Math.round(5000 * currencyScale)}
-                  value={eligIncome}
+                  value={Number(eligIncome) || 0}
                   onChange={(e) => setEligIncome(Number(e.target.value))}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
@@ -1021,14 +1059,19 @@ export default function LoanCalculatorView({
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
-                  <span className="text-[13px] font-bold text-primary">{formatCurrency(eligEmi)}</span>
+                  <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligEmi) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
                   <input
                     type="number"
-                    value={eligEmi === 0 ? "" : eligEmi}
-                    onChange={(e) => setEligEmi(Number(e.target.value))}
+                    value={eligEmi}
+                    onChange={(e) => setEligEmi(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(eligEmi) || 0;
+                      const maxVal = Math.round(500000 * currencyScale);
+                      setEligEmi(Math.max(0, Math.min(maxVal, val)));
+                    }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
@@ -1037,7 +1080,7 @@ export default function LoanCalculatorView({
                   min={0}
                   max={Math.round(500000 * currencyScale)}
                   step={Math.round(2000 * currencyScale)}
-                  value={eligEmi}
+                  value={Number(eligEmi) || 0}
                   onChange={(e) => setEligEmi(Number(e.target.value))}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
@@ -1051,7 +1094,11 @@ export default function LoanCalculatorView({
                     type="number"
                     step="0.1"
                     value={eligRate}
-                    onChange={(e) => setEligRate(Number(e.target.value))}
+                    onChange={(e) => setEligRate(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(eligRate) || 0;
+                      setEligRate(Math.max(1, Math.min(30, val)));
+                    }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -1060,7 +1107,11 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={eligTenure}
-                    onChange={(e) => setEligTenure(Number(e.target.value))}
+                    onChange={(e) => setEligTenure(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(eligTenure) || 0;
+                      setEligTenure(Math.max(1, Math.min(40, val)));
+                    }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -1208,7 +1259,13 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={compAmountA}
-                    onChange={(e) => setCompAmountA(Number(e.target.value))}
+                    onChange={(e) => setCompAmountA(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(compAmountA) || 0;
+                      const minVal = Math.round(100000 * currencyScale);
+                      const maxVal = Math.round(10000000 * currencyScale);
+                      setCompAmountA(Math.max(minVal, Math.min(maxVal, val)));
+                    }}
                     className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                   />
                   <input
@@ -1216,7 +1273,7 @@ export default function LoanCalculatorView({
                     min={Math.round(100000 * currencyScale)}
                     max={Math.round(10000000 * currencyScale)}
                     step={Math.round(50000 * currencyScale)}
-                    value={compAmountA}
+                    value={Number(compAmountA) || 0}
                     onChange={(e) => setCompAmountA(Number(e.target.value))}
                     className="w-full h-1 bg-gray-200 rounded mt-2 cursor-pointer accent-primary"
                   />
@@ -1229,7 +1286,11 @@ export default function LoanCalculatorView({
                       type="number"
                       step="0.05"
                       value={compRateA}
-                      onChange={(e) => setCompRateA(Number(e.target.value))}
+                      onChange={(e) => setCompRateA(e.target.value === "" ? "" : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(compRateA) || 0;
+                        setCompRateA(Math.max(1, Math.min(30, val)));
+                      }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
                   </div>
@@ -1238,7 +1299,11 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={compTenureA}
-                      onChange={(e) => setCompTenureA(Number(e.target.value))}
+                      onChange={(e) => setCompTenureA(e.target.value === "" ? "" : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(compTenureA) || 0;
+                        setCompTenureA(Math.max(1, Math.min(40, val)));
+                      }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
                   </div>
@@ -1257,7 +1322,13 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={compAmountB}
-                    onChange={(e) => setCompAmountB(Number(e.target.value))}
+                    onChange={(e) => setCompAmountB(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(compAmountB) || 0;
+                      const minVal = Math.round(100000 * currencyScale);
+                      const maxVal = Math.round(10000000 * currencyScale);
+                      setCompAmountB(Math.max(minVal, Math.min(maxVal, val)));
+                    }}
                     className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                   />
                   <input
@@ -1265,7 +1336,7 @@ export default function LoanCalculatorView({
                     min={Math.round(100000 * currencyScale)}
                     max={Math.round(10000000 * currencyScale)}
                     step={Math.round(50000 * currencyScale)}
-                    value={compAmountB}
+                    value={Number(compAmountB) || 0}
                     onChange={(e) => setCompAmountB(Number(e.target.value))}
                     className="w-full h-1 bg-gray-200 rounded mt-2 cursor-pointer accent-emerald-500"
                   />
@@ -1278,7 +1349,11 @@ export default function LoanCalculatorView({
                       type="number"
                       step="0.05"
                       value={compRateB}
-                      onChange={(e) => setCompRateB(Number(e.target.value))}
+                      onChange={(e) => setCompRateB(e.target.value === "" ? "" : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(compRateB) || 0;
+                        setCompRateB(Math.max(1, Math.min(30, val)));
+                      }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
                   </div>
@@ -1287,7 +1362,11 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={compTenureB}
-                      onChange={(e) => setCompTenureB(Number(e.target.value))}
+                      onChange={(e) => setCompTenureB(e.target.value === "" ? "" : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(compTenureB) || 0;
+                        setCompTenureB(Math.max(1, Math.min(40, val)));
+                      }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
                   </div>
@@ -1455,14 +1534,14 @@ export default function LoanCalculatorView({
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[13px] font-semibold text-gray-700">Base Loan Principal</label>
-                  <span className="text-[13px] font-bold text-primary">{formatCurrency(prepAmount)}</span>
+                  <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(prepAmount) || 0)}</span>
                 </div>
                 <input
                   type="range"
                   min={activeConfig.minAmount}
                   max={activeConfig.maxAmount}
                   step={activeConfig.amountStep}
-                  value={prepAmount}
+                  value={Number(prepAmount) || 0}
                   onChange={(e) => setPrepAmount(Number(e.target.value))}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
@@ -1476,7 +1555,12 @@ export default function LoanCalculatorView({
                     type="number"
                     step="0.1"
                     value={prepRate}
-                    onChange={(e) => setPrepRate(Number(e.target.value))}
+                    onChange={(e) => setPrepRate(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(prepRate) || 0;
+                      const clamped = Math.max(activeConfig.minRate, Math.min(activeConfig.maxRate, val));
+                      setPrepRate(clamped);
+                    }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -1485,7 +1569,12 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={prepTenure}
-                    onChange={(e) => setPrepTenure(Number(e.target.value))}
+                    onChange={(e) => setPrepTenure(e.target.value === "" ? "" : Number(e.target.value))}
+                    onBlur={() => {
+                      const val = Number(prepTenure) || 0;
+                      const clamped = Math.max(activeConfig.minTenure, Math.min(activeConfig.maxTenure, val));
+                      setPrepTenure(clamped);
+                    }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -1525,7 +1614,11 @@ export default function LoanCalculatorView({
                       <input
                         type="number"
                         value={prepVal}
-                        onChange={(e) => setPrepVal(Number(e.target.value))}
+                        onChange={(e) => setPrepVal(e.target.value === "" ? "" : Number(e.target.value))}
+                        onBlur={() => {
+                          const val = Number(prepVal) || 0;
+                          setPrepVal(Math.max(0, val));
+                        }}
                         className="w-full text-[13px] font-bold outline-none border-none"
                       />
                     </div>
@@ -1537,7 +1630,11 @@ export default function LoanCalculatorView({
                       type="number"
                       min={1}
                       value={prepStartMonth}
-                      onChange={(e) => setPrepStartMonth(Number(e.target.value))}
+                      onChange={(e) => setPrepStartMonth(e.target.value === "" ? "" : Number(e.target.value))}
+                      onBlur={() => {
+                        const val = Number(prepStartMonth) || 0;
+                        setPrepStartMonth(Math.max(1, val));
+                      }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                     />
                   </div>
