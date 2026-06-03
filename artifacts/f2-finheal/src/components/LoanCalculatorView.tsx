@@ -42,6 +42,34 @@ interface LoanTypeConfig {
   maxTenure: number;
 }
 
+export interface LenderProduct {
+  id: string;
+  name: string;
+  lenderType: string;
+  productType: string;
+  category: string;
+  minRate: number;
+  maxRate: number;
+  minTenureYears: number;
+  maxTenureYears: number;
+  minMonthlyIncome: number;
+  minCibil: number;
+  maxFoirPct: number;
+  minAmount: number;
+  maxAmount: number;
+  disbursalTime: string;
+  pros: string[];
+  cons: string[];
+  docsRequired: string[];
+  processingFee?: string;
+  emiPerLakhMin?: string;
+  extraParams?: {
+    eligibilityCriteria?: string;
+    abb_to_emi_factor?: number;
+    degreeCaps?: Record<string, number>;
+  };
+}
+
 const LOAN_TYPES: LoanTypeConfig[] = [
   {
     id: "home",
@@ -119,6 +147,22 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     minRate: 10.5,
     maxRate: 24.0,
     rateStep: 0.1,
+    defaultTenure: 5,
+    minTenure: 1,
+    maxTenure: 7,
+  },
+  {
+    id: "professional",
+    name: "Professional Loan (Doctors)",
+    icon: "🩺",
+    defaultAmount: 3000000,
+    minAmount: 100000,
+    maxAmount: 15000000, // 1.5 Cr
+    amountStep: 50000,
+    defaultRate: 10.75,
+    minRate: 8.5,
+    maxRate: 20.0,
+    rateStep: 0.05,
     defaultTenure: 5,
     minTenure: 1,
     maxTenure: 7,
@@ -235,10 +279,55 @@ export default function LoanCalculatorView({
   }, [activeConfig]);
 
   // Tab 2: Eligibility Calculator Inputs
+  const [eligLoanType, setEligLoanType] = useState<string>("home");
   const [eligIncome, setEligIncome] = useState<string>(String(Math.round(100000 * currencyScale)));
   const [eligEmi, setEligEmi] = useState<string>(String(Math.round(10000 * currencyScale)));
-  const [eligRate, setEligRate] = useState<string>("9.5");
+  const [eligRate, setEligRate] = useState<string>("8.5");
   const [eligTenure, setEligTenure] = useState<string>("20");
+  const [eligCibil, setEligCibil] = useState<string>("750");
+  const [eligDegree, setEligDegree] = useState<string>("MBBS");
+  const [eligExperience, setEligExperience] = useState<string>("3");
+
+  // Lenders catalog state
+  const [lenders, setLenders] = useState<LenderProduct[]>([]);
+  const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchLenders = async () => {
+      try {
+        setIsLoadingLenders(true);
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const res = await fetch(`${apiBase}/lenders`);
+        if (res.ok) {
+          const data = await res.json();
+          setLenders(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch lenders:", err);
+      } finally {
+        setIsLoadingLenders(false);
+      }
+    };
+
+    fetchLenders();
+
+    const handleUpdate = () => {
+      fetchLenders();
+    };
+    window.addEventListener("finheal:lenders_update", handleUpdate);
+    return () => {
+      window.removeEventListener("finheal:lenders_update", handleUpdate);
+    };
+  }, []);
+
+  const handleEligLoanTypeChange = (typeId: string) => {
+    setEligLoanType(typeId);
+    const selected = LOAN_TYPES.find((t) => t.id === typeId);
+    if (selected) {
+      setEligRate(String(selected.defaultRate));
+      setEligTenure(String(selected.defaultTenure));
+    }
+  };
 
   // Sync eligibility default amounts on currency scale shifts
   useEffect(() => {
@@ -247,18 +336,50 @@ export default function LoanCalculatorView({
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
+  const [compTypeA, setCompTypeA] = useState<string>("home");
   const [compAmountA, setCompAmountA] = useState<string>(String(Math.round(2000000 * currencyScale)));
   const [compRateA, setCompRateA] = useState<string>("8.5");
   const [compTenureA, setCompTenureA] = useState<string>("20");
 
+  const [compTypeB, setCompTypeB] = useState<string>("business");
   const [compAmountB, setCompAmountB] = useState<string>(String(Math.round(2000000 * currencyScale)));
-  const [compRateB, setCompRateB] = useState<string>("9.2");
-  const [compTenureB, setCompTenureB] = useState<string>("15");
+  const [compRateB, setCompRateB] = useState<string>("14.0");
+  const [compTenureB, setCompTenureB] = useState<string>("5");
+
+  const handleCompTypeAChange = (typeId: string) => {
+    setCompTypeA(typeId);
+    const selected = LOAN_TYPES.find((t) => t.id === typeId);
+    if (selected) {
+      setCompAmountA(String(Math.round(selected.defaultAmount * currencyScale)));
+      setCompRateA(String(selected.defaultRate));
+      setCompTenureA(String(selected.defaultTenure));
+    }
+  };
+
+  const handleCompTypeBChange = (typeId: string) => {
+    setCompTypeB(typeId);
+    const selected = LOAN_TYPES.find((t) => t.id === typeId);
+    if (selected) {
+      setCompAmountB(String(Math.round(selected.defaultAmount * currencyScale)));
+      setCompRateB(String(selected.defaultRate));
+      setCompTenureB(String(selected.defaultTenure));
+    }
+  };
 
   useEffect(() => {
-    setCompAmountA(String(Math.round(2000000 * currencyScale)));
-    setCompAmountB(String(Math.round(2000000 * currencyScale)));
-  }, [currencyScale]);
+    const defaultAmtA = LOAN_TYPES.find((t) => t.id === compTypeA)?.defaultAmount || 2000000;
+    const defaultAmtB = LOAN_TYPES.find((t) => t.id === compTypeB)?.defaultAmount || 2000000;
+    setCompAmountA(String(Math.round(defaultAmtA * currencyScale)));
+    setCompAmountB(String(Math.round(defaultAmtB * currencyScale)));
+  }, [currencyScale, compTypeA, compTypeB]);
+
+  const labelA = useMemo(() => {
+    return LOAN_TYPES.find(t => t.id === compTypeA)?.name.split(" ")[0] || "Loan A";
+  }, [compTypeA]);
+
+  const labelB = useMemo(() => {
+    return LOAN_TYPES.find(t => t.id === compTypeB)?.name.split(" ")[0] || "Loan B";
+  }, [compTypeB]);
 
   // Tab 4: Prepayment Inputs
   const [prepAmount, setPrepAmount] = useState<string>(String(activeConfig.defaultAmount));
@@ -493,6 +614,141 @@ export default function LoanCalculatorView({
     };
   }, [eligIncome, eligEmi, eligRate, eligTenure]);
 
+  // Matching Engine for Lender Products
+  const matchedOffers = useMemo(() => {
+    if (calcType !== "eligibility" || lenders.length === 0) return [];
+    
+    const incomeVal = Number(eligIncome) || 0;
+    const debtEmiVal = Number(eligEmi) || 0;
+    const tenureVal = Number(eligTenure) || 1;
+    const cibilVal = Number(eligCibil) || 750;
+    const degreeVal = eligDegree;
+    const expVal = Number(eligExperience) || 0;
+
+    // Filter products matching this category
+    const categoryProducts = lenders.filter(l => l.category === eligLoanType);
+    if (categoryProducts.length === 0) return [];
+
+    return categoryProducts.map(lender => {
+      const reasons: string[] = [];
+      let isEligible = true;
+
+      // Check CIBIL gate
+      if (cibilVal < lender.minCibil) {
+        isEligible = false;
+        reasons.push(`BUREAU_MIN_FAIL: Credit score ${cibilVal} is below lender minimum of ${lender.minCibil}`);
+      }
+
+      // Check Income gate
+      if (incomeVal < lender.minMonthlyIncome) {
+        isEligible = false;
+        reasons.push(`INCOME_MIN_FAIL: Monthly income ${formatCurrency(incomeVal)} is below lender minimum of ${formatCurrency(lender.minMonthlyIncome)}`);
+      }
+
+      // Check Tenure gate
+      if (tenureVal > lender.maxTenureYears) {
+        isEligible = false;
+        reasons.push(`TENURE_MAX_FAIL: Requested tenure ${tenureVal}y exceeds lender maximum of ${lender.maxTenureYears}y`);
+      }
+
+      // Professional-specific gates
+      if (eligLoanType === "professional") {
+        if (lender.id === "DL-GODREJ") {
+          const isDoctor = degreeVal.match(/MBBS|MD|MS/);
+          const isCA = degreeVal === "CA";
+          if (isDoctor && expVal < 3) {
+            isEligible = false;
+            reasons.push("VINTAGE_SHORTFALL: Doctor experience must be at least 3 years");
+          } else if (isCA && expVal < 5) {
+            isEligible = false;
+            reasons.push("VINTAGE_SHORTFALL: CA experience must be at least 5 years");
+          }
+        }
+        
+        if (lender.id === "DL-TATA" && expVal < 2) {
+          isEligible = false;
+          reasons.push("VINTAGE_SHORTFALL: Experience must be at least 2 years");
+        }
+
+        if (lender.id === "DL-LTF" && expVal < 3) {
+          isEligible = false;
+          reasons.push("VINTAGE_SHORTFALL: Experience must be at least 3 years");
+        }
+      }
+
+      // Compute Affordable Limit & resulting FOIR
+      const maxFoirPct = lender.maxFoirPct || 50;
+      const lenderMaxEmiAllowed = Math.max(0, (incomeVal * (maxFoirPct / 100)) - debtEmiVal);
+      
+      const monthlyRate = lender.minRate / 12 / 100;
+      const totalMonths = tenureVal * 12;
+      let eligibleLimit = 0;
+      if (lenderMaxEmiAllowed > 0 && monthlyRate > 0) {
+        eligibleLimit = (lenderMaxEmiAllowed * (Math.pow(1 + monthlyRate, totalMonths) - 1)) / (monthlyRate * Math.pow(1 + monthlyRate, totalMonths));
+      } else if (lenderMaxEmiAllowed > 0 && monthlyRate === 0) {
+        eligibleLimit = lenderMaxEmiAllowed * totalMonths;
+      }
+
+      // Cap at lender maximums and degree-specific caps
+      let capLimit = lender.maxAmount;
+      if (eligLoanType === "professional" && lender.id === "DL-GODREJ" && lender.extraParams?.degreeCaps) {
+        const caps = lender.extraParams.degreeCaps as Record<string, number>;
+        const degreeKey = degreeVal.match(/MBBS|BDS|BHMS/) ? "MBBS" : degreeVal.match(/MD|MS/) ? "MD" : "CA";
+        const specificCap = caps[degreeKey];
+        if (specificCap) capLimit = Math.min(capLimit, specificCap);
+      }
+      
+      eligibleLimit = Math.min(eligibleLimit, capLimit);
+
+      // If eligible limit is below lender minAmount, mark ineligible
+      if (eligibleLimit < lender.minAmount) {
+        isEligible = false;
+        reasons.push(`ABB_LT_THRESHOLD: Eligible loan amount is below lender minimum of ${formatCurrency(lender.minAmount)}`);
+      }
+
+      // Compute resulting FOIR with this lender
+      const emiVal = monthlyRate === 0 ? eligibleLimit / totalMonths : (eligibleLimit * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
+      const resultingFoir = incomeVal > 0 ? ((debtEmiVal + emiVal) / incomeVal) * 100 : 0;
+
+      // Assign Approval Likelihood
+      let likelihood: "high" | "medium" | "low" | "ineligible" = "ineligible";
+      if (!isEligible) {
+        likelihood = "ineligible";
+      } else {
+        const margin = maxFoirPct - resultingFoir;
+        if (resultingFoir > maxFoirPct + 5) {
+          likelihood = "ineligible";
+          reasons.push("FOIR_EXCEEDS_MAX: Total EMIs exceed acceptable income ratio by more than 5%");
+        } else if (resultingFoir > maxFoirPct) {
+          likelihood = "low";
+        } else if (margin <= 10) {
+          likelihood = "medium";
+        } else {
+          likelihood = "high";
+        }
+      }
+
+      return {
+        lender,
+        eligibleLimit: Math.round(eligibleLimit),
+        emi: Math.round(emiVal),
+        resultingFoir: Math.round(resultingFoir),
+        likelihood,
+        reasons,
+      };
+    });
+  }, [calcType, lenders, eligIncome, eligEmi, eligTenure, eligCibil, eligRate, eligDegree, eligExperience, eligLoanType, currencyScale]);
+
+  const sortedOffers = useMemo(() => {
+    const approved = matchedOffers.filter(o => o.likelihood !== "ineligible");
+    const ineligible = matchedOffers.filter(o => o.likelihood === "ineligible");
+    
+    const sortMap = { high: 0, medium: 1, low: 2, ineligible: 3 };
+    approved.sort((a, b) => sortMap[a.likelihood] - sortMap[b.likelihood]);
+    
+    return [...approved.slice(0, 4), ...ineligible.slice(0, 2)];
+  }, [matchedOffers]);
+
   // Calculations for Tab 3: Comparison
   const compCalculations = useMemo(() => {
     const amtAVal = Number(compAmountA) || 0;
@@ -606,6 +862,8 @@ export default function LoanCalculatorView({
   // AI Chat Handler Integration for each tool output
   const handleAskAssistant = () => {
     let detailsStr = "";
+    const selectedEligType = LOAN_TYPES.find((t) => t.id === eligLoanType) || LOAN_TYPES[0];
+    
     if (calcType === "emi") {
       detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
         `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
@@ -613,28 +871,47 @@ export default function LoanCalculatorView({
         `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
         (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
     } else if (calcType === "eligibility") {
-      detailsStr = `Checked Loan Eligibility & Affordability. ` +
+      detailsStr = `Checked ${selectedEligType.name} Eligibility & Affordability. ` +
         `Monthly income: ${formatCurrency(Number(eligIncome) || 0)}, existing monthly debt EMIs: ${formatCurrency(Number(eligEmi) || 0)}. ` +
         `Interest rate: ${Number(eligRate) || 0}%, Tenure: ${Number(eligTenure) || 0} years. ` +
         `Calculated maximum affordable EMI: ${formatCurrency(eligCalculations.maxEmiAllowed)} and total loan eligibility: ${formatCurrency(eligCalculations.eligibleAmount)}. ` +
         `Current Debt Obligation Ratio (FOIR): ${eligCalculations.baseFoir}% (Assessment: ${eligCalculations.riskLevel.toUpperCase()} RISK).`;
     } else if (calcType === "compare") {
+      const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
+      const typeB = LOAN_TYPES.find((t) => t.id === compTypeB) || LOAN_TYPES[0];
       detailsStr = `Compared two loans side-by-side. ` +
-        `Loan A: ${formatCurrency(Number(compAmountA) || 0)} at ${Number(compRateA) || 0}% for ${Number(compTenureA) || 0} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}, Total Payable: ${formatCurrency(compCalculations.loanA.totalPayable)}). ` +
-        `Loan B: ${formatCurrency(Number(compAmountB) || 0)} at ${Number(compRateB) || 0}% for ${Number(compTenureB) || 0} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}, Total Payable: ${formatCurrency(compCalculations.loanB.totalPayable)}). ` +
+        `Loan A (${typeA.name}): ${formatCurrency(Number(compAmountA) || 0)} at ${Number(compRateA) || 0}% for ${Number(compTenureA) || 0} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}, Total Payable: ${formatCurrency(compCalculations.loanA.totalPayable)}). ` +
+        `Loan B (${typeB.name}): ${formatCurrency(Number(compAmountB) || 0)} at ${Number(compRateB) || 0}% for ${Number(compTenureB) || 0} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}, Total Payable: ${formatCurrency(compCalculations.loanB.totalPayable)}). ` +
         `Difference: EMI diff is ${formatCurrency(compCalculations.emiDiff)}, interest diff is ${formatCurrency(compCalculations.interestDiff)}. ` +
-        `Loan ${compCalculations.betterLoan} is cheaper in total cost.`;
+        `Loan ${compCalculations.betterLoan} (${compCalculations.betterLoan === "A" ? typeA.name : typeB.name}) is cheaper in total cost.`;
     } else if (calcType === "prepayment") {
       detailsStr = `Simulated prepayment/foreclosure impact on a ${formatCurrency(Number(prepAmount) || 0)} loan at ${Number(prepRate) || 0}% for ${Number(prepTenure) || 0} years. ` +
         `Prepayment plan: ${prepType === "monthly" ? "Extra monthly payment" : "Lump sum"} of ${formatCurrency(Number(prepVal) || 0)} starting in Month ${Number(prepStartMonth) || 1}. ` +
         `Result: Saved ${formatCurrency(prepCalculations.interestSaved)} in interest, and paid off loan ${Math.floor(prepCalculations.monthsSaved / 12)} years ${prepCalculations.monthsSaved % 12} months sooner.`;
     }
 
+    const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
     onApplyNow(
-      activeConfig.name, 
-      Number(emiAmount) || 0, 
-      Number(emiRate) || 0, 
-      Number(emiTenure) || 0, 
+      calcType === "eligibility" 
+        ? selectedEligType.name 
+        : calcType === "compare" 
+        ? `${typeA.name} vs Alternative` 
+        : activeConfig.name, 
+      calcType === "eligibility" 
+        ? eligCalculations.eligibleAmount 
+        : calcType === "compare" 
+        ? (Number(compAmountA) || 0) 
+        : (Number(emiAmount) || 0), 
+      calcType === "eligibility" 
+        ? (Number(eligRate) || 0) 
+        : calcType === "compare" 
+        ? (Number(compRateA) || 0) 
+        : (Number(emiRate) || 0), 
+      calcType === "eligibility" 
+        ? (Number(eligTenure) || 0) 
+        : calcType === "compare" 
+        ? (Number(compTenureA) || 0) 
+        : (Number(emiTenure) || 0), 
       detailsStr
     );
   };
@@ -1117,8 +1394,29 @@ export default function LoanCalculatorView({
         {/* ----------------- ELIGIBILITY CALCULATOR TAB ----------------- */}
         {calcType === "eligibility" && (
           <div className="animate-fade-up grid gap-6 lg:grid-cols-12">
-            {/* Left inputs */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
+            {/* Left inputs & Safety Gauge Stack */}
+            <div className={`${sortedOffers.length > 0 ? "lg:col-span-5" : "lg:col-span-7"} flex flex-col gap-6`}>
+              {/* Select Loan Type */}
+              <div className="flex flex-col">
+                <label className="text-[13px] font-semibold text-gray-700 mb-1.5">Select Loan Category</label>
+                <div className="relative">
+                  <select
+                    value={eligLoanType}
+                    onChange={(e) => handleEligLoanTypeChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] text-[13px] font-bold text-gray-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+                  >
+                    {LOAN_TYPES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.icon} {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-500">
+                    <ChevronDown className="h-4.5 w-4.5" />
+                  </div>
+                </div>
+              </div>
+
               {/* Monthly Income */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
@@ -1213,6 +1511,70 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
+              {/* CIBIL Score Slider */}
+              <div className="flex flex-col">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[13px] font-semibold text-gray-700">CIBIL Score</label>
+                  <span className="text-[13px] font-bold text-primary">{eligCibil}</span>
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="number"
+                    value={eligCibil}
+                    onChange={(e) => setEligCibil(e.target.value)}
+                    onBlur={() => {
+                      const val = Number(eligCibil) || 750;
+                      setEligCibil(String(Math.max(300, Math.min(900, val))));
+                    }}
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={300}
+                  max={900}
+                  step={5}
+                  value={Number(eligCibil) || 750}
+                  onChange={(e) => setEligCibil(e.target.value)}
+                  className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+
+              {/* Conditional Profession & Experience Inputs for Doctors / CAs */}
+              {eligLoanType === "professional" && (
+                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 mt-2">
+                  <div className="flex flex-col">
+                    <label className="text-[12px] font-semibold text-gray-700 mb-1">Profession / Degree</label>
+                    <select
+                      value={eligDegree}
+                      onChange={(e) => setEligDegree(e.target.value)}
+                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[8px] text-[12.5px] font-bold text-gray-800 focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                    >
+                      <option value="MBBS">MBBS (Doctor)</option>
+                      <option value="MD">MD/MS/MCh (Super-specialist)</option>
+                      <option value="CA">Chartered Accountant (CA)</option>
+                      <option value="BDS">BDS/MDS (Dentist)</option>
+                      <option value="BHMS">BHMS/BAMS (Alternative)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[12px] font-semibold text-gray-700">Practice Vintage</label>
+                      <span className="text-[11px] font-bold text-primary">{eligExperience} Yrs</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      step={1}
+                      value={Number(eligExperience) || 0}
+                      onChange={(e) => setEligExperience(e.target.value)}
+                      className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary mt-2"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Eligibility card summary */}
               <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex items-center justify-between mt-2">
                 <div className="flex flex-col">
@@ -1231,111 +1593,201 @@ export default function LoanCalculatorView({
                   Ask Assistant
                 </button>
               </div>
-            </div>
 
-            {/* Right side Affordability assessment & Speedometer Gauge */}
-            <div className="lg:col-span-5 flex flex-col justify-center items-center gap-4">
-              <span className="text-[12.5px] font-bold text-gray-700 uppercase tracking-wide">Affordability Safety Gauge</span>
-
-              {/* Half Speedometer Gauge */}
-              <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
-                <svg width="180" height="180" className="absolute top-0">
-                  {/* Gauge background track */}
-                  <path
-                    d="M 20 90 A 70 70 0 0 1 160 90"
-                    fill="none"
-                    stroke="#f3f4f6"
-                    strokeWidth="12"
-                    strokeLinecap="round"
-                  />
-                  {/* Color arcs for reference */}
-                  {/* Green Arc (Safe < 35%) */}
-                  <path
-                    d="M 20 90 A 70 70 0 0 1 70 35"
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="12"
-                    className="opacity-20"
-                  />
-                  {/* Yellow Arc (Moderate 35% - 50%) */}
-                  <path
-                    d="M 70 35 A 70 70 0 0 1 110 35"
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth="12"
-                    className="opacity-20"
-                  />
-                  {/* Red Arc (High > 50%) */}
-                  <path
-                    d="M 110 35 A 70 70 0 0 1 160 90"
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="12"
-                    className="opacity-20"
-                  />
-                  {/* Active segment pointer or filled track */}
-                  <path
-                    d="M 20 90 A 70 70 0 0 1 160 90"
-                    fill="none"
-                    stroke={
-                      eligCalculations.riskLevel === "low"
-                        ? "#10b981"
-                        : eligCalculations.riskLevel === "medium"
-                        ? "#f59e0b"
-                        : "#ef4444"
-                    }
-                    strokeWidth="12"
-                    strokeDasharray={`${(eligCalculations.baseFoir / 100) * 220} 220`}
-                    strokeLinecap="round"
-                    className="transition-all duration-700"
-                  />
-                </svg>
-
-                {/* Numeric reading overlay */}
-                <div className="absolute bottom-1 flex flex-col items-center justify-center">
-                  <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
-                </div>
-              </div>
-
-              {/* Safety Evaluation Card */}
-              <div className={`w-full max-w-[290px] border p-4 rounded-[14px] flex flex-col gap-2 ${
-                eligCalculations.riskLevel === "low"
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                  : eligCalculations.riskLevel === "medium"
-                  ? "bg-amber-50 border-amber-200 text-amber-800"
-                  : "bg-rose-50 border-rose-200 text-rose-800"
-              }`}>
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
-                  <span className="text-[12px] font-bold uppercase tracking-wide">
-                    {eligCalculations.riskLevel === "low"
-                      ? "Healthy Debt Levels"
+              {/* Stack safety gauge on left if suggested offers are displayed */}
+              {sortedOffers.length > 0 && (
+                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col items-center justify-center gap-4 mt-2">
+                  <span className="text-[12px] font-bold text-gray-500 uppercase tracking-wide">Affordability Safety Gauge</span>
+                  <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
+                    <svg width="180" height="180" className="absolute top-0">
+                      <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#f3f4f6" strokeWidth="12" strokeLinecap="round" />
+                      <path d="M 20 90 A 70 70 0 0 1 70 35" fill="none" stroke="#10b981" strokeWidth="12" className="opacity-20" />
+                      <path d="M 70 35 A 70 70 0 0 1 110 35" fill="none" stroke="#f59e0b" strokeWidth="12" className="opacity-20" />
+                      <path d="M 110 35 A 70 70 0 0 1 160 90" fill="none" stroke="#ef4444" strokeWidth="12" className="opacity-20" />
+                      <path
+                        d="M 20 90 A 70 70 0 0 1 160 90"
+                        fill="none"
+                        stroke={
+                          eligCalculations.riskLevel === "low"
+                            ? "#10b981"
+                            : eligCalculations.riskLevel === "medium"
+                            ? "#f59e0b"
+                            : "#ef4444"
+                        }
+                        strokeWidth="12"
+                        strokeDasharray={`${(eligCalculations.baseFoir / 100) * 220} 220`}
+                        strokeLinecap="round"
+                        className="transition-all duration-700"
+                      />
+                    </svg>
+                    <div className="absolute bottom-1 flex flex-col items-center justify-center">
+                      <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
+                    </div>
+                  </div>
+                  <div className={`w-full border p-3 rounded-[12px] flex flex-col gap-1.5 ${
+                    eligCalculations.riskLevel === "low"
+                      ? "bg-emerald-50 border-emerald-250 text-emerald-800"
                       : eligCalculations.riskLevel === "medium"
-                      ? "Moderate Obligation"
-                      : "High Debt Obligation"}
-                  </span>
-                </div>
-                <p className="text-[11px] leading-normal mt-1 opacity-90">
-                  {eligCalculations.riskLevel === "low" &&
-                    "Your existing EMIs consume less than 30% of your income. You are in a strong position to borrow responsibly."}
-                  {eligCalculations.riskLevel === "medium" &&
-                    "Your debt consumes 30% to 45% of your income. Financial advisors recommend keeping debt below 40% before taking new loans."}
-                  {eligCalculations.riskLevel === "high" &&
-                    "Existing monthly payments consume over 45% of your income. High risk of over-leverage. Consider debt consolidation first."}
-                </p>
-                <div className="border-t border-current/10 pt-2.5 mt-1 flex flex-col gap-1 text-[11px]">
-                  <div className="flex justify-between font-semibold">
-                    <span>Affordable Max EMI:</span>
-                    <span>{formatCurrency(eligCalculations.maxEmiAllowed)}</span>
+                      ? "bg-amber-50 border-amber-250 text-amber-800"
+                      : "bg-rose-50 border-rose-250 text-rose-800"
+                  }`}>
+                    <span className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1">
+                      <ShieldCheck className="h-4 w-4" />
+                      {eligCalculations.riskLevel === "low" ? "Healthy Debt Level" : eligCalculations.riskLevel === "medium" ? "Moderate Obligation" : "High Debt Obligation"}
+                    </span>
+                    <p className="text-[10px] leading-normal opacity-95">
+                      {eligCalculations.riskLevel === "low" && "Existing EMIs consume less than 30% of income. Strong position."}
+                      {eligCalculations.riskLevel === "medium" && "EMIs consume 30% to 45% of income. Moderate risk."}
+                      {eligCalculations.riskLevel === "high" && "Debt consumes over 45% of income. High risk of over-leverage."}
+                    </p>
                   </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Target FOIR Cap:</span>
-                    <span>50%</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right side: Suggested Offers list (if matches exist) OR Safety Gauge (if no matches exist) */}
+            {sortedOffers.length > 0 ? (
+              <div className="lg:col-span-7 flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-1">
+                  <span className="text-[14px] font-bold text-gray-800 flex items-center gap-2">
+                    <Landmark className="h-4.5 w-4.5 text-primary" />
+                    <span>Recommended Lender Offers ({sortedOffers.filter(o => o.likelihood !== "ineligible").length} Matched)</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ranked by Fit</span>
+                </div>
+                
+                {isLoadingLenders ? (
+                  <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-[12px] border border-gray-200 border-dashed text-gray-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                    <span className="text-[13px] font-medium">Fetching real-time lender criteria...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3.5 max-h-[750px] overflow-y-auto pr-1">
+                    {sortedOffers.map((offer) => {
+                      const { lender, eligibleLimit, emi, resultingFoir, likelihood, reasons } = offer;
+                      return (
+                        <LenderOfferCard
+                          key={lender.id}
+                          lender={lender}
+                          eligibleLimit={eligibleLimit}
+                          emi={emi}
+                          resultingFoir={resultingFoir}
+                          likelihood={likelihood}
+                          reasons={reasons}
+                          currency={currency}
+                          formatCurrency={formatCurrency}
+                          formatCompact={formatCompact}
+                          onApplyNow={onApplyNow}
+                          eligIncome={eligIncome}
+                          eligEmi={eligEmi}
+                          eligTenure={eligTenure}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="lg:col-span-5 flex flex-col justify-center items-center gap-4">
+                <span className="text-[12.5px] font-bold text-gray-700 uppercase tracking-wide">Affordability Safety Gauge</span>
+
+                {/* Half Speedometer Gauge */}
+                <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
+                  <svg width="180" height="180" className="absolute top-0">
+                    {/* Gauge background track */}
+                    <path
+                      d="M 20 90 A 70 70 0 0 1 160 90"
+                      fill="none"
+                      stroke="#f3f4f6"
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                    />
+                    {/* Color arcs for reference */}
+                    <path
+                      d="M 20 90 A 70 70 0 0 1 70 35"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="12"
+                      className="opacity-20"
+                    />
+                    <path
+                      d="M 70 35 A 70 70 0 0 1 110 35"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="12"
+                      className="opacity-20"
+                    />
+                    <path
+                      d="M 110 35 A 70 70 0 0 1 160 90"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="12"
+                      className="opacity-20"
+                    />
+                    <path
+                      d="M 20 90 A 70 70 0 0 1 160 90"
+                      fill="none"
+                      stroke={
+                        eligCalculations.riskLevel === "low"
+                          ? "#10b981"
+                          : eligCalculations.riskLevel === "medium"
+                          ? "#f59e0b"
+                          : "#ef4444"
+                      }
+                      strokeWidth="12"
+                      strokeDasharray={`${(eligCalculations.baseFoir / 100) * 220} 220`}
+                      strokeLinecap="round"
+                      className="transition-all duration-700"
+                    />
+                  </svg>
+
+                  {/* Numeric reading overlay */}
+                  <div className="absolute bottom-1 flex flex-col items-center justify-center">
+                    <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
+                  </div>
+                </div>
+
+                {/* Safety Evaluation Card */}
+                <div className={`w-full max-w-[290px] border p-4 rounded-[14px] flex flex-col gap-2 ${
+                  eligCalculations.riskLevel === "low"
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : eligCalculations.riskLevel === "medium"
+                    ? "bg-amber-50 border-amber-200 text-amber-800"
+                    : "bg-rose-50 border-rose-200 text-rose-800"
+                }`}>
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
+                    <span className="text-[12px] font-bold uppercase tracking-wide">
+                      {eligCalculations.riskLevel === "low"
+                        ? "Healthy Debt Levels"
+                        : eligCalculations.riskLevel === "medium"
+                        ? "Moderate Obligation"
+                        : "High Debt Obligation"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-normal mt-1 opacity-90">
+                    {eligCalculations.riskLevel === "low" &&
+                      "Your existing EMIs consume less than 30% of your income. You are in a strong position to borrow responsibly."}
+                    {eligCalculations.riskLevel === "medium" &&
+                      "Your debt consumes 30% to 45% of your income. Financial advisors recommend keeping debt below 40% before taking new loans."}
+                    {eligCalculations.riskLevel === "high" &&
+                      "Existing monthly payments consume over 45% of your income. High risk of over-leverage. Consider debt consolidation first."}
+                  </p>
+                  <div className="border-t border-current/10 pt-2.5 mt-1 flex flex-col gap-1 text-[11px]">
+                    <div className="flex justify-between font-semibold">
+                      <span>Affordable Max EMI:</span>
+                      <span>{formatCurrency(eligCalculations.maxEmiAllowed)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Target FOIR Cap:</span>
+                      <span>50%</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1347,7 +1799,27 @@ export default function LoanCalculatorView({
               <div className="border border-gray-200 rounded-[14px] p-4 bg-gray-50/50 flex flex-col gap-4">
                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
                   <span className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[11px]">A</span>
-                  <span className="text-[13px] font-bold text-gray-800">Loan Option A</span>
+                  <span className="text-[13px] font-bold text-gray-800">Loan Option A ({labelA})</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-[12px] font-semibold text-gray-600 mb-1">Loan Category</label>
+                  <div className="relative">
+                    <select
+                      value={compTypeA}
+                      onChange={(e) => handleCompTypeAChange(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold text-gray-800 focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                    >
+                      {LOAN_TYPES.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.icon} {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-col">
@@ -1410,7 +1882,27 @@ export default function LoanCalculatorView({
               <div className="border border-gray-200 rounded-[14px] p-4 bg-gray-50/50 flex flex-col gap-4">
                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
                   <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[11px]">B</span>
-                  <span className="text-[13px] font-bold text-gray-800">Loan Option B</span>
+                  <span className="text-[13px] font-bold text-gray-800">Loan Option B ({labelB})</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-[12px] font-semibold text-gray-600 mb-1">Loan Category</label>
+                  <div className="relative">
+                    <select
+                      value={compTypeB}
+                      onChange={(e) => handleCompTypeBChange(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold text-gray-800 focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                    >
+                      {LOAN_TYPES.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.icon} {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                      <ChevronDown className="h-4 w-4" />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-col">
@@ -1485,7 +1977,9 @@ export default function LoanCalculatorView({
                   <div className="flex flex-col gap-2 mt-1">
                     {/* Loan A */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-gray-500 w-16">Loan A</span>
+                      <span className="text-[11px] font-bold text-gray-500 w-16 truncate" title={`Loan A: ${labelA}`}>
+                        {labelA}
+                      </span>
                       <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary transition-all duration-500"
@@ -1504,7 +1998,9 @@ export default function LoanCalculatorView({
                     </div>
                     {/* Loan B */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-gray-500 w-16">Loan B</span>
+                      <span className="text-[11px] font-bold text-gray-500 w-16 truncate" title={`Loan B: ${labelB}`}>
+                        {labelB}
+                      </span>
                       <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 transition-all duration-500"
@@ -1533,7 +2029,9 @@ export default function LoanCalculatorView({
                   <div className="flex flex-col gap-2 mt-1">
                     {/* Loan A */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-gray-500 w-16">Loan A</span>
+                      <span className="text-[11px] font-bold text-gray-500 w-16 truncate" title={`Loan A: ${labelA}`}>
+                        {labelA}
+                      </span>
                       <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary transition-all duration-500"
@@ -1555,7 +2053,9 @@ export default function LoanCalculatorView({
                     </div>
                     {/* Loan B */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-gray-500 w-16">Loan B</span>
+                      <span className="text-[11px] font-bold text-gray-500 w-16 truncate" title={`Loan B: ${labelB}`}>
+                        {labelB}
+                      </span>
                       <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 transition-all duration-500"
@@ -1589,7 +2089,7 @@ export default function LoanCalculatorView({
                     </span>
                   </div>
                   <p className="text-[11.5px] leading-normal text-emerald-800 mt-1">
-                    <strong>Loan Option {compCalculations.betterLoan}</strong> has the lowest overall cost of borrowing.
+                    <strong>Loan Option {compCalculations.betterLoan} ({compCalculations.betterLoan === "A" ? labelA : labelB})</strong> has the lowest overall cost of borrowing.
                     By selecting Option {compCalculations.betterLoan}, you save{" "}
                     <strong>{formatCurrency(compCalculations.totalDiff)}</strong> in total repayments compared to the alternative.
                   </p>
@@ -1813,3 +2313,176 @@ export default function LoanCalculatorView({
     </main>
   );
 }
+
+// Lender Offer Card Sub-Component
+function LenderOfferCard({
+  lender,
+  eligibleLimit,
+  emi,
+  resultingFoir,
+  likelihood,
+  reasons,
+  currency,
+  formatCurrency,
+  formatCompact,
+  onApplyNow,
+  eligIncome,
+  eligEmi,
+  eligTenure
+}: {
+  lender: LenderProduct;
+  eligibleLimit: number;
+  emi: number;
+  resultingFoir: number;
+  likelihood: "high" | "medium" | "low" | "ineligible";
+  reasons: string[];
+  currency: any;
+  formatCurrency: (val: number) => string;
+  formatCompact: (val: number) => string;
+  onApplyNow: any;
+  eligIncome: string;
+  eligEmi: string;
+  eligTenure: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isNotApproved = likelihood === "ineligible";
+
+  // Likelihood Badge Config
+  const badgeConfig = {
+    high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
+    medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
+    low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
+    ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
+  }[likelihood];
+
+  const handleApplyClick = () => {
+    let details = `Applied for ${lender.name} ${lender.productType} via matching suggestions. ` +
+      `Eligible Limit: ${formatCurrency(eligibleLimit)}, ROI: ${lender.minRate}%, Tenure: ${eligTenure} years. ` +
+      `Lender constraints: Max FOIR: ${lender.maxFoirPct}%, processing fee: ${lender.processingFee || "N/A"}.`;
+    onApplyNow(
+      `${lender.name} ${lender.productType}`,
+      eligibleLimit,
+      lender.minRate,
+      Number(eligTenure) || 5,
+      details
+    );
+  };
+
+  return (
+    <div className={`border rounded-[16px] p-4 bg-white shadow-sm transition-all duration-300 ${
+      isNotApproved ? "opacity-75 border-gray-200" : "border-gray-200 hover:shadow-md hover:border-primary/30"
+    }`}>
+      {/* Top row */}
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
+              {badgeConfig.label}
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-gray-400 mt-0.5">{lender.productType}</span>
+        </div>
+        {!isNotApproved && (
+          <button
+            onClick={handleApplyClick}
+            className="px-3.5 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[8px] hover:opacity-90 transition-all cursor-pointer"
+          >
+            Apply Now
+          </button>
+        )}
+      </div>
+
+      {/* Middle Grid */}
+      <div className="grid grid-cols-3 gap-2 border-t border-b border-gray-100 py-3 my-3 text-center">
+        <div className="flex flex-col border-r border-gray-100">
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Eligible Limit</span>
+          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
+            {isNotApproved ? "₹0" : formatCompact(eligibleLimit)}
+          </span>
+        </div>
+        <div className="flex flex-col border-r border-gray-100">
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Interest Rate</span>
+          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
+            {lender.minRate}%
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Est. Monthly EMI</span>
+          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
+            {isNotApproved ? "—" : formatCompact(emi)}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom Collapsible Info */}
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between text-[11px] font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+        >
+          <span>{expanded ? "Hide Details" : "View Checklist & Details"}</span>
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+
+        {expanded && (
+          <div className="mt-2 text-[11.5px] text-gray-600 flex flex-col gap-3 animate-fade-up">
+            {/* Why Matched / Why Not */}
+            <div className="p-2.5 rounded-[10px] bg-gray-50/50 border border-gray-100">
+              <span className="font-bold text-gray-700 block mb-1">
+                {isNotApproved ? "Reason for Not Approved:" : "Why Matched:"}
+              </span>
+              {isNotApproved ? (
+                <div className="flex flex-col gap-1 text-rose-700 font-semibold">
+                  {reasons.map((r, idx) => (
+                    <div key={idx} className="flex items-start gap-1">
+                      <span className="mt-0.5">•</span>
+                      <span>{r.split(": ")[1] || r}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Profile meets CIBIL (≥{lender.minCibil}), Income & FOIR requirements.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Pros and Cons */}
+            {!isNotApproved && (
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <span className="font-bold text-gray-700 block mb-1">Pros</span>
+                  <ul className="list-disc pl-3 text-emerald-700 space-y-0.5">
+                    {lender.pros.map((p, idx) => <li key={idx}>{p}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <span className="font-bold text-gray-700 block mb-1">Cons</span>
+                  <ul className="list-disc pl-3 text-amber-700 space-y-0.5">
+                    {lender.cons.map((c, idx) => <li key={idx}>{c}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Document Checklist */}
+            <div className="border-t border-gray-100 pt-2">
+              <span className="font-bold text-gray-700 block mb-1.5">Required Documents Checklist:</span>
+              <div className="grid gap-1.5">
+                {lender.docsRequired.map((doc, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-[8px] px-2 py-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary block shrink-0" />
+                    <span>{doc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

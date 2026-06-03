@@ -4,7 +4,7 @@ import { fetchAdminStats, type BackendStats } from "@/lib/backendAuth";
 import { advisorsData, type Advisor } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
-
+import { type LenderProduct } from "./LoanCalculatorView";
 interface AdminPortalProps {
   userId: string;
   userEmail: string;
@@ -32,8 +32,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   
 
 
-  // Active Admin Tabs: stats, experts, education, tests, appointments
-  const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments">("stats");
+  // Active Admin Tabs: stats, experts, education, tests, appointments, lenders
+  const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments" | "lenders">("stats");
 
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
@@ -41,6 +41,34 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+
+  // Lenders Catalog States
+  const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
+  const [lendersLoading, setLendersLoading] = useState(false);
+  const [lenderModalOpen, setLenderModalOpen] = useState(false);
+  const [editingLender, setEditingLender] = useState<LenderProduct | null>(null);
+  const [lenderForm, setLenderForm] = useState({
+    id: "",
+    name: "",
+    lenderType: "NBFC",
+    productType: "Home Loan",
+    category: "home",
+    minRate: 8.5,
+    maxRate: 12.0,
+    minTenureYears: 5,
+    maxTenureYears: 20,
+    minMonthlyIncome: 30000,
+    minCibil: 700,
+    maxFoirPct: 60,
+    minAmount: 100000,
+    maxAmount: 5000000,
+    disbursalTime: "2-5 days",
+    pros: "",
+    cons: "",
+    docsRequired: "",
+    processingFee: "As per offer at login",
+    emiPerLakhMin: "",
+  });
   
   // Loading and Error States
   const [statsLoading, setStatsLoading] = useState(false);
@@ -123,6 +151,170 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         .finally(() => setStatsLoading(false));
     }
   }, [isAdmin]);
+
+  // Fetch Lenders Catalog from backend JSON database
+  const fetchLenders = async () => {
+    try {
+      setLendersLoading(true);
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/lenders`);
+      if (res.ok) {
+        const data = await res.json();
+        setLenderList(data);
+      }
+    } catch (err) {
+      console.error("Error loading lenders list:", err);
+    } finally {
+      setLendersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchLenders();
+    }
+  }, [isAdmin]);
+
+  // Lenders CRUD Handlers
+  const handleOpenAddLender = () => {
+    setEditingLender(null);
+    setLenderForm({
+      id: "",
+      name: "",
+      lenderType: "NBFC",
+      productType: "Home Loan",
+      category: "home",
+      minRate: 8.5,
+      maxRate: 12.0,
+      minTenureYears: 5,
+      maxTenureYears: 20,
+      minMonthlyIncome: 30000,
+      minCibil: 700,
+      maxFoirPct: 60,
+      minAmount: 100000,
+      maxAmount: 5000000,
+      disbursalTime: "2-5 days",
+      pros: "Fast approvals, Digital KYC",
+      cons: "Documentation heavy",
+      docsRequired: "PAN & Aadhaar, 3 months salary slips, 6 months bank statements",
+      processingFee: "Up to 2% + GST",
+      emiPerLakhMin: "",
+    });
+    setLenderModalOpen(true);
+  };
+
+  const handleOpenEditLender = (l: LenderProduct) => {
+    setEditingLender(l);
+    setLenderForm({
+      id: l.id,
+      name: l.name,
+      lenderType: l.lenderType,
+      productType: l.productType,
+      category: l.category,
+      minRate: l.minRate,
+      maxRate: l.maxRate,
+      minTenureYears: l.minTenureYears,
+      maxTenureYears: l.maxTenureYears,
+      minMonthlyIncome: l.minMonthlyIncome,
+      minCibil: l.minCibil,
+      maxFoirPct: l.maxFoirPct,
+      minAmount: l.minAmount,
+      maxAmount: l.maxAmount,
+      disbursalTime: l.disbursalTime,
+      pros: l.pros.join(", "),
+      cons: l.cons.join(", "),
+      docsRequired: l.docsRequired.join(", "),
+      processingFee: l.processingFee || "",
+      emiPerLakhMin: l.emiPerLakhMin || "",
+    });
+    setLenderModalOpen(true);
+  };
+
+  const handleSaveLender = async () => {
+    if (!lenderForm.name?.trim() || !lenderForm.productType?.trim()) {
+      alert("Lender Name and Product Type are required!");
+      return;
+    }
+
+    const generatedId = lenderForm.id?.trim() || `${lenderForm.category}-${lenderForm.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}`;
+    
+    const item: LenderProduct = {
+      id: generatedId,
+      name: lenderForm.name.trim(),
+      lenderType: lenderForm.lenderType,
+      productType: lenderForm.productType.trim(),
+      category: lenderForm.category,
+      minRate: Number(lenderForm.minRate) || 8.5,
+      maxRate: Number(lenderForm.maxRate) || Number(lenderForm.minRate) || 8.5,
+      minTenureYears: Number(lenderForm.minTenureYears) || 1,
+      maxTenureYears: Number(lenderForm.maxTenureYears) || 30,
+      minMonthlyIncome: Number(lenderForm.minMonthlyIncome) || 25000,
+      minCibil: Number(lenderForm.minCibil) || 700,
+      maxFoirPct: Number(lenderForm.maxFoirPct) || 60,
+      minAmount: Number(lenderForm.minAmount) || 100000,
+      maxAmount: Number(lenderForm.maxAmount) || 10000000,
+      disbursalTime: lenderForm.disbursalTime?.trim() || "2-5 days",
+      pros: (lenderForm.pros || "").split(",").map(p => p.trim()).filter(Boolean),
+      cons: (lenderForm.cons || "").split(",").map(c => c.trim()).filter(Boolean),
+      docsRequired: (lenderForm.docsRequired || "").split(",").map(d => d.trim()).filter(Boolean),
+      processingFee: lenderForm.processingFee?.trim() || "As per offer at login",
+      emiPerLakhMin: lenderForm.emiPerLakhMin?.trim() || "",
+    };
+
+    let updatedList: LenderProduct[];
+    if (editingLender) {
+      updatedList = lenderList.map(l => l.id === editingLender.id ? item : l);
+    } else {
+      updatedList = [...lenderList, item];
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/lenders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedList),
+      });
+      if (res.ok) {
+        setLenderList(updatedList);
+        setLenderModalOpen(false);
+        // Sync with active LoanCalculatorView matching engine
+        window.dispatchEvent(new CustomEvent("finheal:lenders_update"));
+      } else {
+        const errData = await res.json();
+        alert("Failed to save: " + JSON.stringify(errData));
+      }
+    } catch (err) {
+      console.error("Error saving lender:", err);
+      alert("Network error connecting to backend API.");
+    }
+  };
+
+  const handleDeleteLender = async (id: string) => {
+    if (confirm("Are you sure you want to delete this lender product?")) {
+      const updatedList = lenderList.filter(l => l.id !== id);
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const res = await fetch(`${apiBase}/lenders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedList),
+        });
+        if (res.ok) {
+          setLenderList(updatedList);
+          window.dispatchEvent(new CustomEvent("finheal:lenders_update"));
+        } else {
+          alert("Failed to delete lender product.");
+        }
+      } catch (err) {
+        console.error("Error deleting lender:", err);
+      }
+    }
+  };
 
   // Load local storage states
   useEffect(() => {
@@ -602,7 +794,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 { id: "experts", label: "🧑‍💼 Manage Experts" },
                 { id: "education", label: "📚 Manage Education" },
                 { id: "tests", label: "🧭 Manage Tests" },
-                { id: "appointments", label: "📅 Scheduled Calls" }
+                { id: "appointments", label: "📅 Scheduled Calls" },
+                { id: "lenders", label: "🏦 Lenders Catalog" }
               ].map(t => (
                 <button 
                   key={t.id} 
@@ -1006,6 +1199,83 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: MANAGE LENDERS */}
+            {activeTab === "lenders" && (
+              <div className="space-y-[16px] animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({lenderList.length})</h3>
+                  <button 
+                    onClick={handleOpenAddLender}
+                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                  >
+                    + Add Lender Product
+                  </button>
+                </div>
+
+                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
+                  <table className="w-full text-left text-[12px] border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                        <th className="p-[12px]">Lender / Product</th>
+                        <th className="p-[12px]">Lender Type</th>
+                        <th className="p-[12px]">Category</th>
+                        <th className="p-[12px]">Rate (ROI)</th>
+                        <th className="p-[12px]">Limit Range</th>
+                        <th className="p-[12px]">Min CIBIL / Income</th>
+                        <th className="p-[12px] text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lendersLoading ? (
+                        <tr>
+                          <td colSpan={7} className="text-center p-6 text-gray-400">Loading catalog...</td>
+                        </tr>
+                      ) : lenderList.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center p-6 text-gray-400">No lenders listed. Click "+ Add Lender Product" to seed catalog.</td>
+                        </tr>
+                      ) : (
+                        lenderList.map((l) => (
+                          <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                            <td className="p-[12px] max-w-[200px]">
+                              <strong className="text-gray-900 block">{l.name}</strong>
+                              <span className="text-[10px] text-gray-400 block">{l.productType}</span>
+                              <span className="text-[9px] text-primary/70 font-semibold uppercase">{l.id}</span>
+                            </td>
+                            <td className="p-[12px] font-semibold text-gray-600">{l.lenderType}</td>
+                            <td className="p-[12px] font-semibold text-gray-500 uppercase">{l.category}</td>
+                            <td className="p-[12px] font-bold text-emerald-600">{l.minRate}% - {l.maxRate}%</td>
+                            <td className="p-[12px] font-semibold text-gray-800">
+                              ₹{l.minAmount >= 10000000 ? `${(l.minAmount/10000000).toFixed(1)}Cr` : l.minAmount >= 100000 ? `${(l.minAmount/100000).toFixed(0)}L` : l.minAmount} - 
+                              ₹{l.maxAmount >= 10000000 ? `${(l.maxAmount/10000000).toFixed(0)}Cr` : l.maxAmount >= 100000 ? `${(l.maxAmount/100000).toFixed(0)}L` : l.maxAmount}
+                            </td>
+                            <td className="p-[12px] text-gray-500">
+                              <span>CIBIL: ≥{l.minCibil}</span>
+                              <span className="block text-[10px] text-gray-400">Min Income: ₹{l.minMonthlyIncome}</span>
+                            </td>
+                            <td className="p-[12px] text-right space-x-[6px]">
+                              <button 
+                                onClick={() => handleOpenEditLender(l)}
+                                className="text-primary hover:underline font-bold cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteLender(l.id)}
+                                className="text-rose-500 hover:underline font-bold cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -1555,6 +1825,244 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               </button>
               <button onClick={handleSaveTest} className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 transition cursor-pointer shadow-md">
                 Save Test
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ===================== LENDERS ADD/EDIT POPUP MODAL ======================= */}
+      {/* ========================================================================= */}
+      {lenderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[550px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
+              <h3 className="text-[14px] font-bold text-gray-900">
+                {editingLender ? `Edit Lender: ${editingLender.name}` : "Add New Lender Product"}
+              </h3>
+              <button onClick={() => setLenderModalOpen(false)} className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[12px] overflow-y-auto max-h-[70vh] scrollbar-thin">
+              <div className="grid grid-cols-2 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Lender Name</label>
+                  <input
+                    type="text"
+                    value={lenderForm.name || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, name: e.target.value })}
+                    placeholder="e.g. SBI"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Product Type</label>
+                  <input
+                    type="text"
+                    value={lenderForm.productType || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, productType: e.target.value })}
+                    placeholder="e.g. Home Loan"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Category</label>
+                  <select
+                    value={lenderForm.category || "home"}
+                    onChange={(e) => setLenderForm({ ...lenderForm, category: e.target.value as any })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white animate-fade-in"
+                  >
+                    <option value="home">Home Loan</option>
+                    <option value="personal">Personal Loan</option>
+                    <option value="professional">Professional Loan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Lender Type</label>
+                  <select
+                    value={lenderForm.lenderType || "NBFC"}
+                    onChange={(e) => setLenderForm({ ...lenderForm, lenderType: e.target.value })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white animate-fade-in"
+                  >
+                    <option value="PSU">PSU Bank</option>
+                    <option value="Private Bank">Private Bank</option>
+                    <option value="NBFC">NBFC</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Product ID</label>
+                  <input
+                    type="text"
+                    value={lenderForm.id || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, id: e.target.value })}
+                    placeholder="e.g. HL-SBI"
+                    disabled={!!editingLender}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Min Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={lenderForm.minRate || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, minRate: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Max Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={lenderForm.maxRate || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, maxRate: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Min Tenure (Y)</label>
+                  <input
+                    type="number"
+                    value={lenderForm.minTenureYears || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, minTenureYears: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Max Tenure (Y)</label>
+                  <input
+                    type="number"
+                    value={lenderForm.maxTenureYears || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, maxTenureYears: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Min CIBIL</label>
+                  <input
+                    type="number"
+                    value={lenderForm.minCibil || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, minCibil: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Max FOIR (%)</label>
+                  <input
+                    type="number"
+                    value={lenderForm.maxFoirPct || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, maxFoirPct: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Min Monthly Income</label>
+                  <input
+                    type="number"
+                    value={lenderForm.minMonthlyIncome || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, minMonthlyIncome: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Min Loan Amount</label>
+                  <input
+                    type="number"
+                    value={lenderForm.minAmount || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, minAmount: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Max Loan Amount</label>
+                  <input
+                    type="number"
+                    value={lenderForm.maxAmount || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, maxAmount: Number(e.target.value) })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Disbursal TAT</label>
+                  <input
+                    type="text"
+                    value={lenderForm.disbursalTime || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, disbursalTime: e.target.value })}
+                    placeholder="e.g. 2-5 working days"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Processing Fee</label>
+                  <input
+                    type="text"
+                    value={lenderForm.processingFee || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, processingFee: e.target.value })}
+                    placeholder="e.g. 2.0% + GST"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Pros (comma-separated)</label>
+                <input
+                  type="text"
+                  value={lenderForm.pros || ""}
+                  onChange={(e) => setLenderForm({ ...lenderForm, pros: e.target.value })}
+                  placeholder="Fast approvals, Digital KYC"
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Cons (comma-separated)</label>
+                <input
+                  type="text"
+                  value={lenderForm.cons || ""}
+                  onChange={(e) => setLenderForm({ ...lenderForm, cons: e.target.value })}
+                  placeholder="Higher ROI band, Documentation heavy"
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Required Documents (comma-separated)</label>
+                <textarea
+                  value={lenderForm.docsRequired || ""}
+                  onChange={(e) => setLenderForm({ ...lenderForm, docsRequired: e.target.value })}
+                  placeholder="PAN & Aadhaar KYC, Medical/CA degree, 6 months banking statements"
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] h-[55px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-[10px] border-t border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
+              <button onClick={() => setLenderModalOpen(false)} className="px-[16px] py-[8px] bg-white border border-gray-300 rounded-[10px] text-[12px] font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={handleSaveLender} className="px-[16px] py-[8px] bg-primary text-white hover:opacity-90 rounded-[10px] text-[12px] font-bold cursor-pointer animate-pulse-ring">
+                Save Product
               </button>
             </div>
           </div>
