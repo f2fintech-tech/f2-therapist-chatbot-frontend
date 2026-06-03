@@ -8,12 +8,9 @@ Steps to run locally (Codespaces / local machine):
 
 2. Edit `.env` only if you need a different backend host; the default is `/api/v1`, which Vite proxies to the backend.
 
-3. Start the dev server (ensure `PORT` and `BASE_PATH` are set in `.env` or environment):
+3. Start the dev server:
 
-   # Example (bash)
-   export PORT=5173
-   export BASE_PATH=/
-   pnpm --filter @workspace/f2-finheal dev
+   pnpm dev
 
 Notes:
 - Use `VITE_API_BASE_URL` to override the API endpoint.
