@@ -23,9 +23,11 @@ interface SidebarProps {
   onOpenAdmin?: () => void;
   onLogout?: () => void;
   initialActiveNav: string;
+  onSelectMood?: (moodEmoji: string, moodTitle: string) => void;
+  onOpenLoanCalculator?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -219,6 +221,15 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const handleOpenLoanCalculator = () => {
+    setActiveNav("Loan Calculator");
+    onOpenLoanCalculator?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
   const moods = [
     { emoji: "😰", title: "Very Stressed", hoverText: "Stressed" },
     { emoji: "😟", title: "Anxious", hoverText: "Worried" },
@@ -288,7 +299,10 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
                   <button
                     type="button"
                     aria-label={m.title}
-                    onClick={() => setActiveMood(m.emoji)}
+                    onClick={() => {
+                      setActiveMood(m.emoji);
+                      onSelectMood?.(m.emoji, m.title);
+                    }}
                     className={`flex-1 h-[36px] rounded-[10px] border-[1.5px] text-[17px] flex items-center justify-center transition-all ${activeMood === m.emoji ? 'border-primary bg-primary/10 shadow-[0_0_0_3px_rgba(50,68,230,0.1)]' : 'border-gray-200 bg-white hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:scale-105'}`}
                   >
                     {m.emoji}
@@ -496,7 +510,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
             <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => { setActiveNav("Financial Education"); onOpenEducation?.(); }} />
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
-            <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={() => setActiveNav("Loan Calculator")} />
+            <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>

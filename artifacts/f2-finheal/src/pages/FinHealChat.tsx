@@ -22,6 +22,7 @@ import WelcomeSplash from "@/components/WelcomeSplash";
 import FinancialEducation from "@/components/FinancialEducation";
 import AdvisorPanel from "@/components/AdvisorPanel";
 import AdminPortal from "@/components/AdminPortal"; // Dynamic admin/expert workspace portal
+import LoanCalculatorView from "@/components/LoanCalculatorView";
 
 export default function FinHealChat() {
 
@@ -37,6 +38,7 @@ export default function FinHealChat() {
     if (view === "profile") return "profile" as const;
     if (view === "advisor") return "advisor" as const;
     if (view === "admin") return "admin" as const;
+    if (view === "loan-calculator") return "loan-calculator" as const;
     return "chat" as const;
   };
 
@@ -46,7 +48,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -212,6 +214,25 @@ export default function FinHealChat() {
   const openProfilePage = () => setMainView("profile");
   const openAdvisor = () => setMainView("advisor");
   const openAdmin = () => setMainView("admin");
+  const openLoanCalculator = () => setMainView("loan-calculator");
+
+  const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
+    const formattedAmount = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+    const messageText = `I would like to apply for a ${loanType} of ${formattedAmount} at an interest rate of ${rate}% for a tenure of ${tenure} years. Could you please guide me on the next steps, eligibility criteria, and documents required?`;
+
+    setMainView("chat");
+    void chat.startNewChatWithMessage(messageText);
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      closeSidebar();
+    }
+  }, [chat]);
+
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -250,7 +271,9 @@ export default function FinHealChat() {
           ? "Admin Portal"
           : mainView === "education"
             ? "Financial Education"
-            : "Financial Health Test";
+            : mainView === "loan-calculator"
+              ? "Loan Calculator"
+              : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -272,6 +295,23 @@ export default function FinHealChat() {
     setStoredAuthSession(nextSession);
     setAuthSession(nextSession);
   };
+
+  const handleSelectMood = useCallback((emoji: string, title: string) => {
+    setMainView("chat");
+    const moodMessages: Record<string, string> = {
+      "😰": "😰 I am feeling very stressed and overwhelmed today.",
+      "😟": "😟 I am feeling anxious and worried today.",
+      "😐": "😐 I am feeling neutral today.",
+      "🙂": "🙂 I am feeling okay and calm today.",
+      "😄": "😄 I am feeling great and energetic today.",
+    };
+    const messageText = moodMessages[emoji] || `${emoji} I am feeling ${title.toLowerCase()} today.`;
+    void chat.startNewChatWithMessage(messageText);
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      closeSidebar();
+    }
+  }, [chat]);
 
   if (!authSession || !userProfile) {
     return <AuthScreen currentSession={prevGuestSession || authSession} onAuthSuccess={persistSession} />;
@@ -309,6 +349,8 @@ export default function FinHealChat() {
           onOpenAdmin={openAdmin}
           onLogout={handleLogout}
           initialActiveNav={activeSidebarNav}
+          onSelectMood={handleSelectMood}
+          onOpenLoanCalculator={openLoanCalculator}
         />
         {mainView === "chat" ? (
           <ChatArea
@@ -415,6 +457,13 @@ export default function FinHealChat() {
             userEmail={authSession.email || ""}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
+          />
+        ) : mainView === "loan-calculator" ? (
+          <LoanCalculatorView
+            userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
+            onApplyNow={handleApplyLoan}
           />
         ) : (
           <DebtBalanceReviewView

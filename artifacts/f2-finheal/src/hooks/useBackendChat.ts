@@ -24,6 +24,7 @@ export interface UseBackendChatResult {
   conversations: ConversationSummary[];
   conversationCount: number;
   sendMessage: (message: string) => Promise<void>;
+  startNewChatWithMessage: (message: string) => Promise<void>;
   stopSendingMessage: () => void;
   clearMessages: () => void;
   clearConversation: () => void;
@@ -256,6 +257,72 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     };
   }, [userId]);
 
+  const startNewChatWithMessage = useCallback(
+    async (message: string) => {
+      const trimmedMessage = message.trim();
+      if (!trimmedMessage || !userId) {
+        return;
+      }
+
+      // Abort any active request first
+      activeSendControllerRef.current?.abort();
+      activeSendControllerRef.current = null;
+
+      // Reset conversation/messages state for a fresh start
+      setMessages([]);
+      setConversationId(null);
+      setError(null);
+      setIsLoading(false);
+      setIsSendingMessage(true);
+
+      const controller = new AbortController();
+      activeSendControllerRef.current = controller;
+      const optimisticMessage = createUserMessage(trimmedMessage);
+      setMessages([optimisticMessage]);
+
+      try {
+        const response = await sendChatMessage({
+          message: trimmedMessage,
+          user_id: userId,
+          conversation_id: undefined, // Force undefined to start a new conversation
+        }, controller.signal);
+
+        setConversationId(response.conversation_id);
+        const assistantMsg = createAssistantMessage(response);
+        const conversationTitle = response.title?.trim() || trimmedMessage.substring(0, 60).trim();
+        setMessages((currentMessages) => {
+          const next = [...currentMessages, assistantMsg];
+          try {
+            upsertLocalConversation(response.conversation_id, userId, next, conversationTitle);
+          } catch {}
+          return next;
+        });
+
+        await refreshConversations();
+      } catch (caughtError) {
+        const normalizedError = normalizeBackendError(caughtError);
+        // Clear optimistic message if request was cancelled or failed
+        setMessages([]);
+
+        if (normalizedError.code !== "cancelled") {
+          if (normalizedError.message.includes("402") || normalizedError.message.includes("Not enough hearts")) {
+            setHeartsExhausted(true);
+          } else {
+            setError(normalizedError);
+          }
+        } else {
+          setError(null);
+        }
+      } finally {
+        if (activeSendControllerRef.current === controller) {
+          activeSendControllerRef.current = null;
+        }
+        setIsSendingMessage(false);
+      }
+    },
+    [refreshConversations, userId]
+  );
+
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
@@ -281,6 +348,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     conversations,
     conversationCount,
     sendMessage,
+    startNewChatWithMessage,
     stopSendingMessage,
     clearMessages,
     clearConversation,
