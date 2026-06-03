@@ -101,12 +101,36 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
+
+    // Client-side validation
+    const email = loginUsername.trim();
+    const password = loginPassword;
+    const firstName = loginDisplayName.trim();
+    const age = loginAge.trim();
+
+    if (authMode === "signup") {
+      if (!firstName || !age || !email || !password) {
+        setLoginError("Please fill in all details to continue.");
+        return;
+      }
+      const parsedAge = parseInt(age, 10);
+      if (isNaN(parsedAge) || parsedAge < 18) {
+        setLoginError("You must be 18 or older to create an account.");
+        return;
+      }
+    } else {
+      if (!email || !password) {
+        setLoginError("Please enter your email and password to sign in.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const guestUserId = currentSession?.isGuest ? currentSession.userId : null;
       const payload = authMode === "signup"
-        ? await signUpUser(loginUsername.trim(), loginPassword, guestUserId ?? undefined, [loginDisplayName.trim(), loginLastName.trim()].filter(Boolean).join(" ") || loginUsername.trim())
-        : await signInUser(loginUsername.trim(), loginPassword);
+        ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email)
+        : await signInUser(email, password);
       if (guestUserId && payload.userId && guestUserId !== payload.userId) {
         migrateConversationsFromUserId(guestUserId, payload.userId);
         try {
@@ -120,9 +144,18 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
       onAuthSuccess(payload);
     } catch (error) {
       let message = error instanceof Error ? error.message : "Unable to authenticate. Please try again.";
-      if (message.includes("Invalid email or password")) message = "Incorrect email or password. Please try again.";
-      else if (message.includes("{")) {
-        try { const p = JSON.parse(message); message = p.detail || p.error || message; } catch {}
+      if (message.includes("Invalid email or password")) {
+        message = "Incorrect email or password. Please try again.";
+      } else if (message.includes("{")) {
+        try {
+          const p = JSON.parse(message);
+          if (Array.isArray(p.detail)) {
+            // Format FastAPI Pydantic validation errors nicely
+            message = p.detail.map((err: any) => err.msg).join(", ");
+          } else {
+            message = p.detail || p.error || message;
+          }
+        } catch {}
       }
       setLoginError(message);
     } finally {
@@ -446,7 +479,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
                   <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
-                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" required style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
+                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
                   </label>
                   <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>

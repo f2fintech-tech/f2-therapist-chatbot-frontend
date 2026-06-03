@@ -37,6 +37,16 @@ export default function InsightsPanel({
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<string>("");
 
+  // Live clock state
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Goal Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
@@ -141,6 +151,28 @@ export default function InsightsPanel({
 
   const panelContent = (
     <>
+      {/* Live Digital Clock & Date */}
+      <div className="mb-[18px] bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px] flex items-center justify-between shadow-sm animate-fade-in">
+        <div className="flex flex-col">
+          <div className="font-mono text-[20px] font-bold text-gray-900 leading-[1.2]">
+            {currentTime.toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: true
+            })}
+          </div>
+          <div className="text-[10px] text-gray-500 font-semibold uppercase tracking-[0.5px] mt-[3px]">
+            {currentTime.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric"
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Session Stats */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">This Session</div>
