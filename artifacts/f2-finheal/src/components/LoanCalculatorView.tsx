@@ -217,63 +217,63 @@ export default function LoanCalculatorView({
 
   // State definitions for sub-calculators
   // Tab 1: EMI Calculator Inputs
-  const [emiAmount, setEmiAmount] = useState<number | "">(activeConfig.defaultAmount);
-  const [emiRate, setEmiRate] = useState<number | "">(activeConfig.defaultRate);
-  const [emiTenure, setEmiTenure] = useState<number | "">(activeConfig.defaultTenure);
+  const [emiAmount, setEmiAmount] = useState<string>(String(activeConfig.defaultAmount));
+  const [emiRate, setEmiRate] = useState<string>(String(activeConfig.defaultRate));
+  const [emiTenure, setEmiTenure] = useState<string>(String(activeConfig.defaultTenure));
   const [emiOptimize, setEmiOptimize] = useState<boolean>(false);
   const [showAmortization, setShowAmortization] = useState<boolean>(false);
   const [expandedYear, setExpandedYear] = useState<number | null>(null);
 
   // Sync state when config changes
   useEffect(() => {
-    setEmiAmount(activeConfig.defaultAmount);
-    setEmiRate(activeConfig.defaultRate);
-    setEmiTenure(activeConfig.defaultTenure);
+    setEmiAmount(String(activeConfig.defaultAmount));
+    setEmiRate(String(activeConfig.defaultRate));
+    setEmiTenure(String(activeConfig.defaultTenure));
     setEmiOptimize(false);
     setShowAmortization(false);
     setExpandedYear(null);
   }, [activeConfig]);
 
   // Tab 2: Eligibility Calculator Inputs
-  const [eligIncome, setEligIncome] = useState<number | "">(Math.round(100000 * currencyScale));
-  const [eligEmi, setEligEmi] = useState<number | "">(Math.round(10000 * currencyScale));
-  const [eligRate, setEligRate] = useState<number | "">(9.5);
-  const [eligTenure, setEligTenure] = useState<number | "">(20);
+  const [eligIncome, setEligIncome] = useState<string>(String(Math.round(100000 * currencyScale)));
+  const [eligEmi, setEligEmi] = useState<string>(String(Math.round(10000 * currencyScale)));
+  const [eligRate, setEligRate] = useState<string>("9.5");
+  const [eligTenure, setEligTenure] = useState<string>("20");
 
   // Sync eligibility default amounts on currency scale shifts
   useEffect(() => {
-    setEligIncome(Math.round(100000 * currencyScale));
-    setEligEmi(Math.round(10000 * currencyScale));
+    setEligIncome(String(Math.round(100000 * currencyScale)));
+    setEligEmi(String(Math.round(10000 * currencyScale)));
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
-  const [compAmountA, setCompAmountA] = useState<number | "">(Math.round(2000000 * currencyScale));
-  const [compRateA, setCompRateA] = useState<number | "">(8.5);
-  const [compTenureA, setCompTenureA] = useState<number | "">(20);
+  const [compAmountA, setCompAmountA] = useState<string>(String(Math.round(2000000 * currencyScale)));
+  const [compRateA, setCompRateA] = useState<string>("8.5");
+  const [compTenureA, setCompTenureA] = useState<string>("20");
 
-  const [compAmountB, setCompAmountB] = useState<number | "">(Math.round(2000000 * currencyScale));
-  const [compRateB, setCompRateB] = useState<number | "">(9.2);
-  const [compTenureB, setCompTenureB] = useState<number | "">(15);
+  const [compAmountB, setCompAmountB] = useState<string>(String(Math.round(2000000 * currencyScale)));
+  const [compRateB, setCompRateB] = useState<string>("9.2");
+  const [compTenureB, setCompTenureB] = useState<string>("15");
 
   useEffect(() => {
-    setCompAmountA(Math.round(2000000 * currencyScale));
-    setCompAmountB(Math.round(2000000 * currencyScale));
+    setCompAmountA(String(Math.round(2000000 * currencyScale)));
+    setCompAmountB(String(Math.round(2000000 * currencyScale)));
   }, [currencyScale]);
 
   // Tab 4: Prepayment Inputs
-  const [prepAmount, setPrepAmount] = useState<number | "">(activeConfig.defaultAmount);
-  const [prepRate, setPrepRate] = useState<number | "">(activeConfig.defaultRate);
-  const [prepTenure, setPrepTenure] = useState<number | "">(activeConfig.defaultTenure);
+  const [prepAmount, setPrepAmount] = useState<string>(String(activeConfig.defaultAmount));
+  const [prepRate, setPrepRate] = useState<string>(String(activeConfig.defaultRate));
+  const [prepTenure, setPrepTenure] = useState<string>(String(activeConfig.defaultTenure));
   const [prepType, setPrepType] = useState<"lump" | "monthly">("monthly");
-  const [prepVal, setPrepVal] = useState<number | "">(Math.round(10000 * currencyScale));
-  const [prepStartMonth, setPrepStartMonth] = useState<number | "">(12);
+  const [prepVal, setPrepVal] = useState<string>(String(Math.round(10000 * currencyScale)));
+  const [prepStartMonth, setPrepStartMonth] = useState<string>("12");
 
   useEffect(() => {
-    setPrepAmount(activeConfig.defaultAmount);
-    setPrepRate(activeConfig.defaultRate);
-    setPrepTenure(activeConfig.defaultTenure);
-    setPrepVal(Math.round(10000 * currencyScale));
-    setPrepStartMonth(12);
+    setPrepAmount(String(activeConfig.defaultAmount));
+    setPrepRate(String(activeConfig.defaultRate));
+    setPrepTenure(String(activeConfig.defaultTenure));
+    setPrepVal(String(Math.round(10000 * currencyScale)));
+    setPrepStartMonth("12");
   }, [activeConfig]);
 
   // Calculations for Tab 1: EMI
@@ -389,6 +389,68 @@ export default function LoanCalculatorView({
       yearlyAmortization,
     };
   }, [emiAmount, emiRate, emiTenure, emiOptimize]);
+
+  // Chart data calculations for Cumulative Amortization curve
+  const emiChartData = useMemo(() => {
+    const amountVal = Number(emiAmount) || 0;
+    const tenureVal = Number(emiTenure) || 1;
+    
+    // Balance Points
+    const balancePoints = [amountVal];
+    // Cumulative Interest Points
+    const interestPoints = [0];
+    
+    let cumulativeInterest = 0;
+    emiCalculations.yearlyAmortization.forEach((yr) => {
+      balancePoints.push(yr.endBalance);
+      cumulativeInterest += yr.interest;
+      interestPoints.push(cumulativeInterest);
+    });
+
+    const maxY = Math.max(amountVal, emiCalculations.totalInterest) || 100;
+    const pointsCount = balancePoints.length;
+
+    const chartWidth = 256;
+    const chartHeight = 110;
+
+    // Build SVG path strings
+    let balancePath = "";
+    let interestPath = "";
+    let balanceLine = "";
+    let interestLine = "";
+
+    for (let i = 0; i < pointsCount; i++) {
+      const x = (i / (pointsCount - 1)) * chartWidth;
+      // Subtract 5px padding from top and bottom to prevent line cuts
+      const yBal = chartHeight - (balancePoints[i] / maxY) * (chartHeight - 10) - 5;
+      const yInt = chartHeight - (interestPoints[i] / maxY) * (chartHeight - 10) - 5;
+
+      if (i === 0) {
+        balanceLine = `M ${x} ${yBal}`;
+        interestLine = `M ${x} ${yInt}`;
+        balancePath = `M ${x} ${chartHeight} L ${x} ${yBal}`;
+        interestPath = `M ${x} ${chartHeight} L ${x} ${yInt}`;
+      } else {
+        balanceLine += ` L ${x} ${yBal}`;
+        interestLine += ` L ${x} ${yInt}`;
+        balancePath += ` L ${x} ${yBal}`;
+        interestPath += ` L ${x} ${yInt}`;
+      }
+    }
+
+    if (pointsCount > 0) {
+      balancePath += ` L ${chartWidth} ${chartHeight} Z`;
+      interestPath += ` L ${chartWidth} ${chartHeight} Z`;
+    }
+
+    return {
+      balancePath,
+      interestPath,
+      balanceLine,
+      interestLine,
+      maxY,
+    };
+  }, [emiAmount, emiCalculations.yearlyAmortization, emiCalculations.totalInterest, emiTenure]);
 
   // Calculations for Tab 2: Eligibility
   const eligCalculations = useMemo(() => {
@@ -716,14 +778,14 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={emiAmount}
-                      onChange={(e) => setEmiAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setEmiAmount(e.target.value)}
                       onBlur={() => {
                         const val = Number(emiAmount) || 0;
                         const clamped = Math.max(
                           activeConfig.minAmount,
                           Math.min(activeConfig.maxAmount, val)
                         );
-                        setEmiAmount(clamped);
+                        setEmiAmount(String(clamped));
                       }}
                       className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                     />
@@ -734,7 +796,7 @@ export default function LoanCalculatorView({
                     max={activeConfig.maxAmount}
                     step={activeConfig.amountStep}
                     value={Number(emiAmount) || 0}
-                    onChange={(e) => setEmiAmount(Number(e.target.value))}
+                    onChange={(e) => setEmiAmount(e.target.value)}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                   <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
@@ -754,14 +816,14 @@ export default function LoanCalculatorView({
                       type="number"
                       step="0.05"
                       value={emiRate}
-                      onChange={(e) => setEmiRate(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setEmiRate(e.target.value)}
                       onBlur={() => {
                         const val = Number(emiRate) || 0;
                         const clamped = Math.max(
                           activeConfig.minRate,
                           Math.min(activeConfig.maxRate, val)
                         );
-                        setEmiRate(Number(clamped.toFixed(2)));
+                        setEmiRate(String(Number(clamped.toFixed(2))));
                       }}
                       className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                     />
@@ -773,7 +835,7 @@ export default function LoanCalculatorView({
                     max={activeConfig.maxRate}
                     step={activeConfig.rateStep}
                     value={Number(emiRate) || 0}
-                    onChange={(e) => setEmiRate(Number(e.target.value))}
+                    onChange={(e) => setEmiRate(e.target.value)}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                   <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
@@ -792,14 +854,14 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={emiTenure}
-                      onChange={(e) => setEmiTenure(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setEmiTenure(e.target.value)}
                       onBlur={() => {
                         const val = Number(emiTenure) || 0;
                         const clamped = Math.max(
                           activeConfig.minTenure,
                           Math.min(activeConfig.maxTenure, val)
                         );
-                        setEmiTenure(clamped);
+                        setEmiTenure(String(clamped));
                       }}
                       className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                     />
@@ -811,7 +873,7 @@ export default function LoanCalculatorView({
                     max={activeConfig.maxTenure}
                     step={1}
                     value={Number(emiTenure) || 0}
-                    onChange={(e) => setEmiTenure(Number(e.target.value))}
+                    onChange={(e) => setEmiTenure(e.target.value)}
                     className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                   <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
@@ -856,41 +918,23 @@ export default function LoanCalculatorView({
 
               {/* Visualizations Side */}
               <div className="lg:col-span-5 flex flex-col gap-[20px] justify-center items-center">
-                {/* Donut Chart */}
-                <div className="relative flex flex-col items-center justify-center p-4">
-                  <svg width="180" height="180" className="transform -rotate-90">
-                    <circle cx="90" cy="90" r={emiCalculations.donutRadius} stroke="#f3f4f6" strokeWidth="12" fill="none" />
-                    <circle
-                      cx="90"
-                      cy="90"
-                      r={emiCalculations.donutRadius}
-                      stroke="#3344e6" // Principal Blue
-                      strokeWidth="12"
-                      fill="none"
-                      strokeDasharray={`${emiCalculations.principalStrokeLength} ${emiCalculations.donutCircumference}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-500"
+                {/* Horizontal Outflow Progress Bar */}
+                <div className="w-full max-w-[280px] flex flex-col gap-2 mt-1 animate-fade-up">
+                  <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                    <span>Outflow Breakdown</span>
+                    <span>Total: {formatCurrency(emiCalculations.totalPayable)}</span>
+                  </div>
+                  <div className="w-full h-4 bg-gray-100 rounded-full flex overflow-hidden border border-gray-200/50">
+                    <div
+                      className="h-full bg-primary transition-all duration-500"
+                      style={{ width: `${emiCalculations.principalPct}%` }}
                     />
                     {emiCalculations.totalInterest > 0 && (
-                      <circle
-                        cx="90"
-                        cy="90"
-                        r={emiCalculations.donutRadius}
-                        stroke="#10b981" // Interest Emerald
-                        strokeWidth="12"
-                        fill="none"
-                        strokeDasharray={`${emiCalculations.interestStrokeLength} ${emiCalculations.donutCircumference}`}
-                        strokeDashoffset={emiCalculations.interestStrokeOffset}
-                        strokeLinecap="round"
-                        className="transition-all duration-500"
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${emiCalculations.interestPct}%` }}
                       />
                     )}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-5px]">
-                    <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-gray-400">Total Payments</span>
-                    <span className="text-[17px] font-bold text-gray-900 mt-0.5">
-                      {formatCurrency(emiCalculations.totalPayable)}
-                    </span>
                   </div>
                 </div>
 
@@ -912,6 +956,58 @@ export default function LoanCalculatorView({
                     </div>
                     <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(emiCalculations.totalInterest)}</span>
                     <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.interestPct)}%)</span>
+                  </div>
+                </div>
+
+                {/* Payoff Progress Amortization Timeline Area Chart */}
+                <div className="w-full max-w-[280px] bg-gray-50 border border-gray-150 rounded-[14px] p-3 flex flex-col gap-2 animate-fade-up">
+                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                    <span>Payoff Progress Timeline</span>
+                    <span>Max: {formatCompact(emiChartData.maxY)}</span>
+                  </div>
+                  
+                  <div className="relative w-full h-[115px] flex items-center justify-center">
+                    <svg width="256" height="110" className="overflow-visible">
+                      {/* Grid lines */}
+                      <line x1="0" y1="5" x2="256" y2="5" stroke="#f1f3f5" strokeWidth="1" />
+                      <line x1="0" y1="55" x2="256" y2="55" stroke="#f1f3f5" strokeWidth="1" />
+                      <line x1="0" y1="105" x2="256" y2="105" stroke="#e9ecef" strokeWidth="1" strokeDasharray="3 3" />
+                      
+                      {/* Areas */}
+                      {emiChartData.interestPath && (
+                        <path d={emiChartData.interestPath} fill="url(#interestGrad)" className="opacity-15 transition-all duration-500" />
+                      )}
+                      {emiChartData.balancePath && (
+                        <path d={emiChartData.balancePath} fill="url(#balanceGrad)" className="opacity-10 transition-all duration-500" />
+                      )}
+                      
+                      {/* Lines */}
+                      {emiChartData.interestLine && (
+                        <path d={emiChartData.interestLine} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" className="transition-all duration-500" />
+                      )}
+                      {emiChartData.balanceLine && (
+                        <path d={emiChartData.balanceLine} fill="none" stroke="#3344e6" strokeWidth="2.5" strokeLinecap="round" className="transition-all duration-500" />
+                      )}
+                      
+                      {/* Gradients */}
+                      <defs>
+                        <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3344e6" />
+                          <stop offset="100%" stopColor="#3344e6" stopOpacity="0" />
+                        </linearGradient>
+                        <linearGradient id="interestGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
+                  
+                  {/* Chart Labels */}
+                  <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5">
+                    <span>Start (Year 0)</span>
+                    <span>Midway</span>
+                    <span>End (Year {Number(emiTenure) || 0})</span>
                   </div>
                 </div>
 
@@ -1034,12 +1130,12 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={eligIncome}
-                    onChange={(e) => setEligIncome(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setEligIncome(e.target.value)}
                     onBlur={() => {
                       const val = Number(eligIncome) || 0;
                       const minVal = Math.round(10000 * currencyScale);
                       const maxVal = Math.round(1000000 * currencyScale);
-                      setEligIncome(Math.max(minVal, Math.min(maxVal, val)));
+                      setEligIncome(String(Math.max(minVal, Math.min(maxVal, val))));
                     }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
@@ -1050,7 +1146,7 @@ export default function LoanCalculatorView({
                   max={Math.round(1000000 * currencyScale)}
                   step={Math.round(5000 * currencyScale)}
                   value={Number(eligIncome) || 0}
-                  onChange={(e) => setEligIncome(Number(e.target.value))}
+                  onChange={(e) => setEligIncome(e.target.value)}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
               </div>
@@ -1066,11 +1162,11 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={eligEmi}
-                    onChange={(e) => setEligEmi(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setEligEmi(e.target.value)}
                     onBlur={() => {
                       const val = Number(eligEmi) || 0;
                       const maxVal = Math.round(500000 * currencyScale);
-                      setEligEmi(Math.max(0, Math.min(maxVal, val)));
+                      setEligEmi(String(Math.max(0, Math.min(maxVal, val))));
                     }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
@@ -1081,7 +1177,7 @@ export default function LoanCalculatorView({
                   max={Math.round(500000 * currencyScale)}
                   step={Math.round(2000 * currencyScale)}
                   value={Number(eligEmi) || 0}
-                  onChange={(e) => setEligEmi(Number(e.target.value))}
+                  onChange={(e) => setEligEmi(e.target.value)}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
               </div>
@@ -1094,10 +1190,10 @@ export default function LoanCalculatorView({
                     type="number"
                     step="0.1"
                     value={eligRate}
-                    onChange={(e) => setEligRate(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setEligRate(e.target.value)}
                     onBlur={() => {
                       const val = Number(eligRate) || 0;
-                      setEligRate(Math.max(1, Math.min(30, val)));
+                      setEligRate(String(Math.max(1, Math.min(30, val))));
                     }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
@@ -1107,10 +1203,10 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={eligTenure}
-                    onChange={(e) => setEligTenure(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setEligTenure(e.target.value)}
                     onBlur={() => {
                       const val = Number(eligTenure) || 0;
-                      setEligTenure(Math.max(1, Math.min(40, val)));
+                      setEligTenure(String(Math.max(1, Math.min(40, val))));
                     }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
@@ -1259,12 +1355,12 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={compAmountA}
-                    onChange={(e) => setCompAmountA(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setCompAmountA(e.target.value)}
                     onBlur={() => {
                       const val = Number(compAmountA) || 0;
                       const minVal = Math.round(100000 * currencyScale);
                       const maxVal = Math.round(10000000 * currencyScale);
-                      setCompAmountA(Math.max(minVal, Math.min(maxVal, val)));
+                      setCompAmountA(String(Math.max(minVal, Math.min(maxVal, val))));
                     }}
                     className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                   />
@@ -1274,7 +1370,7 @@ export default function LoanCalculatorView({
                     max={Math.round(10000000 * currencyScale)}
                     step={Math.round(50000 * currencyScale)}
                     value={Number(compAmountA) || 0}
-                    onChange={(e) => setCompAmountA(Number(e.target.value))}
+                    onChange={(e) => setCompAmountA(e.target.value)}
                     className="w-full h-1 bg-gray-200 rounded mt-2 cursor-pointer accent-primary"
                   />
                 </div>
@@ -1286,10 +1382,10 @@ export default function LoanCalculatorView({
                       type="number"
                       step="0.05"
                       value={compRateA}
-                      onChange={(e) => setCompRateA(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setCompRateA(e.target.value)}
                       onBlur={() => {
                         const val = Number(compRateA) || 0;
-                        setCompRateA(Math.max(1, Math.min(30, val)));
+                        setCompRateA(String(Math.max(1, Math.min(30, val))));
                       }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
@@ -1299,10 +1395,10 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={compTenureA}
-                      onChange={(e) => setCompTenureA(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setCompTenureA(e.target.value)}
                       onBlur={() => {
                         const val = Number(compTenureA) || 0;
-                        setCompTenureA(Math.max(1, Math.min(40, val)));
+                        setCompTenureA(String(Math.max(1, Math.min(40, val))));
                       }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
@@ -1322,12 +1418,12 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={compAmountB}
-                    onChange={(e) => setCompAmountB(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setCompAmountB(e.target.value)}
                     onBlur={() => {
                       const val = Number(compAmountB) || 0;
                       const minVal = Math.round(100000 * currencyScale);
                       const maxVal = Math.round(10000000 * currencyScale);
-                      setCompAmountB(Math.max(minVal, Math.min(maxVal, val)));
+                      setCompAmountB(String(Math.max(minVal, Math.min(maxVal, val))));
                     }}
                     className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                   />
@@ -1337,7 +1433,7 @@ export default function LoanCalculatorView({
                     max={Math.round(10000000 * currencyScale)}
                     step={Math.round(50000 * currencyScale)}
                     value={Number(compAmountB) || 0}
-                    onChange={(e) => setCompAmountB(Number(e.target.value))}
+                    onChange={(e) => setCompAmountB(e.target.value)}
                     className="w-full h-1 bg-gray-200 rounded mt-2 cursor-pointer accent-emerald-500"
                   />
                 </div>
@@ -1349,10 +1445,10 @@ export default function LoanCalculatorView({
                       type="number"
                       step="0.05"
                       value={compRateB}
-                      onChange={(e) => setCompRateB(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setCompRateB(e.target.value)}
                       onBlur={() => {
                         const val = Number(compRateB) || 0;
-                        setCompRateB(Math.max(1, Math.min(30, val)));
+                        setCompRateB(String(Math.max(1, Math.min(30, val))));
                       }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
@@ -1362,10 +1458,10 @@ export default function LoanCalculatorView({
                     <input
                       type="number"
                       value={compTenureB}
-                      onChange={(e) => setCompTenureB(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setCompTenureB(e.target.value)}
                       onBlur={() => {
                         const val = Number(compTenureB) || 0;
-                        setCompTenureB(Math.max(1, Math.min(40, val)));
+                        setCompTenureB(String(Math.max(1, Math.min(40, val))));
                       }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-bold focus:outline-none focus:border-primary"
                     />
@@ -1542,7 +1638,7 @@ export default function LoanCalculatorView({
                   max={activeConfig.maxAmount}
                   step={activeConfig.amountStep}
                   value={Number(prepAmount) || 0}
-                  onChange={(e) => setPrepAmount(Number(e.target.value))}
+                  onChange={(e) => setPrepAmount(e.target.value)}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
               </div>
@@ -1555,11 +1651,11 @@ export default function LoanCalculatorView({
                     type="number"
                     step="0.1"
                     value={prepRate}
-                    onChange={(e) => setPrepRate(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setPrepRate(e.target.value)}
                     onBlur={() => {
                       const val = Number(prepRate) || 0;
                       const clamped = Math.max(activeConfig.minRate, Math.min(activeConfig.maxRate, val));
-                      setPrepRate(clamped);
+                      setPrepRate(String(clamped));
                     }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
@@ -1569,11 +1665,11 @@ export default function LoanCalculatorView({
                   <input
                     type="number"
                     value={prepTenure}
-                    onChange={(e) => setPrepTenure(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) => setPrepTenure(e.target.value)}
                     onBlur={() => {
                       const val = Number(prepTenure) || 0;
                       const clamped = Math.max(activeConfig.minTenure, Math.min(activeConfig.maxTenure, val));
-                      setPrepTenure(clamped);
+                      setPrepTenure(String(clamped));
                     }}
                     className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                   />
@@ -1614,10 +1710,10 @@ export default function LoanCalculatorView({
                       <input
                         type="number"
                         value={prepVal}
-                        onChange={(e) => setPrepVal(e.target.value === "" ? "" : Number(e.target.value))}
+                        onChange={(e) => setPrepVal(e.target.value)}
                         onBlur={() => {
                           const val = Number(prepVal) || 0;
-                          setPrepVal(Math.max(0, val));
+                          setPrepVal(String(Math.max(0, val)));
                         }}
                         className="w-full text-[13px] font-bold outline-none border-none"
                       />
@@ -1630,10 +1726,10 @@ export default function LoanCalculatorView({
                       type="number"
                       min={1}
                       value={prepStartMonth}
-                      onChange={(e) => setPrepStartMonth(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => setPrepStartMonth(e.target.value)}
                       onBlur={() => {
                         const val = Number(prepStartMonth) || 0;
-                        setPrepStartMonth(Math.max(1, val));
+                        setPrepStartMonth(String(Math.max(1, val)));
                       }}
                       className="px-3 py-1.5 border border-gray-200 bg-white rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
                     />
