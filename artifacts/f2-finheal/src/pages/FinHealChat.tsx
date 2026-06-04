@@ -266,9 +266,11 @@ export default function FinHealChat() {
     : mainView === "profile"
       ? "Settings"
       : mainView === "advisor"
-        ? "Advisor Workspace"
+        ? "Talk to an Advisor"
         : mainView === "admin"
-          ? "Admin Portal"
+          ? (authSession.email && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(authSession.email)
+              ? "Advisor Workspace"
+              : "Admin Portal")
           : mainView === "education"
             ? "Financial Education"
             : mainView === "loan-calculator"
@@ -464,6 +466,7 @@ export default function FinHealChat() {
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}
+            onTalkToAdvisor={() => setMainView("advisor")}
           />
         ) : (
           <DebtBalanceReviewView

@@ -15,7 +15,10 @@ import {
   AlertCircle,
   HelpCircle,
   Landmark,
-  Plus
+  Plus,
+  Check,
+  X,
+  Download
 } from "lucide-react";
 
 interface LoanCalculatorViewProps {
@@ -23,6 +26,7 @@ interface LoanCalculatorViewProps {
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
+  onTalkToAdvisor?: () => void;
 }
 
 interface LoanTypeConfig {
@@ -182,6 +186,7 @@ export default function LoanCalculatorView({
   onToggleSidebar,
   onToggleInsights,
   onApplyNow,
+  onTalkToAdvisor,
 }: LoanCalculatorViewProps) {
   // Global States
   const [activeTab, setActiveTab] = useState<string>("home");
@@ -292,6 +297,11 @@ export default function LoanCalculatorView({
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
 
+  // Side-by-Side Comparison State
+  const [selectedLenderIds, setSelectedLenderIds] = useState<string[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchLenders = async () => {
       try {
@@ -322,11 +332,26 @@ export default function LoanCalculatorView({
 
   const handleEligLoanTypeChange = (typeId: string) => {
     setEligLoanType(typeId);
+    setSelectedLenderIds([]); // clear comparison selection when changing loan category
     const selected = LOAN_TYPES.find((t) => t.id === typeId);
     if (selected) {
       setEligRate(String(selected.defaultRate));
       setEligTenure(String(selected.defaultTenure));
     }
+  };
+
+  const handleToggleSelectLender = (id: string) => {
+    setSelectedLenderIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length >= 3) {
+        setCompareError("You can compare up to 3 lenders at a time.");
+        setTimeout(() => setCompareError(null), 4000);
+        return prev;
+      }
+      return [...prev, id];
+    });
   };
 
   // Sync eligibility default amounts on currency scale shifts
@@ -749,6 +774,10 @@ export default function LoanCalculatorView({
     return [...approved.slice(0, 4), ...ineligible.slice(0, 2)];
   }, [matchedOffers]);
 
+  const selectedOffers = useMemo(() => {
+    return matchedOffers.filter((o) => selectedLenderIds.includes(o.lender.id));
+  }, [matchedOffers, selectedLenderIds]);
+
   // Calculations for Tab 3: Comparison
   const compCalculations = useMemo(() => {
     const amtAVal = Number(compAmountA) || 0;
@@ -914,6 +943,290 @@ export default function LoanCalculatorView({
         : (Number(emiTenure) || 0), 
       detailsStr
     );
+  };
+
+  const handleExportExcel = () => {
+    // 1. Helper function for CRC32 calculation
+    const makeCRCTable = () => {
+      let c;
+      const crcTable = [];
+      for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+          c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        crcTable[n] = c;
+      }
+      return crcTable;
+    };
+
+    const crcTable = makeCRCTable();
+
+    const calculateCrc32 = (bytes: Uint8Array) => {
+      let crc = 0 ^ (-1);
+      for (let i = 0; i < bytes.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xFF];
+      }
+      return (crc ^ (-1)) >>> 0;
+    };
+
+    // 2. Helper function to create an uncompressed ZIP file
+    const createZipBlob = (files: { name: string; content: string }[]) => {
+      const encoder = new TextEncoder();
+      const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
+      let currentOffset = 0;
+      const parts: Uint8Array[] = [];
+
+      files.forEach((file) => {
+        const nameBytes = encoder.encode(file.name);
+        const contentBytes = encoder.encode(file.content);
+        const crc = calculateCrc32(contentBytes);
+
+        const header = new Uint8Array(30 + nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x04034b50, true); // Local file header signature
+        view.setUint16(4, 10, true);         // Version needed to extract
+        view.setUint16(6, 0, true);          // General purpose bit flag
+        view.setUint16(8, 0, true);          // Compression method (0 = Store)
+        view.setUint32(10, 0, true);         // Last mod time / date (not set)
+        view.setUint32(14, crc, true);       // CRC-32
+        view.setUint32(18, contentBytes.length, true); // Compressed size
+        view.setUint32(22, contentBytes.length, true); // Uncompressed size
+        view.setUint16(26, nameBytes.length, true);    // File name length
+        view.setUint16(28, 0, true);         // Extra field length
+
+        header.set(nameBytes, 30);
+
+        zipData.push({
+          nameBytes,
+          contentBytes,
+          crc,
+          offset: currentOffset
+        });
+
+        parts.push(header);
+        parts.push(contentBytes);
+
+        currentOffset += header.length + contentBytes.length;
+      });
+
+      const centralDirectoryOffset = currentOffset;
+      let centralDirectorySize = 0;
+
+      zipData.forEach((file) => {
+        const header = new Uint8Array(46 + file.nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x02014b50, true); // Central file header signature
+        view.setUint16(4, 20, true);         // Version made by
+        view.setUint16(6, 10, true);         // Version needed to extract
+        view.setUint16(8, 0, true);          // General purpose bit flag
+        view.setUint16(10, 0, true);         // Compression method (Store)
+        view.setUint32(12, 0, true);         // Last mod time / date
+        view.setUint32(16, file.crc, true);  // CRC-32
+        view.setUint32(20, file.contentBytes.length, true); // Compressed size
+        view.setUint32(24, file.contentBytes.length, true); // Uncompressed size
+        view.setUint16(28, file.nameBytes.length, true);    // File name length
+        view.setUint16(30, 0, true);         // Extra field length
+        view.setUint16(32, 0, true);         // File comment length
+        view.setUint16(34, 0, true);         // Disk number start
+        view.setUint16(36, 0, true);         // Internal file attributes
+        view.setUint32(38, 0, true);         // External file attributes
+        view.setUint32(42, file.offset, true); // Local header offset
+
+        header.set(file.nameBytes, 46);
+        parts.push(header);
+
+        centralDirectorySize += header.length;
+        currentOffset += header.length;
+      });
+
+      const eocd = new Uint8Array(22);
+      const view = new DataView(eocd.buffer);
+
+      view.setUint32(0, 0x06054b50, true); // End of central dir signature
+      view.setUint16(4, 0, true);          // Number of this disk
+      view.setUint16(6, 0, true);          // Disk where central dir starts
+      view.setUint16(8, files.length, true); // Directory records on this disk
+      view.setUint16(10, files.length, true); // Total directory records
+      view.setUint32(12, centralDirectorySize, true); // Size of central dir
+      view.setUint32(16, centralDirectoryOffset, true); // Offset of central dir
+      view.setUint16(20, 0, true);         // Comment length
+
+      parts.push(eocd);
+
+      return new Blob(parts, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    };
+
+    // 3. Generate XML parts for the Excel XLSX file
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+    const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Repayment Schedule" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="5">
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/></font>
+    <font><b/><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FFFFFFFF"/></font>
+    <font><b/><sz val="11"/><name val="Segoe UI"/><family val="2"/></font>
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FF059669"/></font>
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FF2563EB"/></font>
+  </fonts>
+  <fills count="4">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF059669"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF9FAFB"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border/>
+    <border>
+      <left style="thin"><color rgb="FFD1D5DB"/></left>
+      <right style="thin"><color rgb="FFD1D5DB"/></right>
+      <top style="thin"><color rgb="FFD1D5DB"/></top>
+      <bottom style="thin"><color rgb="FFD1D5DB"/></bottom>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="12">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="3" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="3" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="3" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center"/>
+    </xf>
+  </cellXfs>
+</styleSheet>`;
+
+    let rowsXml = "";
+    let rowIndex = 2;
+
+    emiCalculations.yearlyAmortization.forEach((yr) => {
+      yr.months.forEach((m) => {
+        const beginningBalance = m.balance + m.principal + m.extra;
+        const emiPayment = m.principal + m.interest + m.extra;
+        const isEven = m.month % 2 === 0;
+
+        const cStyle = isEven ? "8" : "4";
+        const vStyle = isEven ? "3" : "2";
+        const bStyle = isEven ? "9" : "5";
+        const iStyle = isEven ? "10" : "6";
+        const eStyle = isEven ? "11" : "7";
+
+        rowsXml += `
+    <row r="${rowIndex}" spans="1:8">
+      <c r="A${rowIndex}" s="${cStyle}" t="n"><v>${m.month}</v></c>
+      <c r="B${rowIndex}" s="${cStyle}" t="inlineStr"><is><t>Year ${yr.year}</t></is></c>
+      <c r="C${rowIndex}" s="${vStyle}" t="n"><v>${beginningBalance}</v></c>
+      <c r="D${rowIndex}" s="${vStyle}" t="n"><v>${emiPayment}</v></c>
+      <c r="E${rowIndex}" s="${vStyle}" t="n"><v>${m.principal}</v></c>
+      <c r="F${rowIndex}" s="${iStyle}" t="n"><v>${m.interest}</v></c>
+      <c r="G${rowIndex}" s="${eStyle}" t="n"><v>${m.extra}</v></c>
+      <c r="H${rowIndex}" s="${bStyle}" t="n"><v>${m.balance}</v></c>
+    </row>`;
+        rowIndex++;
+      });
+    });
+
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:H${rowIndex - 1}"/>
+  <cols>
+    <col min="1" max="1" width="10" customWidth="1"/>
+    <col min="2" max="2" width="12" customWidth="1"/>
+    <col min="3" max="8" width="24" customWidth="1"/>
+  </cols>
+  <sheetData>
+    <row r="1" spans="1:8">
+      <c r="A1" s="1" t="inlineStr"><is><t>Month</t></is></c>
+      <c r="B1" s="1" t="inlineStr"><is><t>Year</t></is></c>
+      <c r="C1" s="1" t="inlineStr"><is><t>Beginning Balance (${currency.code})</t></is></c>
+      <c r="D1" s="1" t="inlineStr"><is><t>EMI Payment (${currency.code})</t></is></c>
+      <c r="E1" s="1" t="inlineStr"><is><t>Principal Paid (${currency.code})</t></is></c>
+      <c r="F1" s="1" t="inlineStr"><is><t>Interest Paid (${currency.code})</t></is></c>
+      <c r="G1" s="1" t="inlineStr"><is><t>Extra Prepayment (${currency.code})</t></is></c>
+      <c r="H1" s="1" t="inlineStr"><is><t>Ending Balance (${currency.code})</t></is></c>
+    </row>
+    ${rowsXml}
+  </sheetData>
+</worksheet>`;
+
+    // 4. Build ZIP file list
+    const files = [
+      { name: "[Content_Types].xml", content: contentTypesXml },
+      { name: "_rels/.rels", content: relsXml },
+      { name: "xl/workbook.xml", content: workbookXml },
+      { name: "xl/_rels/workbook.xml.rels", content: workbookRelsXml },
+      { name: "xl/styles.xml", content: stylesXml },
+      { name: "xl/worksheets/sheet1.xml", content: sheetXml }
+    ];
+
+    // 5. Pack zip and trigger download
+    const blob = createZipBlob(files);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const category = activeTab || "loan";
+    link.setAttribute("download", `repayment_schedule_${category}.xlsx`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -1183,13 +1496,24 @@ export default function LoanCalculatorView({
                       {formatCurrency(emiCalculations.monthlyEmi)}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAskAssistant}
-                    className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
-                  >
-                    Apply & Chat
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAskAssistant}
+                      className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
+                    >
+                      Apply & Chat
+                    </button>
+                    {onTalkToAdvisor && (
+                      <button
+                        type="button"
+                        onClick={onTalkToAdvisor}
+                        className="px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5"
+                      >
+                        Talk to Advisor
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1332,6 +1656,19 @@ export default function LoanCalculatorView({
 
               {showAmortization && (
                 <div className="mt-4 border border-gray-200 rounded-[12px] overflow-hidden animate-fade-up">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-gray-50 border-b border-gray-200">
+                    <div className="text-[12px] text-gray-500 font-semibold">
+                      Download complete month-wise breakdown for Excel, Google Sheets, or Numbers.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExportExcel}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[12.5px] font-bold rounded-[10px] shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Export Monthly Schedule (Excel)</span>
+                    </button>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
@@ -1432,7 +1769,7 @@ export default function LoanCalculatorView({
                     onBlur={() => {
                       const val = Number(eligIncome) || 0;
                       const minVal = Math.round(10000 * currencyScale);
-                      const maxVal = Math.round(1000000 * currencyScale);
+                      const maxVal = Math.round(5000000 * currencyScale);
                       setEligIncome(String(Math.max(minVal, Math.min(maxVal, val))));
                     }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -1441,8 +1778,8 @@ export default function LoanCalculatorView({
                 <input
                   type="range"
                   min={Math.round(10000 * currencyScale)}
-                  max={Math.round(1000000 * currencyScale)}
-                  step={Math.round(5000 * currencyScale)}
+                  max={Math.round(5000000 * currencyScale)}
+                  step={Math.round(25000 * currencyScale)}
                   value={Number(eligIncome) || 0}
                   onChange={(e) => setEligIncome(e.target.value)}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
@@ -1463,7 +1800,7 @@ export default function LoanCalculatorView({
                     onChange={(e) => setEligEmi(e.target.value)}
                     onBlur={() => {
                       const val = Number(eligEmi) || 0;
-                      const maxVal = Math.round(500000 * currencyScale);
+                      const maxVal = Math.round(2500000 * currencyScale);
                       setEligEmi(String(Math.max(0, Math.min(maxVal, val))));
                     }}
                     className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -1472,8 +1809,8 @@ export default function LoanCalculatorView({
                 <input
                   type="range"
                   min={0}
-                  max={Math.round(500000 * currencyScale)}
-                  step={Math.round(2000 * currencyScale)}
+                  max={Math.round(2500000 * currencyScale)}
+                  step={Math.round(10000 * currencyScale)}
                   value={Number(eligEmi) || 0}
                   onChange={(e) => setEligEmi(e.target.value)}
                   className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
@@ -1585,13 +1922,24 @@ export default function LoanCalculatorView({
                     {formatCurrency(eligCalculations.eligibleAmount)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAskAssistant}
-                  className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
-                >
-                  Ask Assistant
-                </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAskAssistant}
+                      className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
+                    >
+                      Ask Assistant
+                    </button>
+                    {onTalkToAdvisor && (
+                      <button
+                        type="button"
+                        onClick={onTalkToAdvisor}
+                        className="px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5"
+                      >
+                        Talk to Advisor
+                      </button>
+                    )}
+                  </div>
               </div>
 
               {/* Stack safety gauge on left if suggested offers are displayed */}
@@ -1682,6 +2030,8 @@ export default function LoanCalculatorView({
                           eligIncome={eligIncome}
                           eligEmi={eligEmi}
                           eligTenure={eligTenure}
+                          isSelected={selectedLenderIds.includes(lender.id)}
+                          onToggleSelect={() => handleToggleSelectLender(lender.id)}
                         />
                       );
                     })}
@@ -2108,14 +2458,26 @@ export default function LoanCalculatorView({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleAskAssistant}
-                  className="w-full max-w-[280px] py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
-                >
-                  <span>Ask Assistant to Analyze</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                <div className="w-full max-w-[280px] flex flex-col gap-2 animate-fade-up">
+                  <button
+                    type="button"
+                    onClick={handleAskAssistant}
+                    className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                  >
+                    <span>Ask Assistant to Analyze</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                  {onTalkToAdvisor && (
+                    <button
+                      type="button"
+                      onClick={onTalkToAdvisor}
+                      className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    >
+                      <span>Talk to Advisor</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2298,18 +2660,267 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleAskAssistant}
-                className="py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
-              >
-                <span>Apply & Chat with Advisor</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
+              <div className="flex flex-col gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={handleAskAssistant}
+                  className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                >
+                  <span>Apply & Chat with Advisor</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                {onTalkToAdvisor && (
+                  <button
+                    type="button"
+                    onClick={onTalkToAdvisor}
+                    className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                  >
+                    <span>Talk to Advisor</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Floating Comparison Banner */}
+      {selectedLenderIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] w-[90%] max-w-2xl bg-white/90 backdrop-blur-md border border-gray-200 shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-[24px] px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in transition-all">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-10 w-10 rounded-[14px] bg-primary/10 text-primary shrink-0">
+              <Scale className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13.5px] font-bold text-gray-900">
+                Compare Lenders ({selectedLenderIds.length} of 3 selected)
+              </div>
+              <div className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                {selectedOffers.map((o) => (
+                  <span key={o.lender.id} className="bg-gray-100 border border-gray-200/50 rounded-full px-2 py-0.5 text-gray-700">
+                    {o.lender.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end">
+            <button
+              onClick={() => setSelectedLenderIds([])}
+              className="px-4 py-2 hover:bg-gray-100 text-gray-600 text-[12px] font-bold rounded-full transition-all cursor-pointer"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => {
+                if (selectedLenderIds.length < 2) {
+                  setCompareError("Please select at least 2 lenders to compare.");
+                  setTimeout(() => setCompareError(null), 4000);
+                  return;
+                }
+                setIsCompareModalOpen(true);
+              }}
+              disabled={selectedLenderIds.length < 2}
+              className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-[0_4px_12px_rgba(50,68,230,0.15)] cursor-pointer ${
+                selectedLenderIds.length >= 2
+                  ? "bg-primary text-white hover:opacity-95 hover:-translate-y-0.5"
+                  : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none"
+              }`}
+            >
+              Compare Selected
+            </button>
+          </div>
+
+          {/* Inline Error Toast inside banner */}
+          {compareError && (
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[11.5px] font-bold px-4 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 animate-bounce z-[90]">
+              <AlertCircle className="h-3.5 w-3.5" />
+              <span>{compareError}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Comparison Modal */}
+      {isCompareModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-[24px] border border-gray-100 shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-y-auto flex flex-col p-6 animate-scale-in">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h3 className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+                  <Scale className="h-5 w-5 text-primary" />
+                  <span>Side-by-Side Lender Comparison</span>
+                </h3>
+                <p className="text-[12px] font-semibold text-gray-500 mt-1">
+                  Review specifications, rates, and criteria side-by-side to find your best fit.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCompareModalOpen(false)}
+                className="p-2 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-full transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content - Table */}
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[750px] border-collapse text-left text-[12px]">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="py-3.5 px-4 font-bold text-gray-400 uppercase tracking-wide w-[22%]">Parameter</th>
+                    {selectedOffers.map((o) => {
+                      const badgeConfig = {
+                        high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
+                        medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
+                        low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
+                        ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
+                      }[o.likelihood];
+
+                      return (
+                        <th key={o.lender.id} className="py-3 px-4 w-[26%] align-bottom">
+                          <div className="flex flex-col gap-1.5 bg-gray-50 border border-gray-100 rounded-[16px] p-3 shadow-sm">
+                            <span className="text-[13px] font-bold text-gray-900 leading-tight">{o.lender.name}</span>
+                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">{o.lender.lenderType}</span>
+                            <span className={`self-start px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
+                              {badgeConfig.label}
+                            </span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                  {/* Category */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Product Category</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 capitalize text-gray-900">{o.lender.productType}</td>
+                    ))}
+                  </tr>
+                  {/* Limit */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Eligible Limit</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 text-[14px] font-bold text-emerald-700">
+                        {formatCurrency(o.eligibleLimit)}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* ROI */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Interest Rate (ROI)</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 text-gray-900 font-bold">
+                        {o.lender.minRate === o.lender.maxRate ? `${o.lender.minRate}%` : `${o.lender.minRate}% – ${o.lender.maxRate}%`}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Est. EMI */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Est. Monthly EMI</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 text-gray-900 font-bold">
+                        {formatCurrency(o.emi)}/mo
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Processing Fee */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Processing Fee</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 text-gray-900">
+                        {o.lender.processingFee || "Nil / Up to 1%"}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Disbursal TAT */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-gray-500">Disbursal Time (TAT)</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3 px-4 text-gray-900">
+                        ⏱️ {o.lender.disbursalTime}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Pros */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Key Benefits (Pros)</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3.5 px-4 text-emerald-700 text-[11px] align-top">
+                        <ul className="list-disc pl-4 space-y-1">
+                          {o.lender.pros.map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Cons */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Shortfalls (Cons)</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3.5 px-4 text-amber-700 text-[11px] align-top">
+                        <ul className="list-disc pl-4 space-y-1">
+                          {o.lender.cons.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Documents Required */}
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Required Documents</td>
+                    {selectedOffers.map((o) => (
+                      <td key={o.lender.id} className="py-3.5 px-4 text-gray-600 text-[10.5px] align-top">
+                        <div className="flex flex-wrap gap-1">
+                          {o.lender.docsRequired.map((doc, i) => (
+                            <span key={i} className="bg-gray-50 border border-gray-150 rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                              {doc}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Action Row */}
+                  <tr>
+                    <td className="py-4 px-4 font-bold text-gray-500">Apply</td>
+                    {selectedOffers.map((o) => {
+                      const handleApplyClickInModal = () => {
+                        setIsCompareModalOpen(false);
+                        const rateStr = o.lender.minRate === o.lender.maxRate ? `${o.lender.minRate}%` : `${o.lender.minRate}% – ${o.lender.maxRate}%`;
+                        let details = `Applied for ${o.lender.name} ${o.lender.productType} via comparison. ` +
+                          `Eligible Limit: ${formatCurrency(o.eligibleLimit)}, ROI: ${rateStr}, Tenure: ${eligTenure} years. ` +
+                          `Lender constraints: Max FOIR: ${o.lender.maxFoirPct}%, processing fee: ${o.lender.processingFee || "N/A"}.`;
+                        onApplyNow(
+                          `${o.lender.name} ${o.lender.productType}`,
+                          o.eligibleLimit,
+                          o.lender.minRate,
+                          Number(eligTenure) || 5,
+                          details
+                        );
+                      };
+
+                      return (
+                        <td key={o.lender.id} className="py-4 px-4">
+                          <button
+                            onClick={handleApplyClickInModal}
+                            className="w-full py-2.5 bg-primary text-white text-[12px] font-bold rounded-[10px] hover:opacity-90 transition-all cursor-pointer shadow-md text-center hover:-translate-y-0.5"
+                          >
+                            Apply Now
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -2328,7 +2939,9 @@ function LenderOfferCard({
   onApplyNow,
   eligIncome,
   eligEmi,
-  eligTenure
+  eligTenure,
+  isSelected = false,
+  onToggleSelect
 }: {
   lender: LenderProduct;
   eligibleLimit: number;
@@ -2343,6 +2956,8 @@ function LenderOfferCard({
   eligIncome: string;
   eligEmi: string;
   eligTenure: string;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isNotApproved = likelihood === "ineligible";
@@ -2356,8 +2971,9 @@ function LenderOfferCard({
   }[likelihood];
 
   const handleApplyClick = () => {
+    const rateStr = lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`;
     let details = `Applied for ${lender.name} ${lender.productType} via matching suggestions. ` +
-      `Eligible Limit: ${formatCurrency(eligibleLimit)}, ROI: ${lender.minRate}%, Tenure: ${eligTenure} years. ` +
+      `Eligible Limit: ${formatCurrency(eligibleLimit)}, ROI: ${rateStr}, Tenure: ${eligTenure} years. ` +
       `Lender constraints: Max FOIR: ${lender.maxFoirPct}%, processing fee: ${lender.processingFee || "N/A"}.`;
     onApplyNow(
       `${lender.name} ${lender.productType}`,
@@ -2374,14 +2990,31 @@ function LenderOfferCard({
     }`}>
       {/* Top row */}
       <div className="flex justify-between items-start gap-2">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
-              {badgeConfig.label}
-            </span>
+        <div className="flex items-start gap-2.5">
+          {!isNotApproved && onToggleSelect && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect();
+              }}
+              className={`flex items-center justify-center h-[18px] w-[18px] rounded-[5px] border transition-all shrink-0 cursor-pointer mt-0.5 ${
+                isSelected 
+                  ? "bg-primary border-primary text-white shadow-sm shadow-primary/25" 
+                  : "border-gray-300 hover:border-primary/50 bg-white"
+              }`}
+            >
+              {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+            </button>
+          )}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
+                {badgeConfig.label}
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-gray-400 mt-0.5">{lender.productType}</span>
           </div>
-          <span className="text-[11px] font-semibold text-gray-400 mt-0.5">{lender.productType}</span>
         </div>
         {!isNotApproved && (
           <button
@@ -2403,8 +3036,8 @@ function LenderOfferCard({
         </div>
         <div className="flex flex-col border-r border-gray-100">
           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Interest Rate</span>
-          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
-            {lender.minRate}%
+          <span className="text-[13px] font-bold text-gray-900 mt-0.5">
+            {lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`}
           </span>
         </div>
         <div className="flex flex-col">
