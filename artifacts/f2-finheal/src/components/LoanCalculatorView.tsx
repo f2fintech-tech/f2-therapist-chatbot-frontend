@@ -1546,7 +1546,7 @@ export default function LoanCalculatorView({
                       <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
                       <span>Principal Amount</span>
                     </div>
-                    <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(emiAmount)}</span>
+                    <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(Number(emiAmount) || 0)}</span>
                     <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.principalPct)}%)</span>
                   </div>
 
@@ -2610,7 +2610,7 @@ export default function LoanCalculatorView({
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between text-[11px] font-bold text-gray-500">
                     <span>Original Payoff Schedule</span>
-                    <span>{prepTenure} Years ({prepTenure * 12} Mo)</span>
+                    <span>{prepTenure} Years ({(Number(prepTenure) || 0) * 12} Mo)</span>
                   </div>
                   <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-gray-400 w-full" />
