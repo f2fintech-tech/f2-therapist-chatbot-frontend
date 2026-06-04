@@ -272,6 +272,9 @@ export default function LoanCalculatorView({
   const [emiOptimize, setEmiOptimize] = useState<boolean>(false);
   const [showAmortization, setShowAmortization] = useState<boolean>(false);
   const [expandedYear, setExpandedYear] = useState<number | null>(null);
+  const [isGraphExpanded, setIsGraphExpanded] = useState<boolean>(false);
+  const [expandedGraphType, setExpandedGraphType] = useState<"stacked" | "comparison">("stacked");
+  const [hoveredYearIndex, setHoveredYearIndex] = useState<number | null>(null);
 
   // Sync state when config changes
   useEffect(() => {
@@ -281,6 +284,9 @@ export default function LoanCalculatorView({
     setEmiOptimize(false);
     setShowAmortization(false);
     setExpandedYear(null);
+    setIsGraphExpanded(false);
+    setExpandedGraphType("stacked");
+    setHoveredYearIndex(null);
   }, [activeConfig]);
 
   // Tab 2: Eligibility Calculator Inputs
@@ -533,6 +539,9 @@ export default function LoanCalculatorView({
       interestStrokeLength: (interestPct / 100) * circumference,
       interestStrokeOffset: -((principalPct / 100) * circumference),
       yearlyAmortization,
+      maxYearlyOutflow: Math.round(
+        Math.max(...yearlyAmortization.map((yr) => yr.principal + yr.interest + yr.extra)) || 1
+      ),
     };
   }, [emiAmount, emiRate, emiTenure, emiOptimize]);
 
@@ -1230,7 +1239,7 @@ export default function LoanCalculatorView({
   };
 
   return (
-    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
+    <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1356,7 +1365,7 @@ export default function LoanCalculatorView({
 
             <div className="grid gap-[24px] lg:grid-cols-12">
               {/* Controls */}
-              <div className="lg:col-span-7 flex flex-col gap-6">
+              <div className="lg:col-span-6 flex flex-col gap-6">
                 {/* Input 1: Loan Amount */}
                 <div className="flex flex-col">
                   <div className="flex justify-between items-center mb-1">
@@ -1518,9 +1527,9 @@ export default function LoanCalculatorView({
               </div>
 
               {/* Visualizations Side */}
-              <div className="lg:col-span-5 flex flex-col gap-[20px] justify-center items-center">
+              <div className="lg:col-span-6 flex flex-col gap-[20px] items-center">
                 {/* Horizontal Outflow Progress Bar */}
-                <div className="w-full max-w-[280px] flex flex-col gap-2 mt-1 animate-fade-up">
+                <div className="w-full max-w-[640px] flex flex-col gap-2 mt-1 animate-fade-up">
                   <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase tracking-wide">
                     <span>Outflow Breakdown</span>
                     <span>Total: {formatCurrency(emiCalculations.totalPayable)}</span>
@@ -1540,7 +1549,7 @@ export default function LoanCalculatorView({
                 </div>
 
                 {/* Legends */}
-                <div className="w-full max-w-[280px] grid grid-cols-2 gap-4">
+                <div className="w-full max-w-[640px] grid grid-cols-2 gap-4">
                   <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
                       <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
@@ -1560,61 +1569,99 @@ export default function LoanCalculatorView({
                   </div>
                 </div>
 
-                {/* Payoff Progress Amortization Timeline Area Chart */}
-                <div className="w-full max-w-[280px] bg-gray-50 border border-gray-150 rounded-[14px] p-3 flex flex-col gap-2 animate-fade-up">
-                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                {/* Payoff Progress Amortization Timeline stacked bar chart */}
+                <button
+                  type="button"
+                  onClick={() => setIsGraphExpanded(true)}
+                  className="w-full max-w-[640px] bg-gray-50 border border-gray-150 rounded-[14px] p-3 flex flex-col gap-2 hover:border-primary/30 hover:shadow-md transition-all text-left cursor-pointer group relative animate-fade-up"
+                  aria-label="Expand detailed amortization graph"
+                >
+                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-wide w-full">
                     <span>Payoff Progress Timeline</span>
-                    <span>Max: {formatCompact(emiChartData.maxY)}</span>
+                    <span className="text-primary group-hover:underline flex items-center gap-1 font-bold normal-case">
+                      Click to expand
+                    </span>
                   </div>
                   
-                  <div className="relative w-full h-[115px] flex items-center justify-center">
-                    <svg width="256" height="110" className="overflow-visible">
+                  <div className="relative w-full h-[115px] flex items-center justify-center bg-white border border-gray-100 rounded-[10px] p-1 overflow-hidden">
+                    <svg viewBox="0 0 256 110" className="w-full h-full max-h-[110px] overflow-visible">
                       {/* Grid lines */}
                       <line x1="0" y1="5" x2="256" y2="5" stroke="#f1f3f5" strokeWidth="1" />
                       <line x1="0" y1="55" x2="256" y2="55" stroke="#f1f3f5" strokeWidth="1" />
                       <line x1="0" y1="105" x2="256" y2="105" stroke="#e9ecef" strokeWidth="1" strokeDasharray="3 3" />
                       
-                      {/* Areas */}
-                      {emiChartData.interestPath && (
-                        <path d={emiChartData.interestPath} fill="url(#interestGrad)" className="opacity-15 transition-all duration-500" />
-                      )}
-                      {emiChartData.balancePath && (
-                        <path d={emiChartData.balancePath} fill="url(#balanceGrad)" className="opacity-10 transition-all duration-500" />
-                      )}
-                      
-                      {/* Lines */}
-                      {emiChartData.interestLine && (
-                        <path d={emiChartData.interestLine} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" className="transition-all duration-500" />
-                      )}
-                      {emiChartData.balanceLine && (
-                        <path d={emiChartData.balanceLine} fill="none" stroke="#3344e6" strokeWidth="2.5" strokeLinecap="round" className="transition-all duration-500" />
-                      )}
-                      
-                      {/* Gradients */}
-                      <defs>
-                        <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#3344e6" />
-                          <stop offset="100%" stopColor="#3344e6" stopOpacity="0" />
-                        </linearGradient>
-                        <linearGradient id="interestGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" />
-                          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
+                      {/* Bars Render */}
+                      {(() => {
+                        const N = emiCalculations.yearlyAmortization.length || 1;
+                        const usableWidth = 236;
+                        const usableHeight = 90;
+                        const gap = Math.max(1, Math.min(6, Math.floor(100 / N)));
+                        const colWidth = (usableWidth - (N - 1) * gap) / N;
+                        const maxOutflow = emiCalculations.maxYearlyOutflow || 1;
+
+                        return emiCalculations.yearlyAmortization.map((yr, idx) => {
+                          const h_p = (yr.principal / maxOutflow) * usableHeight;
+                          const h_i = (yr.interest / maxOutflow) * usableHeight;
+                          const h_e = (yr.extra / maxOutflow) * usableHeight;
+
+                          const x = 10 + idx * (colWidth + gap);
+                          const y_p = 100 - h_p;
+                          const y_i = y_p - h_i;
+                          const y_e = y_i - h_e;
+
+                          return (
+                            <g key={yr.year}>
+                              {/* Principal segment */}
+                              {h_p > 0 && (
+                                <rect
+                                  x={x}
+                                  y={y_p}
+                                  width={colWidth}
+                                  height={h_p}
+                                  fill="#3344e6"
+                                  className="transition-all duration-300"
+                                />
+                              )}
+                              {/* Interest segment */}
+                              {h_i > 0 && (
+                                <rect
+                                  x={x}
+                                  y={y_i}
+                                  width={colWidth}
+                                  height={h_i}
+                                  fill="#10b981"
+                                  className="transition-all duration-300"
+                                />
+                              )}
+                              {/* Extra segment */}
+                              {h_e > 0 && (
+                                <rect
+                                  x={x}
+                                  y={y_e}
+                                  width={colWidth}
+                                  height={h_e}
+                                  fill="#8b5cf6"
+                                  className="transition-all duration-300"
+                                />
+                              )}
+                            </g>
+                          );
+                        });
+                      })()}
                     </svg>
                   </div>
                   
                   {/* Chart Labels */}
-                  <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5">
+                  <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5 w-full">
                     <span>Start (Year 0)</span>
                     <span>Midway</span>
                     <span>End (Year {Number(emiTenure) || 0})</span>
                   </div>
-                </div>
+                </button>
 
                 {/* Optimized impact card */}
                 {emiOptimize && (
-                  <div className="w-full bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
+                  <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[16px]">✨</span>
                       <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Optimization Benefits</span>
@@ -1948,27 +1995,23 @@ export default function LoanCalculatorView({
                   <span className="text-[12px] font-bold text-gray-500 uppercase tracking-wide">Affordability Safety Gauge</span>
                   <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
                     <svg width="180" height="180" className="absolute top-0">
-                      <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#f3f4f6" strokeWidth="12" strokeLinecap="round" />
-                      <path d="M 20 90 A 70 70 0 0 1 70 35" fill="none" stroke="#10b981" strokeWidth="12" className="opacity-20" />
-                      <path d="M 70 35 A 70 70 0 0 1 110 35" fill="none" stroke="#f59e0b" strokeWidth="12" className="opacity-20" />
-                      <path d="M 110 35 A 70 70 0 0 1 160 90" fill="none" stroke="#ef4444" strokeWidth="12" className="opacity-20" />
+                      <defs>
+                        <linearGradient id="safety-gauge-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="50%" stopColor="#f59e0b" />
+                          <stop offset="100%" stopColor="#ef4444" />
+                        </linearGradient>
+                      </defs>
+                      {/* Gradient Speedometer Gauge Arc */}
                       <path
                         d="M 20 90 A 70 70 0 0 1 160 90"
                         fill="none"
-                        stroke={
-                          eligCalculations.riskLevel === "low"
-                            ? "#10b981"
-                            : eligCalculations.riskLevel === "medium"
-                            ? "#f59e0b"
-                            : "#ef4444"
-                        }
+                        stroke="url(#safety-gauge-gradient-1)"
                         strokeWidth="12"
-                        strokeDasharray={`${(eligCalculations.baseFoir / 100) * 220} 220`}
                         strokeLinecap="round"
-                        className="transition-all duration-700"
                       />
                     </svg>
-                    <div className="absolute bottom-1 flex flex-col items-center justify-center">
+                    <div className="absolute bottom-3 flex flex-col items-center justify-center">
                       <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
                       <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
                     </div>
@@ -2039,61 +2082,31 @@ export default function LoanCalculatorView({
                 )}
               </div>
             ) : (
-              <div className="lg:col-span-5 flex flex-col justify-center items-center gap-4">
+              <div className="lg:col-span-5 flex flex-col items-center gap-4">
                 <span className="text-[12.5px] font-bold text-gray-700 uppercase tracking-wide">Affordability Safety Gauge</span>
 
                 {/* Half Speedometer Gauge */}
                 <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
                   <svg width="180" height="180" className="absolute top-0">
-                    {/* Gauge background track */}
+                    <defs>
+                      <linearGradient id="safety-gauge-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="50%" stopColor="#f59e0b" />
+                        <stop offset="100%" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    {/* Gradient Speedometer Gauge Arc */}
                     <path
                       d="M 20 90 A 70 70 0 0 1 160 90"
                       fill="none"
-                      stroke="#f3f4f6"
+                      stroke="url(#safety-gauge-gradient-2)"
                       strokeWidth="12"
                       strokeLinecap="round"
-                    />
-                    {/* Color arcs for reference */}
-                    <path
-                      d="M 20 90 A 70 70 0 0 1 70 35"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="12"
-                      className="opacity-20"
-                    />
-                    <path
-                      d="M 70 35 A 70 70 0 0 1 110 35"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="12"
-                      className="opacity-20"
-                    />
-                    <path
-                      d="M 110 35 A 70 70 0 0 1 160 90"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="12"
-                      className="opacity-20"
-                    />
-                    <path
-                      d="M 20 90 A 70 70 0 0 1 160 90"
-                      fill="none"
-                      stroke={
-                        eligCalculations.riskLevel === "low"
-                          ? "#10b981"
-                          : eligCalculations.riskLevel === "medium"
-                          ? "#f59e0b"
-                          : "#ef4444"
-                      }
-                      strokeWidth="12"
-                      strokeDasharray={`${(eligCalculations.baseFoir / 100) * 220} 220`}
-                      strokeLinecap="round"
-                      className="transition-all duration-700"
                     />
                   </svg>
 
                   {/* Numeric reading overlay */}
-                  <div className="absolute bottom-1 flex flex-col items-center justify-center">
+                  <div className="absolute bottom-3 flex flex-col items-center justify-center">
                     <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
                     <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
                   </div>
@@ -2487,7 +2500,7 @@ export default function LoanCalculatorView({
         {calcType === "prepayment" && (
           <div className="animate-fade-up grid gap-[24px] lg:grid-cols-12">
             {/* Left Controls */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
+            <div className="lg:col-span-6 flex flex-col gap-6">
               {/* Amount slider */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
@@ -2601,11 +2614,11 @@ export default function LoanCalculatorView({
             </div>
 
             {/* Right Visualizations Side */}
-            <div className="lg:col-span-5 flex flex-col justify-center gap-4">
+            <div className="lg:col-span-6 flex flex-col items-center gap-4">
               <span className="text-[12.5px] font-bold text-gray-700 uppercase tracking-wide text-center">Tenure Reduction Visualizer</span>
 
               {/* Progress bars showing reduction */}
-              <div className="flex flex-col gap-3 bg-gray-50 border border-gray-200 rounded-[12px] p-4 w-full">
+              <div className="flex flex-col gap-3 bg-gray-50 border border-gray-200 rounded-[12px] p-4 w-full max-w-[640px]">
                 {/* Standard Tenure */}
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between text-[11px] font-bold text-gray-500">
@@ -2636,11 +2649,11 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
-              {/* Prepayment impact banner */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2">
+              {/* Foreclosure Metrics Summary Card */}
+              <div className="w-full max-w-[640px] bg-[#f6f7fe] border border-[#d4d8fa] p-4 rounded-[14px] flex flex-col gap-3.5 animate-fade-up">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[16px]">🎉</span>
-                  <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-wide">
+                  <span className="text-[16px]">🚀</span>
+                  <span className="text-[12.5px] font-bold text-primary uppercase tracking-wide">
                     Savings & Payoff Speedup
                   </span>
                 </div>
@@ -2917,6 +2930,385 @@ export default function LoanCalculatorView({
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isGraphExpanded && (
+        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md flex flex-col p-6 rounded-[20px] shadow-2xl border border-gray-150 animate-fade-in overflow-hidden">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4 mb-4">
+            <div>
+              <h3 className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <span>Detailed Loan Amortization Analysis</span>
+              </h3>
+              <p className="text-[12px] font-semibold text-gray-500 mt-1">
+                Interactive year-by-year view of principal, interest, and prepayments.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-stretch sm:self-auto">
+              <div className="flex bg-gray-100 p-0.5 rounded-[10px] border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setExpandedGraphType("stacked")}
+                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${
+                    expandedGraphType === "stacked"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  Stacked Breakdown
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpandedGraphType("comparison")}
+                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${
+                    expandedGraphType === "comparison"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  Side-by-Side
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGraphExpanded(false);
+                  setHoveredYearIndex(null);
+                }}
+                className="p-2 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-full transition-all cursor-pointer"
+                aria-label="Close detailed graph"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body content split */}
+          <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 overflow-y-auto lg:overflow-hidden">
+            {/* Premium HUD Info Card */}
+            <div className="lg:w-80 flex flex-col gap-4 bg-gray-50 border border-gray-150 rounded-[16px] p-4 shrink-0">
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                Year Details HUD
+              </div>
+              
+              {hoveredYearIndex !== null && emiCalculations.yearlyAmortization[hoveredYearIndex] ? (
+                (() => {
+                  const yrData = emiCalculations.yearlyAmortization[hoveredYearIndex];
+                  const prevYrData = hoveredYearIndex > 0 ? emiCalculations.yearlyAmortization[hoveredYearIndex - 1] : null;
+                  const begBalance = prevYrData ? prevYrData.endBalance : (Number(emiAmount) || 0);
+                  const totalPaid = yrData.principal + yrData.interest + yrData.extra;
+
+                  return (
+                    <div className="flex flex-col gap-3 animate-fade-in">
+                      <div className="flex justify-between items-center bg-primary/5 border border-primary/10 rounded-[10px] p-2.5">
+                        <span className="text-[14px] font-bold text-primary">Year {yrData.year}</span>
+                        <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase">
+                          Active Year
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white border border-gray-150 rounded-[10px] p-2.5">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block">Beg. Balance</span>
+                          <span className="text-[13px] font-bold text-gray-900 block mt-0.5">{formatCurrency(begBalance)}</span>
+                        </div>
+                        <div className="bg-white border border-gray-150 rounded-[10px] p-2.5">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block">End Balance</span>
+                          <span className="text-[13px] font-bold text-gray-900 block mt-0.5">{formatCurrency(yrData.endBalance)}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-gray-150 rounded-[10px] p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-[11.5px]">
+                          <div className="flex items-center gap-1.5 font-semibold text-gray-500">
+                            <span className="w-2 h-2 rounded-full bg-primary block shrink-0" />
+                            <span>Principal Paid</span>
+                          </div>
+                          <span className="font-bold text-gray-900">{formatCurrency(yrData.principal)}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-[11.5px] border-t border-gray-50 pt-2">
+                          <div className="flex items-center gap-1.5 font-semibold text-gray-500">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 block shrink-0" />
+                            <span>Interest Paid</span>
+                          </div>
+                          <span className="font-bold text-emerald-600">{formatCurrency(yrData.interest)}</span>
+                        </div>
+
+                        {yrData.extra > 0 && (
+                          <div className="flex items-center justify-between text-[11.5px] border-t border-gray-50 pt-2">
+                            <div className="flex items-center gap-1.5 font-semibold text-gray-500">
+                              <span className="w-2 h-2 rounded-full bg-purple-500 block shrink-0" />
+                              <span>Extra Prepayment</span>
+                            </div>
+                            <span className="font-bold text-purple-600">{formatCurrency(yrData.extra)}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[12px] font-bold text-gray-900 border-t border-gray-100 pt-2">
+                          <span>Total Yearly Paid</span>
+                          <span>{formatCurrency(totalPaid)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-250 rounded-[16px] bg-white min-h-[180px]">
+                  <span className="text-[20px] mb-2">📊</span>
+                  <span className="text-[12px] font-bold text-gray-700">Interactive Preview</span>
+                  <p className="text-[11px] font-semibold text-gray-400 mt-1 max-w-[180px] leading-normal">
+                    Hover over any of the columns in the graph to display year-specific repayment data.
+                  </p>
+                </div>
+              )}
+
+              {/* Dynamic metrics summaries inside HUD */}
+              <div className="mt-auto border-t border-gray-200 pt-4 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-[11.5px] font-semibold text-gray-500">
+                  <span>Standard Tenure:</span>
+                  <span className="font-bold text-gray-900">{Number(emiTenure) || 0} Years</span>
+                </div>
+                {emiOptimize && (
+                  <>
+                    <div className="flex justify-between items-center text-[11.5px] font-semibold text-gray-500">
+                      <span>Optimized Tenure:</span>
+                      <span className="font-bold text-emerald-600">
+                        {Math.round(emiCalculations.actualMonths / 12 * 10) / 10} Years
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-[8px] p-2 mt-1">
+                      <span>Total Interest Saved:</span>
+                      <span className="font-bold">{formatCurrency(emiCalculations.interestSaved)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Interactive Main Graph */}
+            <div className="flex-1 flex flex-col bg-white border border-gray-150 rounded-[16px] p-4 min-w-0 relative">
+              <div className="flex-1 min-h-[220px] relative">
+                <svg
+                  viewBox="0 0 1000 400"
+                  className="w-full h-full overflow-visible"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Grid lines and Y axis ticks */}
+                  {(() => {
+                    const ticks = 4;
+                    const maxVal = emiCalculations.maxYearlyOutflow || 1;
+                    const lines = [];
+                    for (let i = 0; i <= ticks; i++) {
+                      const y = 40 + (310 / ticks) * i;
+                      const value = maxVal - (maxVal / ticks) * i;
+                      lines.push(
+                        <g key={i}>
+                          <line x1="70" y1={y} x2="960" y2={y} stroke="#f1f3f5" strokeWidth="1" />
+                          <text
+                            x="60"
+                            y={y + 4}
+                            textAnchor="end"
+                            className="text-[10px] font-bold fill-gray-400"
+                          >
+                            {formatCompact(value)}
+                          </text>
+                        </g>
+                      );
+                    }
+                    return lines;
+                  })()}
+
+                  {/* Bars Render */}
+                  {(() => {
+                    const N = emiCalculations.yearlyAmortization.length || 1;
+                    const usableWidth = 870;
+                    const usableHeight = 310;
+                    const gap = Math.max(4, Math.min(16, Math.floor(400 / N)));
+                    const colWidth = (usableWidth - (N - 1) * gap) / N;
+                    const maxOutflow = emiCalculations.maxYearlyOutflow || 1;
+
+                    return emiCalculations.yearlyAmortization.map((yr, idx) => {
+                      const x = 80 + idx * (colWidth + gap);
+                      const isHovered = hoveredYearIndex === idx;
+
+                      if (expandedGraphType === "stacked") {
+                        const h_p = (yr.principal / maxOutflow) * usableHeight;
+                        const h_i = (yr.interest / maxOutflow) * usableHeight;
+                        const h_e = (yr.extra / maxOutflow) * usableHeight;
+
+                        const y_p = 350 - h_p;
+                        const y_i = y_p - h_i;
+                        const y_e = y_i - h_e;
+
+                        return (
+                          <g
+                            key={yr.year}
+                            onMouseEnter={() => setHoveredYearIndex(idx)}
+                            onMouseLeave={() => setHoveredYearIndex(null)}
+                            className="cursor-pointer"
+                          >
+                            {/* Principal segment */}
+                            {h_p > 0 && (
+                              <rect
+                                x={x}
+                                y={y_p}
+                                width={colWidth}
+                                height={h_p}
+                                fill="#3344e6"
+                                opacity={hoveredYearIndex === null || isHovered ? 1 : 0.65}
+                                className="transition-all duration-200"
+                              />
+                            )}
+                            {/* Interest segment */}
+                            {h_i > 0 && (
+                              <rect
+                                x={x}
+                                y={y_i}
+                                width={colWidth}
+                                height={h_i}
+                                fill="#10b981"
+                                opacity={hoveredYearIndex === null || isHovered ? 1 : 0.65}
+                                className="transition-all duration-200"
+                              />
+                            )}
+                            {/* Extra segment */}
+                            {h_e > 0 && (
+                              <rect
+                                x={x}
+                                y={y_e}
+                                width={colWidth}
+                                height={h_e}
+                                fill="#8b5cf6"
+                                opacity={hoveredYearIndex === null || isHovered ? 1 : 0.65}
+                                className="transition-all duration-200"
+                              />
+                            )}
+
+                            {/* Hover Trigger overlay rect */}
+                            <rect
+                              x={x - gap/2}
+                              y="40"
+                              width={colWidth + gap}
+                              height="310"
+                              fill="transparent"
+                            />
+                          </g>
+                        );
+                      } else {
+                        // Side-by-side Comparison mode
+                        const principalVal = yr.principal + yr.extra;
+                        const h_p = (principalVal / maxOutflow) * usableHeight;
+                        const h_i = (yr.interest / maxOutflow) * usableHeight;
+
+                        const y_p = 350 - h_p;
+                        const y_i = 350 - h_i;
+
+                        const splitWidth = colWidth / 2 - 1;
+                        const x_p = x;
+                        const x_i = x + splitWidth + 2;
+
+                        return (
+                          <g
+                            key={yr.year}
+                            onMouseEnter={() => setHoveredYearIndex(idx)}
+                            onMouseLeave={() => setHoveredYearIndex(null)}
+                            className="cursor-pointer"
+                          >
+                            {/* Principal Column */}
+                            {h_p > 0 && (
+                              <rect
+                                x={x_p}
+                                y={y_p}
+                                width={splitWidth}
+                                height={h_p}
+                                fill="#3344e6"
+                                opacity={hoveredYearIndex === null || isHovered ? 1 : 0.65}
+                                className="transition-all duration-200"
+                              />
+                            )}
+                            
+                            {/* Interest Column */}
+                            {h_i > 0 && (
+                              <rect
+                                x={x_i}
+                                y={y_i}
+                                width={splitWidth}
+                                height={h_i}
+                                fill="#10b981"
+                                opacity={hoveredYearIndex === null || isHovered ? 1 : 0.65}
+                                className="transition-all duration-200"
+                              />
+                            )}
+
+                            {/* Hover Trigger overlay rect */}
+                            <rect
+                              x={x - gap/2}
+                              y="40"
+                              width={colWidth + gap}
+                              height="310"
+                              fill="transparent"
+                            />
+                          </g>
+                        );
+                      }
+                    });
+                  })()}
+
+                  {/* X Axis line */}
+                  <line x1="70" y1="350" x2="960" y2="350" stroke="#cccccc" strokeWidth="1.5" />
+
+                  {/* X Axis Labels */}
+                  {(() => {
+                    const N = emiCalculations.yearlyAmortization.length || 1;
+                    const usableWidth = 870;
+                    const gap = Math.max(4, Math.min(16, Math.floor(400 / N)));
+                    const colWidth = (usableWidth - (N - 1) * gap) / N;
+
+                    // Only render label if there's enough space, or thin them out
+                    const step = Math.max(1, Math.ceil(N / 15));
+
+                    return emiCalculations.yearlyAmortization.map((yr, idx) => {
+                      if (idx % step !== 0 && idx !== N - 1) return null;
+                      const x = 80 + idx * (colWidth + gap) + colWidth / 2;
+
+                      return (
+                        <text
+                          key={yr.year}
+                          x={x}
+                          y="370"
+                          textAnchor="middle"
+                          className="text-[10px] font-bold fill-gray-400"
+                        >
+                          Yr {yr.year}
+                        </text>
+                      );
+                    });
+                  })()}
+                </svg>
+              </div>
+
+              {/* Legend Indicator footer */}
+              <div className="flex justify-center items-center gap-6 mt-4 border-t border-gray-100 pt-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
+                  <span>Principal Paid {emiOptimize && "(incl. prepayments in comparison)"}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block shrink-0" />
+                  <span>Interest Paid</span>
+                </div>
+                {expandedGraphType === "stacked" && emiOptimize && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
+                    <span>Extra Prepayment</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
