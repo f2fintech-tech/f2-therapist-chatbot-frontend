@@ -276,6 +276,27 @@ export default function LoanCalculatorView({
   const [expandedGraphType, setExpandedGraphType] = useState<"stacked" | "comparison">("stacked");
   const [hoveredYearIndex, setHoveredYearIndex] = useState<number | null>(null);
 
+  // Education Loan specific inputs
+  const [eduMode, setEduMode] = useState<"quick" | "advanced">("quick");
+  const [eduQuickCourseYears, setEduQuickCourseYears] = useState<string>("2");
+  const [eduQuickMoratoriumMonths, setEduQuickMoratoriumMonths] = useState<string>("30");
+
+  const [eduSanctionedAmount, setEduSanctionedAmount] = useState<string>("1500000");
+  const [eduAdvancedRate, setEduAdvancedRate] = useState<string>("9.5");
+  const [eduAdvancedTenure, setEduAdvancedTenure] = useState<string>("7");
+  const [eduCourseMonths, setEduCourseMonths] = useState<string>("24");
+  const [eduGraceMonths, setEduGraceMonths] = useState<string>("6");
+  const [eduDisbursementType, setEduDisbursementType] = useState<"lump" | "multiple">("lump");
+  const [eduDisbursements, setEduDisbursements] = useState<{ amount: string; month: string }[]>([]);
+  const [eduInterestServicing, setEduInterestServicing] = useState<"accumulate" | "serviced" | "partial">("accumulate");
+  const [eduPartialPaymentAmount, setEduPartialPaymentAmount] = useState<string>("5000");
+  const [eduCapitalizationFrequency, setEduCapitalizationFrequency] = useState<"single" | "periodic">("single");
+  const [eduCompoundingFrequency, setEduCompoundingFrequency] = useState<"monthly" | "quarterly" | "half-yearly" | "yearly">("monthly");
+
+  const [eduPrepayMonthly, setEduPrepayMonthly] = useState<string>("0");
+  const [eduPrepayLump, setEduPrepayLump] = useState<string>("0");
+  const [eduPrepayStrategy, setEduPrepayStrategy] = useState<"reduce-emi" | "reduce-tenure">("reduce-tenure");
+
   // Sync state when config changes
   useEffect(() => {
     setEmiAmount(String(activeConfig.defaultAmount));
@@ -287,6 +308,27 @@ export default function LoanCalculatorView({
     setIsGraphExpanded(false);
     setExpandedGraphType("stacked");
     setHoveredYearIndex(null);
+
+    // Sync Education Loan states
+    setEduMode("quick");
+    setEduQuickCourseYears("2");
+    setEduQuickMoratoriumMonths("30");
+    setEduSanctionedAmount(String(activeConfig.defaultAmount));
+    setEduAdvancedRate(String(activeConfig.defaultRate));
+    setEduAdvancedTenure(String(activeConfig.defaultTenure));
+    setEduCourseMonths("24");
+    setEduGraceMonths("6");
+    setEduDisbursementType("lump");
+    setEduDisbursements([
+      { amount: String(activeConfig.defaultAmount), month: "1" }
+    ]);
+    setEduInterestServicing("accumulate");
+    setEduPartialPaymentAmount(String(Math.round(5000 * currencyScale)));
+    setEduCapitalizationFrequency("single");
+    setEduCompoundingFrequency("monthly");
+    setEduPrepayMonthly("0");
+    setEduPrepayLump("0");
+    setEduPrepayStrategy("reduce-tenure");
   }, [activeConfig]);
 
   // Tab 2: Eligibility Calculator Inputs
@@ -364,6 +406,7 @@ export default function LoanCalculatorView({
   useEffect(() => {
     setEligIncome(String(Math.round(100000 * currencyScale)));
     setEligEmi(String(Math.round(10000 * currencyScale)));
+    setEduPartialPaymentAmount(String(Math.round(5000 * currencyScale)));
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
@@ -430,6 +473,224 @@ export default function LoanCalculatorView({
 
   // Calculations for Tab 1: EMI
   const emiCalculations = useMemo(() => {
+    if (activeTab === "education") {
+      const isQuick = eduMode === "quick";
+      const sanctionedAmount = isQuick ? (Number(emiAmount) || 0) : (Number(eduSanctionedAmount) || 0);
+      const rateVal = isQuick ? (Number(emiRate) || 0) : (Number(eduAdvancedRate) || 0);
+      const tenureVal = isQuick ? (Number(emiTenure) || 0) : (Number(eduAdvancedTenure) || 0);
+      const courseMonths = isQuick ? (Number(eduQuickCourseYears) * 12) : (Number(eduCourseMonths) || 0);
+      const graceMonths = isQuick ? (Number(eduQuickMoratoriumMonths) - courseMonths) : (Number(eduGraceMonths) || 0);
+      const moratoriumMonths = isQuick ? (Number(eduQuickMoratoriumMonths) || 0) : (courseMonths + graceMonths);
+
+      const prepayMonthly = isQuick ? 0 : (Number(eduPrepayMonthly) || 0);
+      const prepayLump = isQuick ? 0 : (Number(eduPrepayLump) || 0);
+      const prepayStrategy = isQuick ? "reduce-tenure" : eduPrepayStrategy;
+
+      let disbursements: { amount: number; month: number }[] = [];
+      if (isQuick || eduDisbursementType === "lump") {
+        disbursements = [{ amount: sanctionedAmount, month: 1 }];
+      } else {
+        disbursements = eduDisbursements.map(d => ({
+          amount: Number(d.amount) || 0,
+          month: Number(d.month) || 1
+        }));
+      }
+
+      const interestServicing = isQuick ? "accumulate" : eduInterestServicing;
+      const partialPaymentAmount = isQuick ? 0 : (Number(eduPartialPaymentAmount) || 0);
+      const capitalizationFrequency = isQuick ? "single" : eduCapitalizationFrequency;
+      const compoundingFrequency = isQuick ? "monthly" : eduCompoundingFrequency;
+
+      const runSimulation = (
+        servicingOverride?: "accumulate" | "serviced" | "partial",
+        prepayMonthlyOverride?: number,
+        prepayLumpOverride?: number
+      ) => {
+        const actualServicing = servicingOverride || interestServicing;
+        const actualPrepayMonthly = prepayMonthlyOverride !== undefined ? prepayMonthlyOverride : prepayMonthly;
+        const actualPrepayLump = prepayLumpOverride !== undefined ? prepayLumpOverride : prepayLump;
+        const monthlyRate = rateVal / 12 / 100;
+        const tenureMonths = tenureVal * 12;
+
+        let outstandingPrincipal = 0;
+        let accruedUnpaidInterest = 0;
+        let totalInterestPaidDuringMoratorium = 0;
+        const monthlyAmortization: { month: number; interest: number; principal: number; extra: number; balance: number }[] = [];
+
+        // Moratorium Phase
+        for (let m = 1; m <= moratoriumMonths; m++) {
+          const disbsThisMonth = disbursements.filter(d => d.month === m);
+          disbsThisMonth.forEach(d => {
+            outstandingPrincipal += d.amount;
+          });
+
+          const interestAccrued = outstandingPrincipal * monthlyRate;
+          accruedUnpaidInterest += interestAccrued;
+
+          let payment = 0;
+          if (actualServicing === "serviced") {
+            payment = interestAccrued;
+          } else if (actualServicing === "partial") {
+            payment = Math.min(accruedUnpaidInterest, partialPaymentAmount);
+          }
+          accruedUnpaidInterest = Math.max(0, accruedUnpaidInterest - payment);
+          totalInterestPaidDuringMoratorium += payment;
+
+          if (capitalizationFrequency === "periodic" && outstandingPrincipal > 0) {
+            let isCompoundingMonth = false;
+            if (compoundingFrequency === "monthly") isCompoundingMonth = true;
+            else if (compoundingFrequency === "quarterly" && m % 3 === 0) isCompoundingMonth = true;
+            else if (compoundingFrequency === "half-yearly" && m % 6 === 0) isCompoundingMonth = true;
+            else if (compoundingFrequency === "yearly" && m % 12 === 0) isCompoundingMonth = true;
+
+            if (isCompoundingMonth) {
+              outstandingPrincipal += accruedUnpaidInterest;
+              accruedUnpaidInterest = 0;
+            }
+          }
+
+          monthlyAmortization.push({
+            month: m,
+            interest: Math.round(payment),
+            principal: 0,
+            extra: 0,
+            balance: Math.round(outstandingPrincipal + accruedUnpaidInterest)
+          });
+        }
+
+        outstandingPrincipal += accruedUnpaidInterest;
+        accruedUnpaidInterest = 0;
+        const effectiveRepaymentPrincipal = outstandingPrincipal;
+
+        // Repayment Phase
+        let currentEmi = 0;
+        if (effectiveRepaymentPrincipal > 0 && tenureMonths > 0) {
+          currentEmi = monthlyRate === 0
+            ? effectiveRepaymentPrincipal / tenureMonths
+            : (effectiveRepaymentPrincipal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+              (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+        }
+        const initialEmi = currentEmi;
+
+        let repMonthsElapsed = 0;
+        while (outstandingPrincipal > 0 && repMonthsElapsed < 600) {
+          repMonthsElapsed += 1;
+          const m = moratoriumMonths + repMonthsElapsed;
+          const interestForMonth = outstandingPrincipal * monthlyRate;
+          const interestPaid = Math.min(outstandingPrincipal + interestForMonth, interestForMonth);
+          const emiPaid = Math.min(outstandingPrincipal + interestPaid, currentEmi);
+          const principalPaidFromEmi = Math.max(0, emiPaid - interestPaid);
+
+          const extraPaid = actualPrepayMonthly + (repMonthsElapsed % 12 === 0 ? actualPrepayLump : 0);
+          const extraPrincipalPaid = Math.min(outstandingPrincipal - principalPaidFromEmi, extraPaid);
+
+          const totalPrincipalPaid = principalPaidFromEmi + extraPrincipalPaid;
+          outstandingPrincipal -= totalPrincipalPaid;
+
+          monthlyAmortization.push({
+            month: m,
+            interest: Math.round(interestPaid),
+            principal: Math.round(principalPaidFromEmi),
+            extra: Math.round(extraPrincipalPaid),
+            balance: Math.max(0, Math.round(outstandingPrincipal))
+          });
+
+          if (extraPrincipalPaid > 0 && prepayStrategy === "reduce-emi") {
+            const remainingMonths = tenureMonths - repMonthsElapsed;
+            if (remainingMonths > 0 && outstandingPrincipal > 0) {
+              currentEmi = monthlyRate === 0
+                ? outstandingPrincipal / remainingMonths
+                : (outstandingPrincipal * monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) /
+                  (Math.pow(1 + monthlyRate, remainingMonths) - 1);
+            }
+          }
+        }
+
+        const totalInterest = monthlyAmortization.reduce((sum, item) => sum + item.interest, 0);
+        const totalPrincipal = monthlyAmortization.reduce((sum, item) => sum + item.principal + item.extra, 0);
+        const totalPayable = totalInterest + totalPrincipal;
+
+        return {
+          effectiveRepaymentPrincipal,
+          initialEmi,
+          totalInterest,
+          totalPayable,
+          actualMonths: monthlyAmortization.length,
+          monthlyAmortization,
+          totalInterestPaidDuringMoratorium
+        };
+      };
+
+      const activeResult = runSimulation();
+      const baselineResult = runSimulation(undefined, 0, 0);
+      const noPaymentResult = runSimulation("accumulate", 0, 0);
+      const fullServicedResult = runSimulation("serviced", 0, 0);
+
+      const savings = Math.max(0, noPaymentResult.totalPayable - fullServicedResult.totalPayable);
+      const interestSaved = Math.max(0, baselineResult.totalInterest - activeResult.totalInterest);
+      const monthsSaved = Math.max(0, baselineResult.actualMonths - activeResult.actualMonths);
+
+      const yearlyAmortization: {
+        year: number;
+        interest: number;
+        principal: number;
+        extra: number;
+        endBalance: number;
+        months: typeof activeResult.monthlyAmortization;
+      }[] = [];
+
+      for (let i = 0; i < activeResult.monthlyAmortization.length; i += 12) {
+        const chunk = activeResult.monthlyAmortization.slice(i, i + 12);
+        const yearNum = Math.floor(i / 12) + 1;
+        const yrInterest = chunk.reduce((sum, m) => sum + m.interest, 0);
+        const yrPrincipal = chunk.reduce((sum, m) => sum + m.principal, 0);
+        const yrExtra = chunk.reduce((sum, m) => sum + m.extra, 0);
+        const lastBal = chunk[chunk.length - 1].balance;
+
+        yearlyAmortization.push({
+          year: yearNum,
+          interest: yrInterest,
+          principal: yrPrincipal,
+          extra: yrExtra,
+          endBalance: lastBal,
+          months: chunk,
+        });
+      }
+
+      const totalDisbursed = isQuick ? sanctionedAmount : disbursements.reduce((sum, d) => sum + d.amount, 0);
+      const denominator = activeResult.totalPayable || 1;
+      const principalPct = (totalDisbursed / denominator) * 100;
+      const interestPct = (activeResult.totalInterest / denominator) * 100;
+
+      const radius = 70;
+      const circumference = 2 * Math.PI * radius;
+
+      return {
+        monthlyEmi: Math.round(activeResult.initialEmi),
+        totalPayable: Math.round(activeResult.totalPayable),
+        totalInterest: Math.round(activeResult.totalInterest),
+        actualMonths: activeResult.actualMonths,
+        principalPct,
+        interestPct,
+        interestSaved: Math.round(interestSaved),
+        monthsSaved,
+        donutRadius: radius,
+        donutCircumference: circumference,
+        principalStrokeLength: (principalPct / 100) * circumference,
+        interestStrokeLength: (interestPct / 100) * circumference,
+        interestStrokeOffset: -((principalPct / 100) * circumference),
+        yearlyAmortization,
+        maxYearlyOutflow: Math.round(
+          Math.max(...yearlyAmortization.map((yr) => yr.principal + yr.interest + yr.extra)) || 1
+        ),
+        comparison: {
+          noPayment: noPaymentResult,
+          fullServiced: fullServicedResult,
+          savings
+        }
+      };
+    }
+
     const amountVal = Number(emiAmount) || 0;
     const rateVal = Number(emiRate) || 0;
     const tenureVal = Number(emiTenure) || 0;
@@ -542,16 +803,41 @@ export default function LoanCalculatorView({
       maxYearlyOutflow: Math.round(
         Math.max(...yearlyAmortization.map((yr) => yr.principal + yr.interest + yr.extra)) || 1
       ),
+      comparison: undefined,
     };
-  }, [emiAmount, emiRate, emiTenure, emiOptimize]);
+  }, [
+    activeTab,
+    emiAmount,
+    emiRate,
+    emiTenure,
+    emiOptimize,
+    eduMode,
+    eduQuickCourseYears,
+    eduQuickMoratoriumMonths,
+    eduSanctionedAmount,
+    eduAdvancedRate,
+    eduAdvancedTenure,
+    eduCourseMonths,
+    eduGraceMonths,
+    eduDisbursementType,
+    eduDisbursements,
+    eduInterestServicing,
+    eduPartialPaymentAmount,
+    eduCapitalizationFrequency,
+    eduCompoundingFrequency,
+    eduPrepayMonthly,
+    eduPrepayLump,
+    eduPrepayStrategy,
+    currencyScale
+  ]);
 
   // Chart data calculations for Cumulative Amortization curve
   const emiChartData = useMemo(() => {
-    const amountVal = Number(emiAmount) || 0;
+    const amountVal = activeTab === "education" ? (eduMode === "quick" ? (Number(emiAmount) || 0) : (Number(eduSanctionedAmount) || 0)) : (Number(emiAmount) || 0);
     const tenureVal = Number(emiTenure) || 1;
     
     // Balance Points
-    const balancePoints = [amountVal];
+    const balancePoints = [activeTab === "education" ? 0 : amountVal];
     // Cumulative Interest Points
     const interestPoints = [0];
     
@@ -562,7 +848,7 @@ export default function LoanCalculatorView({
       interestPoints.push(cumulativeInterest);
     });
 
-    const maxY = Math.max(amountVal, emiCalculations.totalInterest) || 100;
+    const maxY = Math.max(amountVal, emiCalculations.totalInterest, ...balancePoints) || 100;
     const pointsCount = balancePoints.length;
 
     const chartWidth = 256;
@@ -605,7 +891,7 @@ export default function LoanCalculatorView({
       interestLine,
       maxY,
     };
-  }, [emiAmount, emiCalculations.yearlyAmortization, emiCalculations.totalInterest, emiTenure]);
+  }, [activeTab, emiAmount, emiCalculations.yearlyAmortization, emiCalculations.totalInterest, emiTenure, eduMode, eduSanctionedAmount]);
 
   // Calculations for Tab 2: Eligibility
   const eligCalculations = useMemo(() => {
@@ -897,6 +1183,75 @@ export default function LoanCalculatorView({
     };
   }, [prepAmount, prepRate, prepTenure, prepType, prepVal, prepStartMonth]);
 
+  const eduErrors = useMemo(() => {
+    if (activeTab !== "education") return [];
+    const errors: string[] = [];
+
+    if (eduMode === "quick") {
+      const amountVal = Number(emiAmount) || 0;
+      const rateVal = Number(emiRate) || 0;
+      const tenureVal = Number(emiTenure) || 0;
+      const courseYearsVal = Number(eduQuickCourseYears) || 0;
+      const morMonthsVal = Number(eduQuickMoratoriumMonths) || 0;
+
+      if (amountVal <= 0) errors.push("Loan amount must be greater than zero.");
+      if (rateVal <= 0) errors.push("Interest rate must be greater than zero.");
+      if (tenureVal <= 0) errors.push("Repayment tenure must be greater than zero.");
+      if (courseYearsVal <= 0) errors.push("Course duration must be greater than zero.");
+      if (morMonthsVal < 0) errors.push("Moratorium period cannot be negative.");
+    } else {
+      const amountVal = Number(eduSanctionedAmount) || 0;
+      const rateVal = Number(eduAdvancedRate) || 0;
+      const tenureVal = Number(eduAdvancedTenure) || 0;
+      const courseMonthsVal = Number(eduCourseMonths) || 0;
+      const graceMonthsVal = Number(eduGraceMonths) || 0;
+      const partialVal = Number(eduPartialPaymentAmount) || 0;
+
+      if (amountVal <= 0) errors.push("Sanctioned loan amount must be greater than zero.");
+      if (rateVal <= 0) errors.push("Interest rate must be greater than zero.");
+      if (tenureVal <= 0) errors.push("Repayment tenure must be greater than zero.");
+      if (courseMonthsVal <= 0) errors.push("Course duration must be greater than zero.");
+      if (graceMonthsVal < 0) errors.push("Grace period cannot be negative.");
+      if (graceMonthsVal > 24) errors.push("Grace period cannot exceed 24 months.");
+      if (eduInterestServicing === "partial" && partialVal < 0) errors.push("Partial interest payment amount cannot be negative.");
+
+      if (eduDisbursementType === "multiple") {
+        const totalDisb = eduDisbursements.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+        if (totalDisb > amountVal + 0.01) {
+          errors.push(`Total Scheduled Disbursements (${formatCurrency(totalDisb)}) cannot exceed the Sanctioned Loan Amount (${formatCurrency(amountVal)}).`);
+        }
+        eduDisbursements.forEach((d, idx) => {
+          const dAmt = Number(d.amount) || 0;
+          const dMonth = Number(d.month) || 0;
+          const morMonthsTotal = courseMonthsVal + graceMonthsVal;
+          if (dAmt <= 0) errors.push(`Disbursement #${idx + 1} amount must be greater than zero.`);
+          if (dMonth <= 0 || dMonth > morMonthsTotal) {
+            errors.push(`Disbursement #${idx + 1} month must be between 1 and ${morMonthsTotal} (moratorium duration).`);
+          }
+        });
+      }
+    }
+    return errors;
+  }, [
+    activeTab,
+    eduMode,
+    emiAmount,
+    emiRate,
+    emiTenure,
+    eduQuickCourseYears,
+    eduQuickMoratoriumMonths,
+    eduSanctionedAmount,
+    eduAdvancedRate,
+    eduAdvancedTenure,
+    eduCourseMonths,
+    eduGraceMonths,
+    eduDisbursementType,
+    eduDisbursements,
+    eduInterestServicing,
+    eduPartialPaymentAmount,
+    currencyScale
+  ]);
+
   // AI Chat Handler Integration for each tool output
   const handleAskAssistant = () => {
     let detailsStr = "";
@@ -1163,11 +1518,13 @@ export default function LoanCalculatorView({
 
     let rowsXml = "";
     let rowIndex = 2;
+    let rollingBalance = activeTab === "education" ? 0 : (Number(emiAmount) || 0);
 
     emiCalculations.yearlyAmortization.forEach((yr) => {
       yr.months.forEach((m) => {
-        const beginningBalance = m.balance + m.principal + m.extra;
+        const beginningBalance = rollingBalance;
         const emiPayment = m.principal + m.interest + m.extra;
+        rollingBalance = m.balance;
         const isEven = m.month % 2 === 0;
 
         const cStyle = isEven ? "8" : "4";
@@ -1363,137 +1720,778 @@ export default function LoanCalculatorView({
               ))}
             </div>
 
+            {activeTab === "education" && (
+              <div className="bg-blue-50 border border-blue-150 rounded-[12px] p-4 flex gap-3 text-blue-900 mb-6 animate-fade-up">
+                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-[12px] leading-relaxed">
+                  <strong className="font-bold">Education Loan Notice:</strong> Education loans differ from standard loans because interest may accrue during the study and moratorium period. If unpaid, this interest can be capitalized and added to the principal before repayment begins, increasing the EMI and total repayment cost.
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-[24px] lg:grid-cols-12">
               {/* Controls */}
               <div className="lg:col-span-6 flex flex-col gap-6">
-                {/* Input 1: Loan Amount */}
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[13px] font-semibold text-gray-700">Loan Amount ({activeConfig.name})</label>
-                    <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(emiAmount) || 0)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
-                    <input
-                      type="number"
-                      value={emiAmount}
-                      onChange={(e) => setEmiAmount(e.target.value)}
-                      onBlur={() => {
-                        const val = Number(emiAmount) || 0;
-                        const clamped = Math.max(
-                          activeConfig.minAmount,
-                          Math.min(activeConfig.maxAmount, val)
-                        );
-                        setEmiAmount(String(clamped));
-                      }}
-                      className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min={activeConfig.minAmount}
-                    max={activeConfig.maxAmount}
-                    step={activeConfig.amountStep}
-                    value={Number(emiAmount) || 0}
-                    onChange={(e) => setEmiAmount(e.target.value)}
-                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
-                    <span>{formatCompact(activeConfig.minAmount)}</span>
-                    <span>{formatCompact(activeConfig.maxAmount)}</span>
-                  </div>
-                </div>
+                {activeTab === "education" ? (
+                  <div className="flex flex-col gap-6">
+                    {/* Mode Selector */}
+                    <div className="flex bg-gray-100 p-1 rounded-[12px] border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setEduMode("quick")}
+                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${
+                          eduMode === "quick"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        Quick Calculator
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEduMode("advanced")}
+                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${
+                          eduMode === "advanced"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        Advanced Calculator
+                      </button>
+                    </div>
 
-                {/* Input 2: Interest Rate */}
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
-                    <span className="text-[13px] font-bold text-primary">{Number(emiRate) || 0}%</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <input
-                      type="number"
-                      step="0.05"
-                      value={emiRate}
-                      onChange={(e) => setEmiRate(e.target.value)}
-                      onBlur={() => {
-                        const val = Number(emiRate) || 0;
-                        const clamped = Math.max(
-                          activeConfig.minRate,
-                          Math.min(activeConfig.maxRate, val)
-                        );
-                        setEmiRate(String(Number(clamped.toFixed(2))));
-                      }}
-                      className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                    />
-                    <span className="text-gray-400 font-bold text-[14px] pr-1">%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={activeConfig.minRate}
-                    max={activeConfig.maxRate}
-                    step={activeConfig.rateStep}
-                    value={Number(emiRate) || 0}
-                    onChange={(e) => setEmiRate(e.target.value)}
-                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
-                    <span>{activeConfig.minRate}%</span>
-                    <span>{activeConfig.maxRate}%</span>
-                  </div>
-                </div>
+                    {/* Quick Mode Inputs */}
+                    {eduMode === "quick" ? (
+                      <div className="flex flex-col gap-6">
+                        {/* Loan Amount */}
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[13px] font-semibold text-gray-700">Sanctioned Loan Amount</label>
+                            <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(emiAmount) || 0)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                            <input
+                              type="number"
+                              value={emiAmount}
+                              onChange={(e) => setEmiAmount(e.target.value)}
+                              onBlur={() => {
+                                const val = Number(emiAmount) || 0;
+                                const clamped = Math.max(activeConfig.minAmount, Math.min(activeConfig.maxAmount, val));
+                                setEmiAmount(String(clamped));
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                          <input
+                            type="range"
+                            min={activeConfig.minAmount}
+                            max={activeConfig.maxAmount}
+                            step={activeConfig.amountStep}
+                            value={Number(emiAmount) || 0}
+                            onChange={(e) => setEmiAmount(e.target.value)}
+                            className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                            <span>{formatCompact(activeConfig.minAmount)}</span>
+                            <span>{formatCompact(activeConfig.maxAmount)}</span>
+                          </div>
+                        </div>
 
-                {/* Input 3: Tenure */}
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-[13px] font-semibold text-gray-700">Loan Tenure</label>
-                    <span className="text-[13px] font-bold text-primary">{Number(emiTenure) || 0} Years</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <input
-                      type="number"
-                      value={emiTenure}
-                      onChange={(e) => setEmiTenure(e.target.value)}
-                      onBlur={() => {
-                        const val = Number(emiTenure) || 0;
-                        const clamped = Math.max(
-                          activeConfig.minTenure,
-                          Math.min(activeConfig.maxTenure, val)
-                        );
-                        setEmiTenure(String(clamped));
-                      }}
-                      className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                    />
-                    <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={activeConfig.minTenure}
-                    max={activeConfig.maxTenure}
-                    step={1}
-                    value={Number(emiTenure) || 0}
-                    onChange={(e) => setEmiTenure(e.target.value)}
-                    className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
-                    <span>{activeConfig.minTenure} Y</span>
-                    <span>{activeConfig.maxTenure} Y</span>
-                  </div>
-                </div>
+                        {/* Interest Rate */}
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
+                            <span className="text-[13px] font-bold text-primary">{Number(emiRate) || 0}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={emiRate}
+                              onChange={(e) => setEmiRate(e.target.value)}
+                              onBlur={() => {
+                                const val = Number(emiRate) || 0;
+                                const clamped = Math.max(activeConfig.minRate, Math.min(activeConfig.maxRate, val));
+                                setEmiRate(String(Number(clamped.toFixed(2))));
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
+                            />
+                            <span className="text-gray-400 font-bold text-[14px] pr-1">%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={activeConfig.minRate}
+                            max={activeConfig.maxRate}
+                            step={activeConfig.rateStep}
+                            value={Number(emiRate) || 0}
+                            onChange={(e) => setEmiRate(e.target.value)}
+                            className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                            <span>{activeConfig.minRate}%</span>
+                            <span>{activeConfig.maxRate}%</span>
+                          </div>
+                        </div>
 
-                {/* Accelerator Switch */}
-                <div className="flex items-start gap-2.5 bg-[#f6f7fe] border border-[#d4d8fa] p-3 rounded-[12px]">
-                  <input
-                    id="optimize-emi-checkbox"
-                    type="checkbox"
-                    checked={emiOptimize}
-                    onChange={(e) => setEmiOptimize(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                  />
-                  <label htmlFor="optimize-emi-checkbox" className="text-[12px] text-gray-700 leading-normal select-none cursor-pointer">
-                    <strong className="text-primary font-bold">Accelerate with 1 extra EMI annually.</strong> Make an additional repayment equal to your EMI once a year. Reduces interest burden and loan period.
-                  </label>
-                </div>
+                        {/* Course Duration */}
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[13px] font-semibold text-gray-700">Course Duration</label>
+                            <span className="text-[13px] font-bold text-primary">{eduQuickCourseYears} Years</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              type="number"
+                              value={eduQuickCourseYears}
+                              onChange={(e) => setEduQuickCourseYears(e.target.value)}
+                              onBlur={() => {
+                                const val = Number(eduQuickCourseYears) || 1;
+                                const clamped = Math.max(1, Math.min(5, val));
+                                setEduQuickCourseYears(String(clamped));
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
+                            />
+                            <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={1}
+                            max={5}
+                            step={1}
+                            value={Number(eduQuickCourseYears) || 2}
+                            onChange={(e) => setEduQuickCourseYears(e.target.value)}
+                            className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                            <span>1 Year</span>
+                            <span>5 Years</span>
+                          </div>
+                        </div>
+
+                        {/* Moratorium Period */}
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[13px] font-semibold text-gray-700">Moratorium Period (Course + Grace)</label>
+                            <span className="text-[13px] font-bold text-primary">{eduQuickMoratoriumMonths} Months</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              type="number"
+                              value={eduQuickMoratoriumMonths}
+                              onChange={(e) => setEduQuickMoratoriumMonths(e.target.value)}
+                              onBlur={() => {
+                                const val = Number(eduQuickMoratoriumMonths) || 0;
+                                const clamped = Math.max(0, Math.min(72, val));
+                                setEduQuickMoratoriumMonths(String(clamped));
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
+                            />
+                            <span className="text-gray-400 font-bold text-[12px] pr-1">Months</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={72}
+                            step={1}
+                            value={Number(eduQuickMoratoriumMonths) || 30}
+                            onChange={(e) => setEduQuickMoratoriumMonths(e.target.value)}
+                            className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                            <span>0 Months</span>
+                            <span>72 Months</span>
+                          </div>
+                        </div>
+
+                        {/* Repayment Tenure */}
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[13px] font-semibold text-gray-700">Repayment Tenure</label>
+                            <span className="text-[13px] font-bold text-primary">{emiTenure} Years</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              type="number"
+                              value={emiTenure}
+                              onChange={(e) => setEmiTenure(e.target.value)}
+                              onBlur={() => {
+                                const val = Number(emiTenure) || 1;
+                                const clamped = Math.max(activeConfig.minTenure, Math.min(activeConfig.maxTenure, val));
+                                setEmiTenure(String(clamped));
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
+                            />
+                            <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={activeConfig.minTenure}
+                            max={activeConfig.maxTenure}
+                            step={1}
+                            value={Number(emiTenure) || 0}
+                            onChange={(e) => setEmiTenure(e.target.value)}
+                            className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                            <span>{activeConfig.minTenure} Y</span>
+                            <span>{activeConfig.maxTenure} Y</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Advanced Mode Inputs */
+                      <div className="flex flex-col gap-5 text-gray-700">
+                        {/* 1. Loan Details Card */}
+                        <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-4">
+                          <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">1. Loan Details</h4>
+                          
+                          {/* Loan Amount */}
+                          <div className="flex flex-col">
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[12.5px] font-semibold">Sanctioned Loan Amount</label>
+                              <span className="text-[12.5px] font-bold text-primary">{formatCurrency(Number(eduSanctionedAmount) || 0)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-gray-400 font-bold text-[13px]">{currency.symbol}</span>
+                              <input
+                                type="number"
+                                value={eduSanctionedAmount}
+                                onChange={(e) => {
+                                  setEduSanctionedAmount(e.target.value);
+                                  if (eduDisbursementType === "lump") {
+                                    setEduDisbursements([{ amount: e.target.value, month: "1" }]);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const val = Number(eduSanctionedAmount) || 0;
+                                  const clamped = Math.max(activeConfig.minAmount, Math.min(activeConfig.maxAmount, val));
+                                  setEduSanctionedAmount(String(clamped));
+                                  if (eduDisbursementType === "lump") {
+                                    setEduDisbursements([{ amount: String(clamped), month: "1" }]);
+                                  }
+                                }}
+                                className="flex-1 px-2.5 py-1 border border-gray-200 rounded-[8px] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                            <input
+                              type="range"
+                              min={activeConfig.minAmount}
+                              max={activeConfig.maxAmount}
+                              step={activeConfig.amountStep}
+                              value={Number(eduSanctionedAmount) || 0}
+                              onChange={(e) => {
+                                setEduSanctionedAmount(e.target.value);
+                                if (eduDisbursementType === "lump") {
+                                  setEduDisbursements([{ amount: e.target.value, month: "1" }]);
+                                }
+                              }}
+                              className="w-full h-1 bg-gray-150 rounded cursor-pointer accent-primary"
+                            />
+                          </div>
+
+                          {/* Interest Rate & Repayment Tenure */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-semibold mb-1">Rate (%)</label>
+                              <input
+                                type="number"
+                                step="0.05"
+                                value={eduAdvancedRate}
+                                onChange={(e) => setEduAdvancedRate(e.target.value)}
+                                onBlur={() => {
+                                  const val = Number(eduAdvancedRate) || 0;
+                                  const clamped = Math.max(activeConfig.minRate, Math.min(activeConfig.maxRate, val));
+                                  setEduAdvancedRate(String(Number(clamped.toFixed(2))));
+                                }}
+                                className="px-2.5 py-1.5 border border-gray-200 rounded-[8px] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-semibold mb-1">Repayment Tenure (Y)</label>
+                              <input
+                                type="number"
+                                value={eduAdvancedTenure}
+                                onChange={(e) => setEduAdvancedTenure(e.target.value)}
+                                onBlur={() => {
+                                  const val = Number(eduAdvancedTenure) || 1;
+                                  const clamped = Math.max(activeConfig.minTenure, Math.min(activeConfig.maxTenure, val));
+                                  setEduAdvancedTenure(String(clamped));
+                                }}
+                                className="px-2.5 py-1.5 border border-gray-200 rounded-[8px] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Course & Moratorium Details Card */}
+                        <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3">
+                          <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">2. Course & Grace Periods</h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-semibold mb-1" title="Study period duration in months">Course Months</label>
+                              <input
+                                type="number"
+                                value={eduCourseMonths}
+                                onChange={(e) => setEduCourseMonths(e.target.value)}
+                                onBlur={() => {
+                                  const val = Number(eduCourseMonths) || 1;
+                                  setEduCourseMonths(String(Math.max(6, Math.min(60, val))));
+                                }}
+                                className="px-2.5 py-1.5 border border-gray-200 rounded-[8px] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-semibold mb-1" title="Grace period post course before repayment begins (max 24 months)">Grace Months</label>
+                              <input
+                                type="number"
+                                value={eduGraceMonths}
+                                onChange={(e) => setEduGraceMonths(e.target.value)}
+                                onBlur={() => {
+                                  const val = Number(eduGraceMonths) || 0;
+                                  setEduGraceMonths(String(Math.max(0, Math.min(24, val))));
+                                }}
+                                className="px-2.5 py-1.5 border border-gray-200 rounded-[8px] text-[12.5px] font-semibold focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Disbursement Schedule Card */}
+                        <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3">
+                          <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                            <h4 className="text-[12.5px] font-bold text-gray-800 uppercase tracking-wide">3. Disbursement Schedule</h4>
+                            <div className="flex bg-gray-100 p-0.5 rounded-[6px] border border-gray-200 text-[10px]">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEduDisbursementType("lump");
+                                  setEduDisbursements([{ amount: eduSanctionedAmount, month: "1" }]);
+                                }}
+                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${
+                                  eduDisbursementType === "lump" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
+                                }`}
+                              >
+                                Lump Sum
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEduDisbursementType("multiple");
+                                  const amt = Math.round(Number(eduSanctionedAmount) / 4);
+                                  setEduDisbursements([
+                                    { amount: String(amt), month: "1" },
+                                    { amount: String(amt), month: "6" },
+                                    { amount: String(amt), month: "12" },
+                                    { amount: String(Number(eduSanctionedAmount) - amt * 3), month: "18" }
+                                  ]);
+                                }}
+                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${
+                                  eduDisbursementType === "multiple" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
+                                }`}
+                              >
+                                Multiple
+                              </button>
+                            </div>
+                          </div>
+
+                          {eduDisbursementType === "lump" ? (
+                            <p className="text-[11px] text-gray-500 leading-normal">
+                              100% of the loan amount ({formatCurrency(Number(eduSanctionedAmount) || 0)}) will be disbursed in Month 1.
+                            </p>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <div className="max-h-[160px] overflow-y-auto pr-1 flex flex-col gap-1.5">
+                                {eduDisbursements.map((d, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <div className="w-20 text-[11px] font-bold text-gray-400">Disp. #{idx + 1}</div>
+                                    <div className="flex-1 flex items-center gap-1 border border-gray-200 rounded-[6px] px-2 py-1 bg-white">
+                                      <span className="text-[11px] text-gray-400 font-bold">{currency.symbol}</span>
+                                      <input
+                                        type="number"
+                                        value={d.amount}
+                                        onChange={(e) => {
+                                          const updated = [...eduDisbursements];
+                                          updated[idx].amount = e.target.value;
+                                          setEduDisbursements(updated);
+                                        }}
+                                        className="w-full text-[11.5px] font-bold outline-none border-none"
+                                      />
+                                    </div>
+                                    <div className="w-16 flex items-center gap-1 border border-gray-200 rounded-[6px] px-2 py-1 bg-white">
+                                      <input
+                                        type="number"
+                                        value={d.month}
+                                        onChange={(e) => {
+                                          const updated = [...eduDisbursements];
+                                          updated[idx].month = e.target.value;
+                                          setEduDisbursements(updated);
+                                        }}
+                                        placeholder="Mo"
+                                        className="w-full text-[11.5px] font-bold outline-none border-none text-center"
+                                      />
+                                    </div>
+                                    {eduDisbursements.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEduDisbursements(eduDisbursements.filter((_, i) => i !== idx))}
+                                        className="h-7 w-7 rounded-[6px] bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-colors shrink-0"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setEduDisbursements([...eduDisbursements, { amount: "0", month: "1" }])}
+                                className="w-full py-1.5 border border-dashed border-gray-300 rounded-[8px] text-[11px] font-bold text-primary hover:bg-gray-50 flex items-center justify-center gap-1 cursor-pointer mt-1"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                <span>Add Disbursement Row</span>
+                              </button>
+                              
+                              <div className="flex justify-between text-[11px] font-bold border-t border-gray-100 pt-2 mt-1">
+                                <span className="text-gray-400">Total Scheduled:</span>
+                                <span className={
+                                  Math.abs(eduDisbursements.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) - (Number(eduSanctionedAmount) || 0)) < 0.01
+                                    ? "text-emerald-600"
+                                    : "text-rose-600"
+                                }>
+                                  {formatCurrency(eduDisbursements.reduce((sum, d) => sum + (Number(d.amount) || 0), 0))} / {formatCurrency(Number(eduSanctionedAmount) || 0)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 4. Study Interest Servicing Card */}
+                        <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3.5">
+                          <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">4. Study Interest Servicing</h4>
+                          
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[12px] font-semibold text-gray-500">Servicing Option during Moratorium</label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setEduInterestServicing("accumulate")}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                  eduInterestServicing === "accumulate"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                No Payment
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEduInterestServicing("serviced")}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                  eduInterestServicing === "serviced"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                Serviced
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEduInterestServicing("partial")}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                  eduInterestServicing === "partial"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                Partial
+                              </button>
+                            </div>
+                          </div>
+
+                          {eduInterestServicing === "partial" && (
+                            <div className="flex flex-col gap-1.5 bg-gray-50 border border-gray-155 p-2.5 rounded-[8px] animate-fade-up">
+                              <label className="text-[11.5px] font-semibold">Monthly Interest Payment Amount</label>
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 bg-white rounded-[6px]">
+                                <span className="text-[11.5px] text-gray-400 font-bold">{currency.symbol}</span>
+                                <input
+                                  type="number"
+                                  value={eduPartialPaymentAmount}
+                                  onChange={(e) => setEduPartialPaymentAmount(e.target.value)}
+                                  onBlur={() => {
+                                    const val = Number(eduPartialPaymentAmount) || 0;
+                                    setEduPartialPaymentAmount(String(Math.max(0, val)));
+                                  }}
+                                  className="w-full text-[12px] font-bold outline-none border-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {eduInterestServicing !== "serviced" && (
+                            <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+                              <label className="text-[12px] font-semibold text-gray-500">Unpaid Interest Capitalization</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEduCapitalizationFrequency("single")}
+                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                    eduCapitalizationFrequency === "single"
+                                      ? "bg-primary/10 border-primary/20 text-primary"
+                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  Capitalize at End
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEduCapitalizationFrequency("periodic")}
+                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                    eduCapitalizationFrequency === "periodic"
+                                      ? "bg-primary/10 border-primary/20 text-primary"
+                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  Periodic Compounding
+                                </button>
+                              </div>
+
+                              {eduCapitalizationFrequency === "periodic" && (
+                                <div className="flex flex-col gap-1.5 bg-gray-50 border border-gray-155 p-2.5 rounded-[8px] animate-fade-up">
+                                  <label className="text-[11px] font-semibold">Compounding Frequency</label>
+                                  <select
+                                    value={eduCompoundingFrequency}
+                                    onChange={(e) => setEduCompoundingFrequency(e.target.value as any)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-[6px] text-[11.5px] font-bold focus:outline-none cursor-pointer"
+                                  >
+                                    <option value="monthly">Monthly Compounding</option>
+                                    <option value="quarterly">Quarterly Compounding</option>
+                                    <option value="half-yearly">Half-Yearly Compounding</option>
+                                    <option value="yearly">Yearly Compounding</option>
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 5. Prepayments & Strategy Card */}
+                        <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3.5">
+                          <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">5. Prepayments & Strategy</h4>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col">
+                              <label className="text-[11.5px] font-semibold mb-1" title="Additional amount paid every month during repayment">Extra Monthly</label>
+                              <div className="flex items-center gap-1.5 px-2 py-1 border border-gray-250 rounded-[6px] bg-white">
+                                <span className="text-[11px] text-gray-400 font-bold">{currency.symbol}</span>
+                                <input
+                                  type="number"
+                                  value={eduPrepayMonthly}
+                                  onChange={(e) => setEduPrepayMonthly(e.target.value)}
+                                  onBlur={() => {
+                                    const val = Number(eduPrepayMonthly) || 0;
+                                    setEduPrepayMonthly(String(Math.max(0, val)));
+                                  }}
+                                  className="w-full text-[11.5px] font-bold outline-none border-none"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[11.5px] font-semibold mb-1" title="Lump sum amount paid once a year during repayment">Annual Lump Sum</label>
+                              <div className="flex items-center gap-1.5 px-2 py-1 border border-gray-255 rounded-[6px] bg-white">
+                                <span className="text-[11px] text-gray-400 font-bold">{currency.symbol}</span>
+                                <input
+                                  type="number"
+                                  value={eduPrepayLump}
+                                  onChange={(e) => setEduPrepayLump(e.target.value)}
+                                  onBlur={() => {
+                                    const val = Number(eduPrepayLump) || 0;
+                                    setEduPrepayLump(String(Math.max(0, val)));
+                                  }}
+                                  className="w-full text-[11.5px] font-bold outline-none border-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+                            <label className="text-[12px] font-semibold text-gray-500">Prepayment Strategy</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEduPrepayStrategy("reduce-tenure")}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                  eduPrepayStrategy === "reduce-tenure"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                Reduce Tenure
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEduPrepayStrategy("reduce-emi")}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
+                                  eduPrepayStrategy === "reduce-emi"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                Reduce EMI
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Display warning banner if validation errors exist */}
+                    {eduErrors.length > 0 && (
+                      <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-4 flex flex-col gap-2 text-rose-800 animate-fade-up">
+                        <div className="flex items-center gap-2 font-bold text-[12.5px]">
+                          <AlertCircle className="h-4.5 w-4.5 text-rose-600 shrink-0" />
+                          <span>Validation Warnings:</span>
+                        </div>
+                        <ul className="list-disc pl-5 text-[11px] space-y-1 font-semibold leading-normal">
+                          {eduErrors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {/* Input 1: Loan Amount */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Loan Amount ({activeConfig.name})</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(emiAmount) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={emiAmount}
+                          onChange={(e) => setEmiAmount(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(emiAmount) || 0;
+                            const clamped = Math.max(
+                              activeConfig.minAmount,
+                              Math.min(activeConfig.maxAmount, val)
+                            );
+                            setEmiAmount(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={activeConfig.minAmount}
+                        max={activeConfig.maxAmount}
+                        step={activeConfig.amountStep}
+                        value={Number(emiAmount) || 0}
+                        onChange={(e) => setEmiAmount(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{formatCompact(activeConfig.minAmount)}</span>
+                        <span>{formatCompact(activeConfig.maxAmount)}</span>
+                      </div>
+                    </div>
+
+                    {/* Input 2: Interest Rate */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(emiRate) || 0}%</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={emiRate}
+                          onChange={(e) => setEmiRate(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(emiRate) || 0;
+                            const clamped = Math.max(
+                              activeConfig.minRate,
+                              Math.min(activeConfig.maxRate, val)
+                            );
+                            setEmiRate(String(Number(clamped.toFixed(2))));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[14px] pr-1">%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={activeConfig.minRate}
+                        max={activeConfig.maxRate}
+                        step={activeConfig.rateStep}
+                        value={Number(emiRate) || 0}
+                        onChange={(e) => setEmiRate(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{activeConfig.minRate}%</span>
+                        <span>{activeConfig.maxRate}%</span>
+                      </div>
+                    </div>
+
+                    {/* Input 3: Tenure */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Loan Tenure</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(emiTenure) || 0} Years</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          value={emiTenure}
+                          onChange={(e) => setEmiTenure(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(emiTenure) || 0;
+                            const clamped = Math.max(
+                              activeConfig.minTenure,
+                              Math.min(activeConfig.maxTenure, val)
+                            );
+                            setEmiTenure(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={activeConfig.minTenure}
+                        max={activeConfig.maxTenure}
+                        step={1}
+                        value={Number(emiTenure) || 0}
+                        onChange={(e) => setEmiTenure(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{activeConfig.minTenure} Y</span>
+                        <span>{activeConfig.maxTenure} Y</span>
+                      </div>
+                    </div>
+
+                    {/* Accelerator Switch */}
+                    <div className="flex items-start gap-2.5 bg-[#f6f7fe] border border-[#d4d8fa] p-3 rounded-[12px]">
+                      <input
+                        id="optimize-emi-checkbox"
+                        type="checkbox"
+                        checked={emiOptimize}
+                        onChange={(e) => setEmiOptimize(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      />
+                      <label htmlFor="optimize-emi-checkbox" className="text-[12px] text-gray-700 leading-normal select-none cursor-pointer">
+                        <strong className="text-primary font-bold">Accelerate with 1 extra EMI annually.</strong> Make an additional repayment equal to your EMI once a year. Reduces interest burden and loan period.
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 {/* Dashboard Summary Card */}
                 <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex items-center justify-between mt-2">
@@ -1555,7 +2553,15 @@ export default function LoanCalculatorView({
                       <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
                       <span>Principal Amount</span>
                     </div>
-                    <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(Number(emiAmount) || 0)}</span>
+                    <span className="text-[14px] font-bold text-gray-900 mt-1">
+                      {formatCurrency(
+                        activeTab === "education"
+                          ? eduMode === "quick"
+                            ? Number(emiAmount) || 0
+                            : Number(eduSanctionedAmount) || 0
+                          : Number(emiAmount) || 0
+                      )}
+                    </span>
                     <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.principalPct)}%)</span>
                   </div>
 
@@ -1659,8 +2665,8 @@ export default function LoanCalculatorView({
                   </div>
                 </button>
 
-                {/* Optimized impact card */}
-                {emiOptimize && (
+                {/* Optimized impact card (Standard) */}
+                {activeTab !== "education" && emiOptimize && (
                   <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[16px]">✨</span>
@@ -1682,6 +2688,98 @@ export default function LoanCalculatorView({
                         </span>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Prepayment Benefits Card (Education) */}
+                {activeTab === "education" && emiCalculations.interestSaved > 0 && (
+                  <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[16px]">✨</span>
+                      <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Prepayment Benefits</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                        <span className="text-[10px] font-semibold text-gray-400">Interest Saved</span>
+                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                          {formatCurrency(emiCalculations.interestSaved)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                        <span className="text-[10px] font-semibold text-gray-400">Tenure Reduced</span>
+                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                          {Math.floor(emiCalculations.monthsSaved / 12) > 0
+                            ? `${Math.floor(emiCalculations.monthsSaved / 12)} Yr ${emiCalculations.monthsSaved % 12} Mo`
+                            : `${emiCalculations.monthsSaved} Months`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Servicing Strategy Comparison Card (Education) */}
+                {activeTab === "education" && emiCalculations.comparison && (
+                  <div className="w-full max-w-[640px] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-250 rounded-[14px] p-4 flex flex-col gap-3 animate-fade-up">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[16px]">💡</span>
+                      <span className="text-[12.5px] font-bold text-emerald-800 uppercase tracking-wide">
+                        Servicing Strategy Comparison
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] leading-normal text-emerald-800">
+                      Paying interest during the study period prevents it from compounding/capitalizing, saving you money.
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase border-b border-emerald-100 pb-1.5 mt-1">
+                      <span>Parameter</span>
+                      <span className="text-center">No Payment</span>
+                      <span className="text-right">Full Serviced</span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                        <span>Repayment Principal:</span>
+                        <span className="w-24 text-center font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.noPayment.effectiveRepaymentPrincipal)}
+                        </span>
+                        <span className="w-24 text-right font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.fullServiced.effectiveRepaymentPrincipal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                        <span>Monthly EMI:</span>
+                        <span className="w-24 text-center font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.noPayment.initialEmi)}
+                        </span>
+                        <span className="w-24 text-right font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.fullServiced.initialEmi)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                        <span>Total Interest:</span>
+                        <span className="w-24 text-center font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.noPayment.totalInterest)}
+                        </span>
+                        <span className="w-24 text-right font-semibold text-gray-900">
+                          {formatCurrency(emiCalculations.comparison.fullServiced.totalInterest)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px] font-medium text-gray-700 border-t border-emerald-100 pt-1.5 font-bold text-gray-900">
+                        <span>Total Cost:</span>
+                        <span className="w-24 text-center">
+                          {formatCurrency(emiCalculations.comparison.noPayment.totalPayable)}
+                        </span>
+                        <span className="w-24 text-right text-emerald-600">
+                          {formatCurrency(emiCalculations.comparison.fullServiced.totalPayable)}
+                        </span>
+                      </div>
+                    </div>
+                    {emiCalculations.comparison.savings > 0 && (
+                      <div className="bg-white/80 border border-emerald-200 rounded-[10px] p-2.5 mt-1 flex justify-between items-center text-[11.5px]">
+                        <span className="font-bold text-emerald-800">Total Interest Saved:</span>
+                        <span className="font-extrabold text-emerald-600 text-[13.5px]">
+                          {formatCurrency(emiCalculations.comparison.savings)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
