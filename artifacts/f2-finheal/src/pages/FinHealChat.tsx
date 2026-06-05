@@ -23,6 +23,7 @@ import FinancialEducation from "@/components/FinancialEducation";
 import AdvisorPanel from "@/components/AdvisorPanel";
 import AdminPortal from "@/components/AdminPortal"; // Dynamic admin/expert workspace portal
 import LoanCalculatorView from "@/components/LoanCalculatorView";
+import CibilAnalyzerView from "@/components/CibilAnalyzerView";
 
 export default function FinHealChat() {
 
@@ -39,6 +40,7 @@ export default function FinHealChat() {
     if (view === "advisor") return "advisor" as const;
     if (view === "admin") return "admin" as const;
     if (view === "loan-calculator") return "loan-calculator" as const;
+    if (view === "cibil-analyzer") return "cibil-analyzer" as const;
     return "chat" as const;
   };
 
@@ -48,7 +50,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator" | "cibil-analyzer">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -215,6 +217,7 @@ export default function FinHealChat() {
   const openAdvisor = () => setMainView("advisor");
   const openAdmin = () => setMainView("admin");
   const openLoanCalculator = () => setMainView("loan-calculator");
+  const openCibilAnalyzer = () => setMainView("cibil-analyzer");
 
   const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
     const formattedAmount = new Intl.NumberFormat("en-IN", {
@@ -275,7 +278,9 @@ export default function FinHealChat() {
             ? "Financial Education"
             : mainView === "loan-calculator"
               ? "Loan Calculator"
-              : "Financial Health Test";
+              : mainView === "cibil-analyzer"
+                ? "CIBIL Analyzer"
+                : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -353,6 +358,7 @@ export default function FinHealChat() {
           initialActiveNav={activeSidebarNav}
           onSelectMood={handleSelectMood}
           onOpenLoanCalculator={openLoanCalculator}
+          onOpenCibilAnalyzer={openCibilAnalyzer}
         />
         {mainView === "chat" ? (
           <ChatArea
@@ -462,6 +468,14 @@ export default function FinHealChat() {
           />
         ) : mainView === "loan-calculator" ? (
           <LoanCalculatorView
+            userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
+            onApplyNow={handleApplyLoan}
+            onTalkToAdvisor={() => setMainView("advisor")}
+          />
+        ) : mainView === "cibil-analyzer" ? (
+          <CibilAnalyzerView
             userId={userId}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
