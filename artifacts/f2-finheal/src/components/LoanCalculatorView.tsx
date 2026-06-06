@@ -219,7 +219,7 @@ export default function LoanCalculatorView({
   // Format configs dynamically
   const activeConfig = useMemo(() => {
     const base = LOAN_TYPES.find((t) => t.id === activeTab) || LOAN_TYPES[0];
-    
+
     // Scale inputs nicely
     const roundNice = (val: number) => {
       const raw = val * currencyScale;
@@ -503,7 +503,7 @@ export default function LoanCalculatorView({
           currentEmi = monthlyRate === 0
             ? effectiveRepaymentPrincipal / tenureMonths
             : (effectiveRepaymentPrincipal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
-              (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+            (Math.pow(1 + monthlyRate, tenureMonths) - 1);
         }
         const initialEmi = currentEmi;
 
@@ -536,7 +536,7 @@ export default function LoanCalculatorView({
               currentEmi = monthlyRate === 0
                 ? outstandingPrincipal / remainingMonths
                 : (outstandingPrincipal * monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) /
-                  (Math.pow(1 + monthlyRate, remainingMonths) - 1);
+                (Math.pow(1 + monthlyRate, remainingMonths) - 1);
             }
           }
         }
@@ -637,7 +637,7 @@ export default function LoanCalculatorView({
       monthlyRate === 0
         ? totalMonths === 0 ? 0 : amountVal / totalMonths
         : (amountVal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
-          (Math.pow(1 + monthlyRate, totalMonths) - 1);
+        (Math.pow(1 + monthlyRate, totalMonths) - 1);
 
     const standardTotalPayable = emi * totalMonths;
     const standardTotalInterest = standardTotalPayable - amountVal;
@@ -770,12 +770,12 @@ export default function LoanCalculatorView({
   const emiChartData = useMemo(() => {
     const amountVal = activeTab === "education" ? (eduMode === "quick" ? (Number(emiAmount) || 0) : (Number(eduSanctionedAmount) || 0)) : (Number(emiAmount) || 0);
     const tenureVal = Number(emiTenure) || 1;
-    
+
     // Balance Points
     const balancePoints = [activeTab === "education" ? 0 : amountVal];
     // Cumulative Interest Points
     const interestPoints = [0];
-    
+
     let cumulativeInterest = 0;
     emiCalculations.yearlyAmortization.forEach((yr) => {
       balancePoints.push(yr.endBalance);
@@ -847,7 +847,7 @@ export default function LoanCalculatorView({
         monthlyRate === 0
           ? totalMonths === 0 ? 0 : amt / totalMonths
           : (amt * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
-            (Math.pow(1 + monthlyRate, totalMonths) - 1);
+          (Math.pow(1 + monthlyRate, totalMonths) - 1);
       const totalPayable = emi * totalMonths;
       const totalInterest = totalPayable - amt;
 
@@ -893,7 +893,7 @@ export default function LoanCalculatorView({
       monthlyRate === 0
         ? totalMonths === 0 ? 0 : amountVal / totalMonths
         : (amountVal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
-          (Math.pow(1 + monthlyRate, totalMonths) - 1);
+        (Math.pow(1 + monthlyRate, totalMonths) - 1);
 
     const standardTotalPayable = emi * totalMonths;
     const standardTotalInterest = standardTotalPayable - amountVal;
@@ -1012,7 +1012,7 @@ export default function LoanCalculatorView({
   // AI Chat Handler Integration for each tool output
   const handleAskAssistant = () => {
     let detailsStr = "";
-    
+
     if (calcType === "emi") {
       detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
         `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
@@ -1035,18 +1035,18 @@ export default function LoanCalculatorView({
 
     const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
     onApplyNow(
-      calcType === "compare" 
-        ? `${typeA.name} vs Alternative` 
-        : activeConfig.name, 
-      calcType === "compare" 
-        ? (Number(compAmountA) || 0) 
-        : (Number(emiAmount) || 0), 
-      calcType === "compare" 
-        ? (Number(compRateA) || 0) 
-        : (Number(emiRate) || 0), 
-      calcType === "compare" 
-        ? (Number(compTenureA) || 0) 
-        : (Number(emiTenure) || 0), 
+      calcType === "compare"
+        ? `${typeA.name} vs Alternative`
+        : activeConfig.name,
+      calcType === "compare"
+        ? (Number(compAmountA) || 0)
+        : (Number(emiAmount) || 0),
+      calcType === "compare"
+        ? (Number(compRateA) || 0)
+        : (Number(emiRate) || 0),
+      calcType === "compare"
+        ? (Number(compTenureA) || 0)
+        : (Number(emiTenure) || 0),
       detailsStr
     );
   };
@@ -1328,7 +1328,7 @@ export default function LoanCalculatorView({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    
+
     const category = activeTab || "loan";
     link.setAttribute("download", `repayment_schedule_${category}.xlsx`);
     link.style.visibility = "hidden";
@@ -1397,33 +1397,30 @@ export default function LoanCalculatorView({
         <div className="grid grid-cols-3 gap-[6px] border-b border-gray-100 pb-3.5 mb-[20px]">
           <button
             onClick={() => setCalcType("emi")}
-            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              calcType === "emi"
-                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }`}
+            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "emi"
+              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
           >
             <Coins className="h-4 w-4 shrink-0" />
             <span>EMI Calculator</span>
           </button>
           <button
             onClick={() => setCalcType("compare")}
-            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              calcType === "compare"
-                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }`}
+            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "compare"
+              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
           >
             <Scale className="h-4 w-4 shrink-0" />
             <span>Compare Loans</span>
           </button>
           <button
             onClick={() => setCalcType("prepayment")}
-            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              calcType === "prepayment"
-                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }`}
+            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "prepayment"
+              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
           >
             <TrendingUp className="h-4 w-4 shrink-0" />
             <span>Prepayment Tool</span>
@@ -1439,11 +1436,10 @@ export default function LoanCalculatorView({
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  className={`px-3 py-1.5 rounded-[8px] text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    activeTab === t.id
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-[8px] text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === t.id
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
                 >
                   <span>{t.icon}</span>
                   <span>{t.name}</span>
@@ -1470,22 +1466,20 @@ export default function LoanCalculatorView({
                       <button
                         type="button"
                         onClick={() => setEduMode("quick")}
-                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${
-                          eduMode === "quick"
-                            ? "bg-primary text-white shadow-sm"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
+                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${eduMode === "quick"
+                          ? "bg-primary text-white shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                          }`}
                       >
                         Quick Calculator
                       </button>
                       <button
                         type="button"
                         onClick={() => setEduMode("advanced")}
-                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${
-                          eduMode === "advanced"
-                            ? "bg-primary text-white shadow-sm"
-                            : "text-gray-600 hover:text-gray-900"
-                        }`}
+                        className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${eduMode === "advanced"
+                          ? "bg-primary text-white shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                          }`}
                       >
                         Advanced Calculator
                       </button>
@@ -1676,7 +1670,7 @@ export default function LoanCalculatorView({
                         {/* 1. Loan Details Card */}
                         <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-4">
                           <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">1. Loan Details</h4>
-                          
+
                           {/* Loan Amount */}
                           <div className="flex flex-col">
                             <div className="flex justify-between items-center mb-1">
@@ -1799,9 +1793,8 @@ export default function LoanCalculatorView({
                                   setEduDisbursementType("lump");
                                   setEduDisbursements([{ amount: eduSanctionedAmount, month: "1" }]);
                                 }}
-                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${
-                                  eduDisbursementType === "lump" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
-                                }`}
+                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${eduDisbursementType === "lump" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
+                                  }`}
                               >
                                 Lump Sum
                               </button>
@@ -1817,9 +1810,8 @@ export default function LoanCalculatorView({
                                     { amount: String(Number(eduSanctionedAmount) - amt * 3), month: "18" }
                                   ]);
                                 }}
-                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${
-                                  eduDisbursementType === "multiple" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
-                                }`}
+                                className={`px-2 py-0.5 font-bold rounded-[4px] cursor-pointer ${eduDisbursementType === "multiple" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
+                                  }`}
                               >
                                 Multiple
                               </button>
@@ -1882,7 +1874,7 @@ export default function LoanCalculatorView({
                                 <Plus className="h-3.5 w-3.5" />
                                 <span>Add Disbursement Row</span>
                               </button>
-                              
+
                               <div className="flex justify-between text-[11px] font-bold border-t border-gray-100 pt-2 mt-1">
                                 <span className="text-gray-400">Total Scheduled:</span>
                                 <span className={
@@ -1900,40 +1892,37 @@ export default function LoanCalculatorView({
                         {/* 4. Study Interest Servicing Card */}
                         <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3.5">
                           <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">4. Study Interest Servicing</h4>
-                          
+
                           <div className="flex flex-col gap-2">
                             <label className="text-[12px] font-semibold text-gray-500">Servicing Option during Moratorium</label>
                             <div className="grid grid-cols-3 gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => setEduInterestServicing("accumulate")}
-                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                  eduInterestServicing === "accumulate"
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "accumulate"
+                                  ? "bg-primary border-primary text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
                               >
                                 No Payment
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEduInterestServicing("serviced")}
-                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                  eduInterestServicing === "serviced"
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "serviced"
+                                  ? "bg-primary border-primary text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
                               >
                                 Serviced
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEduInterestServicing("partial")}
-                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                  eduInterestServicing === "partial"
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "partial"
+                                  ? "bg-primary border-primary text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
                               >
                                 Partial
                               </button>
@@ -1966,22 +1955,20 @@ export default function LoanCalculatorView({
                                 <button
                                   type="button"
                                   onClick={() => setEduCapitalizationFrequency("single")}
-                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                    eduCapitalizationFrequency === "single"
-                                      ? "bg-primary/10 border-primary/20 text-primary"
-                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                  }`}
+                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduCapitalizationFrequency === "single"
+                                    ? "bg-primary/10 border-primary/20 text-primary"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    }`}
                                 >
                                   Capitalize at End
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setEduCapitalizationFrequency("periodic")}
-                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                    eduCapitalizationFrequency === "periodic"
-                                      ? "bg-primary/10 border-primary/20 text-primary"
-                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                  }`}
+                                  className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduCapitalizationFrequency === "periodic"
+                                    ? "bg-primary/10 border-primary/20 text-primary"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    }`}
                                 >
                                   Periodic Compounding
                                 </button>
@@ -2009,7 +1996,7 @@ export default function LoanCalculatorView({
                         {/* 5. Prepayments & Strategy Card */}
                         <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3.5">
                           <h4 className="text-[12.5px] font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wide">5. Prepayments & Strategy</h4>
-                          
+
                           <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col">
                               <label className="text-[11.5px] font-semibold mb-1" title="Additional amount paid every month during repayment">Extra Monthly</label>
@@ -2051,22 +2038,20 @@ export default function LoanCalculatorView({
                               <button
                                 type="button"
                                 onClick={() => setEduPrepayStrategy("reduce-tenure")}
-                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                  eduPrepayStrategy === "reduce-tenure"
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduPrepayStrategy === "reduce-tenure"
+                                  ? "bg-primary border-primary text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
                               >
                                 Reduce Tenure
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEduPrepayStrategy("reduce-emi")}
-                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${
-                                  eduPrepayStrategy === "reduce-emi"
-                                    ? "bg-primary border-primary text-white shadow-sm"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduPrepayStrategy === "reduce-emi"
+                                  ? "bg-primary border-primary text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                  }`}
                               >
                                 Reduce EMI
                               </button>
@@ -2319,14 +2304,14 @@ export default function LoanCalculatorView({
                       Click to expand
                     </span>
                   </div>
-                  
+
                   <div className="relative w-full h-[115px] flex items-center justify-center bg-white border border-gray-100 rounded-[10px] p-1 overflow-hidden">
                     <svg viewBox="0 0 256 110" className="w-full h-full max-h-[110px] overflow-visible">
                       {/* Grid lines */}
                       <line x1="0" y1="5" x2="256" y2="5" stroke="#f1f3f5" strokeWidth="1" />
                       <line x1="0" y1="55" x2="256" y2="55" stroke="#f1f3f5" strokeWidth="1" />
                       <line x1="0" y1="105" x2="256" y2="105" stroke="#e9ecef" strokeWidth="1" strokeDasharray="3 3" />
-                      
+
                       {/* Bars Render */}
                       {(() => {
                         const N = emiCalculations.yearlyAmortization.length || 1;
@@ -2387,7 +2372,7 @@ export default function LoanCalculatorView({
                       })()}
                     </svg>
                   </div>
-                  
+
                   {/* Chart Labels */}
                   <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5 w-full">
                     <span>Start (Year 0)</span>
@@ -2797,11 +2782,10 @@ export default function LoanCalculatorView({
                         <div
                           className="h-full bg-primary transition-all duration-500"
                           style={{
-                            width: `${
-                              (compCalculations.loanA.emi /
-                                Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
+                            width: `${(compCalculations.loanA.emi /
+                              Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
                               100
-                            }%`,
+                              }%`,
                           }}
                         />
                       </div>
@@ -2818,11 +2802,10 @@ export default function LoanCalculatorView({
                         <div
                           className="h-full bg-emerald-500 transition-all duration-500"
                           style={{
-                            width: `${
-                              (compCalculations.loanB.emi /
-                                Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
+                            width: `${(compCalculations.loanB.emi /
+                              Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
                               100
-                            }%`,
+                              }%`,
                           }}
                         />
                       </div>
@@ -2849,14 +2832,13 @@ export default function LoanCalculatorView({
                         <div
                           className="h-full bg-primary transition-all duration-500"
                           style={{
-                            width: `${
-                              (compCalculations.loanA.totalInterest /
-                                Math.max(
-                                  compCalculations.loanA.totalInterest,
-                                  compCalculations.loanB.totalInterest
-                                )) *
+                            width: `${(compCalculations.loanA.totalInterest /
+                              Math.max(
+                                compCalculations.loanA.totalInterest,
+                                compCalculations.loanB.totalInterest
+                              )) *
                               100
-                            }%`,
+                              }%`,
                           }}
                         />
                       </div>
@@ -2873,14 +2855,13 @@ export default function LoanCalculatorView({
                         <div
                           className="h-full bg-emerald-500 transition-all duration-500"
                           style={{
-                            width: `${
-                              (compCalculations.loanB.totalInterest /
-                                Math.max(
-                                  compCalculations.loanA.totalInterest,
-                                  compCalculations.loanB.totalInterest
-                                )) *
+                            width: `${(compCalculations.loanB.totalInterest /
+                              Math.max(
+                                compCalculations.loanA.totalInterest,
+                                compCalculations.loanB.totalInterest
+                              )) *
                               100
-                            }%`,
+                              }%`,
                           }}
                         />
                       </div>
@@ -3008,17 +2989,15 @@ export default function LoanCalculatorView({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPrepType("monthly")}
-                      className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
-                        prepType === "monthly" ? "bg-primary text-white" : "bg-white border border-gray-300 text-gray-600"
-                      }`}
+                      className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${prepType === "monthly" ? "bg-primary text-white" : "bg-white border border-gray-300 text-gray-600"
+                        }`}
                     >
                       Monthly Extra
                     </button>
                     <button
                       onClick={() => setPrepType("lump")}
-                      className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${
-                        prepType === "lump" ? "bg-primary text-white" : "bg-white border border-gray-300 text-gray-600"
-                      }`}
+                      className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition-all cursor-pointer ${prepType === "lump" ? "bg-primary text-white" : "bg-white border border-gray-300 text-gray-600"
+                        }`}
                     >
                       One-time Lump Sum
                     </button>
@@ -3168,22 +3147,20 @@ export default function LoanCalculatorView({
                 <button
                   type="button"
                   onClick={() => setExpandedGraphType("stacked")}
-                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${
-                    expandedGraphType === "stacked"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${expandedGraphType === "stacked"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                    }`}
                 >
                   Stacked Breakdown
                 </button>
                 <button
                   type="button"
                   onClick={() => setExpandedGraphType("comparison")}
-                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${
-                    expandedGraphType === "comparison"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${expandedGraphType === "comparison"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                    }`}
                 >
                   Side-by-Side
                 </button>
@@ -3209,7 +3186,7 @@ export default function LoanCalculatorView({
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                 Year Details HUD
               </div>
-              
+
               {hoveredYearIndex !== null && emiCalculations.yearlyAmortization[hoveredYearIndex] ? (
                 (() => {
                   const yrData = emiCalculations.yearlyAmortization[hoveredYearIndex];
@@ -3245,7 +3222,7 @@ export default function LoanCalculatorView({
                           </div>
                           <span className="font-bold text-gray-900">{formatCurrency(yrData.principal)}</span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between text-[11.5px] border-t border-gray-50 pt-2">
                           <div className="flex items-center gap-1.5 font-semibold text-gray-500">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 block shrink-0" />
@@ -3406,7 +3383,7 @@ export default function LoanCalculatorView({
 
                             {/* Hover Trigger overlay rect */}
                             <rect
-                              x={x - gap/2}
+                              x={x - gap / 2}
                               y="40"
                               width={colWidth + gap}
                               height="310"
@@ -3446,7 +3423,7 @@ export default function LoanCalculatorView({
                                 className="transition-all duration-200"
                               />
                             )}
-                            
+
                             {/* Interest Column */}
                             {h_i > 0 && (
                               <rect
@@ -3462,7 +3439,7 @@ export default function LoanCalculatorView({
 
                             {/* Hover Trigger overlay rect */}
                             <rect
-                              x={x - gap/2}
+                              x={x - gap / 2}
                               y="40"
                               width={colWidth + gap}
                               height="310"
@@ -3531,4 +3508,5 @@ export default function LoanCalculatorView({
     </main>
   );
 }
+
 
