@@ -88,7 +88,7 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     icon: "🏠",
     defaultAmount: 5000000,
     minAmount: 500000,
-    maxAmount: 100000000, // 10 Cr
+    maxAmount: 300000000, // 30 Cr
     amountStep: 100000,
     defaultRate: 8.5,
     minRate: 6.0,
@@ -103,7 +103,7 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     name: "Business Loan",
     icon: "💼",
     defaultAmount: 2000000,
-    minAmount: 100000,
+    minAmount: 500000, // 5 Lakhs
     maxAmount: 50000000, // 5 Cr
     amountStep: 50000,
     defaultRate: 14.0,
@@ -111,8 +111,8 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     maxRate: 24.0,
     rateStep: 0.1,
     defaultTenure: 5,
-    minTenure: 1,
-    maxTenure: 10,
+    minTenure: 1, // 12 Months
+    maxTenure: 7, // 84 Months
   },
   {
     id: "lap",
@@ -152,15 +152,15 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     icon: "💳",
     defaultAmount: 500000,
     minAmount: 50000,
-    maxAmount: 5000000, // 50 Lakhs
+    maxAmount: 4000000, // 40 Lakhs
     amountStep: 10000,
     defaultRate: 12.5,
-    minRate: 10.5,
-    maxRate: 24.0,
+    minRate: 10.0, // ROI starting at 10%
+    maxRate: 24.0, // ROI up to 24%
     rateStep: 0.1,
     defaultTenure: 5,
-    minTenure: 1,
-    maxTenure: 7,
+    minTenure: 1, // 12 Months
+    maxTenure: 6, // 72 Months
   },
   {
     id: "professional",
@@ -168,7 +168,7 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     icon: "🩺",
     defaultAmount: 3000000,
     minAmount: 100000,
-    maxAmount: 15000000, // 1.5 Cr
+    maxAmount: 50000000, // 5 Cr
     amountStep: 50000,
     defaultRate: 10.75,
     minRate: 8.5,
