@@ -1398,8 +1398,8 @@ export default function LoanCalculatorView({
           <button
             onClick={() => setCalcType("emi")}
             className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "emi"
-              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }`}
           >
             <Coins className="h-4 w-4 shrink-0" />
@@ -1408,8 +1408,8 @@ export default function LoanCalculatorView({
           <button
             onClick={() => setCalcType("compare")}
             className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "compare"
-              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }`}
           >
             <Scale className="h-4 w-4 shrink-0" />
@@ -1418,8 +1418,8 @@ export default function LoanCalculatorView({
           <button
             onClick={() => setCalcType("prepayment")}
             className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${calcType === "prepayment"
-              ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-              : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
+                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }`}
           >
             <TrendingUp className="h-4 w-4 shrink-0" />
@@ -1437,8 +1437,8 @@ export default function LoanCalculatorView({
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
                   className={`px-3 py-1.5 rounded-[8px] text-[11.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${activeTab === t.id
-                    ? "bg-primary/10 text-primary border border-primary/20"
-                    : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                     }`}
                 >
                   <span>{t.icon}</span>
@@ -1467,8 +1467,8 @@ export default function LoanCalculatorView({
                         type="button"
                         onClick={() => setEduMode("quick")}
                         className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${eduMode === "quick"
-                          ? "bg-primary text-white shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
                           }`}
                       >
                         Quick Calculator
@@ -1477,8 +1477,8 @@ export default function LoanCalculatorView({
                         type="button"
                         onClick={() => setEduMode("advanced")}
                         className={`flex-1 py-2 text-[12.5px] font-bold rounded-[10px] transition-all cursor-pointer ${eduMode === "advanced"
-                          ? "bg-primary text-white shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
                           }`}
                       >
                         Advanced Calculator
@@ -1900,8 +1900,8 @@ export default function LoanCalculatorView({
                                 type="button"
                                 onClick={() => setEduInterestServicing("accumulate")}
                                 className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "accumulate"
-                                  ? "bg-primary border-primary text-white shadow-sm"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                   }`}
                               >
                                 No Payment
@@ -1910,8 +1910,8 @@ export default function LoanCalculatorView({
                                 type="button"
                                 onClick={() => setEduInterestServicing("serviced")}
                                 className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "serviced"
-                                  ? "bg-primary border-primary text-white shadow-sm"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                   }`}
                               >
                                 Serviced
@@ -1920,8 +1920,8 @@ export default function LoanCalculatorView({
                                 type="button"
                                 onClick={() => setEduInterestServicing("partial")}
                                 className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduInterestServicing === "partial"
-                                  ? "bg-primary border-primary text-white shadow-sm"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                   }`}
                               >
                                 Partial
@@ -1956,8 +1956,8 @@ export default function LoanCalculatorView({
                                   type="button"
                                   onClick={() => setEduCapitalizationFrequency("single")}
                                   className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduCapitalizationFrequency === "single"
-                                    ? "bg-primary/10 border-primary/20 text-primary"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                      ? "bg-primary/10 border-primary/20 text-primary"
+                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                     }`}
                                 >
                                   Capitalize at End
@@ -1966,8 +1966,8 @@ export default function LoanCalculatorView({
                                   type="button"
                                   onClick={() => setEduCapitalizationFrequency("periodic")}
                                   className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduCapitalizationFrequency === "periodic"
-                                    ? "bg-primary/10 border-primary/20 text-primary"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                      ? "bg-primary/10 border-primary/20 text-primary"
+                                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                     }`}
                                 >
                                   Periodic Compounding
@@ -2039,8 +2039,8 @@ export default function LoanCalculatorView({
                                 type="button"
                                 onClick={() => setEduPrepayStrategy("reduce-tenure")}
                                 className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduPrepayStrategy === "reduce-tenure"
-                                  ? "bg-primary border-primary text-white shadow-sm"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                   }`}
                               >
                                 Reduce Tenure
@@ -2049,8 +2049,8 @@ export default function LoanCalculatorView({
                                 type="button"
                                 onClick={() => setEduPrepayStrategy("reduce-emi")}
                                 className={`py-1.5 px-1 rounded-[8px] text-[11px] font-bold border transition-all cursor-pointer ${eduPrepayStrategy === "reduce-emi"
-                                  ? "bg-primary border-primary text-white shadow-sm"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-primary border-primary text-white shadow-sm"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                                   }`}
                               >
                                 Reduce EMI
@@ -2783,7 +2783,7 @@ export default function LoanCalculatorView({
                           className="h-full bg-primary transition-all duration-500"
                           style={{
                             width: `${(compCalculations.loanA.emi /
-                              Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
+                                Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
                               100
                               }%`,
                           }}
@@ -2803,7 +2803,7 @@ export default function LoanCalculatorView({
                           className="h-full bg-emerald-500 transition-all duration-500"
                           style={{
                             width: `${(compCalculations.loanB.emi /
-                              Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
+                                Math.max(compCalculations.loanA.emi, compCalculations.loanB.emi)) *
                               100
                               }%`,
                           }}
@@ -2833,10 +2833,10 @@ export default function LoanCalculatorView({
                           className="h-full bg-primary transition-all duration-500"
                           style={{
                             width: `${(compCalculations.loanA.totalInterest /
-                              Math.max(
-                                compCalculations.loanA.totalInterest,
-                                compCalculations.loanB.totalInterest
-                              )) *
+                                Math.max(
+                                  compCalculations.loanA.totalInterest,
+                                  compCalculations.loanB.totalInterest
+                                )) *
                               100
                               }%`,
                           }}
@@ -2856,10 +2856,10 @@ export default function LoanCalculatorView({
                           className="h-full bg-emerald-500 transition-all duration-500"
                           style={{
                             width: `${(compCalculations.loanB.totalInterest /
-                              Math.max(
-                                compCalculations.loanA.totalInterest,
-                                compCalculations.loanB.totalInterest
-                              )) *
+                                Math.max(
+                                  compCalculations.loanA.totalInterest,
+                                  compCalculations.loanB.totalInterest
+                                )) *
                               100
                               }%`,
                           }}
@@ -3148,8 +3148,8 @@ export default function LoanCalculatorView({
                   type="button"
                   onClick={() => setExpandedGraphType("stacked")}
                   className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${expandedGraphType === "stacked"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
                     }`}
                 >
                   Stacked Breakdown
@@ -3158,8 +3158,8 @@ export default function LoanCalculatorView({
                   type="button"
                   onClick={() => setExpandedGraphType("comparison")}
                   className={`px-3 py-1.5 text-[12px] font-bold rounded-[8px] transition-all cursor-pointer ${expandedGraphType === "comparison"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900"
                     }`}
                 >
                   Side-by-Side
