@@ -1027,7 +1027,6 @@ export default function LoanCalculatorView({
     };
   }, [activeTab, emiAmount, emiCalculations.yearlyAmortization, emiCalculations.totalInterest, emiTenure, eduMode, eduSanctionedAmount]);
 
-<<<<<<< HEAD
   // Calculations for Tab 2: Eligibility
   const eligCalculations = useMemo(() => {
     if (isInputOutOfBounds) {
@@ -1219,9 +1218,6 @@ export default function LoanCalculatorView({
   const selectedOffers = useMemo(() => {
     return matchedOffers.filter((o) => selectedLenderIds.includes(o.lender.id));
   }, [matchedOffers, selectedLenderIds]);
-=======
-
->>>>>>> d7e4cb137ae0d09f6377dd6a2e37e505479cd536
 
   // Calculations for Tab 3: Comparison
   const compCalculations = useMemo(() => {
@@ -1501,11 +1497,7 @@ export default function LoanCalculatorView({
       const encoder = new TextEncoder();
       const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
       let currentOffset = 0;
-<<<<<<< HEAD
       const parts: any[] = [];
-=======
-      const parts: BlobPart[] = [];
->>>>>>> d7e4cb137ae0d09f6377dd6a2e37e505479cd536
 
       files.forEach((file) => {
         const nameBytes = encoder.encode(file.name);
@@ -1818,11 +1810,7 @@ export default function LoanCalculatorView({
       {/* Main Container */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[14px] py-[14px] sm:px-[16px] sm:py-[18px]">
         {/* Tool Navigation Tabs */}
-<<<<<<< HEAD
         <div className="grid grid-cols-2 md:grid-cols-4 gap-[6px] border-b border-gray-100 pb-2.5 mb-[14px]">
-=======
-        <div className="grid grid-cols-3 gap-[6px] border-b border-gray-100 pb-3.5 mb-[20px]">
->>>>>>> d7e4cb137ae0d09f6377dd6a2e37e505479cd536
           <button
             onClick={() => setCalcType("emi")}
             className={`px-3 py-2 rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1835,7 +1823,6 @@ export default function LoanCalculatorView({
             <span>EMI Calculator</span>
           </button>
           <button
-<<<<<<< HEAD
             onClick={() => setCalcType("eligibility")}
             className={`px-3 py-2 rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               calcType === "eligibility"
@@ -1847,8 +1834,6 @@ export default function LoanCalculatorView({
             <span>Eligibility Check</span>
           </button>
           <button
-=======
->>>>>>> d7e4cb137ae0d09f6377dd6a2e37e505479cd536
             onClick={() => setCalcType("compare")}
             className={`px-3 py-2 rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               calcType === "compare"
@@ -3146,7 +3131,6 @@ export default function LoanCalculatorView({
           </div>
         )}
 
-<<<<<<< HEAD
         {/* ----------------- ELIGIBILITY CALCULATOR TAB ----------------- */}
         {calcType === "eligibility" && (
           <div className="animate-fade-up grid gap-6 lg:grid-cols-12">
@@ -3556,8 +3540,6 @@ export default function LoanCalculatorView({
           </div>
         )}
 
-=======
->>>>>>> d7e4cb137ae0d09f6377dd6a2e37e505479cd536
         {/* ----------------- LOAN COMPARISON TAB ----------------- */}
         {calcType === "compare" && (
           <div className="animate-fade-up flex flex-col gap-4">
