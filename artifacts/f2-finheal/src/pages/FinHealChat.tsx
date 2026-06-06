@@ -24,6 +24,7 @@ import AdvisorPanel from "@/components/AdvisorPanel";
 import AdminPortal from "@/components/AdminPortal"; // Dynamic admin/expert workspace portal
 import LoanCalculatorView from "@/components/LoanCalculatorView";
 import CibilAnalyzerView from "@/components/CibilAnalyzerView";
+import EligibilityCibilView from "@/components/EligibilityCibilView";
 
 export default function FinHealChat() {
 
@@ -41,6 +42,7 @@ export default function FinHealChat() {
     if (view === "admin") return "admin" as const;
     if (view === "loan-calculator") return "loan-calculator" as const;
     if (view === "cibil-analyzer") return "cibil-analyzer" as const;
+    if (view === "eligibility-cibil") return "eligibility-cibil" as const;
     return "chat" as const;
   };
 
@@ -50,7 +52,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator" | "cibil-analyzer">(getInitialMainView);
+  const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator" | "cibil-analyzer" | "eligibility-cibil">(getInitialMainView);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -218,6 +220,7 @@ export default function FinHealChat() {
   const openAdmin = () => setMainView("admin");
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
+  const openEligibilityCibil = () => setMainView("eligibility-cibil");
 
   const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
     const formattedAmount = new Intl.NumberFormat("en-IN", {
@@ -271,7 +274,7 @@ export default function FinHealChat() {
       : mainView === "advisor"
         ? "Talk to an Advisor"
         : mainView === "admin"
-          ? (authSession.email && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(authSession.email)
+          ? (authSession && authSession.email && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(authSession.email)
               ? "Advisor Workspace"
               : "Admin Portal")
           : mainView === "education"
@@ -280,7 +283,9 @@ export default function FinHealChat() {
               ? "Loan Calculator"
               : mainView === "cibil-analyzer"
                 ? "CIBIL Analyzer"
-                : "Financial Health Test";
+                : mainView === "eligibility-cibil"
+                  ? "Eligibility & CIBIL Checker"
+                  : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -358,7 +363,7 @@ export default function FinHealChat() {
           initialActiveNav={activeSidebarNav}
           onSelectMood={handleSelectMood}
           onOpenLoanCalculator={openLoanCalculator}
-          onOpenCibilAnalyzer={openCibilAnalyzer}
+          onOpenEligibilityCibil={openEligibilityCibil}
         />
         {mainView === "chat" ? (
           <ChatArea
@@ -468,6 +473,14 @@ export default function FinHealChat() {
           />
         ) : mainView === "loan-calculator" ? (
           <LoanCalculatorView
+            userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
+            onApplyNow={handleApplyLoan}
+            onTalkToAdvisor={() => setMainView("advisor")}
+          />
+        ) : mainView === "eligibility-cibil" ? (
+          <EligibilityCibilView
             userId={userId}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}

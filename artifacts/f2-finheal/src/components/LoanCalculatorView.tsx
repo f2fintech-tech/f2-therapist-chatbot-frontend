@@ -13,13 +13,20 @@ import {
   Calendar,
   ArrowRight,
   AlertCircle,
+  AlertTriangle,
   HelpCircle,
   Landmark,
   Plus,
   Check,
   X,
-  Download
+  Download,
+  Lock,
+  User as UserIcon,
+  Phone,
+  FileText,
+  Sparkles
 } from "lucide-react";
+
 
 interface LoanCalculatorViewProps {
   userId: string;
@@ -193,6 +200,7 @@ export default function LoanCalculatorView({
   const [calcType, setCalcType] = useState<"emi" | "eligibility" | "compare" | "prepayment">("emi");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
 
+
   // Dynamic Scale Factor based on chosen currency to make sliders make sense
   const currencyScale = useMemo(() => {
     switch (currency.code) {
@@ -331,81 +339,8 @@ export default function LoanCalculatorView({
     setEduPrepayStrategy("reduce-tenure");
   }, [activeConfig]);
 
-  // Tab 2: Eligibility Calculator Inputs
-  const [eligLoanType, setEligLoanType] = useState<string>("home");
-  const [eligIncome, setEligIncome] = useState<string>(String(Math.round(100000 * currencyScale)));
-  const [eligEmi, setEligEmi] = useState<string>(String(Math.round(10000 * currencyScale)));
-  const [eligRate, setEligRate] = useState<string>("8.5");
-  const [eligTenure, setEligTenure] = useState<string>("20");
-  const [eligCibil, setEligCibil] = useState<string>("750");
-  const [eligDegree, setEligDegree] = useState<string>("MBBS");
-  const [eligExperience, setEligExperience] = useState<string>("3");
-
-  // Lenders catalog state
-  const [lenders, setLenders] = useState<LenderProduct[]>([]);
-  const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
-
-  // Side-by-Side Comparison State
-  const [selectedLenderIds, setSelectedLenderIds] = useState<string[]>([]);
-  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
-  const [compareError, setCompareError] = useState<string | null>(null);
-
+  // Sync education default amounts on currency scale shifts
   useEffect(() => {
-    const fetchLenders = async () => {
-      try {
-        setIsLoadingLenders(true);
-        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-        const res = await fetch(`${apiBase}/lenders`);
-        if (res.ok) {
-          const data = await res.json();
-          setLenders(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch lenders:", err);
-      } finally {
-        setIsLoadingLenders(false);
-      }
-    };
-
-    fetchLenders();
-
-    const handleUpdate = () => {
-      fetchLenders();
-    };
-    window.addEventListener("finheal:lenders_update", handleUpdate);
-    return () => {
-      window.removeEventListener("finheal:lenders_update", handleUpdate);
-    };
-  }, []);
-
-  const handleEligLoanTypeChange = (typeId: string) => {
-    setEligLoanType(typeId);
-    setSelectedLenderIds([]); // clear comparison selection when changing loan category
-    const selected = LOAN_TYPES.find((t) => t.id === typeId);
-    if (selected) {
-      setEligRate(String(selected.defaultRate));
-      setEligTenure(String(selected.defaultTenure));
-    }
-  };
-
-  const handleToggleSelectLender = (id: string) => {
-    setSelectedLenderIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((item) => item !== id);
-      }
-      if (prev.length >= 3) {
-        setCompareError("You can compare up to 3 lenders at a time.");
-        setTimeout(() => setCompareError(null), 4000);
-        return prev;
-      }
-      return [...prev, id];
-    });
-  };
-
-  // Sync eligibility default amounts on currency scale shifts
-  useEffect(() => {
-    setEligIncome(String(Math.round(100000 * currencyScale)));
-    setEligEmi(String(Math.round(10000 * currencyScale)));
     setEduPartialPaymentAmount(String(Math.round(5000 * currencyScale)));
   }, [currencyScale]);
 
@@ -893,185 +828,7 @@ export default function LoanCalculatorView({
     };
   }, [activeTab, emiAmount, emiCalculations.yearlyAmortization, emiCalculations.totalInterest, emiTenure, eduMode, eduSanctionedAmount]);
 
-  // Calculations for Tab 2: Eligibility
-  const eligCalculations = useMemo(() => {
-    const incomeVal = Number(eligIncome) || 0;
-    const emiVal = Number(eligEmi) || 0;
-    const rateVal = Number(eligRate) || 0;
-    const tenureVal = Number(eligTenure) || 0;
 
-    // Standard lending standard: Max 50% Fixed Obligation to Income Ratio (FOIR)
-    const maxFoirPct = 50;
-    const affordableMonthlyObligation = incomeVal * (maxFoirPct / 100);
-    const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - emiVal);
-
-    const monthlyRate = rateVal / 12 / 100;
-    const totalMonths = tenureVal * 12;
-
-    let eligibleAmount = 0;
-    if (maxEmiAllowed > 0 && monthlyRate > 0) {
-      eligibleAmount =
-        (maxEmiAllowed * (Math.pow(1 + monthlyRate, totalMonths) - 1)) /
-        (monthlyRate * Math.pow(1 + monthlyRate, totalMonths));
-    } else if (maxEmiAllowed > 0 && monthlyRate === 0) {
-      eligibleAmount = maxEmiAllowed * totalMonths;
-    }
-
-    const currentFoir = incomeVal > 0 ? ((emiVal + maxEmiAllowed) / incomeVal) * 100 : 0;
-    const baseFoir = incomeVal > 0 ? (emiVal / incomeVal) * 100 : 0;
-
-    // Safety assessment
-    let riskLevel: "low" | "medium" | "high" = "low";
-    if (baseFoir > 45) riskLevel = "high";
-    else if (baseFoir > 30) riskLevel = "medium";
-
-    return {
-      maxEmiAllowed: Math.round(maxEmiAllowed),
-      eligibleAmount: Math.round(eligibleAmount),
-      riskLevel,
-      currentFoir: Math.round(currentFoir),
-      baseFoir: Math.round(baseFoir),
-    };
-  }, [eligIncome, eligEmi, eligRate, eligTenure]);
-
-  // Matching Engine for Lender Products
-  const matchedOffers = useMemo(() => {
-    if (calcType !== "eligibility" || lenders.length === 0) return [];
-    
-    const incomeVal = Number(eligIncome) || 0;
-    const debtEmiVal = Number(eligEmi) || 0;
-    const tenureVal = Number(eligTenure) || 1;
-    const cibilVal = Number(eligCibil) || 750;
-    const degreeVal = eligDegree;
-    const expVal = Number(eligExperience) || 0;
-
-    // Filter products matching this category
-    const categoryProducts = lenders.filter(l => l.category === eligLoanType);
-    if (categoryProducts.length === 0) return [];
-
-    return categoryProducts.map(lender => {
-      const reasons: string[] = [];
-      let isEligible = true;
-
-      // Check CIBIL gate
-      if (cibilVal < lender.minCibil) {
-        isEligible = false;
-        reasons.push(`BUREAU_MIN_FAIL: Credit score ${cibilVal} is below lender minimum of ${lender.minCibil}`);
-      }
-
-      // Check Income gate
-      if (incomeVal < lender.minMonthlyIncome) {
-        isEligible = false;
-        reasons.push(`INCOME_MIN_FAIL: Monthly income ${formatCurrency(incomeVal)} is below lender minimum of ${formatCurrency(lender.minMonthlyIncome)}`);
-      }
-
-      // Check Tenure gate
-      if (tenureVal > lender.maxTenureYears) {
-        isEligible = false;
-        reasons.push(`TENURE_MAX_FAIL: Requested tenure ${tenureVal}y exceeds lender maximum of ${lender.maxTenureYears}y`);
-      }
-
-      // Professional-specific gates
-      if (eligLoanType === "professional") {
-        if (lender.id === "DL-GODREJ") {
-          const isDoctor = degreeVal.match(/MBBS|MD|MS/);
-          const isCA = degreeVal === "CA";
-          if (isDoctor && expVal < 3) {
-            isEligible = false;
-            reasons.push("VINTAGE_SHORTFALL: Doctor experience must be at least 3 years");
-          } else if (isCA && expVal < 5) {
-            isEligible = false;
-            reasons.push("VINTAGE_SHORTFALL: CA experience must be at least 5 years");
-          }
-        }
-        
-        if (lender.id === "DL-TATA" && expVal < 2) {
-          isEligible = false;
-          reasons.push("VINTAGE_SHORTFALL: Experience must be at least 2 years");
-        }
-
-        if (lender.id === "DL-LTF" && expVal < 3) {
-          isEligible = false;
-          reasons.push("VINTAGE_SHORTFALL: Experience must be at least 3 years");
-        }
-      }
-
-      // Compute Affordable Limit & resulting FOIR
-      const maxFoirPct = lender.maxFoirPct || 50;
-      const lenderMaxEmiAllowed = Math.max(0, (incomeVal * (maxFoirPct / 100)) - debtEmiVal);
-      
-      const monthlyRate = lender.minRate / 12 / 100;
-      const totalMonths = tenureVal * 12;
-      let eligibleLimit = 0;
-      if (lenderMaxEmiAllowed > 0 && monthlyRate > 0) {
-        eligibleLimit = (lenderMaxEmiAllowed * (Math.pow(1 + monthlyRate, totalMonths) - 1)) / (monthlyRate * Math.pow(1 + monthlyRate, totalMonths));
-      } else if (lenderMaxEmiAllowed > 0 && monthlyRate === 0) {
-        eligibleLimit = lenderMaxEmiAllowed * totalMonths;
-      }
-
-      // Cap at lender maximums and degree-specific caps
-      let capLimit = lender.maxAmount;
-      if (eligLoanType === "professional" && lender.id === "DL-GODREJ" && lender.extraParams?.degreeCaps) {
-        const caps = lender.extraParams.degreeCaps as Record<string, number>;
-        const degreeKey = degreeVal.match(/MBBS|BDS|BHMS/) ? "MBBS" : degreeVal.match(/MD|MS/) ? "MD" : "CA";
-        const specificCap = caps[degreeKey];
-        if (specificCap) capLimit = Math.min(capLimit, specificCap);
-      }
-      
-      eligibleLimit = Math.min(eligibleLimit, capLimit);
-
-      // If eligible limit is below lender minAmount, mark ineligible
-      if (eligibleLimit < lender.minAmount) {
-        isEligible = false;
-        reasons.push(`ABB_LT_THRESHOLD: Eligible loan amount is below lender minimum of ${formatCurrency(lender.minAmount)}`);
-      }
-
-      // Compute resulting FOIR with this lender
-      const emiVal = monthlyRate === 0 ? eligibleLimit / totalMonths : (eligibleLimit * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
-      const resultingFoir = incomeVal > 0 ? ((debtEmiVal + emiVal) / incomeVal) * 100 : 0;
-
-      // Assign Approval Likelihood
-      let likelihood: "high" | "medium" | "low" | "ineligible" = "ineligible";
-      if (!isEligible) {
-        likelihood = "ineligible";
-      } else {
-        const margin = maxFoirPct - resultingFoir;
-        if (resultingFoir > maxFoirPct + 5) {
-          likelihood = "ineligible";
-          reasons.push("FOIR_EXCEEDS_MAX: Total EMIs exceed acceptable income ratio by more than 5%");
-        } else if (resultingFoir > maxFoirPct) {
-          likelihood = "low";
-        } else if (margin <= 10) {
-          likelihood = "medium";
-        } else {
-          likelihood = "high";
-        }
-      }
-
-      return {
-        lender,
-        eligibleLimit: Math.round(eligibleLimit),
-        emi: Math.round(emiVal),
-        resultingFoir: Math.round(resultingFoir),
-        likelihood,
-        reasons,
-      };
-    });
-  }, [calcType, lenders, eligIncome, eligEmi, eligTenure, eligCibil, eligRate, eligDegree, eligExperience, eligLoanType, currencyScale]);
-
-  const sortedOffers = useMemo(() => {
-    const approved = matchedOffers.filter(o => o.likelihood !== "ineligible");
-    const ineligible = matchedOffers.filter(o => o.likelihood === "ineligible");
-    
-    const sortMap = { high: 0, medium: 1, low: 2, ineligible: 3 };
-    approved.sort((a, b) => sortMap[a.likelihood] - sortMap[b.likelihood]);
-    
-    return [...approved.slice(0, 4), ...ineligible.slice(0, 2)];
-  }, [matchedOffers]);
-
-  const selectedOffers = useMemo(() => {
-    return matchedOffers.filter((o) => selectedLenderIds.includes(o.lender.id));
-  }, [matchedOffers, selectedLenderIds]);
 
   // Calculations for Tab 3: Comparison
   const compCalculations = useMemo(() => {
@@ -1255,7 +1012,6 @@ export default function LoanCalculatorView({
   // AI Chat Handler Integration for each tool output
   const handleAskAssistant = () => {
     let detailsStr = "";
-    const selectedEligType = LOAN_TYPES.find((t) => t.id === eligLoanType) || LOAN_TYPES[0];
     
     if (calcType === "emi") {
       detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
@@ -1263,12 +1019,6 @@ export default function LoanCalculatorView({
         `EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo. ` +
         `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
         (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
-    } else if (calcType === "eligibility") {
-      detailsStr = `Checked ${selectedEligType.name} Eligibility & Affordability. ` +
-        `Monthly income: ${formatCurrency(Number(eligIncome) || 0)}, existing monthly debt EMIs: ${formatCurrency(Number(eligEmi) || 0)}. ` +
-        `Interest rate: ${Number(eligRate) || 0}%, Tenure: ${Number(eligTenure) || 0} years. ` +
-        `Calculated maximum affordable EMI: ${formatCurrency(eligCalculations.maxEmiAllowed)} and total loan eligibility: ${formatCurrency(eligCalculations.eligibleAmount)}. ` +
-        `Current Debt Obligation Ratio (FOIR): ${eligCalculations.baseFoir}% (Assessment: ${eligCalculations.riskLevel.toUpperCase()} RISK).`;
     } else if (calcType === "compare") {
       const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
       const typeB = LOAN_TYPES.find((t) => t.id === compTypeB) || LOAN_TYPES[0];
@@ -1285,24 +1035,16 @@ export default function LoanCalculatorView({
 
     const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
     onApplyNow(
-      calcType === "eligibility" 
-        ? selectedEligType.name 
-        : calcType === "compare" 
+      calcType === "compare" 
         ? `${typeA.name} vs Alternative` 
         : activeConfig.name, 
-      calcType === "eligibility" 
-        ? eligCalculations.eligibleAmount 
-        : calcType === "compare" 
+      calcType === "compare" 
         ? (Number(compAmountA) || 0) 
         : (Number(emiAmount) || 0), 
-      calcType === "eligibility" 
-        ? (Number(eligRate) || 0) 
-        : calcType === "compare" 
+      calcType === "compare" 
         ? (Number(compRateA) || 0) 
         : (Number(emiRate) || 0), 
-      calcType === "eligibility" 
-        ? (Number(eligTenure) || 0) 
-        : calcType === "compare" 
+      calcType === "compare" 
         ? (Number(compTenureA) || 0) 
         : (Number(emiTenure) || 0), 
       detailsStr
@@ -1339,7 +1081,7 @@ export default function LoanCalculatorView({
       const encoder = new TextEncoder();
       const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
       let currentOffset = 0;
-      const parts: Uint8Array[] = [];
+      const parts: BlobPart[] = [];
 
       files.forEach((file) => {
         const nameBytes = encoder.encode(file.name);
@@ -1652,7 +1394,7 @@ export default function LoanCalculatorView({
       {/* Main Container */}
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
         {/* Tool Navigation Tabs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-[6px] border-b border-gray-100 pb-3.5 mb-[20px]">
+        <div className="grid grid-cols-3 gap-[6px] border-b border-gray-100 pb-3.5 mb-[20px]">
           <button
             onClick={() => setCalcType("emi")}
             className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
@@ -1663,17 +1405,6 @@ export default function LoanCalculatorView({
           >
             <Coins className="h-4 w-4 shrink-0" />
             <span>EMI Calculator</span>
-          </button>
-          <button
-            onClick={() => setCalcType("eligibility")}
-            className={`px-3 py-2.5 rounded-[12px] text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-              calcType === "eligibility"
-                ? "bg-primary text-white shadow-[0_8px_20px_rgba(50,68,230,0.2)]"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            }`}
-          >
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            <span>Eligibility Check</span>
           </button>
           <button
             onClick={() => setCalcType("compare")}
@@ -2873,385 +2604,6 @@ export default function LoanCalculatorView({
           </div>
         )}
 
-        {/* ----------------- ELIGIBILITY CALCULATOR TAB ----------------- */}
-        {calcType === "eligibility" && (
-          <div className="animate-fade-up grid gap-6 lg:grid-cols-12">
-            {/* Left inputs & Safety Gauge Stack */}
-            <div className={`${sortedOffers.length > 0 ? "lg:col-span-5" : "lg:col-span-7"} flex flex-col gap-6`}>
-              {/* Select Loan Type */}
-              <div className="flex flex-col">
-                <label className="text-[13px] font-semibold text-gray-700 mb-1.5">Select Loan Category</label>
-                <div className="relative">
-                  <select
-                    value={eligLoanType}
-                    onChange={(e) => handleEligLoanTypeChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-[12px] text-[13px] font-bold text-gray-800 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
-                  >
-                    {LOAN_TYPES.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.icon} {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-500">
-                    <ChevronDown className="h-4.5 w-4.5" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Monthly Income */}
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
-                  <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligIncome) || 0)}</span>
-                </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
-                  <input
-                    type="number"
-                    value={eligIncome}
-                    onChange={(e) => setEligIncome(e.target.value)}
-                    onBlur={() => {
-                      const val = Number(eligIncome) || 0;
-                      const minVal = Math.round(10000 * currencyScale);
-                      const maxVal = Math.round(5000000 * currencyScale);
-                      setEligIncome(String(Math.max(minVal, Math.min(maxVal, val))));
-                    }}
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={Math.round(10000 * currencyScale)}
-                  max={Math.round(5000000 * currencyScale)}
-                  step={Math.round(25000 * currencyScale)}
-                  value={Number(eligIncome) || 0}
-                  onChange={(e) => setEligIncome(e.target.value)}
-                  className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-
-              {/* Existing EMIs */}
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
-                  <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligEmi) || 0)}</span>
-                </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
-                  <input
-                    type="number"
-                    value={eligEmi}
-                    onChange={(e) => setEligEmi(e.target.value)}
-                    onBlur={() => {
-                      const val = Number(eligEmi) || 0;
-                      const maxVal = Math.round(2500000 * currencyScale);
-                      setEligEmi(String(Math.max(0, Math.min(maxVal, val))));
-                    }}
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.round(2500000 * currencyScale)}
-                  step={Math.round(10000 * currencyScale)}
-                  value={Number(eligEmi) || 0}
-                  onChange={(e) => setEligEmi(e.target.value)}
-                  className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-
-              {/* Rate and Tenure inputs row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <label className="text-[12px] font-semibold text-gray-700 mb-1">Expected Rate (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={eligRate}
-                    onChange={(e) => setEligRate(e.target.value)}
-                    onBlur={() => {
-                      const val = Number(eligRate) || 0;
-                      setEligRate(String(Math.max(1, Math.min(30, val))));
-                    }}
-                    className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-[12px] font-semibold text-gray-700 mb-1">Tenure (Years)</label>
-                  <input
-                    type="number"
-                    value={eligTenure}
-                    onChange={(e) => setEligTenure(e.target.value)}
-                    onBlur={() => {
-                      const val = Number(eligTenure) || 0;
-                      setEligTenure(String(Math.max(1, Math.min(40, val))));
-                    }}
-                    className="px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              {/* CIBIL Score Slider */}
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">CIBIL Score</label>
-                  <span className="text-[13px] font-bold text-primary">{eligCibil}</span>
-                </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <input
-                    type="number"
-                    value={eligCibil}
-                    onChange={(e) => setEligCibil(e.target.value)}
-                    onBlur={() => {
-                      const val = Number(eligCibil) || 750;
-                      setEligCibil(String(Math.max(300, Math.min(900, val))));
-                    }}
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={300}
-                  max={900}
-                  step={5}
-                  value={Number(eligCibil) || 750}
-                  onChange={(e) => setEligCibil(e.target.value)}
-                  className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-
-              {/* Conditional Profession & Experience Inputs for Doctors / CAs */}
-              {eligLoanType === "professional" && (
-                <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 mt-2">
-                  <div className="flex flex-col">
-                    <label className="text-[12px] font-semibold text-gray-700 mb-1">Profession / Degree</label>
-                    <select
-                      value={eligDegree}
-                      onChange={(e) => setEligDegree(e.target.value)}
-                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-[8px] text-[12.5px] font-bold text-gray-800 focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                    >
-                      <option value="MBBS">MBBS (Doctor)</option>
-                      <option value="MD">MD/MS/MCh (Super-specialist)</option>
-                      <option value="CA">Chartered Accountant (CA)</option>
-                      <option value="BDS">BDS/MDS (Dentist)</option>
-                      <option value="BHMS">BHMS/BAMS (Alternative)</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-[12px] font-semibold text-gray-700">Practice Vintage</label>
-                      <span className="text-[11px] font-bold text-primary">{eligExperience} Yrs</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={20}
-                      step={1}
-                      value={Number(eligExperience) || 0}
-                      onChange={(e) => setEligExperience(e.target.value)}
-                      className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary mt-2"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Eligibility card summary */}
-              <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex items-center justify-between mt-2">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
-                    Max Eligible Loan Amount
-                  </span>
-                  <span className="text-[25px] font-bold text-primary mt-1">
-                    {formatCurrency(eligCalculations.eligibleAmount)}
-                  </span>
-                </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAskAssistant}
-                      className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
-                    >
-                      Ask Assistant
-                    </button>
-                    {onTalkToAdvisor && (
-                      <button
-                        type="button"
-                        onClick={onTalkToAdvisor}
-                        className="px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5"
-                      >
-                        Talk to Advisor
-                      </button>
-                    )}
-                  </div>
-              </div>
-
-              {/* Stack safety gauge on left if suggested offers are displayed */}
-              {sortedOffers.length > 0 && (
-                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col items-center justify-center gap-4 mt-2">
-                  <span className="text-[12px] font-bold text-gray-500 uppercase tracking-wide">Affordability Safety Gauge</span>
-                  <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
-                    <svg width="180" height="180" className="absolute top-0">
-                      <defs>
-                        <linearGradient id="safety-gauge-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#10b981" />
-                          <stop offset="50%" stopColor="#f59e0b" />
-                          <stop offset="100%" stopColor="#ef4444" />
-                        </linearGradient>
-                      </defs>
-                      {/* Gradient Speedometer Gauge Arc */}
-                      <path
-                        d="M 20 90 A 70 70 0 0 1 160 90"
-                        fill="none"
-                        stroke="url(#safety-gauge-gradient-1)"
-                        strokeWidth="12"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute bottom-3 flex flex-col items-center justify-center">
-                      <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
-                    </div>
-                  </div>
-                  <div className={`w-full border p-3 rounded-[12px] flex flex-col gap-1.5 ${
-                    eligCalculations.riskLevel === "low"
-                      ? "bg-emerald-50 border-emerald-250 text-emerald-800"
-                      : eligCalculations.riskLevel === "medium"
-                      ? "bg-amber-50 border-amber-250 text-amber-800"
-                      : "bg-rose-50 border-rose-250 text-rose-800"
-                  }`}>
-                    <span className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1">
-                      <ShieldCheck className="h-4 w-4" />
-                      {eligCalculations.riskLevel === "low" ? "Healthy Debt Level" : eligCalculations.riskLevel === "medium" ? "Moderate Obligation" : "High Debt Obligation"}
-                    </span>
-                    <p className="text-[10px] leading-normal opacity-95">
-                      {eligCalculations.riskLevel === "low" && "Existing EMIs consume less than 30% of income. Strong position."}
-                      {eligCalculations.riskLevel === "medium" && "EMIs consume 30% to 45% of income. Moderate risk."}
-                      {eligCalculations.riskLevel === "high" && "Debt consumes over 45% of income. High risk of over-leverage."}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right side: Suggested Offers list (if matches exist) OR Safety Gauge (if no matches exist) */}
-            {sortedOffers.length > 0 ? (
-              <div className="lg:col-span-7 flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-1">
-                  <span className="text-[14px] font-bold text-gray-800 flex items-center gap-2">
-                    <Landmark className="h-4.5 w-4.5 text-primary" />
-                    <span>Recommended Lender Offers ({sortedOffers.filter(o => o.likelihood !== "ineligible").length} Matched)</span>
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ranked by Fit</span>
-                </div>
-                
-                {isLoadingLenders ? (
-                  <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-[12px] border border-gray-200 border-dashed text-gray-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                    <span className="text-[13px] font-medium">Fetching real-time lender criteria...</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3.5 max-h-[750px] overflow-y-auto pr-1">
-                    {sortedOffers.map((offer) => {
-                      const { lender, eligibleLimit, emi, resultingFoir, likelihood, reasons } = offer;
-                      return (
-                        <LenderOfferCard
-                          key={lender.id}
-                          lender={lender}
-                          eligibleLimit={eligibleLimit}
-                          emi={emi}
-                          resultingFoir={resultingFoir}
-                          likelihood={likelihood}
-                          reasons={reasons}
-                          currency={currency}
-                          formatCurrency={formatCurrency}
-                          formatCompact={formatCompact}
-                          onApplyNow={onApplyNow}
-                          eligIncome={eligIncome}
-                          eligEmi={eligEmi}
-                          eligTenure={eligTenure}
-                          isSelected={selectedLenderIds.includes(lender.id)}
-                          onToggleSelect={() => handleToggleSelectLender(lender.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="lg:col-span-5 flex flex-col items-center gap-4">
-                <span className="text-[12.5px] font-bold text-gray-700 uppercase tracking-wide">Affordability Safety Gauge</span>
-
-                {/* Half Speedometer Gauge */}
-                <div className="relative w-[180px] h-[100px] flex items-center justify-center overflow-hidden">
-                  <svg width="180" height="180" className="absolute top-0">
-                    <defs>
-                      <linearGradient id="safety-gauge-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#10b981" />
-                        <stop offset="50%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#ef4444" />
-                      </linearGradient>
-                    </defs>
-                    {/* Gradient Speedometer Gauge Arc */}
-                    <path
-                      d="M 20 90 A 70 70 0 0 1 160 90"
-                      fill="none"
-                      stroke="url(#safety-gauge-gradient-2)"
-                      strokeWidth="12"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-
-                  {/* Numeric reading overlay */}
-                  <div className="absolute bottom-3 flex flex-col items-center justify-center">
-                    <span className="text-[20px] font-bold text-gray-800">{eligCalculations.baseFoir}%</span>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Debt-to-Income</span>
-                  </div>
-                </div>
-
-                {/* Safety Evaluation Card */}
-                <div className={`w-full max-w-[290px] border p-4 rounded-[14px] flex flex-col gap-2 ${
-                  eligCalculations.riskLevel === "low"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                    : eligCalculations.riskLevel === "medium"
-                    ? "bg-amber-50 border-amber-200 text-amber-800"
-                    : "bg-rose-50 border-rose-200 text-rose-800"
-                }`}>
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="h-4.5 w-4.5 shrink-0" />
-                    <span className="text-[12px] font-bold uppercase tracking-wide">
-                      {eligCalculations.riskLevel === "low"
-                        ? "Healthy Debt Levels"
-                        : eligCalculations.riskLevel === "medium"
-                        ? "Moderate Obligation"
-                        : "High Debt Obligation"}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-normal mt-1 opacity-90">
-                    {eligCalculations.riskLevel === "low" &&
-                      "Your existing EMIs consume less than 30% of your income. You are in a strong position to borrow responsibly."}
-                    {eligCalculations.riskLevel === "medium" &&
-                      "Your debt consumes 30% to 45% of your income. Financial advisors recommend keeping debt below 40% before taking new loans."}
-                    {eligCalculations.riskLevel === "high" &&
-                      "Existing monthly payments consume over 45% of your income. High risk of over-leverage. Consider debt consolidation first."}
-                  </p>
-                  <div className="border-t border-current/10 pt-2.5 mt-1 flex flex-col gap-1 text-[11px]">
-                    <div className="flex justify-between font-semibold">
-                      <span>Affordable Max EMI:</span>
-                      <span>{formatCurrency(eligCalculations.maxEmiAllowed)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <span>Target FOIR Cap:</span>
-                      <span>50%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ----------------- LOAN COMPARISON TAB ----------------- */}
         {calcType === "compare" && (
           <div className="animate-fade-up flex flex-col gap-6">
@@ -3796,242 +3148,7 @@ export default function LoanCalculatorView({
         )}
       </div>
 
-      {/* Floating Comparison Banner */}
-      {selectedLenderIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] w-[90%] max-w-2xl bg-white/90 backdrop-blur-md border border-gray-200 shadow-[0_10px_30px_rgba(0,0,0,0.15)] rounded-[24px] px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in transition-all">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-[14px] bg-primary/10 text-primary shrink-0">
-              <Scale className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[13.5px] font-bold text-gray-900">
-                Compare Lenders ({selectedLenderIds.length} of 3 selected)
-              </div>
-              <div className="text-[11px] font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                {selectedOffers.map((o) => (
-                  <span key={o.lender.id} className="bg-gray-100 border border-gray-200/50 rounded-full px-2 py-0.5 text-gray-700">
-                    {o.lender.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end">
-            <button
-              onClick={() => setSelectedLenderIds([])}
-              className="px-4 py-2 hover:bg-gray-100 text-gray-600 text-[12px] font-bold rounded-full transition-all cursor-pointer"
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => {
-                if (selectedLenderIds.length < 2) {
-                  setCompareError("Please select at least 2 lenders to compare.");
-                  setTimeout(() => setCompareError(null), 4000);
-                  return;
-                }
-                setIsCompareModalOpen(true);
-              }}
-              disabled={selectedLenderIds.length < 2}
-              className={`px-5 py-2.5 rounded-full text-[12px] font-bold transition-all shadow-[0_4px_12px_rgba(50,68,230,0.15)] cursor-pointer ${
-                selectedLenderIds.length >= 2
-                  ? "bg-primary text-white hover:opacity-95 hover:-translate-y-0.5"
-                  : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none"
-              }`}
-            >
-              Compare Selected
-            </button>
-          </div>
-
-          {/* Inline Error Toast inside banner */}
-          {compareError && (
-            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[11.5px] font-bold px-4 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 animate-bounce z-[90]">
-              <AlertCircle className="h-3.5 w-3.5" />
-              <span>{compareError}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Comparison Modal */}
-      {isCompareModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-[24px] border border-gray-100 shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-y-auto flex flex-col p-6 animate-scale-in">
-            {/* Modal Header */}
-            <div className="flex justify-between items-start pb-4 border-b border-gray-100 shrink-0">
-              <div>
-                <h3 className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
-                  <Scale className="h-5 w-5 text-primary" />
-                  <span>Side-by-Side Lender Comparison</span>
-                </h3>
-                <p className="text-[12px] font-semibold text-gray-500 mt-1">
-                  Review specifications, rates, and criteria side-by-side to find your best fit.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCompareModalOpen(false)}
-                className="p-2 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-full transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Modal Content - Table */}
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full min-w-[750px] border-collapse text-left text-[12px]">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="py-3.5 px-4 font-bold text-gray-400 uppercase tracking-wide w-[22%]">Parameter</th>
-                    {selectedOffers.map((o) => {
-                      const badgeConfig = {
-                        high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
-                        medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
-                        low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
-                        ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
-                      }[o.likelihood];
-
-                      return (
-                        <th key={o.lender.id} className="py-3 px-4 w-[26%] align-bottom">
-                          <div className="flex flex-col gap-1.5 bg-gray-50 border border-gray-100 rounded-[16px] p-3 shadow-sm">
-                            <span className="text-[13px] font-bold text-gray-900 leading-tight">{o.lender.name}</span>
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">{o.lender.lenderType}</span>
-                            <span className={`self-start px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
-                              {badgeConfig.label}
-                            </span>
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
-                  {/* Category */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Product Category</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 capitalize text-gray-900">{o.lender.productType}</td>
-                    ))}
-                  </tr>
-                  {/* Limit */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Eligible Limit</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 text-[14px] font-bold text-emerald-700">
-                        {formatCurrency(o.eligibleLimit)}
-                      </td>
-                    ))}
-                  </tr>
-                  {/* ROI */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Interest Rate (ROI)</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 text-gray-900 font-bold">
-                        {o.lender.minRate === o.lender.maxRate ? `${o.lender.minRate}%` : `${o.lender.minRate}% – ${o.lender.maxRate}%`}
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Est. EMI */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Est. Monthly EMI</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 text-gray-900 font-bold">
-                        {formatCurrency(o.emi)}/mo
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Processing Fee */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Processing Fee</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 text-gray-900">
-                        {o.lender.processingFee || "Nil / Up to 1%"}
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Disbursal TAT */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-500">Disbursal Time (TAT)</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3 px-4 text-gray-900">
-                        ⏱️ {o.lender.disbursalTime}
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Pros */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Key Benefits (Pros)</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3.5 px-4 text-emerald-700 text-[11px] align-top">
-                        <ul className="list-disc pl-4 space-y-1">
-                          {o.lender.pros.map((p, i) => <li key={i}>{p}</li>)}
-                        </ul>
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Cons */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Shortfalls (Cons)</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3.5 px-4 text-amber-700 text-[11px] align-top">
-                        <ul className="list-disc pl-4 space-y-1">
-                          {o.lender.cons.map((c, i) => <li key={i}>{c}</li>)}
-                        </ul>
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Documents Required */}
-                  <tr className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-gray-500 align-top">Required Documents</td>
-                    {selectedOffers.map((o) => (
-                      <td key={o.lender.id} className="py-3.5 px-4 text-gray-600 text-[10.5px] align-top">
-                        <div className="flex flex-wrap gap-1">
-                          {o.lender.docsRequired.map((doc, i) => (
-                            <span key={i} className="bg-gray-50 border border-gray-150 rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
-                              {doc}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    ))}
-                  </tr>
-                  {/* Action Row */}
-                  <tr>
-                    <td className="py-4 px-4 font-bold text-gray-500">Apply</td>
-                    {selectedOffers.map((o) => {
-                      const handleApplyClickInModal = () => {
-                        setIsCompareModalOpen(false);
-                        const rateStr = o.lender.minRate === o.lender.maxRate ? `${o.lender.minRate}%` : `${o.lender.minRate}% – ${o.lender.maxRate}%`;
-                        let details = `Applied for ${o.lender.name} ${o.lender.productType} via comparison. ` +
-                          `Eligible Limit: ${formatCurrency(o.eligibleLimit)}, ROI: ${rateStr}, Tenure: ${eligTenure} years. ` +
-                          `Lender constraints: Max FOIR: ${o.lender.maxFoirPct}%, processing fee: ${o.lender.processingFee || "N/A"}.`;
-                        onApplyNow(
-                          `${o.lender.name} ${o.lender.productType}`,
-                          o.eligibleLimit,
-                          o.lender.minRate,
-                          Number(eligTenure) || 5,
-                          details
-                        );
-                      };
-
-                      return (
-                        <td key={o.lender.id} className="py-4 px-4">
-                          <button
-                            onClick={handleApplyClickInModal}
-                            className="w-full py-2.5 bg-primary text-white text-[12px] font-bold rounded-[10px] hover:opacity-90 transition-all cursor-pointer shadow-md text-center hover:-translate-y-0.5"
-                          >
-                            Apply Now
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isGraphExpanded && (
         <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md flex flex-col p-6 rounded-[20px] shadow-2xl border border-gray-150 animate-fade-in overflow-hidden">
@@ -4412,200 +3529,6 @@ export default function LoanCalculatorView({
         </div>
       )}
     </main>
-  );
-}
-
-// Lender Offer Card Sub-Component
-function LenderOfferCard({
-  lender,
-  eligibleLimit,
-  emi,
-  resultingFoir,
-  likelihood,
-  reasons,
-  currency,
-  formatCurrency,
-  formatCompact,
-  onApplyNow,
-  eligIncome,
-  eligEmi,
-  eligTenure,
-  isSelected = false,
-  onToggleSelect
-}: {
-  lender: LenderProduct;
-  eligibleLimit: number;
-  emi: number;
-  resultingFoir: number;
-  likelihood: "high" | "medium" | "low" | "ineligible";
-  reasons: string[];
-  currency: any;
-  formatCurrency: (val: number) => string;
-  formatCompact: (val: number) => string;
-  onApplyNow: any;
-  eligIncome: string;
-  eligEmi: string;
-  eligTenure: string;
-  isSelected?: boolean;
-  onToggleSelect?: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const isNotApproved = likelihood === "ineligible";
-
-  // Likelihood Badge Config
-  const badgeConfig = {
-    high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
-    medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
-    low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
-    ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
-  }[likelihood];
-
-  const handleApplyClick = () => {
-    const rateStr = lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`;
-    let details = `Applied for ${lender.name} ${lender.productType} via matching suggestions. ` +
-      `Eligible Limit: ${formatCurrency(eligibleLimit)}, ROI: ${rateStr}, Tenure: ${eligTenure} years. ` +
-      `Lender constraints: Max FOIR: ${lender.maxFoirPct}%, processing fee: ${lender.processingFee || "N/A"}.`;
-    onApplyNow(
-      `${lender.name} ${lender.productType}`,
-      eligibleLimit,
-      lender.minRate,
-      Number(eligTenure) || 5,
-      details
-    );
-  };
-
-  return (
-    <div className={`border rounded-[16px] p-4 bg-white shadow-sm transition-all duration-300 ${
-      isNotApproved ? "opacity-75 border-gray-200" : "border-gray-200 hover:shadow-md hover:border-primary/30"
-    }`}>
-      {/* Top row */}
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex items-start gap-2.5">
-          {!isNotApproved && onToggleSelect && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSelect();
-              }}
-              className={`flex items-center justify-center h-[18px] w-[18px] rounded-[5px] border transition-all shrink-0 cursor-pointer mt-0.5 ${
-                isSelected 
-                  ? "bg-primary border-primary text-white shadow-sm shadow-primary/25" 
-                  : "border-gray-300 hover:border-primary/50 bg-white"
-              }`}
-            >
-              {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-            </button>
-          )}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
-                {badgeConfig.label}
-              </span>
-            </div>
-            <span className="text-[11px] font-semibold text-gray-400 mt-0.5">{lender.productType}</span>
-          </div>
-        </div>
-        {!isNotApproved && (
-          <button
-            onClick={handleApplyClick}
-            className="px-3.5 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[8px] hover:opacity-90 transition-all cursor-pointer"
-          >
-            Apply Now
-          </button>
-        )}
-      </div>
-
-      {/* Middle Grid */}
-      <div className="grid grid-cols-3 gap-2 border-t border-b border-gray-100 py-3 my-3 text-center">
-        <div className="flex flex-col border-r border-gray-100">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Eligible Limit</span>
-          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
-            {isNotApproved ? "₹0" : formatCompact(eligibleLimit)}
-          </span>
-        </div>
-        <div className="flex flex-col border-r border-gray-100">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Interest Rate</span>
-          <span className="text-[13px] font-bold text-gray-900 mt-0.5">
-            {lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`}
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Est. Monthly EMI</span>
-          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
-            {isNotApproved ? "—" : formatCompact(emi)}
-          </span>
-        </div>
-      </div>
-
-      {/* Bottom Collapsible Info */}
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between text-[11px] font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-        >
-          <span>{expanded ? "Hide Details" : "View Checklist & Details"}</span>
-          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </button>
-
-        {expanded && (
-          <div className="mt-2 text-[11.5px] text-gray-600 flex flex-col gap-3 animate-fade-up">
-            {/* Why Matched / Why Not */}
-            <div className="p-2.5 rounded-[10px] bg-gray-50/50 border border-gray-100">
-              <span className="font-bold text-gray-700 block mb-1">
-                {isNotApproved ? "Reason for Not Approved:" : "Why Matched:"}
-              </span>
-              {isNotApproved ? (
-                <div className="flex flex-col gap-1 text-rose-700 font-semibold">
-                  {reasons.map((r, idx) => (
-                    <div key={idx} className="flex items-start gap-1">
-                      <span className="mt-0.5">•</span>
-                      <span>{r.split(": ")[1] || r}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-emerald-700 font-semibold flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Profile meets CIBIL (≥{lender.minCibil}), Income & FOIR requirements.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Pros and Cons */}
-            {!isNotApproved && (
-              <div className="grid grid-cols-2 gap-3.5">
-                <div>
-                  <span className="font-bold text-gray-700 block mb-1">Pros</span>
-                  <ul className="list-disc pl-3 text-emerald-700 space-y-0.5">
-                    {lender.pros.map((p, idx) => <li key={idx}>{p}</li>)}
-                  </ul>
-                </div>
-                <div>
-                  <span className="font-bold text-gray-700 block mb-1">Cons</span>
-                  <ul className="list-disc pl-3 text-amber-700 space-y-0.5">
-                    {lender.cons.map((c, idx) => <li key={idx}>{c}</li>)}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Document Checklist */}
-            <div className="border-t border-gray-100 pt-2">
-              <span className="font-bold text-gray-700 block mb-1.5">Required Documents Checklist:</span>
-              <div className="grid gap-1.5">
-                {lender.docsRequired.map((doc, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-[8px] px-2 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary block shrink-0" />
-                    <span>{doc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
