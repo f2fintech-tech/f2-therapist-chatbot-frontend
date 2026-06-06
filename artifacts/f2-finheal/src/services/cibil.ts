@@ -41,6 +41,7 @@ export interface CibilReport {
   metrics: CibilReportMetric;
   accounts: CibilAccount[];
   tips: string[];
+  pdf_url?: string;
   fetched_at: string;
 }
 
@@ -48,7 +49,8 @@ export async function fetchCibilReport(
   userId: string,
   name: string,
   phone: string,
-  pan: string
+  pan: string,
+  bureau: "cibil" | "experian" = "cibil"
 ): Promise<CibilReport> {
   const response = await fetch(`${API_BASE_URL}/cibil/fetch`, {
     method: "POST",
@@ -58,6 +60,7 @@ export async function fetchCibilReport(
       name,
       phone,
       pan,
+      bureau,
     }),
   });
 

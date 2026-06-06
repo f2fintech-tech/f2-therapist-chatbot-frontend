@@ -71,6 +71,9 @@ export default function CibilAnalyzerView({
   // Sub-calculator tab state
   const [activeTab, setActiveTab] = useState<"report" | "emi" | "eligibility" | "compare" | "prepayment">("report");
 
+  // Open accounts filter (Bureau Accounts Summary table)
+  const [activeAccountFilter, setActiveAccountFilter] = useState<string | null>(null);
+
   // Loaders Catalog
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
@@ -425,9 +428,22 @@ export default function CibilAnalyzerView({
         </div>
         
         {/* Connection status badge */}
-        <div className="flex items-center gap-[8px] text-[12px] bg-emerald-50 text-emerald-700 px-[12px] py-[6px] rounded-[20px] font-semibold border border-emerald-100 shadow-sm shrink-0">
-          <ShieldCheck className="w-[14px] h-[14px] text-emerald-600 animate-pulse" />
-          <span>PostgreSQL RDS Active</span>
+        <div className="flex items-center gap-[12px] shrink-0">
+          {report && report.pdf_url && (
+            <a
+              href={report.pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer"
+            >
+              <FileText className="w-[14px] h-[14px] text-emerald-600" />
+              <span>Download PDF Report</span>
+            </a>
+          )}
+          <div className="flex items-center gap-[8px] text-[12px] bg-emerald-50 text-emerald-700 px-[12px] py-[6px] rounded-[20px] font-semibold border border-emerald-100 shadow-sm">
+            <ShieldCheck className="w-[14px] h-[14px] text-emerald-600 animate-pulse" />
+            <span>PostgreSQL RDS Active</span>
+          </div>
         </div>
       </header>
 
@@ -572,6 +588,17 @@ export default function CibilAnalyzerView({
                 
                 <p className="text-[11px] text-gray-400 mt-[12px]">PAN: {report.pan} | Phone: {report.phone}</p>
                 <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {new Date(report.fetched_at).toLocaleDateString()}</p>
+                {report.pdf_url && (
+                  <a
+                    href={report.pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full"
+                  >
+                    <FileText className="w-[14px] h-[14px]" />
+                    <span>Download PDF Report</span>
+                  </a>
+                )}
               </div>
 
               {/* Core Factors Card */}
@@ -627,74 +654,231 @@ export default function CibilAnalyzerView({
             <div className="min-h-[300px]">
               
               {/* Tab 1: Credit Report & Tips */}
-              {activeTab === "report" && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-[20px]">
-                  
-                  {/* Account List */}
-                  <div className="lg:col-span-2 space-y-[16px]">
+              {activeTab === "report" && (() => {
+                // Compute open accounts grouped by display category
+                const openAccounts = report.accounts.filter(a => a.is_active);
+                const closedCount = report.accounts.length - openAccounts.length;
+
+                const CATEGORY_DEFS: { key: string; label: string; short: string; color: string; bg: string; border: string }[] = [
+                  { key: "Credit Card",       label: "Credit Card",       short: "CC",  color: "text-violet-700",  bg: "bg-violet-50",  border: "border-violet-200" },
+                  { key: "Personal Loan",     label: "Personal Loan",     short: "PL",  color: "text-blue-700",    bg: "bg-blue-50",    border: "border-blue-200" },
+                  { key: "Business Loan",     label: "Business Loan",     short: "BL",  color: "text-indigo-700",  bg: "bg-indigo-50",  border: "border-indigo-200" },
+                  { key: "Auto Loan",         label: "Auto / Vehicle",    short: "AL",  color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200" },
+                  { key: "Overdraft",         label: "Overdraft",         short: "OD",  color: "text-rose-700",    bg: "bg-rose-50",    border: "border-rose-200" },
+                  { key: "Professional Loan", label: "Professional Loan", short: "PrL", color: "text-teal-700",    bg: "bg-teal-50",    border: "border-teal-200" },
+                  { key: "Housing Loan",      label: "Housing Loan",      short: "HL",  color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+                  { key: "Consumer Loan",     label: "Consumer Loan",     short: "CL",  color: "text-orange-700",  bg: "bg-orange-50",  border: "border-orange-200" },
+                  { key: "Other",             label: "Other Loans",       short: "OL",  color: "text-gray-700",    bg: "bg-gray-100",   border: "border-gray-300" },
+                ];
+
+                const categoryKey = (type: string): string => {
+                  const t = type.toLowerCase();
+                  if (t.includes("credit card"))   return "Credit Card";
+                  if (t.includes("personal loan")) return "Personal Loan";
+                  if (t.includes("business loan")) return "Business Loan";
+                  if (t.includes("auto") || t.includes("vehicle") || t.includes("two wheeler")) return "Auto Loan";
+                  if (t.includes("overdraft"))     return "Overdraft";
+                  if (t.includes("professional"))  return "Professional Loan";
+                  if (t.includes("housing") || t.includes("home loan")) return "Housing Loan";
+                  if (t.includes("consumer"))      return "Consumer Loan";
+                  return "Other";
+                };
+
+                const categoryCounts: Record<string, number> = {};
+                const categoryAccounts: Record<string, typeof openAccounts> = {};
+                for (const acc of openAccounts) {
+                  const k = categoryKey(acc.type);
+                  categoryCounts[k] = (categoryCounts[k] || 0) + 1;
+                  if (!categoryAccounts[k]) categoryAccounts[k] = [];
+                  categoryAccounts[k].push(acc);
+                }
+
+                const filteredAccounts = activeAccountFilter ? (categoryAccounts[activeAccountFilter] || []) : openAccounts;
+
+                return (
+                  <div className="space-y-[20px]">
+
+                    {/* ── Bureau Open Accounts Summary Table ── */}
                     <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm">
                       <div className="flex items-center justify-between mb-[14px]">
-                        <h3 className="text-[13px] font-bold text-gray-800">Your Credit Accounts ({report.accounts.length})</h3>
-                        <span className="text-[11px] bg-gray-100 text-gray-600 px-[8px] py-[3px] rounded-[10px] font-semibold">Active & Closed</span>
-                      </div>
-                      
-                      <div className="divide-y divide-gray-100">
-                        {report.accounts.map((acc, index) => (
-                          <div key={index} className="py-[12px] flex items-center justify-between first:pt-0 last:pb-0">
-                            <div>
-                              <div className="flex items-center gap-[6px]">
-                                <h4 className="text-[13px] font-bold text-gray-800">{acc.lender}</h4>
-                                <span className={`text-[10px] font-semibold px-[6px] py-[1.5px] rounded-[8px] ${acc.is_active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                                  {acc.is_active ? "Active" : "Closed"}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-gray-400 mt-[2px]">{acc.type} | Opened on {new Date(acc.open_date).toLocaleDateString()}</p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-[13px] font-extrabold text-gray-800">₹{acc.outstanding_balance.toLocaleString()}</div>
-                              <div className="flex items-center gap-[4px] justify-end mt-[2px]">
-                                <span className={`w-[6px] h-[6px] rounded-full ${acc.payment_status.includes("Past Due") ? "bg-rose-500" : "bg-emerald-500"}`} />
-                                <span className={`text-[11px] font-medium ${acc.payment_status.includes("Past Due") ? "text-rose-600" : "text-gray-500"}`}>
-                                  {acc.payment_status}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* AI Recommendations Panel */}
-                  <div className="lg:col-span-1">
-                    <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm relative overflow-hidden h-full">
-                      {/* Sub-gradient backdrop */}
-                      <div className="absolute -right-[20px] -bottom-[20px] w-[110px] h-[110px] rounded-full bg-primary/5" />
-                      
-                      <div className="flex items-center gap-[8px] mb-[14px]">
-                        <Sparkles className="w-[18px] h-[18px] text-primary" />
-                        <h3 className="text-[13px] font-bold text-gray-800">FinHeal AI Recommendations</h3>
+                        <div>
+                          <h3 className="text-[13px] font-bold text-gray-800">Bureau Open Accounts Summary</h3>
+                          <p className="text-[11px] text-gray-400 mt-[1px]">
+                            {openAccounts.length} open · {closedCount} closed · {report.accounts.length} total accounts on file
+                          </p>
+                        </div>
+                        {report.pdf_url && (
+                          <a
+                            href={report.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-[10px] py-[4px] rounded-[8px] font-bold flex items-center gap-[4px] hover:bg-primary/20 transition-all cursor-pointer shrink-0"
+                          >
+                            <FileText className="w-[12px] h-[12px]" />
+                            <span>PDF Report</span>
+                          </a>
+                        )}
                       </div>
 
-                      <div className="space-y-[12px] relative z-10">
-                        {report.tips.map((tip, idx) => (
-                          <div key={idx} className="flex gap-[8px] text-[12px] text-gray-600 bg-gray-55/40 border border-gray-100 rounded-[12px] p-[10px]">
-                            <span className="text-primary font-bold">{idx + 1}.</span>
-                            <p className="leading-relaxed">{tip}</p>
-                          </div>
+                      {/* Category chips / filter row */}
+                      <div className="flex flex-wrap gap-[8px] mb-[16px]">
+                        <button
+                          onClick={() => setActiveAccountFilter(null)}
+                          className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${
+                            activeAccountFilter === null
+                              ? "bg-primary text-white border-primary shadow-sm"
+                              : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                          }`}
+                        >
+                          All Open ({openAccounts.length})
+                        </button>
+                        {CATEGORY_DEFS.filter(def => (categoryCounts[def.key] || 0) > 0).map(def => (
+                          <button
+                            key={def.key}
+                            onClick={() => setActiveAccountFilter(activeAccountFilter === def.key ? null : def.key)}
+                            className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${
+                              activeAccountFilter === def.key
+                                ? `${def.bg} ${def.color} ${def.border} shadow-sm`
+                                : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                            }`}
+                          >
+                            {def.label} ({categoryCounts[def.key] || 0})
+                          </button>
                         ))}
                       </div>
 
-                      <button
-                        onClick={onTalkToAdvisor}
-                        className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
-                      >
-                        Talk to Credit Score Repair Expert
-                      </button>
+                      {/* Summary grid table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[12px] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-y border-gray-100">
+                              <th className="text-left px-[12px] py-[8px] font-bold text-gray-500 text-[11px] uppercase tracking-[0.5px]">Category</th>
+                              <th className="text-center px-[12px] py-[8px] font-bold text-gray-500 text-[11px] uppercase tracking-[0.5px]">Open A/C</th>
+                              <th className="text-right px-[12px] py-[8px] font-bold text-gray-500 text-[11px] uppercase tracking-[0.5px]">Total Outstanding</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {CATEGORY_DEFS.filter(def => (categoryCounts[def.key] || 0) > 0).map((def, idx) => {
+                              const accs = categoryAccounts[def.key] || [];
+                              const totalOutstanding = accs.reduce((sum, a) => sum + a.outstanding_balance, 0);
+                              return (
+                                <tr
+                                  key={def.key}
+                                  onClick={() => setActiveAccountFilter(activeAccountFilter === def.key ? null : def.key)}
+                                  className={`border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50/70 ${
+                                    activeAccountFilter === def.key ? def.bg : ""
+                                  }`}
+                                >
+                                  <td className="px-[12px] py-[10px]">
+                                    <div className="flex items-center gap-[8px]">
+                                      <span className={`text-[10px] font-bold px-[6px] py-[2px] rounded-[6px] ${def.bg} ${def.color} ${def.border} border`}>
+                                        {def.short}
+                                      </span>
+                                      <span className={`font-semibold ${ activeAccountFilter === def.key ? def.color : "text-gray-700"}`}>{def.label}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-[12px] py-[10px] text-center">
+                                    <span className={`text-[14px] font-black ${ activeAccountFilter === def.key ? def.color : "text-gray-800"}`}>
+                                      {categoryCounts[def.key] || 0}
+                                    </span>
+                                  </td>
+                                  <td className="px-[12px] py-[10px] text-right font-semibold text-gray-700">
+                                    ₹{totalOutstanding.toLocaleString()}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {/* Totals row */}
+                            <tr className="bg-gray-50 font-bold">
+                              <td className="px-[12px] py-[10px] text-gray-800">Total Open Accounts</td>
+                              <td className="px-[12px] py-[10px] text-center text-[14px] font-black text-primary">{openAccounts.length}</td>
+                              <td className="px-[12px] py-[10px] text-right text-gray-800">
+                                ₹{openAccounts.reduce((s, a) => s + a.outstanding_balance, 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
+
+                    {/* ── Filtered Account Detail Cards ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-[20px]">
+
+                      {/* Account list (filtered) */}
+                      <div className="lg:col-span-2">
+                        <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm">
+                          <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-[0.5px] mb-[12px]">
+                            {activeAccountFilter ? `${activeAccountFilter} — Open Accounts (${filteredAccounts.length})` : `All Open Accounts (${openAccounts.length})`}
+                          </h4>
+
+                          {filteredAccounts.length === 0 ? (
+                            <div className="py-[32px] text-center text-gray-400 text-[13px]">
+                              No open accounts found for this category.
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-gray-100">
+                              {filteredAccounts.map((acc, index) => (
+                                <div key={index} className="py-[12px] flex items-center justify-between first:pt-0 last:pb-0">
+                                  <div>
+                                    <div className="flex items-center gap-[6px]">
+                                      <h4 className="text-[13px] font-bold text-gray-800">{acc.lender}</h4>
+                                      <span className="text-[10px] font-semibold px-[6px] py-[1.5px] rounded-[8px] bg-emerald-50 text-emerald-700">
+                                        Active
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-[2px]">
+                                      {acc.type}
+                                      {acc.open_date ? ` | Opened: ${new Date(acc.open_date).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-[13px] font-extrabold text-gray-800">₹{acc.outstanding_balance.toLocaleString()}</div>
+                                    <div className="flex items-center gap-[4px] justify-end mt-[2px]">
+                                      <span className={`w-[6px] h-[6px] rounded-full ${acc.payment_status.includes("Past Due") ? "bg-rose-500" : "bg-emerald-500"}`} />
+                                      <span className={`text-[11px] font-medium ${acc.payment_status.includes("Past Due") ? "text-rose-600" : "text-gray-500"}`}>
+                                        {acc.payment_status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* AI Recommendations */}
+                      <div className="lg:col-span-1">
+                        <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm relative overflow-hidden h-full">
+                          <div className="absolute -right-[20px] -bottom-[20px] w-[110px] h-[110px] rounded-full bg-primary/5" />
+                          
+                          <div className="flex items-center gap-[8px] mb-[14px]">
+                            <Sparkles className="w-[18px] h-[18px] text-primary" />
+                            <h3 className="text-[13px] font-bold text-gray-800">FinHeal AI Recommendations</h3>
+                          </div>
+
+                          <div className="space-y-[12px] relative z-10">
+                            {report.tips.map((tip, idx) => (
+                              <div key={idx} className="flex gap-[8px] text-[12px] text-gray-600 bg-gray-55/40 border border-gray-100 rounded-[12px] p-[10px]">
+                                <span className="text-primary font-bold">{idx + 1}.</span>
+                                <p className="leading-relaxed">{tip}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={onTalkToAdvisor}
+                            className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
+                          >
+                            Talk to Credit Score Repair Expert
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Tab 2: EMI Calculator */}
               {activeTab === "emi" && (
