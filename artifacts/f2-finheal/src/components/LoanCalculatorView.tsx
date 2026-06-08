@@ -1824,10 +1824,16 @@ export default function LoanCalculatorView({
                             </p>
                           ) : (
                             <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider pb-1 border-b border-gray-50 px-1">
+                                <div className="w-20">Tranche</div>
+                                <div className="flex-1">Disbursement Amount</div>
+                                <div className="w-16 text-center">Release Month</div>
+                                {eduDisbursements.length > 1 && <div className="w-7 shrink-0" />}
+                              </div>
                               <div className="max-h-[160px] overflow-y-auto pr-1 flex flex-col gap-1.5">
                                 {eduDisbursements.map((d, idx) => (
                                   <div key={idx} className="flex items-center gap-2">
-                                    <div className="w-20 text-[11px] font-bold text-gray-400">Disp. #{idx + 1}</div>
+                                    <div className="w-20 text-[11px] font-bold text-gray-400">Disb. #{idx + 1}</div>
                                     <div className="flex-1 flex items-center gap-1 border border-gray-200 rounded-[6px] px-2 py-1 bg-white">
                                       <span className="text-[11px] text-gray-400 font-bold">{currency.symbol}</span>
                                       <input
