@@ -712,9 +712,11 @@ export default function LoanCalculatorView({
       }
 
       const totalDisbursed = isQuick ? sanctionedAmount : disbursements.reduce((sum, d) => sum + d.amount, 0);
+      const capitalizedInterest = Math.max(0, activeResult.effectiveRepaymentPrincipal - totalDisbursed);
       const denominator = activeResult.totalPayable || 1;
       const principalPct = (totalDisbursed / denominator) * 100;
       const interestPct = (activeResult.totalInterest / denominator) * 100;
+      const capitalizedInterestPct = (capitalizedInterest / denominator) * 100;
 
       const radius = 70;
       const circumference = 2 * Math.PI * radius;
@@ -726,6 +728,8 @@ export default function LoanCalculatorView({
         actualMonths: activeResult.actualMonths,
         principalPct,
         interestPct,
+        capitalizedInterestPct,
+        capitalizedInterest: Math.round(capitalizedInterest),
         interestSaved: Math.round(interestSaved),
         monthsSaved,
         donutRadius: radius,
@@ -846,6 +850,8 @@ export default function LoanCalculatorView({
       actualMonths: activeMonths,
       principalPct,
       interestPct,
+      capitalizedInterestPct: 0,
+      capitalizedInterest: 0,
       interestSaved: Math.round(interestSaved),
       monthsSaved,
       donutRadius: radius,
@@ -1943,10 +1949,16 @@ export default function LoanCalculatorView({
                             </p>
                           ) : (
                             <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider pb-1 border-b border-gray-50 px-1">
+                                <div className="w-20">Tranche</div>
+                                <div className="flex-1">Disbursement Amount</div>
+                                <div className="w-16 text-center">Release Month</div>
+                                {eduDisbursements.length > 1 && <div className="w-7 shrink-0" />}
+                              </div>
                               <div className="max-h-[160px] overflow-y-auto pr-1 flex flex-col gap-1.5">
                                 {eduDisbursements.map((d, idx) => (
                                   <div key={idx} className="flex items-center gap-2">
-                                    <div className="w-20 text-[11px] font-bold text-gray-400">Disp. #{idx + 1}</div>
+                                    <div className="w-20 text-[11px] font-bold text-gray-400">Disb. #{idx + 1}</div>
                                     <div className="flex-1 flex items-center gap-1 border border-gray-200 rounded-[6px] px-2 py-1 bg-white">
                                       <span className="text-[11px] text-gray-400 font-bold">{currency.symbol}</span>
                                       <input
@@ -2329,7 +2341,7 @@ export default function LoanCalculatorView({
                 )}
 
                 {/* Dashboard Summary Card */}
-                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex items-center justify-between mt-2">
+                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
                       Calculated Monthly EMI
@@ -2338,11 +2350,11 @@ export default function LoanCalculatorView({
                       {formatCurrency(emiCalculations.monthlyEmi)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={handleAskAssistant}
-                      className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
+                      className="flex-1 sm:flex-none px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                     >
                       Apply & Chat
                     </button>
@@ -2350,7 +2362,7 @@ export default function LoanCalculatorView({
                       <button
                         type="button"
                         onClick={onTalkToAdvisor}
-                        className="px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5"
+                        className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                       >
                         Talk to Advisor
                       </button>
@@ -2372,6 +2384,12 @@ export default function LoanCalculatorView({
                       className="h-full bg-primary transition-all duration-500"
                       style={{ width: `${emiCalculations.principalPct}%` }}
                     />
+                    {emiCalculations.capitalizedInterestPct > 0 && (
+                      <div
+                        className="h-full bg-purple-500 transition-all duration-500"
+                        style={{ width: `${emiCalculations.capitalizedInterestPct}%` }}
+                      />
+                    )}
                     {emiCalculations.totalInterest > 0 && (
                       <div
                         className="h-full bg-emerald-500 transition-all duration-500"
@@ -2382,7 +2400,11 @@ export default function LoanCalculatorView({
                 </div>
 
                 {/* Legends */}
-                <div className="w-full max-w-[640px] grid grid-cols-2 gap-4">
+                <div className={`w-full max-w-[640px] grid gap-4 ${
+                  activeTab === "education" && emiCalculations.capitalizedInterestPct > 0
+                    ? "grid-cols-3"
+                    : "grid-cols-2"
+                }`}>
                   <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
                       <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
@@ -2399,6 +2421,19 @@ export default function LoanCalculatorView({
                     </span>
                     <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.principalPct)}%)</span>
                   </div>
+
+                  {activeTab === "education" && emiCalculations.capitalizedInterestPct > 0 && (
+                    <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+                        <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
+                        <span className="whitespace-nowrap">Capitalized Interest</span>
+                      </div>
+                      <span className="text-[14px] font-bold text-gray-900 mt-1">
+                        {formatCurrency(emiCalculations.capitalizedInterest)}
+                      </span>
+                      <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.capitalizedInterestPct)}%)</span>
+                    </div>
+                  )}
 
                   <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
@@ -2566,43 +2601,43 @@ export default function LoanCalculatorView({
                     </p>
                     <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase border-b border-emerald-100 pb-1.5 mt-1">
                       <span>Parameter</span>
-                      <span className="text-center">No Payment</span>
+                      <span className="text-right">No Payment</span>
                       <span className="text-right">Full Serviced</span>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
                         <span>Repayment Principal:</span>
-                        <span className="w-24 text-center font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.noPayment.effectiveRepaymentPrincipal)}
                         </span>
-                        <span className="w-24 text-right font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.fullServiced.effectiveRepaymentPrincipal)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
                         <span>Monthly EMI:</span>
-                        <span className="w-24 text-center font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.noPayment.initialEmi)}
                         </span>
-                        <span className="w-24 text-right font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.fullServiced.initialEmi)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[12px] font-medium text-gray-700">
+                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
                         <span>Total Interest:</span>
-                        <span className="w-24 text-center font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.noPayment.totalInterest)}
                         </span>
-                        <span className="w-24 text-right font-semibold text-gray-900">
+                        <span className="text-right font-semibold text-gray-900">
                           {formatCurrency(emiCalculations.comparison.fullServiced.totalInterest)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[12px] font-medium text-gray-700 border-t border-emerald-100 pt-1.5 font-bold text-gray-900">
+                      <div className="grid grid-cols-3 gap-2 text-[12px] font-bold text-gray-900 border-t border-emerald-100 pt-1.5">
                         <span>Total Cost:</span>
-                        <span className="w-24 text-center">
+                        <span className="text-right">
                           {formatCurrency(emiCalculations.comparison.noPayment.totalPayable)}
                         </span>
-                        <span className="w-24 text-right text-emerald-600">
+                        <span className="text-right text-emerald-600">
                           {formatCurrency(emiCalculations.comparison.fullServiced.totalPayable)}
                         </span>
                       </div>
@@ -3021,11 +3056,11 @@ export default function LoanCalculatorView({
                   </div>
                 </div>
 
-                <div className="w-full max-w-[280px] flex flex-col gap-2 animate-fade-up">
+                <div className="w-full max-w-[320px] flex flex-col gap-2 animate-fade-up">
                   <button
                     type="button"
                     onClick={handleAskAssistant}
-                    className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    className="w-full px-4 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                   >
                     <span>Ask Assistant to Analyze</span>
                     <ArrowRight className="h-4 w-4" />
@@ -3034,7 +3069,7 @@ export default function LoanCalculatorView({
                     <button
                       type="button"
                       onClick={onTalkToAdvisor}
-                      className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                      className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                     >
                       <span>Talk to Advisor</span>
                       <ArrowRight className="h-4 w-4" />
@@ -3221,11 +3256,11 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="w-full max-w-[320px] flex flex-col gap-2 mt-2">
                 <button
                   type="button"
                   onClick={handleAskAssistant}
-                  className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                  className="w-full px-4 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                 >
                   <span>Apply & Chat with Advisor</span>
                   <ArrowRight className="h-4 w-4" />
@@ -3234,7 +3269,7 @@ export default function LoanCalculatorView({
                   <button
                     type="button"
                     onClick={onTalkToAdvisor}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                   >
                     <span>Talk to Advisor</span>
                     <ArrowRight className="h-4 w-4" />
