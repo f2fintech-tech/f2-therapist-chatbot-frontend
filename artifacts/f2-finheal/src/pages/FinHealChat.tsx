@@ -53,6 +53,10 @@ export default function FinHealChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [mainView, setMainView] = useState<"chat" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator" | "cibil-analyzer" | "eligibility-cibil">(getInitialMainView);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [authPromptReason, setAuthPromptReason] = useState("");
+
+
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
@@ -344,6 +348,36 @@ export default function FinHealChat() {
         onDismiss={handleQuizDismiss}
         onComplete={handleQuizComplete}
       />
+      {showAuthPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.2)] animate-scale-in">
+            <div className="text-[32px] text-center mb-[12px]">🔒</div>
+            <div className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign in required</div>
+            <div className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+              Please sign in or create an account to {authPromptReason}.
+            </div>
+            <div className="flex flex-col gap-[10px]">
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                  handleLogout();
+                }}
+                className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+              >
+                Sign in / Create account
+              </button>
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                }}
+                className="h-[48px] w-full rounded-[14px] border border-gray-200 text-gray-600 font-semibold text-[14px] hover:bg-gray-50 transition cursor-pointer"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid h-[100dvh] w-full min-w-0 grid-cols-1 gap-[6px] overflow-hidden bg-[#f3f4f6] p-[6px] lg:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)] 2xl:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)_clamp(250px,18vw,300px)]">
         <Sidebar 
           userId={userId} 
@@ -430,6 +464,8 @@ export default function FinHealChat() {
         ) : mainView === "financial-literacy" ? (
           <FinancialLiteracyTestView
             userId={userId}
+            isGuest={authSession?.isGuest ?? true}
+            onLoginRequired={handleLogout}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onBackToCatalog={openTestCatalog}
@@ -463,6 +499,8 @@ export default function FinHealChat() {
             userId={userId}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
+            isGuest={authSession?.isGuest ?? true}
+            onLoginRequired={handleLogout}
           />
         ) : mainView === "admin" ? (
           <AdminPortal
@@ -478,6 +516,8 @@ export default function FinHealChat() {
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}
             onTalkToAdvisor={() => setMainView("advisor")}
+            isGuest={authSession?.isGuest ?? true}
+            onLoginRequired={handleLogout}
           />
         ) : mainView === "eligibility-cibil" ? (
           <EligibilityCibilView

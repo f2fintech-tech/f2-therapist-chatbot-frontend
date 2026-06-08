@@ -4,6 +4,8 @@ import FinancialLiteracyAssessment from "@/components/FinancialLiteracyAssessmen
 
 interface FinancialLiteracyTestViewProps {
   userId: string;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onBackToCatalog: () => void;
@@ -473,10 +475,12 @@ const questions: QuestionItem[] = [
   },
 ];
 
-export default function FinancialLiteracyTestView({ userId, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyTestViewProps) {
+export default function FinancialLiteracyTestView({ userId, isGuest, onLoginRequired, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyTestViewProps) {
   return (
     <FinancialLiteracyAssessment
       userId={userId}
+      isGuest={isGuest}
+      onLoginRequired={onLoginRequired}
       onToggleSidebar={onToggleSidebar}
       onToggleInsights={onToggleInsights}
       onBackToCatalog={onBackToCatalog}

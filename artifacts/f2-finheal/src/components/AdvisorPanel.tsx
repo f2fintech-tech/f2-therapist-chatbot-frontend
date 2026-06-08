@@ -35,6 +35,8 @@ interface AdvisorPanelProps {
   userId: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
 }
 
 export const advisorsData: Advisor[] = [
@@ -126,7 +128,13 @@ export const categories = [
 
 export const timeSlots = ["09:30 AM", "11:00 AM", "01:30 PM", "03:00 PM", "04:30 PM", "06:00 PM"];
 
-export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights }: AdvisorPanelProps) {
+export default function AdvisorPanel({
+  userId,
+  onToggleSidebar,
+  onToggleInsights,
+  isGuest = false,
+  onLoginRequired,
+}: AdvisorPanelProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
@@ -696,7 +704,28 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
         </section>
  
         {/* EXPERTS LIST GRID */}
-        <section className="mt-[20px]">
+        <div className="relative">
+          {isGuest && (
+            <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[20px]">
+              <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to view advisors</h3>
+                <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                  Create a free account or sign in to connect 1:1 with certified tax advisors, wealth managers, and estate consultants.
+                </p>
+                <button
+                  onClick={onLoginRequired}
+                  className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                  type="button"
+                >
+                  Sign Up / Login
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}>
+            <section className="mt-[20px]">
           <div className="mb-[14px] flex items-center justify-between">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400">Our Trusted Advisors</h2>
             <div className="text-[11px] text-gray-400 font-medium">Showing {filteredAdvisors.length} active experts</div>
@@ -825,6 +854,8 @@ export default function AdvisorPanel({ userId, onToggleSidebar, onToggleInsights
             })}
           </div>
         </section>
+      </div>
+      </div>
       </div>
 
       {/* BOOKING MODAL POPUP */}

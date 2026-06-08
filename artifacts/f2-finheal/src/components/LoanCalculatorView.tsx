@@ -34,6 +34,8 @@ interface LoanCalculatorViewProps {
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
 }
 
 interface LoanTypeConfig {
@@ -194,6 +196,8 @@ export default function LoanCalculatorView({
   onToggleInsights,
   onApplyNow,
   onTalkToAdvisor,
+  isGuest = false,
+  onLoginRequired,
 }: LoanCalculatorViewProps) {
   // Global States
   const [activeTab, setActiveTab] = useState<string>("home");
@@ -1453,16 +1457,36 @@ export default function LoanCalculatorView({
               ))}
             </div>
 
-            {activeTab === "education" && (
-              <div className="bg-blue-50 border border-blue-150 rounded-[12px] p-4 flex gap-3 text-blue-900 mb-6 animate-fade-up">
-                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-[12px] leading-relaxed">
-                  <strong className="font-bold">Education Loan Notice:</strong> Education loans differ from standard loans because interest may accrue during the study and moratorium period. If unpaid, this interest can be capitalized and added to the principal before repayment begins, increasing the EMI and total repayment cost.
+            <div className="relative">
+              {isGuest && (
+                <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[16px]">
+                  <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                    <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                    <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to use the calculator</h3>
+                    <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                      Create a free account or sign in to compute EMIs, customize interest rates, and analyze prepayment strategies.
+                    </p>
+                    <button
+                      onClick={onLoginRequired}
+                      className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                    >
+                      Sign Up / Login
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="grid gap-[24px] lg:grid-cols-12">
+              <div className={isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}>
+                {activeTab === "education" && (
+                  <div className="bg-blue-50 border border-blue-150 rounded-[12px] p-4 flex gap-3 text-blue-900 mb-6 animate-fade-up">
+                    <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="text-[12px] leading-relaxed">
+                      <strong className="font-bold">Education Loan Notice:</strong> Education loans differ from standard loans because interest may accrue during the study and moratorium period. If unpaid, this interest can be capitalized and added to the principal before repayment begins, increasing the EMI and total repayment cost.
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-[24px] lg:grid-cols-12">
               {/* Controls */}
               <div className="lg:col-span-6 flex flex-col gap-6">
                 {activeTab === "education" ? (
@@ -2622,12 +2646,34 @@ export default function LoanCalculatorView({
               )}
             </div>
           </div>
+          </div>
+          </div>
         )}
 
         {/* ----------------- LOAN COMPARISON TAB ----------------- */}
         {calcType === "compare" && (
-          <div className="animate-fade-up flex flex-col gap-6">
-            <div className="grid gap-[24px] md:grid-cols-2">
+          <div className="relative">
+            {isGuest && (
+              <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[16px]">
+                <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                  <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                  <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to compare loans</h3>
+                  <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                    Create a free account or sign in to compare interest rates, tenures, and total costs side-by-side.
+                  </p>
+                  <button
+                    onClick={onLoginRequired}
+                    className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                    type="button"
+                  >
+                    Sign Up / Login
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={`animate-fade-up flex flex-col gap-6 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
+              <div className="grid gap-[24px] md:grid-cols-2">
               {/* Loan A Column */}
               <div className="border border-gray-200 rounded-[14px] p-4 bg-gray-50/50 flex flex-col gap-4">
                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
@@ -2960,12 +3006,33 @@ export default function LoanCalculatorView({
               </div>
             </div>
           </div>
+          </div>
         )}
 
         {/* ----------------- PREPAYMENT IMPACT TAB ----------------- */}
         {calcType === "prepayment" && (
-          <div className="animate-fade-up grid gap-[24px] lg:grid-cols-12">
-            {/* Left Controls */}
+          <div className="relative">
+            {isGuest && (
+              <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[16px]">
+                <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                  <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                  <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to analyze prepayments</h3>
+                  <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                    Create a free account or sign in to simulate lump sum or monthly prepayments and see how much interest you can save.
+                  </p>
+                  <button
+                    onClick={onLoginRequired}
+                    className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                    type="button"
+                  >
+                    Sign Up / Login
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={`animate-fade-up grid gap-[24px] lg:grid-cols-12 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
+              {/* Left Controls */}
             <div className="lg:col-span-6 flex flex-col gap-6">
               {/* Amount slider */}
               <div className="flex flex-col">
@@ -3159,7 +3226,8 @@ export default function LoanCalculatorView({
               </div>
             </div>
           </div>
-        )}
+          </div>
+        )}  
       </div>
 
 

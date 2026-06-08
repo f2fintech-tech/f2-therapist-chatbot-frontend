@@ -22,6 +22,8 @@ import { submitWellnessTestResult } from "@/lib/backendChat";
 
 interface FinancialLiteracyAssessmentProps {
   userId: string;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onBackToCatalog: () => void;
@@ -310,12 +312,13 @@ function LevelCard({
   );
 }
 
-export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyAssessmentProps) {
+export default function FinancialLiteracyAssessment({ userId, isGuest = false, onLoginRequired, onToggleSidebar, onToggleInsights, onBackToCatalog }: FinancialLiteracyAssessmentProps) {
   const [storageState, setStorageState] = useState<AssessmentStorage>(() => readStorage(userId));
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [displayScore, setDisplayScore] = useState(0);
   const [submittedAttemptIds, setSubmittedAttemptIds] = useState<Record<string, boolean>>({});
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   useEffect(() => {
     const stored = readStorage(userId);
@@ -498,6 +501,10 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   }
 
   function handleSelectLevel(levelId: FinancialLiteracyLevelId) {
+    if (isGuest && levelId !== 1) {
+      setShowAuthPrompt(true);
+      return;
+    }
     if (!unlockState.unlockedLevels.has(levelId)) {
       return;
     }
@@ -509,6 +516,10 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
   }
 
   function handleStartLevel(levelId: FinancialLiteracyLevelId) {
+    if (isGuest && levelId !== 1) {
+      setShowAuthPrompt(true);
+      return;
+    }
     if (!unlockState.unlockedLevels.has(levelId)) {
       return;
     }
@@ -672,7 +683,38 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
 
   if (stage === "selection") {
     return (
-      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100 dark:border-slate-800 dark:bg-slate-950">
+      <>
+        {showAuthPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.2)] animate-scale-in">
+              <div className="text-[32px] text-center mb-[12px]">🔒</div>
+              <div className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign in required</div>
+              <div className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                Please sign in or create an account to unlock this level.
+              </div>
+              <div className="flex flex-col gap-[10px]">
+                <button
+                  onClick={() => {
+                    setShowAuthPrompt(false);
+                    onLoginRequired?.();
+                  }}
+                  className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                >
+                  Sign in / Create account
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAuthPrompt(false);
+                  }}
+                  className="h-[48px] w-full rounded-[14px] border border-gray-200 text-gray-600 font-semibold text-[14px] hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Maybe later
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-sm animate-fade-up delay-100 dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center gap-3 border-b border-gray-100 bg-white px-[16px] py-[14px] shrink-0 rounded-t-[20px] dark:border-slate-800 dark:bg-slate-950 sm:px-[20px] sm:py-[12px]">
           <button type="button" onClick={onToggleSidebar} className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" aria-label="Toggle sidebar">
             ☰
@@ -738,6 +780,7 @@ export default function FinancialLiteracyAssessment({ userId, onToggleSidebar, o
           {/* Removed the 'Start selected level' and 'What you will get' info panels per request */}
         </div>
       </main>
+      </>
     );
   }
 
