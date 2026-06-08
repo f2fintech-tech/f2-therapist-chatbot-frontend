@@ -200,3 +200,18 @@
 }
 
 .heart-pump { display: inline-block; transform-origin: center center; animation: heartPump 1.2s ease-in-out infinite; }
+
+.dashboard-card {
+  background-color: #ffffff;
+  border: 1.5px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 8px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  border-color: #e5e7eb;
+}
+

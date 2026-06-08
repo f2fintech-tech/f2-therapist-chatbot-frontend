@@ -26,9 +26,10 @@ interface SidebarProps {
   onSelectMood?: (moodEmoji: string, moodTitle: string) => void;
   onOpenLoanCalculator?: () => void;
   onOpenEligibilityCibil?: () => void;
+  onOpenDashboard?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -239,6 +240,16 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
       onClose();
     }
   };
+
+  const handleOpenDashboard = () => {
+    setActiveNav("My Dashboard");
+    onOpenDashboard?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
 
   const moods = [
     { emoji: "😰", title: "Very Stressed", hoverText: "Stressed" },
@@ -514,7 +525,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <span>Talk to FinHeal</span>
             </button>
             <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
-            <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={() => setActiveNav("My Dashboard")} />
+            <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
             <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>

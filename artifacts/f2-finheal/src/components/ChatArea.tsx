@@ -21,6 +21,8 @@ interface ChatAreaProps {
   onSignupPrompt?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  isSidebarOpen?: boolean;
+  isInsightsOpen?: boolean;
   prefillMessage?: { text: string; card: string };
   onClearPrefill?: () => void;
 }
@@ -44,6 +46,8 @@ export default function ChatArea({
   onSignupPrompt,
   onToggleSidebar,
   onToggleInsights,
+  isSidebarOpen = false,
+  isInsightsOpen = false,
   prefillMessage,
   onClearPrefill,
 }: ChatAreaProps) {
@@ -234,13 +238,15 @@ export default function ChatArea({
       `}</style>
       <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
         <div className="flex items-start gap-[10px] sm:items-center">
-          <button
-            onClick={onToggleSidebar}
-            className="auth-screen-nav-toggle fixed left-[12px] top-[12px] hidden h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 z-50 shadow-sm"
-            aria-label="Toggle sidebar"
-          >
-            ☰
-          </button>
+          {!isSidebarOpen && (
+            <button
+              onClick={onToggleSidebar}
+              className="auth-screen-nav-toggle fixed left-[12px] top-[12px] hidden h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 z-50 shadow-sm"
+              aria-label="Toggle sidebar"
+            >
+              ☰
+            </button>
+          )}
           <div className="flex-1 min-w-3 lg:pl-5">
             <div className="text-[18px] font-bold text-gray-900 pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
             <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
@@ -298,18 +304,20 @@ export default function ChatArea({
         )}
       </div>
 
-      <div className="fixed right-[12px] top-[12px] flex items-center gap-[6px] z-50">
-        <button onClick={handleClearDraft} className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary cursor-pointer shadow-sm" title="Clear draft text">
-          🗑 Clear
-        </button>
-        <button
-          onClick={onToggleInsights}
-          className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 shadow-sm 2xl:hidden"
-          aria-label="Toggle insights panel"
-        >
-          ☰
-        </button>
-      </div>
+      {!isInsightsOpen && (
+        <div className="fixed right-[12px] top-[12px] flex items-center gap-[6px] z-50">
+          <button onClick={handleClearDraft} className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary cursor-pointer shadow-sm" title="Clear draft text">
+            🗑 Clear
+          </button>
+          <button
+            onClick={onToggleInsights}
+            className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 shadow-sm 2xl:hidden"
+            aria-label="Toggle insights panel"
+          >
+            ☰
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mx-[16px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c] sm:mx-[20px]">
