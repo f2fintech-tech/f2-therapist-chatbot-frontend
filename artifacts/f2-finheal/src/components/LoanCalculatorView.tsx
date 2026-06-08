@@ -2210,7 +2210,7 @@ export default function LoanCalculatorView({
                 )}
 
                 {/* Dashboard Summary Card */}
-                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex items-center justify-between mt-2">
+                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
                       Calculated Monthly EMI
@@ -2219,11 +2219,11 @@ export default function LoanCalculatorView({
                       {formatCurrency(emiCalculations.monthlyEmi)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={handleAskAssistant}
-                      className="px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5"
+                      className="flex-1 sm:flex-none px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                     >
                       Apply & Chat
                     </button>
@@ -2231,7 +2231,7 @@ export default function LoanCalculatorView({
                       <button
                         type="button"
                         onClick={onTalkToAdvisor}
-                        className="px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5"
+                        className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                       >
                         Talk to Advisor
                       </button>
@@ -2902,11 +2902,11 @@ export default function LoanCalculatorView({
                   </div>
                 </div>
 
-                <div className="w-full max-w-[280px] flex flex-col gap-2 animate-fade-up">
+                <div className="w-full max-w-[320px] flex flex-col gap-2 animate-fade-up">
                   <button
                     type="button"
                     onClick={handleAskAssistant}
-                    className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    className="w-full px-4 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                   >
                     <span>Ask Assistant to Analyze</span>
                     <ArrowRight className="h-4 w-4" />
@@ -2915,7 +2915,7 @@ export default function LoanCalculatorView({
                     <button
                       type="button"
                       onClick={onTalkToAdvisor}
-                      className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                      className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                     >
                       <span>Talk to Advisor</span>
                       <ArrowRight className="h-4 w-4" />
@@ -3102,11 +3102,11 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="w-full max-w-[320px] flex flex-col gap-2 mt-2">
                 <button
                   type="button"
                   onClick={handleAskAssistant}
-                  className="w-full py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                  className="w-full px-4 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                 >
                   <span>Apply & Chat with Advisor</span>
                   <ArrowRight className="h-4 w-4" />
@@ -3115,7 +3115,7 @@ export default function LoanCalculatorView({
                   <button
                     type="button"
                     onClick={onTalkToAdvisor}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                   >
                     <span>Talk to Advisor</span>
                     <ArrowRight className="h-4 w-4" />
