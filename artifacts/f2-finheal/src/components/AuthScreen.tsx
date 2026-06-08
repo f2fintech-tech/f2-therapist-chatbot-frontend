@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { signInUser, signUpUser, signInGuest } from "@/lib/backendAuth";
+import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 
 const loginDefaults = { username: "", password: "" };
@@ -140,6 +140,11 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
             body: JSON.stringify({ from_user_id: guestUserId, to_user_id: payload.userId }),
           });
         } catch {}
+        try {
+          await migrateCalculatorActivities(guestUserId, payload.userId);
+        } catch (err) {
+          console.error("Failed to migrate calculator activities:", err);
+        }
       }
       onAuthSuccess(payload);
     } catch (error) {

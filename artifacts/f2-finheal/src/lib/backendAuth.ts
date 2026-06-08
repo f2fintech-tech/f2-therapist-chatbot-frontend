@@ -202,3 +202,25 @@ export interface BackendStats {
 export async function fetchAdminStats(): Promise<BackendStats> {
   return authRequest<BackendStats>("auth/admin/stats", { method: "GET" });
 }
+
+export interface CalculatorActivityPayload {
+  user_id: string;
+  calculator_type: string;
+  loan_type: string | null;
+  inputs: Record<string, any>;
+}
+
+export async function logCalculatorActivity(payload: CalculatorActivityPayload): Promise<void> {
+  await authRequest<unknown>("calculator/activity", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function migrateCalculatorActivities(fromUserId: string, toUserId: string): Promise<void> {
+  await authRequest<unknown>("calculator/migrate", {
+    method: "POST",
+    body: JSON.stringify({ from_user_id: fromUserId, to_user_id: toUserId }),
+  });
+}
+
