@@ -19,7 +19,8 @@ import {
   ChevronUp,
   Lock,
   ArrowRight,
-  Info
+  Info,
+  X
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
@@ -106,6 +107,11 @@ export default function CibilAnalyzerView({
   const [prepLumpSum, setPrepLumpSum] = useState<string>("50000");
   const [prepLumpMonth, setPrepLumpMonth] = useState<string>("12");
 
+  // Privacy Policy state
+  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
+  const [activeTermsTab, setActiveTermsTab] = useState<"credit-report" | "terms-of-use" | "privacy-policy">("credit-report");
+
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
@@ -133,6 +139,15 @@ export default function CibilAnalyzerView({
     }
     init();
   }, [userId]);
+
+  // Cap eligibility EMI at gross income
+  useEffect(() => {
+    const income = Number(eligIncome) || 0;
+    const emi = Number(eligEmi) || 0;
+    if (emi > income) {
+      setEligEmi(String(income));
+    }
+  }, [eligIncome, eligEmi]);
 
   // Handle Form Submit
   const handleFetchReport = async (e: React.FormEvent) => {
@@ -440,10 +455,6 @@ export default function CibilAnalyzerView({
               <span>Download PDF Report</span>
             </a>
           )}
-          <div className="flex items-center gap-[8px] text-[12px] bg-emerald-50 text-emerald-700 px-[12px] py-[6px] rounded-[20px] font-semibold border border-emerald-100 shadow-sm">
-            <ShieldCheck className="w-[14px] h-[14px] text-emerald-600 animate-pulse" />
-            <span>PostgreSQL RDS Active</span>
-          </div>
         </div>
       </header>
 
@@ -486,7 +497,7 @@ export default function CibilAnalyzerView({
                         required
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
-                        placeholder="e.g. Gunjan Dhiman"
+                        placeholder="e.g. Rahul Sharma"
                         className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                       />
                     </div>
@@ -502,7 +513,7 @@ export default function CibilAnalyzerView({
                           required
                           value={formPhone}
                           onChange={(e) => setFormPhone(e.target.value)}
-                          placeholder="e.g. 9876543210"
+                          placeholder="e.g. 98765XXXXX"
                           className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
@@ -515,20 +526,71 @@ export default function CibilAnalyzerView({
                           type="text"
                           required
                           value={formPan}
-                          onChange={(e) => setFormPan(e.target.value)}
-                          placeholder="e.g. ABCDE1234F"
+                          onChange={(e) => setFormPan(e.target.value.toUpperCase())}
+                          placeholder="e.g. ABCDEXXXXF"
                           className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
                     </div>
                   </div>
 
+                  <div className="flex items-start gap-[10px] my-[12px] text-left">
+                    <input
+                      type="checkbox"
+                      id="cibil-privacy-policy"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      className="mt-[2px] h-[16px] w-[16px] rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                    />
+                    <label htmlFor="cibil-privacy-policy" className="text-[11px] text-gray-500 leading-normal cursor-pointer select-none">
+                      By logging in, you agree to the following{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setActiveTermsTab("credit-report");
+                          setIsTermsModalOpen(true);
+                        }}
+                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                      >
+                        Credit Report Terms of Use
+                      </button>
+                      ,{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setActiveTermsTab("terms-of-use");
+                          setIsTermsModalOpen(true);
+                        }}
+                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                      >
+                        Terms of Use
+                      </button>{" "}
+                      and{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setActiveTermsTab("privacy-policy");
+                          setIsTermsModalOpen(true);
+                        }}
+                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                      >
+                        Privacy Policy
+                      </button>
+                    </label>
+                  </div>
+
                   <button
                     type="submit"
-                    className="w-full bg-primary hover:opacity-95 text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] cursor-pointer shadow-md"
+                    disabled={!agreedToTerms}
+                    className={`w-full bg-primary text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] shadow-md ${
+                      agreedToTerms ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
+                    }`}
                   >
                     <Sparkles className="w-[16px] h-[16px]" />
-                    <span>Retrieve CIBIL Credit Report</span>
+                    <span>Download CIBIL Credit Report</span>
                   </button>
 
                   {/* Encryption trust badge */}
@@ -1017,7 +1079,7 @@ export default function CibilAnalyzerView({
                       <input
                         type="range"
                         min="0"
-                        max="200000"
+                        max={Number(eligIncome) || 0}
                         step="2500"
                         value={eligEmi}
                         onChange={(e) => setEligEmi(e.target.value)}
@@ -1400,6 +1462,141 @@ export default function CibilAnalyzerView({
           </div>
         )}
       </div>
+      {/* Terms & Conditions Modal */}
+      {isTermsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-[20px] border border-gray-250 shadow-[0_10px_40px_rgba(0,0,0,0.2)] w-full max-w-[620px] overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-150 px-5 py-4 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <h3 className="text-[15px] font-bold text-gray-800">Legal Agreement & Policies</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTermsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Tab switch buttons */}
+            <div className="flex border-b border-gray-150 bg-gray-50/20 px-3">
+              <button
+                type="button"
+                onClick={() => setActiveTermsTab("credit-report")}
+                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
+                  activeTermsTab === "credit-report"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Credit Report Terms
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTermsTab("terms-of-use")}
+                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
+                  activeTermsTab === "terms-of-use"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Terms of Use
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTermsTab("privacy-policy")}
+                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
+                  activeTermsTab === "privacy-policy"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Privacy Policy
+              </button>
+            </div>
+
+            {/* Content area */}
+            <div className="flex-1 overflow-y-auto p-5 text-[12.5px] text-gray-600 leading-relaxed space-y-4 text-left">
+              {activeTermsTab === "credit-report" && (
+                <div className="space-y-3">
+                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Credit Report Terms of Use</h4>
+                  <p>
+                    By checking the agreement box and continuing, you hereby appoint **FinHeal Friend** and its associate group entities as your authorized agent to access, retrieve, and receive your Credit Information on your behalf from credit information bureaus (including Experian, CIBIL, Equifax, and CRIF High Mark).
+                  </p>
+                  <p className="font-bold text-gray-700">1. Purpose and Authorized Representation</p>
+                  <p>
+                    You explicitly authorize FinHeal to represent you to request your Credit Information from the bureaus. This information is fetched securely and parsed to provide a comprehensive analysis of your credit wellness, identify eligible loan products, and update your personal finance dashboard.
+                  </p>
+                  <p className="font-bold text-gray-700">2. Storage and Data Retention</p>
+                  <p>
+                    You agree that FinHeal may store your Credit Information in a secure database to keep your credit history updated, send you periodic alerts about changes in your credit health, and deliver personalized product recommendations.
+                  </p>
+                  <p className="font-bold text-gray-700">3. Validity of Consent</p>
+                  <p>
+                    This authorization remains valid for a maximum period of 6 months from the date of submission or until you explicitly revoke this consent by writing to our support team.
+                  </p>
+                </div>
+              )}
+
+              {activeTermsTab === "terms-of-use" && (
+                <div className="space-y-3">
+                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Platform Terms of Use</h4>
+                  <p>
+                    Welcome to FinHeal. These Terms of Use govern your access and usage of the FinHeal credit analysis tools, EMI planners, and financial health calculators.
+                  </p>
+                  <p className="font-bold text-gray-700">1. Service Eligibility</p>
+                  <p>
+                    You represent that you are at least 18 years of age and hold a valid PAN card issued by the Income Tax Department of India. You agree to provide correct details, including your full name, PAN, and active mobile number.
+                  </p>
+                  <p className="font-bold text-gray-700">2. Prohibited Uses</p>
+                  <p>
+                    You must not retrieve credit score information for individuals other than yourself, nor use false credentials, PAN numbers, or fake mobile phone records. FinHeal reserves the right to report unauthorized queries to credit bureaus.
+                  </p>
+                  <p className="font-bold text-gray-700">3. Disclaimers</p>
+                  <p>
+                    FinHeal calculates loan eligibility based on the criteria configured by partner banks. The final decision to approve a loan lies solely with the respective bank/lender.
+                  </p>
+                </div>
+              )}
+
+              {activeTermsTab === "privacy-policy" && (
+                <div className="space-y-3">
+                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Privacy Policy</h4>
+                  <p>
+                    At FinHeal, your privacy is paramount. We take all necessary security and privacy measures to safeguard your personal credentials and credit data.
+                  </p>
+                  <p className="font-bold text-gray-700">1. Data We Collect</p>
+                  <p>
+                    We collect your full name, contact information, mobile number, and PAN card number. We also collect and cache your credit history from bureaus only after you check the terms checkbox.
+                  </p>
+                  <p className="font-bold text-gray-700">2. Encryption & Protection</p>
+                  <p>
+                    All credit information is transferred using state-of-the-art 256-bit SSL encryption. We secure your cached reports using PostgreSQL encrypted databases.
+                  </p>
+                  <p className="font-bold text-gray-700">3. No Unsolicited Data Sharing</p>
+                  <p>
+                    We do not share, sell, or rent your credit report to third parties. Your details are only shared with partner financial institutions when you explicitly apply for a financial offer.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-150 px-5 py-3.5 bg-gray-50 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setIsTermsModalOpen(false)}
+                className="bg-primary hover:opacity-95 text-white font-bold px-5 py-2 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

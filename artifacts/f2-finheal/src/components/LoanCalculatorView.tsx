@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { logCalculatorActivity } from "@/lib/backendAuth";
 import {
   Calculator,
   Coins,
@@ -409,6 +410,124 @@ export default function LoanCalculatorView({
     setPrepVal(String(Math.round(10000 * currencyScale)));
     setPrepStartMonth("12");
   }, [activeConfig]);
+
+  // Debounced API logging for calculator activities
+  useEffect(() => {
+    if (!userId) return;
+
+    const delayDebounceFn = setTimeout(() => {
+      let payloadInputs: Record<string, any> = {};
+      let loanType: string | null = null;
+
+      if (calcType === "emi") {
+        loanType = activeTab;
+        payloadInputs = {
+          amount: Number(emiAmount) || 0,
+          rate: Number(emiRate) || 0,
+          tenure: Number(emiTenure) || 0,
+          optimize: emiOptimize,
+        };
+
+        if (activeTab === "education") {
+          payloadInputs.educationLoan = {
+            mode: eduMode,
+            quickCourseYears: Number(eduQuickCourseYears) || 0,
+            quickMoratoriumMonths: Number(eduQuickMoratoriumMonths) || 0,
+            sanctionedAmount: Number(eduSanctionedAmount) || 0,
+            advancedRate: Number(eduAdvancedRate) || 0,
+            advancedTenure: Number(eduAdvancedTenure) || 0,
+            courseMonths: Number(eduCourseMonths) || 0,
+            graceMonths: Number(eduGraceMonths) || 0,
+            disbursementType: eduDisbursementType,
+            disbursements: eduDisbursements,
+            interestServicing: eduInterestServicing,
+            partialPaymentAmount: Number(eduPartialPaymentAmount) || 0,
+            capitalizationFrequency: eduCapitalizationFrequency,
+            compoundingFrequency: eduCompoundingFrequency,
+            prepayMonthly: Number(eduPrepayMonthly) || 0,
+            prepayLump: Number(eduPrepayLump) || 0,
+            prepayStrategy: eduPrepayStrategy,
+          };
+        }
+      } else if (calcType === "compare") {
+        loanType = `${compTypeA}_vs_${compTypeB}`;
+        payloadInputs = {
+          loan_a: {
+            type: compTypeA,
+            amount: Number(compAmountA) || 0,
+            rate: Number(compRateA) || 0,
+            tenure: Number(compTenureA) || 0,
+          },
+          loan_b: {
+            type: compTypeB,
+            amount: Number(compAmountB) || 0,
+            rate: Number(compRateB) || 0,
+            tenure: Number(compTenureB) || 0,
+          },
+        };
+      } else if (calcType === "prepayment") {
+        loanType = activeTab;
+        payloadInputs = {
+          amount: Number(prepAmount) || 0,
+          rate: Number(prepRate) || 0,
+          tenure: Number(prepTenure) || 0,
+          prep_type: prepType,
+          prep_value: Number(prepVal) || 0,
+          start_month: Number(prepStartMonth) || 1,
+        };
+      }
+
+      logCalculatorActivity({
+        user_id: userId,
+        calculator_type: calcType,
+        loan_type: loanType,
+        inputs: payloadInputs,
+      }).catch((err) => {
+        console.error("Failed to log calculator activity:", err);
+      });
+    }, 2000); // 2 seconds debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [
+    userId,
+    calcType,
+    activeTab,
+    emiAmount,
+    emiRate,
+    emiTenure,
+    emiOptimize,
+    eduMode,
+    eduQuickCourseYears,
+    eduQuickMoratoriumMonths,
+    eduSanctionedAmount,
+    eduAdvancedRate,
+    eduAdvancedTenure,
+    eduCourseMonths,
+    eduGraceMonths,
+    eduDisbursementType,
+    eduDisbursements,
+    eduInterestServicing,
+    eduPartialPaymentAmount,
+    eduCapitalizationFrequency,
+    eduCompoundingFrequency,
+    eduPrepayMonthly,
+    eduPrepayLump,
+    eduPrepayStrategy,
+    compTypeA,
+    compAmountA,
+    compRateA,
+    compTenureA,
+    compTypeB,
+    compAmountB,
+    compRateB,
+    compTenureB,
+    prepAmount,
+    prepRate,
+    prepTenure,
+    prepType,
+    prepVal,
+    prepStartMonth,
+  ]);
 
   // Calculations for Tab 1: EMI
   const emiCalculations = useMemo(() => {
