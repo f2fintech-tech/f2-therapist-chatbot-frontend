@@ -1100,8 +1100,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <div className="flex items-center gap-[8px] flex-wrap">
                             <strong className="text-[14px] text-gray-900">{appt.advisorName}</strong>
                             <span className="text-[10px] font-semibold bg-primary/10 text-primary px-[8px] py-[2px] rounded-full uppercase">Advisor ID: {appt.advisorId}</span>
-                            {appt.completed ? (
+                            {appt.completed && appt.rating ? (
                               <span className="text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">✓ Completed & Rated</span>
+                            ) : (hasSessionEnded(appt.date, appt.time) || appt.completed) ? (
+                              <span className="text-[9.5px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[8px] py-[2px] rounded-full uppercase tracking-wide">✓ Completed</span>
                             ) : (
                               <span className="text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">🕒 Active Schedule</span>
                             )}
@@ -1122,19 +1124,26 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               </a>
                             </div>
                           )}
-                          {appt.completed && (
+                          {appt.completed && appt.rating && (
                             <div className="flex items-center gap-[6px] text-[11px] font-bold text-amber-500 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
                               <span>{"★".repeat(appt.rating || 0)}</span>
                               <span className="text-gray-500">({appt.rating}/5 stars)</span>
-                              {appt.feedback && (
-                                <span className="text-gray-400 font-normal italic">&quot;{appt.feedback}&quot;</span>
-                              )}
                             </div>
                           )}
-                          {appt.notes && (
-                            <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[480px] mt-[4px]">
-                              &quot;{appt.notes}&quot;
-                            </div>
+                          {appt.completed ? (
+                            appt.feedback && (
+                              <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[480px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
+                                <span>&quot;{appt.feedback}&quot;</span>
+                              </div>
+                            )
+                          ) : (
+                            appt.notes && (
+                              <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[480px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
+                                <span>&quot;{appt.notes}&quot;</span>
+                              </div>
+                            )
                           )}
                         </div>
 
@@ -1333,8 +1342,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                   </div>
                                 )}
                                 {appt.notes && (
-                                  <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[440px] mt-[4px]">
-                                    &quot;{appt.notes}&quot;
+                                  <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                    <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
+                                    <span>&quot;{appt.notes}&quot;</span>
                                   </div>
                                 )}
                               </div>
@@ -1384,10 +1394,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <div className="space-y-[4px]">
                                 <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
                                   Client Email: <span className="text-gray-600 font-bold">{appt.clientEmail}</span>
-                                  {appt.completed ? (
+                                  {appt.completed && appt.rating ? (
                                     <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
                                   ) : (
-                                    <span className="text-[9px] font-bold bg-gray-200 text-gray-700 border border-gray-300 px-[6px] py-[1.5px] rounded-full uppercase">Session Ended</span>
+                                    <span className="text-[9px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed</span>
                                   )}
                                 </div>
                                 {appt.meetUrl && (
@@ -1395,20 +1405,18 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                     🌐 Room Link: <span className="font-semibold text-gray-500">{appt.meetUrl}</span>
                                   </div>
                                 )}
-                                {appt.notes && (
-                                  <div className="text-[11px] italic text-gray-400 max-w-[440px]">
-                                    Notes: &quot;{appt.notes}&quot;
-                                  </div>
-                                )}
-                                {appt.completed && (
-                                  <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/30 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
+                                {appt.completed && appt.rating && (
+                                  <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
                                     <div className="flex items-center gap-[4px]">
                                       <span>{"★".repeat(appt.rating || 0)}</span>
                                       <span className="text-gray-500">({appt.rating}/5 stars)</span>
                                     </div>
-                                    {appt.feedback && (
-                                      <div className="text-gray-600 italic font-normal">&quot;{appt.feedback}&quot;</div>
-                                    )}
+                                  </div>
+                                )}
+                                {appt.completed && appt.feedback && (
+                                  <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                    <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
+                                    <span>&quot;{appt.feedback}&quot;</span>
                                   </div>
                                 )}
                                 {!appt.completed && (
