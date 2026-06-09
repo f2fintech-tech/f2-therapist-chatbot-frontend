@@ -25,6 +25,7 @@ interface ChatAreaProps {
   isInsightsOpen?: boolean;
   prefillMessage?: { text: string; card: string };
   onClearPrefill?: () => void;
+  onOpenEligibilityCibil?: () => void;
 }
 
 
@@ -50,9 +51,11 @@ export default function ChatArea({
   isInsightsOpen = false,
   prefillMessage,
   onClearPrefill,
+  onOpenEligibilityCibil,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [showAd, setShowAd] = useState(true);
   useEffect(() => {
     if (prefillMessage?.text) {
       setInputValue(prefillMessage.text);
@@ -253,7 +256,7 @@ export default function ChatArea({
               <span
                 className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
               />
-              FinHeal AI · {latestConversation} · {conversationCount} chats
+              FinHeal AI · {latestConversation} · {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
             </div>
 
             {typeof remainingHearts === "number" && (
@@ -294,6 +297,46 @@ export default function ChatArea({
               </div>
             )}
           </div>
+          {showAd && (
+            <div 
+              onClick={onOpenEligibilityCibil}
+              className="hidden sm:flex items-center gap-[8px] h-[30px] px-[12px] rounded-full border border-cyan-500/20 bg-cyan-50/10 backdrop-blur-md text-[11px] font-semibold cursor-pointer transition-all duration-300 hover:border-cyan-500/40 hover:bg-cyan-50/20 ad-header-glow mr-[100px] sm:mr-[120px] lg:mr-[140px] shrink-0 text-left relative"
+            >
+              <style>{`
+                @keyframes neonGlow {
+                  0%, 100% { 
+                    box-shadow: 0 0 4px rgba(6, 182, 212, 0.1), inset 0 0 2px rgba(6, 182, 212, 0.05);
+                    border-color: rgba(6, 182, 212, 0.2);
+                  }
+                  50% { 
+                    box-shadow: 0 0 8px rgba(99, 102, 241, 0.25), inset 0 0 3px rgba(99, 102, 241, 0.08);
+                    border-color: rgba(99, 102, 241, 0.35);
+                  }
+                }
+                .ad-header-glow {
+                  animation: neonGlow 2.5s infinite ease-in-out;
+                }
+              `}</style>
+              
+              {/* Glowing Pulse Dot */}
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+              </span>
+              
+              <span className="text-slate-600 tracking-wide font-sans font-medium hover:text-slate-900 transition-colors">
+                Check CIBIL & Loan Eligibility
+              </span>
+                          
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowAd(false); }} 
+                className="text-slate-400 hover:text-slate-600 font-sans text-[11px] p-0.5 ml-1 transition cursor-pointer select-none leading-none focus:outline-none"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
         {onLogout && (
           <div className="flex w-full flex-wrap gap-[6px] justify-end">

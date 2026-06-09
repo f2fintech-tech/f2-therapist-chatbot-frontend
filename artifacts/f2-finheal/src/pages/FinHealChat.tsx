@@ -432,6 +432,7 @@ export default function FinHealChat() {
               clearStoredAuthSession();
               setAuthSession(null);
             }}
+            onOpenEligibilityCibil={openEligibilityCibil}
           />
         ) : mainView === "tests" ? (
           <FinancialHealthTestCatalog
