@@ -181,6 +181,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
+  const [cibilPage, setCibilPage] = useState<number>(1);
+  const cibilPageSize = 15;
+
+  // Reset page when filterDate changes
+  useEffect(() => {
+    setCibilPage(1);
+  }, [filterDate]);
 
   const filteredEnquiries = !filterDate 
     ? cibilEnquiries 
@@ -194,6 +201,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         const localDateStr = `${year}-${month}-${day}`;
         return localDateStr === filterDate;
       });
+
+  const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
+  const safeCibilPage = Math.min(cibilPage, totalPages);
+  const paginatedEnquiries = filteredEnquiries.slice(
+    (safeCibilPage - 1) * cibilPageSize,
+    safeCibilPage * cibilPageSize
+  );
 
   const fetchCibilEnquiries = async () => {
     try {
@@ -1304,22 +1318,49 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </p>
                   </div>
                   
-                  {/* Futuristic Date Filter Picker */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                    <input 
-                      type="date"
-                      value={filterDate}
-                      onChange={(e) => setFilterDate(e.target.value)}
-                      className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                    />
-                    {filterDate && (
-                      <button
-                        onClick={() => setFilterDate("")}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
-                      >
-                        Reset
-                      </button>
+                  {/* Futuristic Date Filter Picker & Pagination */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                      <input 
+                        type="date"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                      />
+                      {filterDate && (
+                        <button
+                          onClick={() => setFilterDate("")}
+                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Compact Pagination Controls */}
+                    {filteredEnquiries.length > 0 && (
+                      <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200">
+                        <button
+                          disabled={safeCibilPage === 1}
+                          onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                          title="Previous Page"
+                        >
+                          ←
+                        </button>
+                        <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                          {safeCibilPage} / {totalPages}
+                        </span>
+                        <button
+                          disabled={safeCibilPage === totalPages}
+                          onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                          title="Next Page"
+                        >
+                          →
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1350,7 +1391,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           </td>
                         </tr>
                       ) : (
-                        filteredEnquiries.map((enq) => {
+                        paginatedEnquiries.map((enq) => {
                           let scoreColorClass = "text-red-500";
                           let bandText = "Poor";
                           if (enq.score >= 750) {
