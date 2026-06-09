@@ -32,8 +32,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   
 
 
-  // Active Admin Tabs: stats, experts, education, tests, appointments, lenders
-  const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments" | "lenders">("stats");
+  // Active Admin Tabs: stats, experts, education, tests, appointments, lenders, cibil-enquiries
+  const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries">("stats");
 
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
@@ -176,6 +176,45 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       fetchLenders();
     }
   }, [isAdmin]);
+
+  // CIBIL Enquiries State and Fetcher
+  const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
+  const [cibilLoading, setCibilLoading] = useState(false);
+  const [filterDate, setFilterDate] = useState<string>("");
+
+  const filteredEnquiries = !filterDate 
+    ? cibilEnquiries 
+    : cibilEnquiries.filter((enq) => enq.fetched_at && enq.fetched_at.split("T")[0] === filterDate);
+
+  const fetchCibilEnquiries = async () => {
+    try {
+      setCibilLoading(true);
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      const res = await fetch(`${apiBase}/cibil/enquiries`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setCibilEnquiries(data);
+      }
+    } catch (err) {
+      console.error("Error loading CIBIL enquiries:", err);
+    } finally {
+      setCibilLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeTab === "cibil-enquiries") {
+      fetchCibilEnquiries();
+    }
+  }, [isAdmin, activeTab]);
 
   // Lenders CRUD Handlers
   const handleOpenAddLender = () => {
@@ -743,7 +782,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 { id: "education", label: "📚 Manage Education" },
                 { id: "tests", label: "🧭 Manage Tests" },
                 { id: "appointments", label: "📅 Scheduled Calls" },
-                { id: "lenders", label: "🏦 Lenders Catalog" }
+                { id: "lenders", label: "🏦 Lenders Catalog" },
+                { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" }
               ].map(t => (
                 <button 
                   key={t.id} 
@@ -1229,6 +1269,140 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             </td>
                           </tr>
                         ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {/* TAB: CIBIL ENQUIRIES */}
+            {activeTab === "cibil-enquiries" && (
+              <div className="space-y-[16px] animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">
+                      CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                    </h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">
+                      {filterDate 
+                        ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                        : "Showing all credit score fetches across the platform."}
+                    </p>
+                  </div>
+                  
+                  {/* Futuristic Date Filter Picker */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                    <input 
+                      type="date"
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
+                      className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                    />
+                    {filterDate && (
+                      <button
+                        onClick={() => setFilterDate("")}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
+                  <table className="w-full text-left text-[12px] border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                        <th className="p-[12px]">User Identity</th>
+                        <th className="p-[12px]">Bureau</th>
+                        <th className="p-[12px]">PAN Card</th>
+                        <th className="p-[12px]">Credit Score</th>
+                        <th className="p-[12px]">Date & Time</th>
+                        <th className="p-[12px] text-right">PDF Report</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cibilLoading ? (
+                        <tr>
+                          <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
+                        </tr>
+                      ) : filteredEnquiries.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center p-6 text-gray-400">
+                            {filterDate 
+                              ? "No CIBIL inquiries found for this particular day." 
+                              : "No CIBIL inquiries found on the platform."}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredEnquiries.map((enq) => {
+                          let scoreColorClass = "text-red-500";
+                          let bandText = "Poor";
+                          if (enq.score >= 750) {
+                            scoreColorClass = "text-emerald-600";
+                            bandText = "Excellent";
+                          } else if (enq.score >= 700) {
+                            scoreColorClass = "text-green-500";
+                            bandText = "Good";
+                          } else if (enq.score >= 630) {
+                            scoreColorClass = "text-amber-500";
+                            bandText = "Fair";
+                          }
+                          
+                          return (
+                            <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                              <td className="p-[12px] max-w-[220px] break-words">
+                                <strong className="text-gray-900 block">{enq.name}</strong>
+                                {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
+                                {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
+                              </td>
+                              <td className="p-[12px]">
+                                <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${
+                                  enq.bureau.toLowerCase() === "experian"
+                                    ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                    : "bg-blue-100 text-blue-700 border border-blue-200"
+                                }`}>
+                                  {enq.bureau}
+                                </span>
+                              </td>
+                              <td className="p-[12px] font-mono font-semibold text-gray-700 uppercase">
+                                {enq.pan || "-"}
+                              </td>
+                              <td className="p-[12px]">
+                                <span className={`text-[15px] font-extrabold ${scoreColorClass}`}>
+                                  {enq.score}
+                                </span>
+                                <span className="text-[10px] text-gray-400 block font-medium">
+                                  {bandText}
+                                </span>
+                              </td>
+                              <td className="p-[12px] text-gray-500">
+                                {new Date(enq.fetched_at).toLocaleString("en-IN", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </td>
+                              <td className="p-[12px] text-right">
+                                {enq.pdf_url ? (
+                                  <a 
+                                    href={enq.pdf_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline font-bold text-[11px]"
+                                  >
+                                    View Report ↗
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
