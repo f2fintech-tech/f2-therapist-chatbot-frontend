@@ -184,7 +184,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const filteredEnquiries = !filterDate 
     ? cibilEnquiries 
-    : cibilEnquiries.filter((enq) => enq.fetched_at && enq.fetched_at.split("T")[0] === filterDate);
+    : cibilEnquiries.filter((enq) => {
+        if (!enq.fetched_at) return false;
+        const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
+        const localDate = new Date(utcStr);
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        const localDateStr = `${year}-${month}-${day}`;
+        return localDateStr === filterDate;
+      });
 
   const fetchCibilEnquiries = async () => {
     try {
@@ -1378,12 +1387,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 </span>
                               </td>
                               <td className="p-[12px] text-gray-500">
-                                {new Date(enq.fetched_at).toLocaleString("en-IN", {
+                                {new Date(enq.fetched_at && !enq.fetched_at.endsWith("Z") && !enq.fetched_at.includes("+") ? `${enq.fetched_at}Z` : enq.fetched_at).toLocaleString("en-IN", {
                                   day: "2-digit",
                                   month: "short",
                                   year: "numeric",
                                   hour: "2-digit",
                                   minute: "2-digit",
+                                  hour12: true,
                                 })}
                               </td>
                               <td className="p-[12px] text-right">
