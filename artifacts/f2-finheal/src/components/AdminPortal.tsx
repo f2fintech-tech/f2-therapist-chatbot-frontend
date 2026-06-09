@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot } from "@/lib/backendAuth";
-import { advisorsData, type Advisor } from "@/components/AdvisorPanel";
+import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
 import { type LenderProduct } from "./LoanCalculatorView";
@@ -688,6 +688,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
   const activeExpertAppointments = allAppointments.filter(a => a.advisorId === currentExpertId);
+  const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !hasSessionEnded(a.date, a.time));
+  const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || hasSessionEnded(a.date, a.time));
 
   // ==================== RENDERING WORKSPACE ====================
   return (
@@ -1296,69 +1298,135 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </Card>
 
                   {/* Right Column: Booked consultations list */}
-                  <div className="md:col-span-2 space-y-[12px]">
-                    <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
-                      📅 Booked Consultations with Clients ({activeExpertAppointments.length})
-                    </h3>
-                    
-                    {activeExpertAppointments.length === 0 ? (
-                      <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px]">
-                        <div className="text-[36px]">📅</div>
-                        <div className="text-[12px] text-gray-400 mt-[6px]">No appointments scheduled with you yet.</div>
-                      </div>
-                    ) : (
-                      <div className="space-y-[10px]">
-                        {activeExpertAppointments.map((appt, idx) => (
-                          <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
-                            <div className="space-y-[4px]">
-                              <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
-                                Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
+                  <div className="md:col-span-2 space-y-[18px]">
+                    {/* Section 1: Upcoming Scheduled Consultations */}
+                    <div className="space-y-[10px]">
+                      <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                        📅 Upcoming Scheduled Consultations ({expertUpcomingAppointments.length})
+                      </h3>
+                      
+                      {expertUpcomingAppointments.length === 0 ? (
+                        <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
+                          <div className="text-[24px]">🕒</div>
+                          <div className="text-[11px] text-gray-400 mt-[4px]">No upcoming scheduled sessions.</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-[10px]">
+                          {expertUpcomingAppointments.map((appt, idx) => (
+                            <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
+                              <div className="space-y-[4px]">
+                                <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                                  Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
+                                  <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
+                                </div>
+                                {appt.meetUrl && (
+                                  <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
+                                    <span>🌐 <strong>Room Link:</strong></span>
+                                    <a
+                                      href={appt.meetUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline font-bold"
+                                    >
+                                      {appt.meetUrl}
+                                    </a>
+                                  </div>
+                                )}
+                                {appt.notes && (
+                                  <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[440px] mt-[4px]">
+                                    &quot;{appt.notes}&quot;
+                                  </div>
+                                )}
                               </div>
-                              {appt.meetUrl && (
-                                <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
-                                  <span>🌐 <strong>Room Link:</strong></span>
+
+                              <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
+                                <div className="text-[13px] font-bold text-primary">{appt.date}</div>
+                                <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
+                                {appt.meetUrl ? (
                                   <a
                                     href={appt.meetUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-primary hover:underline font-bold"
+                                    className="mt-[8px] inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
                                   >
-                                    {appt.meetUrl}
+                                    Join Call Room
                                   </a>
-                                </div>
-                              )}
-                              {appt.notes && (
-                                <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[8px] rounded-[8px] max-w-[440px] mt-[4px]">
-                                  &quot;{appt.notes}&quot;
-                                </div>
-                              )}
+                                ) : (
+                                  <button
+                                    onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
+                                    className="mt-[8px] bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
+                                  >
+                                    Accept session
+                                  </button>
+                                )}
+                              </div>
                             </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                            <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
-                              <div className="text-[13px] font-bold text-primary">{appt.date}</div>
-                              <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
-                              {appt.meetUrl ? (
-                                <a
-                                  href={appt.meetUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-[8px] inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
-                                >
-                                  Join Call Room
-                                </a>
-                              ) : (
-                                <button
-                                  onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
-                                  className="mt-[8px] bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
-                                >
-                                  Accept session
-                                </button>
-                              )}
+                    {/* Section 2: Past Consultations History */}
+                    <div className="space-y-[10px] pt-[8px]">
+                      <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                        📜 Past Consultations History ({expertPastAppointments.length})
+                      </h3>
+                      
+                      {expertPastAppointments.length === 0 ? (
+                        <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
+                          <div className="text-[24px]">📜</div>
+                          <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-[10px]">
+                          {expertPastAppointments.map((appt, idx) => (
+                            <div key={idx} className="border border-gray-200 bg-gray-50/50 p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center text-left">
+                              <div className="space-y-[4px]">
+                                <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
+                                  Client Email: <span className="text-gray-600 font-bold">{appt.clientEmail}</span>
+                                  {appt.completed ? (
+                                    <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
+                                  ) : (
+                                    <span className="text-[9px] font-bold bg-gray-200 text-gray-700 border border-gray-300 px-[6px] py-[1.5px] rounded-full uppercase">Session Ended</span>
+                                  )}
+                                </div>
+                                {appt.meetUrl && (
+                                  <div className="text-[11px] text-gray-400 mt-[2px]">
+                                    🌐 Room Link: <span className="font-semibold text-gray-500">{appt.meetUrl}</span>
+                                  </div>
+                                )}
+                                {appt.notes && (
+                                  <div className="text-[11px] italic text-gray-400 max-w-[440px]">
+                                    Notes: &quot;{appt.notes}&quot;
+                                  </div>
+                                )}
+                                {appt.completed && (
+                                  <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/30 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
+                                    <div className="flex items-center gap-[4px]">
+                                      <span>{"★".repeat(appt.rating || 0)}</span>
+                                      <span className="text-gray-500">({appt.rating}/5 stars)</span>
+                                    </div>
+                                    {appt.feedback && (
+                                      <div className="text-gray-600 italic font-normal">&quot;{appt.feedback}&quot;</div>
+                                    )}
+                                  </div>
+                                )}
+                                {!appt.completed && (
+                                  <div className="text-[10.5px] text-amber-600 font-bold mt-[4px] flex items-center gap-[4px]">
+                                    <span>🕒</span> Awaiting client completion and rating
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 text-gray-400">
+                                <div className="text-[13px] font-bold">{appt.date}</div>
+                                <div className="text-[12px] font-semibold mt-[2px]">{appt.time} (IST)</div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </>
