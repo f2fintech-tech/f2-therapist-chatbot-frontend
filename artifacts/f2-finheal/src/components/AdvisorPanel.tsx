@@ -54,6 +54,71 @@ export const categories = [
 
 export const timeSlots = ["09:30 AM", "11:00 AM", "01:30 PM", "03:00 PM", "04:30 PM", "06:00 PM"];
 
+export const hasSessionEnded = (dateStr: string, timeStr: string) => {
+  try {
+    const monthsShort = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const monthsLong = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+    
+    const parts = dateStr.toLowerCase().replace(/[(),]/g, "").trim().split(/\s+/);
+    if (parts.length < 2) return false;
+
+    let monthIndex = -1;
+    let dayNum = -1;
+
+    for (const part of parts) {
+      const idxShort = monthsShort.indexOf(part);
+      if (idxShort !== -1) {
+        monthIndex = idxShort;
+        continue;
+      }
+      const idxLong = monthsLong.indexOf(part);
+      if (idxLong !== -1) {
+        monthIndex = idxLong;
+        continue;
+      }
+
+      const val = parseInt(part, 10);
+      if (!isNaN(val) && val >= 1 && val <= 31) {
+        dayNum = val;
+      }
+    }
+
+    if (monthIndex === -1 || dayNum === -1) return false;
+
+    const timeClean = timeStr.replace("(IST)", "").trim();
+    const timeParts = timeClean.split(" ");
+    if (timeParts.length < 2) return false;
+    const [hoursStr, minutesStr] = timeParts[0].split(":");
+    const meridiem = timeParts[1].toUpperCase();
+    
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    if (isNaN(hours) || isNaN(minutes)) return false;
+
+    if (meridiem === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (meridiem === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const apptDate = new Date(currentYear, monthIndex, dayNum, hours, minutes);
+    
+    if (monthIndex === 0 && now.getMonth() === 11) {
+      apptDate.setFullYear(currentYear + 1);
+    }
+    if (monthIndex === 11 && now.getMonth() === 0) {
+      apptDate.setFullYear(currentYear - 1);
+    }
+
+    return now.getTime() > apptDate.getTime();
+  } catch (e) {
+    console.error("Error parsing appointment date/time:", e);
+    return false;
+  }
+};
+
 export default function AdvisorPanel({
   userId,
   onToggleSidebar,
@@ -136,8 +201,8 @@ export default function AdvisorPanel({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   // Derived active and past appointments list
-  const activeAppointments = appointments.filter(a => !a.completed);
-  const pastAppointments = appointments.filter(a => a.completed);
+  const activeAppointments = appointments.filter(a => !a.completed && !hasSessionEnded(a.date, a.time));
+  const pastAppointments = appointments.filter(a => a.completed || hasSessionEnded(a.date, a.time));
 
   // Paywall & Simulated secure gateway states
   const [checkoutActive, setCheckoutActive] = useState<boolean>(false);
@@ -394,6 +459,8 @@ export default function AdvisorPanel({
     }
   };
 
+
+
   const handleCancelAppointment = (advisorId: string) => {
     if (confirm("Are you sure you want to cancel your scheduled appointment with this expert?")) {
       const updated = appointments.filter(a => a.advisorId !== advisorId);
@@ -521,7 +588,7 @@ export default function AdvisorPanel({
                           Join Call
                         </button>
                       </div>
-                      {appt.joined ? (
+                      {appt.joined || hasSessionEnded(appt.date, appt.time) ? (
                         <button
                           onClick={() => handleOpenFeedbackModal(appt)}
                           className="w-full py-[8.5px] rounded-[10px] text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition cursor-pointer flex items-center justify-center gap-[4px] shadow-sm shadow-emerald-50/20 animate-fade-in"
@@ -576,20 +643,31 @@ export default function AdvisorPanel({
                         </div>
                       </div>
 
-                      {/* Display stars and feedback */}
-                      <div className="bg-amber-50/40 border border-amber-100/50 rounded-[12px] p-[10px]">
-                        <div className="flex items-center gap-[4px] text-[11px] font-bold text-amber-600 mb-[4px]">
-                          <span>{"★".repeat(appt.rating || 0)}</span>
-                          <span className="text-[10px] font-semibold text-gray-500">({appt.rating}/5 stars)</span>
-                        </div>
-                        {appt.feedback ? (
-                          <div className="text-[11px] text-gray-600 italic">
-                            &quot;{appt.feedback}&quot;
+                      {/* Display stars and feedback or rating prompt */}
+                      {appt.completed ? (
+                        <div className="bg-amber-50/40 border border-amber-100/50 rounded-[12px] p-[10px]">
+                          <div className="flex items-center gap-[4px] text-[11px] font-bold text-amber-600 mb-[4px]">
+                            <span>{"★".repeat(appt.rating || 0)}</span>
+                            <span className="text-[10px] font-semibold text-gray-500">({appt.rating}/5 stars)</span>
                           </div>
-                        ) : (
-                          <div className="text-[10px] text-gray-400 italic">No text review submitted.</div>
-                        )}
-                      </div>
+                          {appt.feedback ? (
+                            <div className="text-[11px] text-gray-600 italic">
+                              &quot;{appt.feedback}&quot;
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-gray-400 italic">No text review submitted.</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="pt-[4px]">
+                          <button
+                            onClick={() => handleOpenFeedbackModal(appt)}
+                            className="w-full py-[8.5px] rounded-[10px] text-[11.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition cursor-pointer flex items-center justify-center gap-[4px] shadow-sm shadow-emerald-50/20"
+                          >
+                            <span>✓</span> Complete & Rate Session
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
