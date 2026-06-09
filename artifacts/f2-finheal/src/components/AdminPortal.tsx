@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot } from "@/lib/backendAuth";
 import { advisorsData, type Advisor } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -85,6 +85,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // Expert form state
   const [expertForm, setExpertForm] = useState({
+    f2FintechId: "",
     name: "",
     designation: "",
     avatarUrl: "",
@@ -93,6 +94,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     strength: "",
     bio: "",
     category: "wealth" as any,
+    customCategory: "",
     rating: 4.8,
     reviewsCount: 45,
     nextSlot: "Tomorrow, 10:00 AM",
@@ -316,60 +318,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
+  const loadAdvisors = async () => {
+    try {
+      const list = await fetchAdvisors();
+      setAdvisors(list);
+      localStorage.setItem("finheal_advisors_list", JSON.stringify(list));
+      dispatchUpdateEvent("finheal:advisors_update");
+    } catch (err) {
+      console.error("Error loading advisors from backend:", err);
+      const stored = localStorage.getItem("finheal_advisors_list");
+      if (stored) {
+        try { setAdvisors(JSON.parse(stored)); } catch { setAdvisors([]); }
+      } else {
+        localStorage.setItem("finheal_advisors_list", JSON.stringify([]));
+        setAdvisors([]);
+      }
+    }
+  };
+
   // Load local storage states
   useEffect(() => {
-    // 1. Advisors List & One-time dynamic ID self-healing migration
-    const storedAdvisors = localStorage.getItem("finheal_advisors_list");
-    if (storedAdvisors) {
-      try {
-        const parsedAdvisors = JSON.parse(storedAdvisors) as Advisor[];
-        let advisorsModified = false;
-        
-        const migratedAdvisors = parsedAdvisors.map(adv => {
-          const expectedId = adv.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-          if (adv.id !== expectedId) {
-            advisorsModified = true;
-            const oldId = adv.id;
-            
-            // Migrate all existing appointments mapped to the old ID across all users
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && key.startsWith("finheal_advisor_appointments:")) {
-                try {
-                  const appts = JSON.parse(localStorage.getItem(key) || "[]");
-                  let apptsModified = false;
-                  const updatedAppts = appts.map((appt: any) => {
-                    if (appt.advisorId === oldId) {
-                      apptsModified = true;
-                      return { ...appt, advisorId: expectedId, advisorName: adv.name };
-                    }
-                    return appt;
-                  });
-                  if (apptsModified) {
-                    localStorage.setItem(key, JSON.stringify(updatedAppts));
-                  }
-                } catch (e) {}
-              }
-            }
-            return { ...adv, id: expectedId };
-          }
-          return adv;
-        });
-
-        if (advisorsModified) {
-          localStorage.setItem("finheal_advisors_list", JSON.stringify(migratedAdvisors));
-          setAdvisors(migratedAdvisors);
-          dispatchUpdateEvent("finheal:advisors_update");
-        } else {
-          setAdvisors(parsedAdvisors);
-        }
-      } catch (e) {
-        setAdvisors(advisorsData);
-      }
-    } else {
-      localStorage.setItem("finheal_advisors_list", JSON.stringify(advisorsData));
-      setAdvisors(advisorsData);
-    }
+    loadAdvisors();
 
     // 2. Educational content
     const storedContent = localStorage.getItem("finheal_education_content");
@@ -447,6 +416,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const handleOpenAddExpert = () => {
     setEditingExpert(null);
     setExpertForm({
+      f2FintechId: "",
       name: "",
       designation: "",
       avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
@@ -455,6 +425,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       strength: "",
       bio: "",
       category: "wealth",
+      customCategory: "",
       rating: 4.8,
       reviewsCount: 15,
       nextSlot: "Tomorrow, 10:00 AM",
@@ -465,7 +436,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const handleOpenEditExpert = (adv: Advisor) => {
     setEditingExpert(adv);
+    const isCustomCategory = !["wealth", "tax", "debt", "property", "insurance"].includes(adv.category);
     setExpertForm({
+      f2FintechId: adv.f2FintechId || adv.id,
       name: adv.name,
       designation: adv.designation,
       avatarUrl: adv.avatarUrl,
@@ -473,7 +446,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       expertise: adv.expertise.join(", "),
       strength: adv.strength,
       bio: adv.bio,
-      category: adv.category,
+      category: isCustomCategory ? "manual" : adv.category,
+      customCategory: isCustomCategory ? adv.category : "",
       rating: adv.rating,
       reviewsCount: adv.reviewsCount,
       nextSlot: adv.nextSlot,
@@ -482,20 +456,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     setExpertModalOpen(true);
   };
 
-  const handleSaveExpert = () => {
+  const handleSaveExpert = async () => {
+    if (!expertForm.f2FintechId.trim()) {
+      alert("F2 Fintech ID is required!");
+      return;
+    }
     if (!expertForm.name.trim() || !expertForm.designation.trim()) {
       alert("Name and designation are required!");
       return;
     }
 
-    const newId = expertForm.name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
+    const resolvedCategory = expertForm.category === "manual" ? expertForm.customCategory.trim() : expertForm.category;
+    if (!resolvedCategory) {
+      alert("Category is required!");
+      return;
+    }
+
+    const f2FintechIdClean = expertForm.f2FintechId.trim();
 
     const item: Advisor = {
-      id: newId,
+      id: f2FintechIdClean,
+      f2FintechId: f2FintechIdClean,
       name: expertForm.name.trim(),
       designation: expertForm.designation.trim(),
       avatarUrl: expertForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
@@ -503,59 +484,32 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       expertise: expertForm.expertise.split(",").map(e => e.trim()).filter(Boolean),
       strength: expertForm.strength.trim() || "Financial planning",
       bio: expertForm.bio.trim() || "Certified Financial Advisor",
-      category: expertForm.category,
+      category: resolvedCategory,
       rating: expertForm.rating,
       reviewsCount: expertForm.reviewsCount,
       nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM",
       fee: Number(expertForm.fee) || 899
     };
 
-    // Scan all appointments in localStorage and dynamically update old advisor ID to the new ID and name
-    if (editingExpert && editingExpert.id !== item.id) {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("finheal_advisor_appointments:")) {
-          try {
-            const appts = JSON.parse(localStorage.getItem(key) || "[]");
-            let modified = false;
-            const updatedAppts = appts.map((appt: any) => {
-              if (appt.advisorId === editingExpert.id) {
-                modified = true;
-                return {
-                  ...appt,
-                  advisorId: item.id,
-                  advisorName: item.name
-                };
-              }
-              return appt;
-            });
-            if (modified) {
-              localStorage.setItem(key, JSON.stringify(updatedAppts));
-            }
-          } catch (e) {}
-        }
-      }
+    try {
+      await saveAdvisor(item);
+      await loadAdvisors();
+      setExpertModalOpen(false);
+    } catch (err) {
+      console.error("Error saving advisor to backend:", err);
+      alert("Failed to save expert to the database.");
     }
-
-    let updatedList;
-    if (editingExpert) {
-      updatedList = advisors.map(a => a.id === editingExpert.id ? item : a);
-    } else {
-      updatedList = [...advisors, item];
-    }
-
-    setAdvisors(updatedList);
-    localStorage.setItem("finheal_advisors_list", JSON.stringify(updatedList));
-    dispatchUpdateEvent("finheal:advisors_update");
-    setExpertModalOpen(false);
   };
 
-  const handleDeleteExpert = (id: string) => {
+  const handleDeleteExpert = async (id: string) => {
     if (confirm("Are you sure you want to retire this expert's profile?")) {
-      const updatedList = advisors.filter(a => a.id !== id);
-      setAdvisors(updatedList);
-      localStorage.setItem("finheal_advisors_list", JSON.stringify(updatedList));
-      dispatchUpdateEvent("finheal:advisors_update");
+      try {
+        await deleteAdvisor(id);
+        await loadAdvisors();
+      } catch (err) {
+        console.error("Error deleting advisor:", err);
+        alert("Failed to delete expert from database.");
+      }
     }
   };
 
@@ -708,36 +662,28 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   // ==================== Expert Workspace Actions ====================
-  const handleToggleExpertAvailability = () => {
+  const handleToggleExpertAvailability = async () => {
     if (!currentExpertId) return;
-
-    const updatedList = advisors.map(a => {
-      if (a.id === currentExpertId) {
-        const nextAvail = a.availability === "available" ? "unavailable" as const : "available" as const;
-        return { ...a, availability: nextAvail };
-      }
-      return a;
-    });
-
-    setAdvisors(updatedList);
-    localStorage.setItem("finheal_advisors_list", JSON.stringify(updatedList));
-    dispatchUpdateEvent("finheal:advisors_update");
+    const advisor = advisors.find(a => a.id === currentExpertId);
+    if (!advisor) return;
+    const nextAvail = advisor.availability === "available" ? "unavailable" : "available";
+    try {
+      await updateAdvisorAvailability(currentExpertId, nextAvail);
+      await loadAdvisors();
+    } catch (err) {
+      console.error("Error toggling availability:", err);
+    }
   };
 
-  const handleUpdateExpertNextSlot = () => {
+  const handleUpdateExpertNextSlot = async () => {
     if (!currentExpertId || !expertNextSlot.trim()) return;
-
-    const updatedList = advisors.map(a => {
-      if (a.id === currentExpertId) {
-        return { ...a, nextSlot: expertNextSlot.trim() };
-      }
-      return a;
-    });
-
-    setAdvisors(updatedList);
-    localStorage.setItem("finheal_advisors_list", JSON.stringify(updatedList));
-    dispatchUpdateEvent("finheal:advisors_update");
-    alert("Next slot has been updated successfully!");
+    try {
+      await updateAdvisorNextSlot(currentExpertId, expertNextSlot.trim());
+      await loadAdvisors();
+      alert("Next slot has been updated successfully!");
+    } catch (err) {
+      console.error("Error updating next slot:", err);
+    }
   };
 
   const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
@@ -1445,6 +1391,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
             <div className="p-[20px] space-y-[12px] overflow-y-auto max-h-[60vh] scrollbar-thin">
               <div className="grid grid-cols-2 gap-[10px]">
+                <div className="col-span-2">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">F2 Fintech ID (Manager Login User/ID) *</label>
+                  <input
+                    type="text"
+                    value={expertForm.f2FintechId}
+                    onChange={(e) => setExpertForm({ ...expertForm, f2FintechId: e.target.value })}
+                    placeholder="e.g. sneha@finheal.com or unique-manager-id"
+                    disabled={!!editingExpert}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white disabled:bg-gray-100 disabled:text-gray-500 font-semibold"
+                  />
+                </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Full Name</label>
                   <input
@@ -1491,6 +1448,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     <option value="debt">Debt & Credit</option>
                     <option value="property">Real Estate</option>
                     <option value="insurance">Insurance</option>
+                    <option value="manual">Manual Type (Write own category)</option>
                   </select>
                 </div>
                 <div>
@@ -1505,6 +1463,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </select>
                 </div>
               </div>
+
+              {expertForm.category === "manual" && (
+                <div className="mt-[4px] border border-blue-50 bg-blue-50/20 p-[10px] rounded-[12px]">
+                  <label className="text-[11px] font-bold text-[#3344e6] uppercase tracking-[0.5px] block mb-[4px]">Write Own Category</label>
+                  <input
+                    type="text"
+                    value={expertForm.customCategory}
+                    onChange={(e) => setExpertForm({ ...expertForm, customCategory: e.target.value })}
+                    placeholder="e.g. Mutual Fund Consultant"
+                    autoFocus
+                    className="w-full px-[10px] py-[8px] border border-[#d4d8fa] rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-[10px]">
                 <div>

@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { fetchAdvisors } from "@/lib/backendAuth";
 
 export interface Advisor {
   id: string;
+  f2FintechId?: string;
   name: string;
   designation: string;
   avatarUrl: string;
@@ -13,7 +15,7 @@ export interface Advisor {
   rating: number;
   reviewsCount: number;
   nextSlot: string;
-  category: "tax" | "wealth" | "debt" | "property" | "insurance";
+  category: string;
   fee: number; // Consultation fee in INR per session
 }
 
@@ -39,83 +41,7 @@ interface AdvisorPanelProps {
   onLoginRequired?: () => void;
 }
 
-export const advisorsData: Advisor[] = [
-  {
-    id: "sneha-reddy",
-    name: "Sneha Reddy",
-    designation: "Debt Restructuring Specialist",
-    avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
-    availability: "available",
-    expertise: ["Debt Recovery", "CIBIL Score Repair", "EMI Optimization"],
-    strength: "Constructing structured repayment paths & negotiation protocols.",
-    bio: "Helping individuals overcome high-interest debt traps and systematically build back their credit rating using proven legal and analytical strategies.",
-    rating: 4.9,
-    reviewsCount: 142,
-    nextSlot: "Today, 02:00 PM",
-    category: "debt",
-    fee: 899
-  },
-  {
-    id: "aradhya-sharma",
-    name: "Aradhya Sharma",
-    designation: "Certified Financial Planner (CFP)",
-    avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=60",
-    availability: "available",
-    expertise: ["Tax Planning", "Retirement Setup", "Mutual Funds"],
-    strength: "Maximizing tax exemptions & indexation benefits.",
-    bio: "With over 9 years of advising corporate professionals, Aradhya excels in making tax structures simpler while laying solid foundations for early retirement.",
-    rating: 4.8,
-    reviewsCount: 189,
-    nextSlot: "Tomorrow, 10:00 AM",
-    category: "tax",
-    fee: 999
-  },
-  {
-    id: "vikram-malhotra",
-    name: "Vikram Malhotra",
-    designation: "Portfolio Manager & Equity Strategist",
-    avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=60",
-    availability: "unavailable",
-    expertise: ["Wealth Building", "Stock Markets", "Risk Assessment"],
-    strength: "Dynamic asset allocation and thematic market investing.",
-    bio: "An ex-investment banker who believes in constructing robust, diversified portfolios tailored to specific risk tolerances and wealth goals.",
-    rating: 4.9,
-    reviewsCount: 210,
-    nextSlot: "June 4, 11:30 AM",
-    category: "wealth",
-    fee: 1499
-  },
-  {
-    id: "rohan-mehta",
-    name: "Rohan Mehta",
-    designation: "Real Estate & Mortgage Consultant",
-    avatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=60",
-    availability: "available",
-    expertise: ["Commercial Property", "Home Loans", "Mortgage Refinancing"],
-    strength: "Leverage evaluation and long-term interest calculations.",
-    bio: "Helping first-time home buyers navigate structural pricing models, interest rate locks, and choosing optimal mortgage products that match their monthly cashflows.",
-    rating: 4.7,
-    reviewsCount: 96,
-    nextSlot: "Today, 04:30 PM",
-    category: "property",
-    fee: 799
-  },
-  {
-    id: "priya-nair",
-    name: "Priya Nair",
-    designation: "Estate & Family Insurance Strategist",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=60",
-    availability: "unavailable",
-    expertise: ["Trust Planning", "Legacy Setup", "Health & Term Coverage"],
-    strength: "Family trust structures and generational wealth protection.",
-    bio: "Specializes in providing custom inheritance blueprints, succession structures, and right-sized term plans to protect growing family liabilities.",
-    rating: 4.9,
-    reviewsCount: 115,
-    nextSlot: "June 5, 09:30 AM",
-    category: "insurance",
-    fee: 1199
-  }
-];
+export const advisorsData: Advisor[] = [];
 
 export const categories = [
   { id: "all", label: "All Experts", icon: "🧑‍💼" },
@@ -138,59 +64,26 @@ export default function AdvisorPanel({
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
+  const [categoriesList, setCategoriesList] = useState(categories);
+
+  const loadAdvisors = async () => {
+    try {
+      const list = await fetchAdvisors();
+      setAdvisors(list);
+      localStorage.setItem("finheal_advisors_list", JSON.stringify(list));
+    } catch (err) {
+      console.error("Error loading advisors:", err);
+      const stored = localStorage.getItem("finheal_advisors_list");
+      if (stored) {
+        try { setAdvisors(JSON.parse(stored)); } catch { setAdvisors([]); }
+      } else {
+        setAdvisors([]);
+      }
+    }
+  };
 
   useEffect(() => {
-    const stored = localStorage.getItem("finheal_advisors_list");
-    if (stored) {
-      try {
-        const parsedAdvisors = JSON.parse(stored) as Advisor[];
-        let advisorsModified = false;
-        
-        const migratedAdvisors = parsedAdvisors.map(adv => {
-          const expectedId = adv.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-          if (adv.id !== expectedId) {
-            advisorsModified = true;
-            const oldId = adv.id;
-            
-            // Migrate all existing appointments mapped to the old ID across all users
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && key.startsWith("finheal_advisor_appointments:")) {
-                try {
-                  const appts = JSON.parse(localStorage.getItem(key) || "[]");
-                  let apptsModified = false;
-                  const updatedAppts = appts.map((appt: any) => {
-                    if (appt.advisorId === oldId) {
-                      apptsModified = true;
-                      return { ...appt, advisorId: expectedId, advisorName: adv.name };
-                    }
-                    return appt;
-                  });
-                  if (apptsModified) {
-                    localStorage.setItem(key, JSON.stringify(updatedAppts));
-                  }
-                } catch (e) {}
-              }
-            }
-            return { ...adv, id: expectedId };
-          }
-          return adv;
-        });
-
-        if (advisorsModified) {
-          localStorage.setItem("finheal_advisors_list", JSON.stringify(migratedAdvisors));
-          setAdvisors(migratedAdvisors);
-          window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
-        } else {
-          setAdvisors(parsedAdvisors);
-        }
-      } catch (e) {
-        setAdvisors(advisorsData);
-      }
-    } else {
-      localStorage.setItem("finheal_advisors_list", JSON.stringify(advisorsData));
-      setAdvisors(advisorsData);
-    }
+    loadAdvisors();
 
     const handleUpdate = () => {
       const nextStored = localStorage.getItem("finheal_advisors_list");
@@ -205,6 +98,31 @@ export default function AdvisorPanel({
       window.removeEventListener("finheal:advisors_update", handleUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    const baseCategories = [
+      { id: "all", label: "All Experts", icon: "🧑‍💼" },
+      { id: "wealth", label: "Wealth & Investing", icon: "📈" },
+      { id: "tax", label: "Tax & Retirement", icon: "💰" },
+      { id: "debt", label: "Debt & Credit", icon: "⚠️" },
+      { id: "property", label: "Real Estate", icon: "🏠" },
+      { id: "insurance", label: "Insurance", icon: "🛡️" }
+    ];
+
+    advisors.forEach(adv => {
+      const exists = baseCategories.some(c => c.id === adv.category);
+      if (!exists && adv.category) {
+        const label = adv.category.charAt(0).toUpperCase() + adv.category.slice(1);
+        baseCategories.push({
+          id: adv.category,
+          label: label,
+          icon: "💼"
+        });
+      }
+    });
+
+    setCategoriesList(baseCategories);
+  }, [advisors]);
   
   // Interactive calendar and selection states
   const [dateList, setDateList] = useState<{ dayName: string; dayNum: number; fullStr: string }[]>([]);
@@ -686,7 +604,7 @@ export default function AdvisorPanel({
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400">Choose Expertise</h2>
           </div>
           <div className="flex items-center gap-[8px] overflow-x-auto pb-[6px] scrollbar-none">
-            {categories.map((cat) => (
+            {categoriesList.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}

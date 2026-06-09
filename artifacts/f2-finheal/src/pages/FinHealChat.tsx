@@ -274,6 +274,26 @@ export default function FinHealChat() {
     setMainView(view as any);
   }, []);
 
+  const isUserAdvisor = (email?: string) => {
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          )
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
   const activeSidebarNav = mainView === "chat"
     ? "Talk to FinHeal"
     : mainView === "goals"
@@ -283,7 +303,7 @@ export default function FinHealChat() {
       : mainView === "advisor"
         ? "Talk to an Advisor"
         : mainView === "admin"
-          ? (authSession && authSession.email && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(authSession.email)
+          ? (isUserAdvisor(authSession?.email)
               ? "Advisor Workspace"
               : "Admin Portal")
           : mainView === "education"
