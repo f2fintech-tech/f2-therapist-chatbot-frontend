@@ -27,6 +27,7 @@ interface Appointment {
   notes?: string;
   bookedAt: string;
   completed?: boolean;
+  cancelled?: boolean;
   rating?: number;
   feedback?: string;
   meetUrl?: string; // Pre-setup Google Meet URL
@@ -201,8 +202,8 @@ export default function AdvisorPanel({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   // Derived active and past appointments list
-  const activeAppointments = appointments.filter(a => !a.completed && !hasSessionEnded(a.date, a.time));
-  const pastAppointments = appointments.filter(a => a.completed || hasSessionEnded(a.date, a.time));
+  const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
+  const pastAppointments = appointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
   // Paywall & Simulated secure gateway states
   const [checkoutActive, setCheckoutActive] = useState<boolean>(false);
@@ -463,7 +464,12 @@ export default function AdvisorPanel({
 
   const handleCancelAppointment = (advisorId: string) => {
     if (confirm("Are you sure you want to cancel your scheduled appointment with this expert?")) {
-      const updated = appointments.filter(a => a.advisorId !== advisorId);
+      const updated = appointments.map(a => {
+        if (a.advisorId === advisorId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time)) {
+          return { ...a, cancelled: true };
+        }
+        return a;
+      });
       saveAppointments(updated);
     }
   };
@@ -643,8 +649,11 @@ export default function AdvisorPanel({
                         </div>
                       </div>
 
-                      {/* Display stars and feedback or rating prompt */}
-                      {appt.completed ? (
+                      {appt.cancelled ? (
+                        <div className="bg-rose-50/40 border border-rose-100/50 rounded-[12px] p-[10px] text-center text-[11px] text-rose-600 font-semibold">
+                          🚫 This appointment was cancelled
+                        </div>
+                      ) : appt.completed ? (
                         <div className="bg-amber-50/40 border border-amber-100/50 rounded-[12px] p-[10px]">
                           <div className="flex items-center gap-[4px] text-[11px] font-bold text-amber-600 mb-[4px]">
                             <span>{"★".repeat(appt.rating || 0)}</span>

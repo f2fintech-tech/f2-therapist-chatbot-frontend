@@ -520,10 +520,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       return;
     }
 
-    const rawExpertise = expertForm.expertise.split(",").map(e => e.trim()).filter(Boolean);
+    const rawExpertise = expertForm.expertise.split(",").map((e: string) => e.trim()).filter(Boolean);
     const resolvedExpertise = rawExpertise.length > 0 
       ? rawExpertise 
-      : resolvedCategory.split(",").map(c => c.trim()).filter(Boolean);
+      : resolvedCategory.split(",").map((c: string) => c.trim()).filter(Boolean);
+
+    const f2FintechIdClean = expertForm.f2FintechId.trim();
 
     const item: Advisor = {
       id: f2FintechIdClean,

@@ -10,6 +10,8 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
+import { fetchAdvisors } from "@/lib/backendAuth";
+import { hasSessionEnded } from "./AdvisorPanel";
 
 export interface DashboardProps {
   userId: string;
@@ -137,13 +139,17 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 }
 
 /* ─── Advisor card ─── */
-function AdvisorCard({ initials, name, title, rating, sessions, available, color, delay = 0, onChat }: any) {
+function AdvisorCard({ initials, name, title, rating, sessions, available, color, avatarUrl, delay = 0, onChat }: any) {
   return (
     <div className="dashboard-card animate-fade-up p-5 flex flex-col gap-4" style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center text-[14px] font-bold text-white flex-shrink-0"
-          style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
-          {initials}
+        <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-[14px] font-bold text-white flex-shrink-0"
+          style={{ background: avatarUrl ? "transparent" : `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+          ) : (
+            initials
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-gray-800">{name}</div>
@@ -309,11 +315,50 @@ export default function Dashboard({
     { icon: "💳", name: "Personal Loan", emi: 5800, remaining: 120000, total: 300000, rate: 13.5, months: 21, color: "#10b981" },
   ];
 
-  const advisors = [
+  const DEFAULT_ADVISORS = [
     { initials: "PK", name: "Priya Kapoor", title: "Debt & Savings Specialist", rating: 4.9, sessions: 312, available: true, color: "#3244e6" },
     { initials: "RS", name: "Rahul Sharma", title: "Investment Advisor", rating: 4.7, sessions: 228, available: false, color: "#8b5cf6" },
     { initials: "AN", name: "Anjali Nair", title: "Tax & Credit Expert", rating: 4.8, sessions: 185, available: true, color: "#10b981" },
   ];
+
+  const [advisors, setAdvisors] = useState<any[]>([]);
+  useEffect(() => {
+    let active = true;
+    async function loadAdvisors() {
+      try {
+        const list = await fetchAdvisors();
+        if (active) {
+          setAdvisors(list);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard advisors:", err);
+        const stored = localStorage.getItem("finheal_advisors_list");
+        if (stored && active) {
+          try { setAdvisors(JSON.parse(stored)); } catch {}
+        }
+      }
+    }
+    loadAdvisors();
+    return () => {
+      active = false;
+    };
+  }, [activeTab]);
+
+  const [appointments, setAppointments] = useState<any[]>([]);
+  useEffect(() => {
+    const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        setAppointments(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse appointments in Dashboard", e);
+      }
+    }
+  }, [userId, activeTab]);
+
+  const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
+  const pastAppointments = appointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
@@ -812,7 +857,7 @@ export default function Dashboard({
               <div className="text-[36px]">🧑‍💼</div>
               <div className="flex-1">
                 <div className="text-[14px] font-semibold text-gray-800 mb-0.5">Talk to a Real Financial Advisor</div>
-                <div className="text-[12px] text-gray-500 leading-relaxed">Our SEBI-registered advisors are available for 1-on-1 sessions. Get personalised advice tailored to your exact situation — no generic templates.</div>
+                <div className="text-[12px] text-gray-500 leading-relaxed">Connect with professional financial experts for 1-on-1 guidance. Get personalised advice tailored to your exact situation — no generic templates.</div>
               </div>
               <button
                 data-testid="btn-browse-advisors"
@@ -825,9 +870,44 @@ export default function Dashboard({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {advisors.map((a, i) => (
-                <AdvisorCard key={a.name} {...a} delay={i * 100} onChat={() => onNavigate("Talk to an Advisor")} />
-              ))}
+              {(() => {
+                const advisorsToDisplay = advisors.length > 0 ? advisors.slice(0, 3) : DEFAULT_ADVISORS;
+                return advisorsToDisplay.map((a, i) => {
+                  const getInitials = (n: string) => {
+                    if (!n) return "";
+                    const parts = n.trim().split(/\s+/);
+                    if (parts.length >= 2) {
+                      return (parts[0][0] + parts[1][0]).toUpperCase();
+                    }
+                    return parts[0][0].toUpperCase();
+                  };
+
+                  const initials = a.initials || getInitials(a.name);
+                  const title = a.designation || a.title || "Advisor";
+                  const rating = a.rating || 4.8;
+                  const sessions = a.reviewsCount !== undefined ? a.reviewsCount : (a.sessions || 15);
+                  const isAvailable = a.availability ? (a.availability === "available") : !!a.available;
+                  
+                  const colors = ["#3244e6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
+                  const color = a.color || colors[i % colors.length];
+
+                  return (
+                    <AdvisorCard
+                      key={a.id || a.f2FintechId || a.name}
+                      initials={initials}
+                      name={a.name}
+                      title={title}
+                      rating={rating}
+                      sessions={sessions}
+                      available={isAvailable}
+                      color={color}
+                      avatarUrl={a.avatarUrl}
+                      delay={i * 100}
+                      onChat={() => onNavigate("Talk to an Advisor")}
+                    />
+                  );
+                });
+              })()}
             </div>
 
             {/* How it works */}
@@ -850,31 +930,107 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* AI + Human hybrid card */}
+            {/* My Bookings Card */}
             <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "250ms" }}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="text-[13px] font-semibold text-gray-800">AI + Human Hybrid Session</div>
-                  <div className="text-[11px] text-gray-400">Let FinHeal AI prep the brief, then jump into a 20-min focused advisor call</div>
+                  <h3 className="text-[13px] font-semibold text-gray-800">My Consultations</h3>
+                  <p className="text-[11px] text-gray-400">Manage your scheduled sessions with advisors</p>
                 </div>
-                <span className="text-[9px] font-bold bg-[#ecfdf5] text-[#10b981] px-3 py-1 rounded-full uppercase tracking-wider">Popular</span>
+                <span className="text-[9px] font-bold bg-[#eef0fd] text-primary px-3 py-1 rounded-full uppercase tracking-wider">
+                  {appointments.length} Total
+                </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                {["AI analyses your chat history", "Generates a 1-page brief", "Advisor reviews before session"].map((s, i) => (
-                  <div key={s} className="bg-gray-50 rounded-[10px] p-3 text-center">
-                    <div className="text-[18px] mb-2">{["🤖", "📄", "🧑‍💼"][i]}</div>
-                    <div className="text-[11px] text-gray-600 font-medium">{s}</div>
+
+              {appointments.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-[12px] border border-dashed border-gray-200">
+                  <p className="text-[18px] mb-1">📅</p>
+                  <p className="text-[12px] font-semibold text-gray-700">No Bookings Yet</p>
+                  <p className="text-[11px] text-gray-400 mt-1 max-w-[240px] mx-auto">
+                    You haven't scheduled any advisory sessions. Select an advisor above to book your first call.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Upcoming Bookings */}
+                  <div className="flex flex-col gap-3">
+                    <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      📅 Current & Upcoming ({activeAppointments.length})
+                    </h4>
+                    {activeAppointments.length === 0 ? (
+                      <div className="bg-gray-50 border border-gray-100 rounded-[10px] p-4 text-center py-6 text-gray-400 text-[11px]">
+                        No upcoming sessions scheduled.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {activeAppointments.map((appt, idx) => (
+                          <div key={idx} className="bg-[#f8f9ff] border border-[#e8ecff] rounded-[10px] p-4 flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="text-[12px] font-bold text-gray-800">{appt.advisorName}</div>
+                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                  {appt.date} · {appt.time}
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-semibold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase">
+                                Scheduled
+                              </span>
+                            </div>
+                            {appt.notes && (
+                              <div className="text-[10px] text-gray-500 bg-white/50 border border-gray-100 rounded-[6px] p-2 leading-relaxed italic">
+                                "{appt.notes}"
+                              </div>
+                            )}
+                            {appt.meetUrl && (
+                              <a
+                                href={appt.meetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[6px] text-[11px] font-semibold text-white transition-all bg-[#3244e6] hover:bg-[#2836b8]"
+                              >
+                                Join Video Call 🎥
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-              <button
-                data-testid="btn-hybrid-session"
-                onClick={() => onNavigate("Talk to an Advisor")}
-                className="w-full py-2.5 rounded-[10px] text-[12px] font-semibold text-white transition-all hover:-translate-y-px cursor-pointer"
-                style={{ background: BRAND }}
-              >
-                Start AI Brief + Book Advisor
-              </button>
+
+                  {/* Past Bookings */}
+                  <div className="flex flex-col gap-3">
+                    <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      📜 Consultation History ({pastAppointments.length})
+                    </h4>
+                    {pastAppointments.length === 0 ? (
+                      <div className="bg-gray-50 border border-gray-100 rounded-[10px] p-4 text-center py-6 text-gray-400 text-[11px]">
+                        No past consultations record found.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin" }}>
+                        {pastAppointments.map((appt, idx) => (
+                          <div key={idx} className="bg-gray-50 border border-gray-100 rounded-[10px] p-3.5 flex flex-col gap-1.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[12px] font-semibold text-gray-700">{appt.advisorName}</span>
+                              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase ${appt.cancelled ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>
+                                {appt.cancelled ? 'Cancelled' : 'Completed'}
+                              </span>
+                            </div>
+                            <div className="text-[10.5px] text-gray-400">
+                              {appt.date} · {appt.time}
+                            </div>
+                            {appt.rating && (
+                              <div className="text-[10.5px] text-amber-500 font-medium">
+                                Rated: {"⭐".repeat(appt.rating)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
