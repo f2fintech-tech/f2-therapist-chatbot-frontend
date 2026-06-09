@@ -520,7 +520,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       return;
     }
 
-    const f2FintechIdClean = expertForm.f2FintechId.trim();
+    const rawExpertise = expertForm.expertise.split(",").map(e => e.trim()).filter(Boolean);
+    const resolvedExpertise = rawExpertise.length > 0 
+      ? rawExpertise 
+      : resolvedCategory.split(",").map(c => c.trim()).filter(Boolean);
 
     const item: Advisor = {
       id: f2FintechIdClean,
@@ -529,7 +532,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       designation: expertForm.designation.trim(),
       avatarUrl: expertForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
       availability: expertForm.availability,
-      expertise: expertForm.expertise.split(",").map(e => e.trim()).filter(Boolean),
+      expertise: resolvedExpertise,
       strength: expertForm.strength.trim() || "Financial planning",
       bio: expertForm.bio.trim() || "Certified Financial Advisor",
       category: resolvedCategory,

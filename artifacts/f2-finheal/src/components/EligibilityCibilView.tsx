@@ -248,8 +248,10 @@ export default function EligibilityCibilView({
         setCibilLoading(true);
         const stored = await getStoredCibilReport(userId);
         if (stored) {
-          setCibilReport(stored);
+          // Keep score for dynamic eligibility calculations
           setEligCibil(String(stored.score));
+          // Do not set cibilReport state on mount to ensure the Checker tab starts fresh
+          // setCibilReport(stored);
         }
       } catch (err) {
         console.error("Failed to load CIBIL report:", err);
