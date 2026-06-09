@@ -224,3 +224,95 @@ export async function migrateCalculatorActivities(fromUserId: string, toUserId: 
   });
 }
 
+// ==================== Advisors API Endpoints ====================
+
+export interface BackendAdvisor {
+  f2_fintech_id: string;
+  name: string;
+  designation: string;
+  avatar_url?: string;
+  availability: "available" | "unavailable";
+  expertise?: string[];
+  strength?: string;
+  bio?: string;
+  rating: number;
+  reviews_count: number;
+  next_slot?: string;
+  category: string;
+  fee: number;
+}
+
+export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
+  return {
+    id: a.f2_fintech_id,
+    f2FintechId: a.f2_fintech_id,
+    name: a.name,
+    designation: a.designation,
+    avatarUrl: a.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+    availability: a.availability,
+    expertise: a.expertise || [],
+    strength: a.strength || "",
+    bio: a.bio || "",
+    rating: a.rating,
+    reviewsCount: a.reviews_count,
+    nextSlot: a.next_slot || "Tomorrow, 10:00 AM",
+    category: a.category,
+    fee: a.fee
+  };
+}
+
+export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
+  return {
+    f2_fintech_id: a.f2FintechId || a.id,
+    name: a.name,
+    designation: a.designation,
+    avatar_url: a.avatarUrl,
+    availability: a.availability,
+    expertise: a.expertise || [],
+    strength: a.strength || "",
+    bio: a.bio || "",
+    rating: a.rating || 4.8,
+    reviews_count: a.reviewsCount || 15,
+    next_slot: a.nextSlot,
+    category: a.category,
+    fee: a.fee || 899
+  };
+}
+
+export async function fetchAdvisors(): Promise<any[]> {
+  const list = await authRequest<BackendAdvisor[]>("advisors", { method: "GET" });
+  return list.map(mapBackendAdvisorToFrontend);
+}
+
+export async function saveAdvisor(advisor: any): Promise<any> {
+  const payload = mapFrontendAdvisorToBackend(advisor);
+  const result = await authRequest<BackendAdvisor>("advisors", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapBackendAdvisorToFrontend(result);
+}
+
+export async function deleteAdvisor(f2FintechId: string): Promise<void> {
+  await authRequest<unknown>(`advisors/${encodeURIComponent(f2FintechId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateAdvisorAvailability(f2FintechId: string, availability: string): Promise<any> {
+  const result = await authRequest<BackendAdvisor>(`advisors/${encodeURIComponent(f2FintechId)}/availability`, {
+    method: "PUT",
+    body: JSON.stringify({ availability }),
+  });
+  return mapBackendAdvisorToFrontend(result);
+}
+
+export async function updateAdvisorNextSlot(f2FintechId: string, nextSlot: string): Promise<any> {
+  const result = await authRequest<BackendAdvisor>(`advisors/${encodeURIComponent(f2FintechId)}/next-slot`, {
+    method: "PUT",
+    body: JSON.stringify({ next_slot: nextSlot }),
+  });
+  return mapBackendAdvisorToFrontend(result);
+}
+
+

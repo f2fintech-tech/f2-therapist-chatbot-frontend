@@ -214,8 +214,28 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const isUserAdvisor = (email?: string) => {
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          )
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
   const handleOpenAdmin = () => {
-    setActiveNav(userEmail && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(userEmail) ? "Advisor Workspace" : "Admin Portal");
+    setActiveNav(isUserAdvisor(userEmail) ? "Advisor Workspace" : "Admin Portal");
     onOpenAdmin?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
@@ -544,7 +564,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             )}
 
             {/* If Expert */}
-            {userEmail && ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"].includes(userEmail) && (
+            {isUserAdvisor(userEmail) && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 

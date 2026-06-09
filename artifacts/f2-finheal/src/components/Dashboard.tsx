@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  LineChart, Line
 } from "recharts";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
+import { getStoredAuthSession } from "@/utils/authSession";
 
 export interface DashboardProps {
   userId: string;
@@ -203,6 +205,16 @@ const spendPie = [
   { name: "Other", value: 6000, color: "#e5e7eb" },
 ];
 
+const stressData = [
+  { day: "Mon", stress: 45 },
+  { day: "Tue", stress: 58 },
+  { day: "Wed", stress: 72 },
+  { day: "Thu", stress: 50 },
+  { day: "Fri", stress: 38 },
+  { day: "Sat", stress: 30 },
+  { day: "Sun", stress: 25 },
+];
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -210,9 +222,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="font-semibold text-gray-700 mb-1">{label}</div>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <div className="w-2 h-2 rounded-full" style={{ background: p.name === "Stress Index" ? "#f43f5e" : (p.color || p.stroke) }} />
           <span className="text-gray-500">{p.name}:</span>
-          <span className="font-semibold text-gray-800">₹{p.value?.toLocaleString()}</span>
+          <span className="font-semibold text-gray-800">
+            {p.name === "Stress Index" ? "" : "₹"}{p.value?.toLocaleString()}
+          </span>
         </div>
       ))}
     </div>
@@ -229,6 +243,28 @@ export default function Dashboard({
   isInsightsOpen = false,
 }: DashboardProps) {
   const { data: wellness } = useGetWellnessScore(userId);
+
+  const getMemberSinceText = () => {
+    try {
+      const storageKey = `finheal_setup_date_${userId}`;
+      let setupDateStr = localStorage.getItem(storageKey);
+      if (!setupDateStr) {
+        const session = getStoredAuthSession();
+        setupDateStr = session?.authenticatedAt || new Date().toISOString();
+        localStorage.setItem(storageKey, setupDateStr);
+      }
+      
+      const setupDate = new Date(setupDateStr);
+      const formatted = setupDate.toLocaleDateString("en-US", {
+        month: "short",
+        year: "numeric"
+      });
+      
+      return `Member since ${formatted}`;
+    } catch {
+      return "Member since Jun 2026";
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<"overview" | "loans" | "reports" | "advisor">("overview");
 
@@ -349,7 +385,7 @@ export default function Dashboard({
                     <span>·</span>
                   </>
                 )}
-                <span>Member since Jan 2024</span>
+                <span>{getMemberSinceText()}</span>
                 <span>·</span>
                 <span>{actualSessions.length} sessions</span>
               </div>
@@ -484,8 +520,65 @@ export default function Dashboard({
               </div>
             </div>
 
+            {/* Stress level chart row */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              {/* Daily Stress Level line chart */}
+              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
+                    <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
+                    <span className="text-gray-500">Stress Index (0-100)</span>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={stressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" />
+                        <stop offset="100%" stopColor="#6366f1" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Quick Insights or summary card */}
+              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
+                <div>
+                  <div className="text-[13px] font-semibold text-gray-800 mb-1">Stress Analysis</div>
+                  <div className="text-[11px] text-gray-400 mb-4">Weekly overview</div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-gray-500">Average Stress Level</span>
+                      <span className="font-bold text-gray-800">46 / 100</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-gray-500">Peak Stress Day</span>
+                      <span className="font-bold text-red-500">Wednesday (72)</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-gray-500">Lowest Stress Day</span>
+                      <span className="font-bold text-emerald-500">Sunday (25)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[10px] p-3 text-[11px] text-[#b91c1c] leading-relaxed mt-4">
+                  <strong>💡 Stress Nudge:</strong> Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety.
+                </div>
+              </div>
+            </div>
+
             {/* Goals overview */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
@@ -530,7 +623,7 @@ export default function Dashboard({
             </div>
 
             {/* Recent sessions */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "250ms" }}>
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "350ms" }}>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-[13px] font-semibold text-gray-800">Recent Sessions</div>
                 <button
