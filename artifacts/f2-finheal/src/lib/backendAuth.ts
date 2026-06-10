@@ -280,7 +280,7 @@ export interface BackendAdvisor {
   name: string;
   designation: string;
   avatar_url?: string;
-  availability: "available" | "unavailable";
+  availability: "available" | "unavailable" | "in meeting";
   expertise?: string[];
   strength?: string;
   bio?: string;

@@ -142,6 +142,10 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
 /* ─── Advisor card ─── */
 function AdvisorCard({ initials, name, title, rating, sessions, available, color, avatarUrl, delay = 0, onChat }: any) {
+  const isOnline = available === "available";
+  const isInMeeting = available === "in meeting";
+  const isActionable = isOnline || isInMeeting;
+
   return (
     <div className="dashboard-card animate-fade-up p-5 flex flex-col gap-4" style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-center gap-3">
@@ -157,10 +161,16 @@ function AdvisorCard({ initials, name, title, rating, sessions, available, color
           <div className="text-[13px] font-semibold text-gray-800">{name}</div>
           <div className="text-[11px] text-gray-400">{title}</div>
         </div>
-        {available && (
-          <div className="flex items-center gap-1.5">
+        {isOnline && (
+          <div className="flex items-center gap-1.5 animate-fade-in">
             <div className="w-2 h-2 rounded-full bg-[#10b981]" />
             <span className="text-[10px] font-medium text-[#10b981]">Online</span>
+          </div>
+        )}
+        {isInMeeting && (
+          <div className="flex items-center gap-1.5 animate-fade-in">
+            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="text-[10px] font-medium text-indigo-600">In Meeting</span>
           </div>
         )}
       </div>
@@ -177,10 +187,10 @@ function AdvisorCard({ initials, name, title, rating, sessions, available, color
       <button
         data-testid={`btn-book-${initials}`}
         onClick={onChat}
-        className="w-full py-2.5 rounded-[10px] text-[12px] font-semibold transition-all active:scale-95"
-        style={{ background: available ? BRAND : "#f3f4f6", color: available ? "#fff" : "#6b7280" }}
+        className="w-full py-2.5 rounded-[10px] text-[12px] font-semibold transition-all active:scale-95 cursor-pointer"
+        style={{ background: isActionable ? BRAND : "#f3f4f6", color: isActionable ? "#fff" : "#6b7280" }}
       >
-        {available ? "Book Session" : "View Profile"}
+        {isActionable ? "Book Session" : "View Profile"}
       </button>
     </div>
   );
@@ -1078,7 +1088,7 @@ export default function Dashboard({
                   const title = a.designation || a.title || "Advisor";
                   const rating = a.rating || 4.8;
                   const sessions = a.reviewsCount !== undefined ? a.reviewsCount : (a.sessions || 15);
-                  const isAvailable = a.availability ? (a.availability === "available") : !!a.available;
+                  const isAvailable = a.availability || (a.available ? "available" : "unavailable");
                   
                   const colors = ["#3244e6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
                   const color = a.color || colors[i % colors.length];

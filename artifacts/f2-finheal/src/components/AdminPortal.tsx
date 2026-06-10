@@ -141,7 +141,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     name: "",
     designation: "",
     avatarUrl: "",
-    availability: "available" as "available" | "unavailable",
+    availability: "available" as "available" | "unavailable" | "in meeting",
     expertise: "",
     strength: "",
     bio: "",
@@ -950,16 +950,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   // ==================== Expert Workspace Actions ====================
-  const handleToggleExpertAvailability = async () => {
+  const handleSetExpertAvailability = async (nextAvail: "available" | "unavailable" | "in meeting") => {
     if (!currentExpertId) return;
-    const advisor = advisors.find(a => a.id === currentExpertId);
-    if (!advisor) return;
-    const nextAvail = advisor.availability === "available" ? "unavailable" : "available";
     try {
       await updateAdvisorAvailability(currentExpertId, nextAvail);
       await loadAdvisors();
+      dispatchUpdateEvent("finheal:advisors_update");
     } catch (err) {
-      console.error("Error toggling availability:", err);
+      console.error("Error setting availability:", err);
     }
   };
 
@@ -1295,8 +1293,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <td className="p-[12px]">
                             {adv.availability === "available" ? (
                               <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
+                            ) : adv.availability === "in meeting" ? (
+                              <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
                             ) : (
-                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Busy</span>
+                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>
                             )}
                           </td>
                           <td className="p-[12px] text-right space-x-[6px]">
@@ -1859,24 +1859,34 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </div>
                   </div>
                   
-                  {/* Glowing Status Toggle */}
-                  <div className="shrink-0 flex flex-col items-center gap-[8px] p-[10px] bg-white border border-gray-100 rounded-[16px] shadow-inner">
+                  {/* Glowing Status Selection Segmented Control */}
+                  <div className="shrink-0 flex flex-col items-center gap-[8px] p-[10px] bg-white border border-gray-100 rounded-[20px] shadow-inner">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Availability Status</span>
                     
-                    <button
-                      onClick={handleToggleExpertAvailability}
-                      className={`flex items-center gap-[8px] px-[16px] py-[8px] rounded-full text-[12px] font-bold transition cursor-pointer ${
-                        activeExpert.availability === "available"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                          : "bg-rose-50 text-rose-700 border border-rose-100"
-                      }`}
-                    >
-                      <span className={`relative flex h-3 w-3 ${activeExpert.availability === "available" ? "animate-pulse-ring" : ""}`}>
-                        <span className={`relative inline-flex rounded-full h-3 w-3 ${activeExpert.availability === "available" ? "bg-emerald-500" : "bg-rose-500"}`} />
-                      </span>
-                      {activeExpert.availability === "available" ? "Live Available" : "Offline / Busy"}
-                    </button>
-                    <span className="text-[9px] text-gray-400">Click button to toggle status</span>
+                    <div className="flex bg-gray-100 p-[3px] rounded-full border border-gray-200">
+                      {[
+                        { value: "available", label: "Available", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-sm" },
+                        { value: "unavailable", label: "Not Available", color: "bg-rose-500", text: "text-rose-700", activeBg: "bg-rose-50 border-rose-200 shadow-sm" },
+                        { value: "in meeting", label: "In Meeting", color: "bg-indigo-500", text: "text-indigo-700", activeBg: "bg-indigo-50 border-indigo-200 shadow-sm" }
+                      ].map((opt) => {
+                        const isActive = activeExpert.availability === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleSetExpertAvailability(opt.value as any)}
+                            className={`flex items-center gap-[6px] px-[12px] py-[6px] rounded-full text-[11px] font-bold transition border border-transparent cursor-pointer ${
+                              isActive ? `${opt.activeBg} ${opt.text}` : "text-gray-500 hover:text-gray-700"
+                            }`}
+                          >
+                            <span className="relative flex h-2 w-2">
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${opt.color} ${isActive && opt.value === "available" ? "animate-pulse-ring" : ""}`} />
+                            </span>
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <span className="text-[9px] text-gray-400">Select status to update availability</span>
                   </div>
                 </div>
 
@@ -2273,10 +2283,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   <select
                     value={expertForm.availability}
                     onChange={(e) => setExpertForm({ ...expertForm, availability: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
                   >
                     <option value="available">Available (Green dot)</option>
-                    <option value="unavailable">Busy / Offline (Red dot)</option>
+                    <option value="unavailable">Not Available (Red dot)</option>
+                    <option value="in meeting">In Meeting (Indigo dot)</option>
                   </select>
                 </div>
               </div>
