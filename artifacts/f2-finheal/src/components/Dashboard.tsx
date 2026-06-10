@@ -10,8 +10,10 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
+import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
+
 
 export interface DashboardProps {
   userId: string;
@@ -239,6 +241,123 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+/* ─── Parse monthly income string/number helper ─── */
+const parseMonthlyIncome = (incomeStr: string | null | undefined): number => {
+  if (!incomeStr) return 87000;
+  const num = parseInt(incomeStr.replace(/\D/g, ""), 10);
+  if (!isNaN(num) && num > 0) return num;
+  switch (incomeStr) {
+    case "under-25000":
+      return 20000;
+    case "25000-50000":
+      return 37500;
+    case "50000-100000":
+      return 75000;
+    case "above-100000":
+      return 150000;
+    case "prefer-not-to-say":
+    default:
+      return 87000;
+  }
+};
+
+/* ─── Map CIBIL accounts to Dashboard UI loan cards ─── */
+const mapCibilAccountsToLoans = (accounts: CibilAccount[], brandColor: string) => {
+  const colors = [brandColor, "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
+  return accounts.map((acc, index) => {
+    const typeLower = (acc.type || "").toLowerCase();
+    
+    // 1. Determine icon, rate, and default tenure based on loan type
+    let icon = "💼"; 
+    let rate = 12.0; 
+    let defaultTenureYears = 5; 
+
+    if (typeLower.includes("home") || typeLower.includes("housing") || typeLower.includes("property")) {
+      icon = "🏠";
+      rate = 8.5;
+      defaultTenureYears = 15;
+    } else if (typeLower.includes("auto") || typeLower.includes("vehicle") || typeLower.includes("car") || typeLower.includes("two wheeler")) {
+      icon = "🚗";
+      rate = 9.2;
+      defaultTenureYears = 5;
+    } else if (typeLower.includes("card") || typeLower.includes("credit card")) {
+      icon = "💳";
+      rate = 36.0;
+      defaultTenureYears = 1; 
+    } else if (typeLower.includes("personal") || typeLower.includes("consumer")) {
+      icon = "💳";
+      rate = 13.5;
+      defaultTenureYears = 3;
+    } else if (typeLower.includes("business") || typeLower.includes("commercial")) {
+      icon = "💼";
+      rate = 14.0;
+      defaultTenureYears = 5;
+    } else if (typeLower.includes("education")) {
+      icon = "🎓";
+      rate = 9.5;
+      defaultTenureYears = 7;
+    }
+
+    // 2. Estimate remaining months based on open_date if possible
+    let remainingMonths = defaultTenureYears * 12;
+    if (acc.open_date) {
+      try {
+        const openDate = new Date(acc.open_date);
+        const currentDate = new Date();
+        const diffMonths = (currentDate.getFullYear() - openDate.getFullYear()) * 12 + (currentDate.getMonth() - openDate.getMonth());
+        const elapsed = Math.max(0, diffMonths);
+        const totalEstimatedMonths = defaultTenureYears * 12;
+        remainingMonths = Math.max(1, totalEstimatedMonths - elapsed);
+      } catch (e) {
+        console.error("Error calculating remaining months from open_date:", e);
+      }
+    }
+
+    // 3. Estimate monthly EMI
+    const totalAmount = acc.sanctioned_amount || acc.outstanding_balance || 0;
+    const remainingAmount = acc.outstanding_balance || 0;
+    let emi = 0;
+
+    if (typeLower.includes("card")) {
+      // For credit cards, minimum payment is typically 5% of outstanding balance
+      emi = Math.max(250, Math.round(remainingAmount * 0.05));
+      remainingMonths = remainingAmount > 0 ? Math.ceil(remainingAmount / emi) : 0;
+    } else {
+      const p = totalAmount;
+      const r = (rate / 12) / 100;
+      const n = defaultTenureYears * 12;
+      if (r > 0 && n > 0) {
+        const factor = Math.pow(1 + r, n);
+        emi = Math.round((p * r * factor) / (factor - 1));
+      } else {
+        emi = Math.round(p / n);
+      }
+    }
+
+    if (emi > remainingAmount && remainingAmount > 0) {
+      emi = remainingAmount;
+    }
+
+    const color = colors[index % colors.length];
+    
+    // Capitalize lender name nicely
+    const displayName = acc.lender 
+      ? acc.lender.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
+      : (acc.type || "Loan");
+
+    return {
+      icon,
+      name: displayName,
+      emi: emi || 0,
+      remaining: remainingAmount,
+      total: totalAmount || remainingAmount || 0,
+      rate,
+      months: remainingMonths,
+      color
+    };
+  });
+};
+
 export default function Dashboard({
   userId,
   userProfile,
@@ -311,14 +430,99 @@ export default function Dashboard({
   }, [userId, activeTab]);
 
 
-  const score = useCountUp(wellness?.score ?? 0);
-  const netWorth = useCountUp(498000, 1600);
-  const totalDebt = useCountUp(660000, 1400);
+  const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
+  const [monthlyIncome, setMonthlyIncome] = useState<string | null>(null);
+  const [loadingCibil, setLoadingCibil] = useState<boolean>(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadCibilAndProfile() {
+      if (!userId) return;
+      try {
+        setLoadingCibil(true);
+        let storedIncome: string | null = null;
+        try {
+          const stored = window.localStorage.getItem(`finheal_profile_extra_${userId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.monthlyIncome) {
+              storedIncome = parsed.monthlyIncome;
+              if (active) setMonthlyIncome(storedIncome);
+            }
+          }
+        } catch {}
+
+        try {
+          const report = await getStoredCibilReport(userId);
+          if (active) setCibilReport(report);
+        } catch {
+          if (active) setCibilReport(null);
+        }
+
+        try {
+          const profile = await fetchUserProfile(userId);
+          if (active && profile?.monthly_income) {
+            setMonthlyIncome(profile.monthly_income);
+          }
+        } catch {}
+      } finally {
+        if (active) setLoadingCibil(false);
+      }
+    }
+
+    loadCibilAndProfile();
+
+    const handleWellnessUpdate = () => {
+      loadCibilAndProfile();
+    };
+    window.addEventListener("finheal:wellness_update", handleWellnessUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("finheal:wellness_update", handleWellnessUpdate);
+    };
+  }, [userId]);
 
   const loans = [
     { icon: "🏠", name: "Home Loan", emi: 24500, remaining: 3200000, total: 5000000, rate: 8.5, months: 156, color: BRAND },
     { icon: "🚗", name: "Car Loan", emi: 8200, remaining: 240000, total: 600000, rate: 9.2, months: 29, color: "#8b5cf6" },
     { icon: "💳", name: "Personal Loan", emi: 5800, remaining: 120000, total: 300000, rate: 13.5, months: 21, color: "#10b981" },
+  ];
+
+  const incomeVal = parseMonthlyIncome(monthlyIncome);
+  const activeAccounts = cibilReport?.accounts?.filter(a => a.is_active) || [];
+  const dynamicLoans = cibilReport ? mapCibilAccountsToLoans(activeAccounts, BRAND) : loans;
+
+  const totalDebtVal = dynamicLoans.reduce((sum, l) => sum + l.remaining, 0);
+  const totalEmiVal = dynamicLoans.reduce((sum, l) => sum + l.emi, 0);
+  const emiPct = incomeVal > 0 ? Math.round((totalEmiVal / incomeVal) * 100) : 0;
+
+  const score = useCountUp(wellness?.score ?? 0);
+  const netWorth = useCountUp(Math.max(100000, incomeVal * 5.7), 1600);
+  const totalDebt = useCountUp(totalDebtVal, 1400);
+
+  const activeLoansCount = cibilReport ? activeAccounts.length : 3;
+  
+  const stressNudgeText = activeLoansCount > 0
+    ? "Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety."
+    : "Your stress levels are moderate. Keep maintaining a healthy savings buffer to prevent unexpected financial anxiety.";
+
+  const dynamicSpendData = spendData.map(d => {
+    const scaledIncome = Math.round(incomeVal * (d.income / 92000));
+    const baseExpenses = Math.round(scaledIncome * 0.4);
+    const scaledExpenses = baseExpenses + totalEmiVal;
+    return {
+      month: d.month,
+      income: scaledIncome,
+      expenses: scaledExpenses
+    };
+  });
+
+  const dynamicSpendPie = [
+    { name: "Loans / EMI", value: totalEmiVal, color: BRAND },
+    { name: "Living", value: Math.round(incomeVal * 0.25), color: "#10b981" },
+    { name: "Food", value: Math.round(incomeVal * 0.12), color: "#f59e0b" },
+    { name: "Transport", value: Math.round(incomeVal * 0.06), color: "#8b5cf6" },
+    { name: "Other", value: Math.max(2000, incomeVal - totalEmiVal - Math.round(incomeVal * 0.43) - Math.round(incomeVal * 0.27)), color: "#e5e7eb" },
   ];
 
   const DEFAULT_ADVISORS = [
@@ -443,35 +647,7 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Score & Stats Group */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-start xl:justify-end gap-6 w-full xl:w-auto">
-            {/* Score ring */}
-            <div className="relative shrink-0 flex flex-col items-center gap-1">
-              <div className="relative">
-                <ScoreRing score={wellness?.score ?? 0} size={90} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-serif text-[22px] font-bold text-white leading-none">{score}</span>
-                  <span className="text-white/60 text-[8px] tracking-widest uppercase">/100</span>
-                </div>
-              </div>
-              <span className="text-[9px] text-white/70 font-semibold uppercase tracking-wider">Wellness</span>
-            </div>
 
-            {/* Quick stats */}
-            <div className="flex gap-2 sm:gap-3 shrink-0 flex-1 sm:flex-initial">
-              {[
-                { icon: "📅", label: "Active Days", val: wellness?.active_days ?? 22 },
-                { icon: "🎯", label: "Goals", val: localGoals.length },
-                { icon: "💬", label: "Chats", val: actualSessions.length },
-              ].map((s) => (
-                <div key={s.label} className="bg-white/10 backdrop-blur-sm rounded-[12px] px-3 py-2 sm:px-4 sm:py-3 text-center border border-white/10 flex-1 sm:flex-initial min-w-[70px] sm:min-w-[80px]">
-                  <div className="text-[16px] sm:text-[18px]">{s.icon}</div>
-                  <div className="font-bold text-white text-[14px] sm:text-[16px] leading-tight mt-1">{s.val}</div>
-                  <div className="text-white/55 text-[8px] sm:text-[9px] uppercase tracking-wide mt-0.5">{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Tabs */}
@@ -504,9 +680,9 @@ export default function Dashboard({
             {/* KPI row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard icon="💰" label="Net Worth" value={`₹${(netWorth / 100000).toFixed(1)}L`} sub="↑ 5.7% vs last month" color="#10b981" delay={0} />
-              <StatCard icon="📉" label="Total Debt" value={`₹${(totalDebt / 100000).toFixed(1)}L`} sub="3 active loans" color="#ef4444" delay={80} />
-              <StatCard icon="🏦" label="Monthly EMI" value="₹38,500" sub="44% of income" color={BRAND} delay={160} />
-              <StatCard icon="💸" label="Monthly Savings" value="₹23,500" sub="↑ ₹3K vs Mar" color="#f59e0b" delay={240} />
+              <StatCard icon="📉" label="Total Debt" value={`₹${(totalDebt / 100000).toFixed(1)}L`} sub={`${activeLoansCount} active loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={80} />
+              <StatCard icon="🏦" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of income`} color={BRAND} delay={160} />
+              <StatCard icon="💸" label="Monthly Savings" value={`₹${Math.round(incomeVal * 0.27).toLocaleString()}`} sub="Based on 27% savings rate" color="#f59e0b" delay={240} />
             </div>
 
             {/* Chart row */}
@@ -524,7 +700,7 @@ export default function Dashboard({
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={spendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                  <AreaChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
                     <defs>
                       <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={BRAND} stopOpacity={0.15} />
@@ -548,17 +724,17 @@ export default function Dashboard({
               {/* Spend pie */}
               <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5" style={{ animationDelay: "150ms" }}>
                 <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Spending Breakdown</div>
-                <div className="text-[11px] text-gray-400 mb-3">This month · ₹68,000</div>
+                <div className="text-[11px] text-gray-400 mb-3">This month · ₹{(incomeVal - Math.round(incomeVal * 0.27)).toLocaleString()}</div>
                 <ResponsiveContainer width="100%" height={140}>
                   <PieChart>
-                    <Pie data={spendPie} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
-                      {spendPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    <Pie data={dynamicSpendPie} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
+                      {dynamicSpendPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
                     <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex flex-col gap-1.5 mt-2">
-                  {spendPie.slice(0, 4).map((item) => (
+                  {dynamicSpendPie.slice(0, 4).map((item) => (
                     <div key={item.name} className="flex items-center justify-between text-[10.5px]">
                       <span className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full inline-block" style={{ background: item.color }} />
@@ -623,7 +799,7 @@ export default function Dashboard({
                   </div>
                 </div>
                 <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[10px] p-3 text-[11px] text-[#b91c1c] leading-relaxed mt-4">
-                  <strong>💡 Stress Nudge:</strong> Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety.
+                  <strong>💡 Stress Nudge:</strong> {stressNudgeText}
                 </div>
               </div>
             </div>
@@ -720,14 +896,24 @@ export default function Dashboard({
           <div className="flex flex-col gap-6">
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard icon="💰" label="Total Outstanding" value="₹35.6L" sub="Across 3 loans" color="#ef4444" delay={0} />
-              <StatCard icon="📅" label="Monthly EMI" value="₹38,500" sub="44% of ₹87K income" color={BRAND} delay={80} />
-              <StatCard icon="📉" label="Interest This Year" value="₹2.1L" sub="Paid so far in 2026" color="#f59e0b" delay={160} />
+              <StatCard icon="💰" label="Total Outstanding" value={`₹${(totalDebtVal / 100000).toFixed(1)}L`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
+              <StatCard icon="📅" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of ₹${Math.round(incomeVal / 1000)}K income`} color={BRAND} delay={80} />
+              <StatCard icon="📉" label="Interest This Year" value={`₹${(activeLoansCount > 0 ? (dynamicLoans.reduce((sum, l) => sum + (l.emi * 12 * 0.45), 0) / 100000) : 2.1).toFixed(1)}L`} sub="Paid so far in 2026" color="#f59e0b" delay={160} />
             </div>
 
             {/* Loan cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {loans.map((l, i) => <LoanCard key={l.name} {...l} delay={i * 100} />)}
+              {dynamicLoans.length === 0 ? (
+                <div className="col-span-full text-center py-10 bg-gray-50 rounded-[12px] border border-dashed border-gray-200">
+                  <p className="text-[20px] mb-1">🎉</p>
+                  <p className="text-[12px] font-semibold text-gray-750">No Active Loans</p>
+                  <p className="text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto">
+                    Your synced credit profile shows no outstanding loan accounts. Great job!
+                  </p>
+                </div>
+              ) : (
+                dynamicLoans.map((l, i) => <LoanCard key={`${l.name}-${i}`} {...l} delay={i * 100} />)
+              )}
             </div>
 
             {/* EMI bar chart */}
@@ -735,7 +921,7 @@ export default function Dashboard({
               <div className="text-[13px] font-semibold text-gray-800 mb-0.5">EMI Timeline</div>
               <div className="text-[11px] text-gray-400 mb-4">Monthly obligations over the next 6 months</div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={spendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={4}>
+                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={4}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
@@ -746,22 +932,7 @@ export default function Dashboard({
               </ResponsiveContainer>
             </div>
 
-            {/* Debt freedom tip */}
-            <div className="animate-fade-up rounded-[14px] p-5 border-[1.5px]" style={{ background: "#eef0fd", borderColor: "#d4d8fa", animationDelay: "300ms" }}>
-              <div className="text-[9px] font-bold text-primary uppercase tracking-wider mb-2">💡 Debt Freedom Strategy</div>
-              <div className="text-[13px] font-semibold text-gray-800 mb-1">Avalanche Method Recommendation</div>
-              <div className="text-[12px] text-gray-600 leading-relaxed">
-                Pay <strong>₹2,000 extra</strong> on your Personal Loan (13.5% p.a.) this month. That single move will save you <strong>₹18,400 in interest</strong> and close it <strong>3 months early.</strong> Once it's cleared, redirect that EMI to your Car Loan.
-              </div>
-              <button
-                data-testid="btn-get-debt-plan"
-                onClick={() => onNavigate("Talk to FinHeal")}
-                className="mt-3 text-[11px] font-semibold text-white px-4 py-2 rounded-[8px] transition-all hover:-translate-y-px"
-                style={{ background: BRAND }}
-              >
-                Get My Full Debt Plan →
-              </button>
-            </div>
+
           </div>
         )}
 
@@ -775,8 +946,8 @@ export default function Dashboard({
                 <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
                 {[
                   { label: "Savings Rate", pct: 27, color: "#10b981" },
-                  { label: "Debt Ratio", pct: 44, color: "#ef4444" },
-                  { label: "Credit Score", pct: 74, color: BRAND },
+                  { label: "Debt Ratio", pct: emiPct, color: "#ef4444" },
+                  { label: "Credit Score", pct: Math.min(100, Math.max(0, Math.round(((cibilReport?.score || 742) - 300) / 600 * 100))), color: BRAND },
                   { label: "Emergency Fund", pct: 20, color: "#f59e0b" },
                   { label: "Investment Rate", pct: 12, color: "#8b5cf6" },
                 ].map((item, i) => (
@@ -824,7 +995,7 @@ export default function Dashboard({
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={spendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
+                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
@@ -837,21 +1008,36 @@ export default function Dashboard({
 
             {/* Insight tiles */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "220ms" }}>
-              {[
-                { icon: "📊", title: "CIBIL Score", value: "742", tag: "Good", tagColor: "#10b981", desc: "Improved by 18 pts this quarter. Aim for 750+ by September." },
-                { icon: "🎯", title: "Goal Progress", value: "52%", tag: "On Track", tagColor: BRAND, desc: "2 of 3 goals are progressing well. Emergency fund needs attention." },
-                { icon: "💡", title: "Savings Potential", value: "₹4.2K", tag: "Opportunity", tagColor: "#f59e0b", desc: "Reduce dining & transport by ₹4K/mo. Redirect to EMI prepayment." },
-              ].map((tile) => (
-                <div key={tile.title} className="dashboard-card p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[18px]">{tile.icon}</span>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
+              {(() => {
+                const currentScore = cibilReport?.score || 742;
+                const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
+                const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
+                const scoreDesc = cibilReport 
+                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.` 
+                  : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
+
+                const avgGoalProgress = localGoals.length > 0 
+                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100) 
+                  : 0;
+
+                const tiles = [
+                  { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
+                  { icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` },
+                  { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
+                ];
+
+                return tiles.map((tile) => (
+                  <div key={tile.title} className="dashboard-card p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[18px]">{tile.icon}</span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
+                    </div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
+                    <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
+                    <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
                   </div>
-                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
-                  <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
-                  <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
         )}
