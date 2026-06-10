@@ -8,7 +8,7 @@ export interface Advisor {
   name: string;
   designation: string;
   avatarUrl: string;
-  availability: "available" | "unavailable";
+  availability: "available" | "unavailable" | "in meeting";
   expertise: string[];
   strength: string;
   bio: string;
@@ -874,17 +874,25 @@ export default function AdvisorPanel({
                   {/* Visual Availability dot on top right corner */}
                   <div className="absolute top-[16px] right-[16px]">
                     {advisor.availability === "available" ? (
-                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9.5px] font-bold">
+                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9.5px] font-bold animate-fade-in">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
                         Available
                       </div>
+                    ) : advisor.availability === "in meeting" ? (
+                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9.5px] font-bold animate-fade-in">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        </span>
+                        In Meeting
+                      </div>
                     ) : (
-                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-[9.5px] font-bold">
+                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-[9.5px] font-bold animate-fade-in">
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                        Busy
+                        Not Available
                       </div>
                     )}
                   </div>
