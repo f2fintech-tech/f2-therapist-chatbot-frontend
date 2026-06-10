@@ -185,6 +185,7 @@ export default function EligibilityCibilView({
   const [cibilPhone, setCibilPhone] = useState<string>("");
   const [cibilPan, setCibilPan] = useState<string>("");
   const [cibilBureau, setCibilBureau] = useState<"cibil" | "experian">("cibil");
+  const [cibilReportType, setCibilReportType] = useState<"individual" | "company">("individual");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Privacy Policy state
@@ -294,7 +295,11 @@ export default function EligibilityCibilView({
   const handleFetchCibilReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cibilName.trim()) {
-      toast({ title: "Name Required", description: "Please enter your name.", variant: "destructive" });
+      toast({
+        title: cibilReportType === "company" ? "Company Name Required" : "Name Required",
+        description: cibilReportType === "company" ? "Please enter company name." : "Please enter your name.",
+        variant: "destructive"
+      });
       return;
     }
     if (cibilPhone.replace(/\D/g, "").length < 10) {
@@ -302,13 +307,17 @@ export default function EligibilityCibilView({
       return;
     }
     if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(cibilPan.trim())) {
-      toast({ title: "Invalid PAN", description: "Standard PAN card format is ABCDE1234F.", variant: "destructive" });
+      toast({
+        title: cibilReportType === "company" ? "Invalid Company PAN" : "Invalid PAN",
+        description: "Standard PAN card format is ABCDE1234F.",
+        variant: "destructive"
+      });
       return;
     }
     setCibilFetching(true);
     setCibilError(null);
     try {
-      const result = await fetchCibilReport(userId, cibilName, cibilPhone, cibilPan.toUpperCase(), cibilBureau);
+      const result = await fetchCibilReport(userId, cibilName, cibilPhone, cibilPan.toUpperCase(), cibilBureau, cibilReportType);
       setCibilReport(result);
       setEligCibil(String(result.score));
       setCibilError(null);
@@ -1162,13 +1171,61 @@ export default function EligibilityCibilView({
                     <div className="mx-auto w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2.5">
                       <Lock className="w-5 h-5" />
                     </div>
-                    <h2 className="text-[16px] font-bold text-gray-900">Check Your Official {cibilBureau === "experian" ? "Experian" : "CIBIL"} Score</h2>
-                    <p className="text-[12px] text-gray-400 mt-1">Retrieve your credit score and bureau report securely.</p>
+                    <h2 className="text-[16px] font-bold text-gray-900">
+                      {cibilReportType === "company"
+                        ? `Check Company ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                        : `Check Your Official ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                      }
+                    </h2>
+                    <p className="text-[12px] text-gray-400 mt-1">
+                      {cibilReportType === "company"
+                        ? "Retrieve commercial credit rank and bureau report securely."
+                        : "Retrieve your credit score and bureau report securely."
+                      }
+                    </p>
+                  </div>
+
+                  {/* Report Type Selector */}
+                  <div className="flex bg-gray-100 rounded-[12px] p-1 mb-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCibilReportType("individual");
+                        setCibilName("");
+                        setCibilPhone("");
+                        setCibilPan("");
+                      }}
+                      className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                        cibilReportType === "individual"
+                          ? "bg-white text-primary shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Individual CIBIL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCibilReportType("company");
+                        setCibilName("");
+                        setCibilPhone("");
+                        setCibilPan("");
+                      }}
+                      className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                        cibilReportType === "company"
+                          ? "bg-white text-primary shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Company CIBIL
+                    </button>
                   </div>
 
                   <form onSubmit={handleFetchCibilReport} className="space-y-4">
                     <div className="flex flex-col">
-                      <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Full Name (as on PAN)</label>
+                      <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                        {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
+                      </label>
                       <div className="relative">
                         <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                         <input
@@ -1176,7 +1233,7 @@ export default function EligibilityCibilView({
                           required
                           value={cibilName}
                           onChange={(e) => setCibilName(e.target.value)}
-                          placeholder="e.g. Rahul Sharma"
+                          placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
                           className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
@@ -1184,7 +1241,9 @@ export default function EligibilityCibilView({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col">
-                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Mobile Number</label>
+                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                          {cibilReportType === "company" ? "Authorized Mobile Number" : "Mobile Number"}
+                        </label>
                         <div className="relative">
                           <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                           <input
@@ -1198,7 +1257,9 @@ export default function EligibilityCibilView({
                         </div>
                       </div>
                       <div className="flex flex-col">
-                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">PAN Card Number</label>
+                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                          {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
+                        </label>
                         <div className="relative">
                           <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                           <input
@@ -1206,7 +1267,7 @@ export default function EligibilityCibilView({
                             required
                             value={cibilPan}
                             onChange={(e) => setCibilPan(e.target.value.toUpperCase())}
-                            placeholder="e.g. ABCDEXXXXF"
+                            placeholder={cibilReportType === "company" ? "e.g. AAACAXXXXF" : "e.g. ABCDEXXXXF"}
                             className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                           />
                         </div>
@@ -1304,7 +1365,12 @@ export default function EligibilityCibilView({
                           }`}
                         >
                           <Sparkles className="w-4 h-4 shrink-0" />
-                          <span>Download {cibilBureau === "cibil" ? "CIBIL" : "Experian"} Credit Report</span>
+                          <span>
+                            {cibilReportType === "company"
+                              ? `Download Company ${cibilBureau === "cibil" ? "CIBIL" : "Experian"} Credit Report`
+                              : `Download ${cibilBureau === "cibil" ? "CIBIL" : "Experian"} Credit Report`
+                            }
+                          </span>
                         </button>
                       </>
                     )}
