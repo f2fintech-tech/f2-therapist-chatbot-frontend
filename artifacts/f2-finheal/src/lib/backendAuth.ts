@@ -488,5 +488,10 @@ export async function uploadAdvisorAvatar(f2FintechId: string, file: File): Prom
   return { url: result.avatar_url };
 }
 
-
-
+export async function rescheduleAppointment(apptId: string, date: string, time: string): Promise<Appointment> {
+  const result = await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}/reschedule`, {
+    method: "PUT",
+    body: JSON.stringify({ date, time })
+  });
+  return mapBackendAppointmentToFrontend(result);
+}

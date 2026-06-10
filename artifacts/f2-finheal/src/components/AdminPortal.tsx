@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -185,6 +185,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [slotTime, setSlotTime] = useState("");
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+
+  // Reschedule meeting states
+  const [reschedulingApptId, setReschedulingApptId] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
 
   const timeSlots = [
     "09:00 AM",
@@ -1044,6 +1049,40 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     } catch (err) {
       console.error("Error cancelling appointment:", err);
       alert("Failed to cancel appointment.");
+    }
+  };
+
+  // ---------- Reschedule handler ----------
+  const generateRescheduleDateList = () => {
+    const dates: { dayName: string; dayNum: number; fullStr: string }[] = [];
+    const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dayName = i === 0 ? "Today" : daysShort[d.getDay()];
+      const dayNum = d.getDate();
+      const fullStr = `${monthsShort[d.getMonth()]} ${dayNum} (${daysShort[d.getDay()]})`;
+      dates.push({ dayName, dayNum, fullStr });
+    }
+    return dates;
+  };
+
+  const handleRescheduleAppointment = async (apptId: string) => {
+    if (!rescheduleDate || !rescheduleTime) {
+      alert("Please select both a new date and time slot.");
+      return;
+    }
+    try {
+      await rescheduleAppointment(apptId, rescheduleDate, rescheduleTime);
+      setReschedulingApptId(null);
+      setRescheduleDate("");
+      setRescheduleTime("");
+      await loadGlobalAppointments();
+      alert("Consultation has been rescheduled successfully.");
+    } catch (err) {
+      console.error("Error rescheduling appointment:", err);
+      alert("Failed to reschedule appointment.");
     }
   };
 
@@ -2071,10 +2110,22 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                       onClick={() => {
                                         setCancellingApptId(appt.id || null);
                                         setCancelReason("");
+                                        setReschedulingApptId(null);
                                       }}
                                       className="border border-rose-200 hover:bg-rose-50 text-rose-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
                                     >
                                       Cancel Call
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setReschedulingApptId(appt.id || null);
+                                        setRescheduleDate("");
+                                        setRescheduleTime("");
+                                        setCancellingApptId(null);
+                                      }}
+                                      className="border border-blue-200 hover:bg-blue-50 text-blue-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
+                                    >
+                                      Reschedule
                                     </button>
                                   </div>
                                 </div>
@@ -2106,6 +2157,66 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                       className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
                                     >
                                       Confirm Cancellation
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Reschedule inline form */}
+                              {reschedulingApptId === appt.id && (
+                                <div className="mt-[4px] p-[12px] bg-blue-50/50 border border-blue-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                  <label className="text-[10px] font-bold text-blue-800 uppercase block">Reschedule — Select New Date & Time</label>
+                                  <div className="flex gap-[6px] overflow-x-auto pb-[4px] scrollbar-none">
+                                    {generateRescheduleDateList().map((dt, idx) => (
+                                      <button
+                                        key={idx}
+                                        onClick={() => { setRescheduleDate(dt.fullStr); setRescheduleTime(""); }}
+                                        className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${
+                                          rescheduleDate === dt.fullStr
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
+                                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                        }`}
+                                      >
+                                        <span className={`text-[9px] font-medium leading-none ${rescheduleDate === dt.fullStr ? "text-white/80" : "text-gray-400"}`}>{dt.dayName}</span>
+                                        <span className="text-[14px] font-bold mt-[3px] leading-none">{dt.dayNum}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {rescheduleDate && (
+                                    <div className="grid grid-cols-4 gap-[6px]">
+                                      {timeSlots.map((slot) => (
+                                        <button
+                                          key={slot}
+                                          type="button"
+                                          onClick={() => setRescheduleTime(slot)}
+                                          className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${
+                                            rescheduleTime === slot
+                                              ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
+                                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                          }`}
+                                        >
+                                          {slot}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="flex gap-[8px] justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setReschedulingApptId(null);
+                                        setRescheduleDate("");
+                                        setRescheduleTime("");
+                                      }}
+                                      className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                    >
+                                      Back
+                                    </button>
+                                    <button
+                                      onClick={() => appt.id && handleRescheduleAppointment(appt.id)}
+                                      disabled={!rescheduleDate || !rescheduleTime}
+                                      className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-blue-600 rounded-[8px] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                    >
+                                      Confirm Reschedule
                                     </button>
                                   </div>
                                 </div>
