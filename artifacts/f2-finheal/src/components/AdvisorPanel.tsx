@@ -201,6 +201,8 @@ export default function AdvisorPanel({
   
   // Load saved appointments from local storage
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   // Derived active and past appointments list
   const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
@@ -517,29 +519,39 @@ export default function AdvisorPanel({
 
 
 
-  const handleCancelAppointment = async (advisorId: string) => {
-    if (confirm("Are you sure you want to cancel your scheduled appointment with this expert?")) {
-      const appt = appointments.find(a => a.advisorId === advisorId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
-      if (appt && appt.id) {
-        try {
-          await updateAppointmentStatus(appt.id, { cancelled: true });
-          await loadAppointments();
-          return;
-        } catch (e) {
-          console.error("Failed to cancel appointment on backend", e);
-        }
-      }
+  const handleCancelAppointment = async (apptId: string, reason: string) => {
+    if (!reason.trim()) return;
 
-      const updated = appointments.map(a => {
-        if (a.advisorId === advisorId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time)) {
-          return { ...a, cancelled: true };
-        }
-        return a;
-      });
-      setAppointments(updated);
-      const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
-      localStorage.setItem(storageKey, JSON.stringify(updated));
+    // Find appointment
+    const appt = appointments.find(a => a.id === apptId || a.advisorId === apptId);
+    if (appt && appt.id) {
+      try {
+        await updateAppointmentStatus(appt.id, { cancelled: true, feedback: reason.trim() });
+        await loadAppointments();
+        setCancellingApptId(null);
+        setCancelReason("");
+        window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+        alert("Your consultation has been cancelled successfully.");
+        return;
+      } catch (e) {
+        console.error("Failed to cancel appointment on backend", e);
+      }
     }
+
+    // Fallback for local simulation
+    const updated = appointments.map(a => {
+      if (a.id === apptId || (!a.id && a.advisorId === apptId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time))) {
+        return { ...a, cancelled: true, feedback: reason.trim() };
+      }
+      return a;
+    });
+    setAppointments(updated);
+    const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setCancellingApptId(null);
+    setCancelReason("");
+    window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+    alert("Your consultation has been cancelled successfully.");
   };
 
   // Filtered advisor list based on specialty category
@@ -615,8 +627,9 @@ export default function AdvisorPanel({
             <div className="grid gap-[12px] sm:grid-cols-2 lg:grid-cols-3">
               {activeAppointments.map((appt) => {
                 const advisor = advisors.find(a => a.id === appt.advisorId);
+                const apptKeyId = appt.id || appt.advisorId;
                 return (
-                  <div key={appt.advisorId} className="bg-[linear-gradient(135deg,#ffffff_0%,#f9faff_100%)] border border-primary/20 rounded-[18px] p-[16px] shadow-sm flex flex-col justify-between hover:border-primary/40 transition">
+                  <div key={apptKeyId} className="bg-[linear-gradient(135deg,#ffffff_0%,#f9faff_100%)] border border-primary/20 rounded-[18px] p-[16px] shadow-sm flex flex-col justify-between hover:border-primary/40 transition">
                     <div>
                       <div className="flex items-center gap-[10px] mb-[10px]">
                         <img 
@@ -650,7 +663,10 @@ export default function AdvisorPanel({
                     <div className="space-y-[8px] mt-[4px]">
                       <div className="flex items-center gap-[8px]">
                         <button
-                          onClick={() => handleCancelAppointment(appt.advisorId)}
+                          onClick={() => {
+                            setCancellingApptId(apptKeyId);
+                            setCancelReason("");
+                          }}
                           className="flex-1 py-[8px] rounded-[10px] text-[11px] font-bold border border-rose-100 text-rose-600 hover:bg-rose-50/50 transition cursor-pointer"
                         >
                           Cancel Call
@@ -672,6 +688,37 @@ export default function AdvisorPanel({
                       ) : (
                         <div className="w-full text-center py-[8.5px] text-[10.5px] font-bold text-gray-400 bg-gray-50 rounded-[10px] border border-gray-100/60 select-none">
                           🔒 Rate unlocks once you Join Call
+                        </div>
+                      )}
+
+                      {cancellingApptId === apptKeyId && (
+                        <div className="mt-[10px] p-[12px] bg-rose-50/50 border border-rose-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                          <label className="text-[10px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
+                          <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="Please tell us why you are cancelling..."
+                            rows={2}
+                            className="w-full px-[10px] py-[8px] border border-rose-200 rounded-[8px] text-[12px] focus:outline-none focus:border-rose-400 bg-white"
+                          />
+                          <div className="flex gap-[8px] justify-end">
+                            <button
+                              onClick={() => {
+                                setCancellingApptId(null);
+                                setCancelReason("");
+                              }}
+                              className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                            >
+                              Back
+                            </button>
+                            <button
+                              onClick={() => handleCancelAppointment(apptKeyId, cancelReason)}
+                              disabled={!cancelReason.trim()}
+                              className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                            >
+                              Confirm
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -718,8 +765,16 @@ export default function AdvisorPanel({
                       </div>
 
                       {appt.cancelled ? (
-                        <div className="bg-rose-50/40 border border-rose-100/50 rounded-[12px] p-[10px] text-center text-[11px] text-rose-600 font-semibold">
-                          🚫 This appointment was cancelled
+                        <div className="space-y-[6px]">
+                          <div className="bg-rose-50/40 border border-rose-100/50 rounded-[12px] p-[10px] text-center text-[11px] text-rose-600 font-semibold">
+                            🚫 This appointment was cancelled
+                          </div>
+                          {appt.feedback && (
+                            <div className="text-[11px] italic text-rose-700 bg-rose-50/30 border border-rose-100/40 p-[10px] rounded-[12px] flex flex-col gap-[3px] text-left">
+                              <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
+                              <span>&quot;{appt.feedback}&quot;</span>
+                            </div>
+                          )}
                         </div>
                       ) : appt.completed ? (
                         <div className="bg-amber-50/40 border border-amber-100/50 rounded-[12px] p-[10px]">
@@ -888,13 +943,48 @@ export default function AdvisorPanel({
                               <div className="text-emerald-600 font-medium">{activeAppt.date} at {activeAppt.time}</div>
                             </div>
                             <button
-                              onClick={() => handleCancelAppointment(advisor.id)}
+                              onClick={() => {
+                                setCancellingApptId(activeAppt.id || activeAppt.advisorId);
+                                setCancelReason("");
+                              }}
                               className="text-rose-500 font-bold hover:underline ml-2 cursor-pointer"
                               title="Cancel appointment"
                             >
                               Cancel
                             </button>
                           </div>
+                          
+                          {cancellingApptId === (activeAppt.id || activeAppt.advisorId) && (
+                            <div className="bg-rose-50/50 border border-rose-100 rounded-[12px] p-[10px] space-y-[6px] text-left mb-[8px] animate-fade-in">
+                              <label className="text-[9.5px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
+                              <textarea
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                placeholder="Please write why you are cancelling..."
+                                rows={2}
+                                className="w-full px-[8px] py-[6px] border border-rose-200 rounded-[8px] text-[11.5px] focus:outline-none focus:border-rose-400 bg-white"
+                              />
+                              <div className="flex gap-[6px] justify-end">
+                                <button
+                                  onClick={() => {
+                                    setCancellingApptId(null);
+                                    setCancelReason("");
+                                  }}
+                                  className="px-[10px] py-[4px] text-[10.5px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[6px] hover:bg-gray-50 transition cursor-pointer"
+                                >
+                                  Back
+                                </button>
+                                <button
+                                  onClick={() => handleCancelAppointment(activeAppt.id || activeAppt.advisorId, cancelReason)}
+                                  disabled={!cancelReason.trim()}
+                                  className="px-[10px] py-[4px] text-[10.5px] font-bold text-white bg-rose-600 rounded-[6px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                >
+                                  Confirm
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           <button
                             onClick={() => handleJoinCall(activeAppt)}
                             className="w-full bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer text-center"
