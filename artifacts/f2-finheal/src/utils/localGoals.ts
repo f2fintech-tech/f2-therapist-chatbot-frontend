@@ -1,4 +1,5 @@
-// Goals CRUD utility for localStorage persistence.
+// Goals CRUD utility — localStorage cache with backend database sync.
+import { saveUserGoals } from "@/lib/backendAuth";
 
 const GOALS_STORAGE_KEY = "finheal_user_goals";
 const GOALS_UPDATED_EVENT = "finheal:goals-updated";
@@ -46,6 +47,26 @@ export function listUserGoals(userId: string): Goal[] {
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
 }
 
+export function syncGoalsFromBackend(userId: string, backendGoals: Goal[]) {
+  const allGoals = _readGoalsStore();
+  const otherGoals = allGoals.filter((g) => g.userId !== userId);
+  const merged = [...otherGoals, ...backendGoals];
+  _writeGoalsStore(merged);
+}
+
+/** Persist the current user goals to the backend DB, with one retry on failure. */
+function _syncToBackend(userId: string, goals: Goal[]) {
+  const userGoals = goals.filter((g) => g.userId === userId);
+  saveUserGoals(userId, userGoals).catch((err) => {
+    console.warn("Goal backend sync failed, retrying in 2s…", err);
+    setTimeout(() => {
+      saveUserGoals(userId, userGoals).catch((retryErr) =>
+        console.error("Goal backend sync retry failed:", retryErr)
+      );
+    }, 2000);
+  });
+}
+
 export function createGoal(userId: string, name: string, targetAmount: number, currency: string = "₹", color: string = "var(--color-primary)", icon?: string): Goal {
   const goals = _readGoalsStore();
   const now = new Date().toISOString();
@@ -63,6 +84,8 @@ export function createGoal(userId: string, name: string, targetAmount: number, c
   };
   goals.push(newGoal);
   _writeGoalsStore(goals);
+  _syncToBackend(userId, goals);
+  
   return newGoal;
 }
 
@@ -82,6 +105,8 @@ export function updateGoal(goalId: string, updates: Partial<Goal>): Goal | null 
 
   goals[idx] = updated;
   _writeGoalsStore(goals);
+  _syncToBackend(updated.userId, goals);
+
   return updated;
 }
 
@@ -90,11 +115,15 @@ export function updateGoalProgress(goalId: string, currentAmount: number): Goal 
 }
 
 export function deleteGoal(goalId: string): boolean {
-  let goals = _readGoalsStore();
-  const originalLength = goals.length;
-  goals = goals.filter((g) => g.id !== goalId);
-  if (goals.length < originalLength) {
+  const originalGoals = _readGoalsStore();
+  const targetGoal = originalGoals.find((g) => g.id === goalId);
+  
+  let goals = originalGoals.filter((g) => g.id !== goalId);
+  if (goals.length < originalGoals.length) {
     _writeGoalsStore(goals);
+    if (targetGoal) {
+      _syncToBackend(targetGoal.userId, goals);
+    }
     return true;
   }
   return false;

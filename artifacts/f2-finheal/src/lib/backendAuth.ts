@@ -28,6 +28,7 @@ export interface BackendUserProfile {
   risk_tolerance?: string | null;
   monthly_income?: string | null;
   therapy_style?: string | null;
+  goals?: any[] | null;
 }
 
 export interface BackendUserProfileUpdate {
@@ -313,6 +314,13 @@ export async function updateAdvisorNextSlot(f2FintechId: string, nextSlot: strin
     body: JSON.stringify({ next_slot: nextSlot }),
   });
   return mapBackendAdvisorToFrontend(result);
+}
+
+export async function saveUserGoals(userId: string, goals: any[]): Promise<any> {
+  return authRequest(`auth/profile/${encodeURIComponent(userId)}/goals`, {
+    method: "PUT",
+    body: JSON.stringify(goals),
+  });
 }
 
 

@@ -16,7 +16,8 @@ import { deleteLocalConversation } from "@/utils/localConversations";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
-import { fetchHearts } from "@/lib/backendAuth";
+import { fetchHearts, fetchUserProfile } from "@/lib/backendAuth";
+import { syncGoalsFromBackend } from "@/utils/localGoals";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
 import FinancialEducation from "@/components/FinancialEducation";
@@ -151,6 +152,45 @@ export default function FinHealChat() {
       void refreshHearts();
     }
   }, [authSession, refreshHearts]);
+
+  // Sync goals from backend on session load, on tab focus, and periodically
+  useEffect(() => {
+    if (!userId) return;
+
+    const syncBackendGoals = async () => {
+      try {
+        const profile = await fetchUserProfile(userId);
+        if (profile && Array.isArray(profile.goals)) {
+          syncGoalsFromBackend(userId, profile.goals);
+        }
+      } catch (err) {
+        console.error("Failed to sync goals from backend:", err);
+      }
+    };
+
+    // Initial sync on load
+    void syncBackendGoals();
+
+    // Re-sync when the tab becomes visible (covers cross-machine scenario)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncBackendGoals();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Periodic fallback: re-sync every 60s if tab stays open
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncBackendGoals();
+      }
+    }, 60_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [userId]);
 
   const handleLogout = () => {
     clearStoredAuthSession();

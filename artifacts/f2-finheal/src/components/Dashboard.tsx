@@ -277,6 +277,12 @@ export default function Dashboard({
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
   useEffect(() => {
     setLocalGoals(listUserGoals(userId));
+
+    const handleGoalsUpdated = () => {
+      setLocalGoals(listUserGoals(userId));
+    };
+    window.addEventListener("finheal:goals-updated", handleGoalsUpdated);
+    return () => window.removeEventListener("finheal:goals-updated", handleGoalsUpdated);
   }, [userId, activeTab]);
 
   const [actualSessions, setActualSessions] = useState<any[]>([]);

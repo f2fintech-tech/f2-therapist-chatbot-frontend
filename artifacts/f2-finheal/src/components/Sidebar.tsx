@@ -45,10 +45,16 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const { data: wellnessData } = useGetWellnessScore(userId);
   const changePoints = wellnessData?.change_pts ?? 0;
 
-  // Load goals from localStorage
+  // Load goals from localStorage and re-read whenever they change (e.g. backend sync)
   useEffect(() => {
     const userGoals = listUserGoals(userId);
     setGoals(userGoals);
+
+    const handleGoalsUpdated = () => {
+      setGoals(listUserGoals(userId));
+    };
+    window.addEventListener("finheal:goals-updated", handleGoalsUpdated);
+    return () => window.removeEventListener("finheal:goals-updated", handleGoalsUpdated);
   }, [userId]);
 
   useEffect(() => {

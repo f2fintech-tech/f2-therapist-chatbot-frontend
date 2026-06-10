@@ -79,6 +79,12 @@ export default function InsightsPanel({
   useEffect(() => {
     const goals = listUserGoals(userId);
     setGoalsList(goals);
+
+    const handleGoalsUpdated = () => {
+      setGoalsList(listUserGoals(userId));
+    };
+    window.addEventListener("finheal:goals-updated", handleGoalsUpdated);
+    return () => window.removeEventListener("finheal:goals-updated", handleGoalsUpdated);
   }, [userId]);
 
   const handleUpdateProgress = (goalId: string, newAmount: number) => {
