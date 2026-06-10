@@ -29,6 +29,56 @@ interface Appointment {
   joined?: boolean;
 }
 
+export function classifyEnquiryRole(email: string, name: string, advisors: any[] = []): "Admin" | "Manager" | "Senior Leadership" | "User" {
+  const cleanEmail = (email || "").toLowerCase().trim();
+  const cleanName = (name || "").toLowerCase().trim();
+
+  // 1. Admin Classification
+  if (
+    cleanEmail === "admin@finheal.com" || 
+    cleanEmail === "admin@f2finheal.com" || 
+    cleanEmail.startsWith("admin@") ||
+    cleanName.includes("admin") ||
+    cleanName === "finheal admin"
+  ) {
+    return "Admin";
+  }
+
+  // 2. Senior Leadership Classification
+  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
+  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
+  
+  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
+  const hasLeadershipName = cleanName.includes("ceo") || cleanName.includes("cto") || cleanName.includes("cfo") || cleanName.includes("coo") || cleanName.includes("vp") || cleanName.includes("president") || cleanName.includes("founder") || cleanName.includes("director") || cleanName.includes("executive");
+
+  if ((isInternalDomain && hasLeadershipEmail) || hasLeadershipName) {
+    return "Senior Leadership";
+  }
+
+  // 3. Manager Classification
+  // Check against advisors list
+  const isAdvisor = advisors.some(adv => {
+    const advId = (adv.f2FintechId || adv.id || "").toLowerCase().trim();
+    const advEmail = (adv.email || "").toLowerCase().trim();
+    const advName = (adv.name || "").toLowerCase().trim();
+    return (
+      (cleanEmail && (cleanEmail === advId || cleanEmail === advEmail)) ||
+      (cleanName && cleanName === advName)
+    );
+  });
+
+  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
+  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
+  const hasManagerName = cleanName.includes("manager") || cleanName.includes("advisor") || cleanName.includes("lead") || cleanName.includes("head") || cleanName.includes("supervisor");
+
+  if (isAdvisor || hasManagerEmail || (isInternalDomain && hasManagerName)) {
+    return "Manager";
+  }
+
+  // 4. Regular User / Lead
+  return "User";
+}
+
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
   
@@ -233,26 +283,36 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
+  const [filterRole, setFilterRole] = useState<string>("all");
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
 
-  // Reset page when filterDate changes
+  // Reset page when filterDate or filterRole changes
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate]);
+  }, [filterDate, filterRole]);
 
-  const filteredEnquiries = !filterDate 
-    ? cibilEnquiries 
-    : cibilEnquiries.filter((enq) => {
-        if (!enq.fetched_at) return false;
-        const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
-        const localDate = new Date(utcStr);
-        const year = localDate.getFullYear();
-        const month = String(localDate.getMonth() + 1).padStart(2, '0');
-        const day = String(localDate.getDate()).padStart(2, '0');
-        const localDateStr = `${year}-${month}-${day}`;
-        return localDateStr === filterDate;
-      });
+  const filteredEnquiries = cibilEnquiries.filter((enq) => {
+    // 1. Filter by Date
+    if (filterDate) {
+      if (!enq.fetched_at) return false;
+      const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
+      const localDate = new Date(utcStr);
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const localDateStr = `${year}-${month}-${day}`;
+      if (localDateStr !== filterDate) return false;
+    }
+
+    // 2. Filter by Role
+    if (filterRole !== "all") {
+      const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+      if (role !== filterRole) return false;
+    }
+
+    return true;
+  });
 
   const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
   const safeCibilPage = Math.min(cibilPage, totalPages);
@@ -260,6 +320,73 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     (safeCibilPage - 1) * cibilPageSize,
     safeCibilPage * cibilPageSize
   );
+
+  const handleExportCSV = () => {
+    if (filteredEnquiries.length === 0) return;
+
+    // Header row
+    const headers = ["Name", "Phone", "Email", "CIBIL Score", "Bureau", "Existing Open Accounts", "Date Fetched"];
+    
+    // Map rows
+    const rows = filteredEnquiries.map(enq => {
+      // 1. Get only active (open) accounts
+      const activeAccountsList = (enq.accounts || []).filter((acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1);
+      
+      // 2. Format active accounts list
+      const formattedAccounts = activeAccountsList.length > 0 
+        ? activeAccountsList.map((acc: any) => {
+            const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
+            return `${acc.lender} (${acc.type}) - Bal: Rs.${bal}`;
+          }).join("; ")
+        : "No open accounts";
+
+      // 3. Date formatting
+      const dateFormatted = enq.fetched_at 
+        ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
+        : "-";
+
+      return [
+        enq.name || "Guest",
+        enq.phone || "-",
+        enq.email || "-",
+        enq.score || "-",
+        enq.bureau || "CIBIL",
+        formattedAccounts,
+        dateFormatted
+      ];
+    });
+
+    // Convert to CSV string, escaping quotes
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => 
+        row.map(val => {
+          const strVal = String(val);
+          // Escape double quotes by doubling them
+          const escaped = strVal.replace(/"/g, '""');
+          // If it contains commas, quotes, or newlines, wrap in quotes
+          if (escaped.includes(",") || escaped.includes('"') || escaped.includes("\n") || escaped.includes(";")) {
+            return `"${escaped}"`;
+          }
+          return escaped;
+        }).join(",")
+      )
+    ].join("\n");
+
+    // Create Blob and trigger download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    const roleName = filterRole === "all" ? "All" : filterRole === "User" ? "Leads" : filterRole;
+    const dateStr = filterDate ? `_${filterDate}` : "";
+    link.setAttribute("href", url);
+    link.setAttribute("download", `FinHeal_CIBIL_${roleName}_Enquiries${dateStr}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const fetchCibilEnquiries = async () => {
     try {
@@ -1496,8 +1623,24 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </p>
                   </div>
                   
-                  {/* Futuristic Date Filter Picker & Pagination */}
+                  {/* Futuristic Filters & Pagination */}
                   <div className="flex flex-wrap items-center gap-3">
+                    {/* Role Filter Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
+                      <select
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Enquirers</option>
+                        <option value="User">Regular Users (Leads)</option>
+                        <option value="Admin">Admins</option>
+                        <option value="Manager">Managers</option>
+                        <option value="Senior Leadership">Senior Leadership</option>
+                      </select>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
                       <input 
@@ -1506,12 +1649,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         onChange={(e) => setFilterDate(e.target.value)}
                         className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
-                      {filterDate && (
+                      {(filterDate || filterRole !== "all") && (
                         <button
-                          onClick={() => setFilterDate("")}
+                          onClick={() => { setFilterDate(""); setFilterRole("all"); }}
                           className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
                         >
-                          Reset
+                          Reset Filters
+                        </button>
+                      )}
+                      {filteredEnquiries.length > 0 && (
+                        <button
+                          onClick={handleExportCSV}
+                          className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                          title="Export leads to Excel/CSV sheet"
+                        >
+                          📥 Export Leads
                         </button>
                       )}
                     </div>
@@ -1583,12 +1735,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             bandText = "Fair";
                           }
                           
+                          const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+                          
                           return (
                             <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                               <td className="p-[12px] max-w-[220px] break-words">
                                 <strong className="text-gray-900 block">{enq.name}</strong>
                                 {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
                                 {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
+                                <div className="mt-[4px]">
+                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${
+                                    role === "Admin"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                                      : role === "Senior Leadership"
+                                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                                        : role === "Manager"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : "bg-emerald-50 text-emerald-700 border-emerald-250"
+                                  }`}>
+                                    {role === "User" ? "User (Lead)" : role}
+                                  </span>
+                                </div>
                               </td>
                               <td className="p-[12px]">
                                 <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${
