@@ -146,6 +146,54 @@ export async function signUpUser(email: string, password: string, guestUserId?: 
   };
 }
 
+export interface AdvisorSignupPayload {
+  f2_fintech_id: string;
+  designation: string;
+  password: string;
+  confirm_password: string;
+}
+
+export interface AdvisorLoginPayload {
+  f2_fintech_id: string;
+  password: string;
+}
+
+export async function signUpAdvisor(payload: AdvisorSignupPayload): Promise<AuthSession> {
+  const result = await authRequest<AuthResponse & { is_advisor?: boolean }>("auth/advisor/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return {
+    userId: result.user_id,
+    token: result.token ?? "",
+    email: result.email,
+    displayName: result.name || payload.f2_fintech_id,
+    hearts: result.hearts ?? null,
+    isGuest: false,
+    isAdvisor: true,
+    authenticatedAt: new Date().toISOString(),
+  };
+}
+
+export async function signInAdvisor(payload: AdvisorLoginPayload): Promise<AuthSession> {
+  const result = await authRequest<AuthResponse & { is_advisor?: boolean }>("auth/advisor/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return {
+    userId: result.user_id,
+    token: result.token ?? "",
+    email: result.email,
+    displayName: result.name || payload.f2_fintech_id,
+    hearts: result.hearts ?? null,
+    isGuest: false,
+    isAdvisor: true,
+    authenticatedAt: new Date().toISOString(),
+  };
+}
+
 export async function fetchHearts(userId: string): Promise<number> {
   const response = await authRequest<{ hearts: number }>(`auth/hearts/${encodeURIComponent(userId)}`, {
     method: "GET",
@@ -322,5 +370,123 @@ export async function saveUserGoals(userId: string, goals: any[]): Promise<any> 
     body: JSON.stringify(goals),
   });
 }
+
+// ==================== Advisor Appointments APIs ====================
+
+export interface Appointment {
+  id?: string;
+  advisorId: string;
+  advisorName: string;
+  date: string;
+  time: string;
+  notes?: string;
+  bookedAt: string;
+  completed?: boolean;
+  cancelled?: boolean;
+  rating?: number;
+  feedback?: string;
+  meetUrl?: string;
+  joined?: boolean;
+  clientEmail?: string;
+  userId?: string;
+}
+
+export interface BookAppointmentPayload {
+  user_id: string;
+  advisor_id: string;
+  advisor_name: string;
+  date: string;
+  time: string;
+  notes?: string;
+  meet_url?: string;
+}
+
+export interface AppointmentStatusUpdatePayload {
+  completed?: boolean;
+  cancelled?: boolean;
+  rating?: number;
+  feedback?: string;
+}
+
+function mapBackendAppointmentToFrontend(a: any): Appointment {
+  return {
+    id: a.id,
+    userId: a.user_id,
+    advisorId: a.advisor_id,
+    advisorName: a.advisor_name,
+    date: a.date,
+    time: a.time,
+    notes: a.notes,
+    bookedAt: a.booked_at,
+    completed: a.completed,
+    cancelled: a.cancelled,
+    rating: a.rating,
+    feedback: a.feedback,
+    meetUrl: a.meet_url,
+    joined: a.joined,
+    clientEmail: a.clientEmail
+  };
+}
+
+export async function bookAppointment(payload: BookAppointmentPayload): Promise<Appointment> {
+  const result = await authRequest<any>("advisors/appointments", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return mapBackendAppointmentToFrontend(result);
+}
+
+export async function fetchUserAppointments(userId: string): Promise<Appointment[]> {
+  const list = await authRequest<any[]>(`advisors/appointments/user/${encodeURIComponent(userId)}`, {
+    method: "GET"
+  });
+  return list.map(mapBackendAppointmentToFrontend);
+}
+
+export async function fetchAllAppointments(): Promise<Appointment[]> {
+  const list = await authRequest<any[]>("advisors/appointments/all", {
+    method: "GET"
+  });
+  return list.map(mapBackendAppointmentToFrontend);
+}
+
+export async function updateAppointmentStatus(apptId: string, payload: AppointmentStatusUpdatePayload): Promise<Appointment> {
+  const result = await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}/status`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  return mapBackendAppointmentToFrontend(result);
+}
+
+export async function joinAppointment(apptId: string): Promise<Appointment> {
+  const result = await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}/join`, {
+    method: "PUT"
+  });
+  return mapBackendAppointmentToFrontend(result);
+}
+
+export async function uploadAdvisorAvatar(f2FintechId: string, file: File): Promise<{ url: string }> {
+  const url = buildUrl(`advisors/${encodeURIComponent(f2FintechId)}/upload-avatar`);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+    headers: {
+      ...(configuredApiKey ? { Authorization: `Bearer ${configuredApiKey}`, "X-API-Key": configuredApiKey } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const message = body || `${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+
+  const result = await parseJsonResponse<{ status: string; avatar_url: string }>(response);
+  return { url: result.avatar_url };
+}
+
 
 

@@ -6,6 +6,7 @@ export interface AuthSession {
   avatarUrl?: string | null;
   hearts?: number | null;
   isGuest?: boolean | null;
+  isAdvisor?: boolean | null;
   authenticatedAt: string;
 }
 

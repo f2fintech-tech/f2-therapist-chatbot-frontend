@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdvisors } from "@/lib/backendAuth";
+import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment } from "@/lib/backendAuth";
 
 export interface Advisor {
   id: string;
@@ -20,6 +20,7 @@ export interface Advisor {
 }
 
 interface Appointment {
+  id?: string;
   advisorId: string;
   advisorName: string;
   date: string; // e.g., "Jun 3 (Wed)"
@@ -235,11 +236,24 @@ export default function AdvisorPanel({
     setFeedbackModalOpen(true);
   };
 
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     if (!ratingAppt) return;
     if (userRating === 0) {
       alert("Please select a rating of at least 1 star.");
       return;
+    }
+
+    if (ratingAppt.id) {
+      try {
+        await updateAppointmentStatus(ratingAppt.id, {
+          completed: true,
+          rating: userRating,
+          feedback: userFeedbackText.trim()
+        });
+        await loadAppointments();
+      } catch (e) {
+        console.error("Failed to save rating on backend", e);
+      }
     }
 
     // 1. Update appointment inside appointments list
@@ -254,7 +268,9 @@ export default function AdvisorPanel({
       }
       return appt;
     });
-    saveAppointments(updatedAppointments);
+    setAppointments(updatedAppointments);
+    const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    localStorage.setItem(storageKey, JSON.stringify(updatedAppointments));
 
     // 2. Update advisor's average rating in local storage
     const updatedAdvisors = advisors.map(adv => {
@@ -281,16 +297,27 @@ export default function AdvisorPanel({
     setUserFeedbackText("");
   };
 
-  useEffect(() => {
-    const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        setAppointments(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to parse appointments", e);
+  const loadAppointments = async () => {
+    if (!userId) return;
+    try {
+      const list = await fetchUserAppointments(userId);
+      setAppointments(list);
+    } catch (e) {
+      console.error("Failed to load appointments from backend", e);
+      const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        try {
+          setAppointments(JSON.parse(stored));
+        } catch (err) {
+          console.error("Failed to parse appointments", err);
+        }
       }
     }
+  };
+
+  useEffect(() => {
+    loadAppointments();
   }, [userId]);
 
   // Generate the next 7 days for the interactive date picker
@@ -385,24 +412,43 @@ export default function AdvisorPanel({
     return `https://meet.google.com/${part(3)}-${part(4)}-${part(3)}`;
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
     if (!selectedAdvisor) return;
 
-    const newAppt: Appointment = {
-      advisorId: selectedAdvisor.id,
-      advisorName: selectedAdvisor.name,
+    const meetUrl = generateMeetUrl();
+    const apptPayload = {
+      user_id: userId || "anonymous",
+      advisor_id: selectedAdvisor.id,
+      advisor_name: selectedAdvisor.name,
       date: selectedDateStr,
       time: selectedTimeSlot,
       notes: userNotes.trim(),
-      bookedAt: new Date().toISOString(),
-      meetUrl: generateMeetUrl(),
-      joined: false
+      meet_url: meetUrl
     };
+
+    let newAppt: Appointment;
+    try {
+      newAppt = await bookAppointment(apptPayload);
+    } catch (e) {
+      console.error("Failed to save appointment to DB, using local fallback", e);
+      newAppt = {
+        advisorId: selectedAdvisor.id,
+        advisorName: selectedAdvisor.name,
+        date: selectedDateStr,
+        time: selectedTimeSlot,
+        notes: userNotes.trim(),
+        bookedAt: new Date().toISOString(),
+        meetUrl: meetUrl,
+        joined: false
+      };
+    }
 
     // Filter out any previous appointment with the same advisor to replace it, or append
     const updated = appointments.filter(a => a.advisorId !== selectedAdvisor.id);
     updated.push(newAppt);
-    saveAppointments(updated);
+    setAppointments(updated);
+    const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    localStorage.setItem(storageKey, JSON.stringify(updated));
 
     setConfirmedApptDetails(newAppt);
     setBookingConfirmed(true);
@@ -444,33 +490,55 @@ export default function AdvisorPanel({
     }, 3000);
   };
 
-  const handleJoinCall = (appt: Appointment) => {
+  const handleJoinCall = async (appt: Appointment) => {
     if (!appt.meetUrl) return;
     window.open(appt.meetUrl, "_blank");
 
     if (!appt.joined) {
+      if (appt.id) {
+        try {
+          await joinAppointment(appt.id);
+        } catch (e) {
+          console.error("Failed to mark appointment joined on backend", e);
+        }
+      }
       const updated = appointments.map((a) => {
         if (a.advisorId === appt.advisorId && a.bookedAt === appt.bookedAt) {
           return { ...a, joined: true };
         }
         return a;
       });
-      saveAppointments(updated);
+      setAppointments(updated);
+      const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+      localStorage.setItem(storageKey, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
     }
   };
 
 
 
-  const handleCancelAppointment = (advisorId: string) => {
+  const handleCancelAppointment = async (advisorId: string) => {
     if (confirm("Are you sure you want to cancel your scheduled appointment with this expert?")) {
+      const appt = appointments.find(a => a.advisorId === advisorId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
+      if (appt && appt.id) {
+        try {
+          await updateAppointmentStatus(appt.id, { cancelled: true });
+          await loadAppointments();
+          return;
+        } catch (e) {
+          console.error("Failed to cancel appointment on backend", e);
+        }
+      }
+
       const updated = appointments.map(a => {
         if (a.advisorId === advisorId && !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time)) {
           return { ...a, cancelled: true };
         }
         return a;
       });
-      saveAppointments(updated);
+      setAppointments(updated);
+      const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+      localStorage.setItem(storageKey, JSON.stringify(updated));
     }
   };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities } from "@/lib/backendAuth";
+import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 
 const loginDefaults = { username: "", password: "" };
@@ -55,6 +55,11 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isEmployee, setIsEmployee] = useState(false);
+  const [employeeId, setEmployeeId] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0, active: false });
   const [progress, setProgress] = useState(0);
   const [msgIndex, setMsgIndex] = useState(0);
@@ -78,8 +83,8 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
 
   useEffect(() => {
     const fields = authMode === "signup"
-      ? [loginDisplayName, loginUsername, loginPassword]
-      : [loginUsername, loginPassword];
+      ? (isEmployee ? [employeeId, designation, loginPassword, confirmPassword] : [loginDisplayName, loginUsername, loginPassword])
+      : (isEmployee ? [employeeId, loginPassword] : [loginUsername, loginPassword]);
     const filled = fields.filter(f => f.trim().length > 0).length;
     const newProgress = Math.round((filled / fields.length) * 100);
     setProgress(newProgress);
@@ -88,7 +93,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
       setMsgVisible(false);
       setTimeout(() => { setMsgIndex(idx); setMsgVisible(true); }, 200);
     }
-  }, [loginDisplayName, loginUsername, loginPassword, authMode]);
+  }, [loginDisplayName, loginUsername, loginPassword, authMode, isEmployee, employeeId, designation, confirmPassword]);
 
   const handleTilt = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -108,42 +113,71 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
     const firstName = loginDisplayName.trim();
     const age = loginAge.trim();
 
-    if (authMode === "signup") {
-      if (!firstName || !age || !email || !password) {
-        setLoginError("Please fill in all details to continue.");
-        return;
-      }
-      const parsedAge = parseInt(age, 10);
-      if (isNaN(parsedAge) || parsedAge < 18) {
-        setLoginError("You must be 18 or older to create an account.");
-        return;
+    if (isEmployee) {
+      if (authMode === "signup") {
+        if (!employeeId.trim() || !designation.trim() || !password || !confirmPassword) {
+          setLoginError("Please fill in all employee details to continue.");
+          return;
+        }
+        if (password !== confirmPassword) {
+          setLoginError("Passwords do not match.");
+          return;
+        }
+        if (password.length < 6) {
+          setLoginError("Password must be at least 6 characters long.");
+          return;
+        }
+      } else {
+        if (!employeeId.trim() || !password) {
+          setLoginError("Please enter your F2 Fintech ID and password.");
+          return;
+        }
       }
     } else {
-      if (!email || !password) {
-        setLoginError("Please enter your email and password to sign in.");
-        return;
+      if (authMode === "signup") {
+        if (!firstName || !age || !email || !password) {
+          setLoginError("Please fill in all details to continue.");
+          return;
+        }
+        const parsedAge = parseInt(age, 10);
+        if (isNaN(parsedAge) || parsedAge < 18) {
+          setLoginError("You must be 18 or older to create an account.");
+          return;
+        }
+      } else {
+        if (!email || !password) {
+          setLoginError("Please enter your email and password to sign in.");
+          return;
+        }
       }
     }
 
     setIsSubmitting(true);
     try {
-      const guestUserId = currentSession?.isGuest ? currentSession.userId : null;
-      const payload = authMode === "signup"
-        ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email)
-        : await signInUser(email, password);
-      if (guestUserId && payload.userId && guestUserId !== payload.userId) {
-        migrateConversationsFromUserId(guestUserId, payload.userId);
-        try {
-          await fetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/test-results/migrate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ from_user_id: guestUserId, to_user_id: payload.userId }),
-          });
-        } catch {}
-        try {
-          await migrateCalculatorActivities(guestUserId, payload.userId);
-        } catch (err) {
-          console.error("Failed to migrate calculator activities:", err);
+      let payload;
+      if (isEmployee) {
+        payload = authMode === "signup"
+          ? await signUpAdvisor({ f2_fintech_id: employeeId, designation, password, confirm_password: confirmPassword })
+          : await signInAdvisor({ f2_fintech_id: employeeId, password });
+      } else {
+        const guestUserId = currentSession?.isGuest ? currentSession.userId : null;
+        payload = authMode === "signup"
+          ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email)
+          : await signInUser(email, password);
+        if (guestUserId && payload.userId && guestUserId !== payload.userId) {
+          migrateConversationsFromUserId(guestUserId, payload.userId);
+          try {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/test-results/migrate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ from_user_id: guestUserId, to_user_id: payload.userId }),
+            });
+          } catch {}
+          try {
+            await migrateCalculatorActivities(guestUserId, payload.userId);
+          } catch (err) {
+            console.error("Failed to migrate calculator activities:", err);
+          }
         }
       }
       onAuthSuccess(payload);
@@ -471,35 +505,73 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
           <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", minHeight: "560px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
-            <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
-              <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
-              <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "8px 18px", fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
+                <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
+                <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={isEmployee} onChange={(e) => { setIsEmployee(e.target.checked); setLoginError(null); }} style={{ width: "15px", height: "15px", accentColor: "#3344e6", cursor: "pointer" }} />
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#374151" }}>I am an Employee</span>
+              </label>
             </div>
             <div>
-              <div style={{ fontSize: authMode === "signup" ? "22px" : "26px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>{authMode === "signup" ? "Create your account" : "Welcome back"}</div>
-              <div style={{ marginTop: authMode === "signup" ? "2px" : "4px", fontSize: authMode === "signup" ? "12px" : "14px", lineHeight: 1.3, color: "#6b7280" }}>{authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey"}</div>
+              <div style={{ fontSize: authMode === "signup" ? "20px" : "24px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>
+                {isEmployee 
+                  ? (authMode === "signup" ? "Register Employee" : "Employee Sign in") 
+                  : (authMode === "signup" ? "Create your account" : "Welcome back")}
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "11px", lineHeight: 1.3, color: "#6b7280" }}>
+                {isEmployee 
+                  ? "Verify F2 Fintech credentials to manage advisor dashboard." 
+                  : (authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey")}
+              </div>
             </div>
             <form className="auth-screen-form" onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "9px" : "16px", minWidth: 0 }}>
-              {authMode === "signup" && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
+              {isEmployee ? (
+                <>
+                  {authMode === "signup" ? (
+                    <>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>F2 Fintech ID <span style={{ color: "#ef4444" }}>*</span></span>
+                        <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="e.g. F2-369-001" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      </label>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Designation <span style={{ color: "#ef4444" }}>*</span></span>
+                        <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Sales Manager" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      </label>
+                    </>
+                  ) : (
+                    <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>F2 Fintech ID <span style={{ color: "#ef4444" }}>*</span></span>
+                      <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="e.g. F2-369-001" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                    </label>
+                  )}
+                </>
+              ) : (
+                <>
+                  {authMode === "signup" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
+                        <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      </label>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>
+                        <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      </label>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "3px", gridColumn: "1 / -1" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 500, color: "#374151" }}>Age <span style={{ color: "#ef4444" }}>*</span></span>
+                        <input value={loginAge} onChange={e => setLoginAge(e.target.value)} placeholder="e.g. 28" type="number" min="18" max="100" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      </label>
+                    </div>
+                  )}
                   <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
-                    <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
+                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Email</span>
+                    <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                   </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>
-                    <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
-                  </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: "3px", gridColumn: "1 / -1" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 500, color: "#374151" }}>Age <span style={{ color: "#ef4444" }}>*</span></span>
-                    <input value={loginAge} onChange={e => setLoginAge(e.target.value)} placeholder="e.g. 28" type="number" min="18" max="100" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
-                  </label>
-                </div>
+                </>
               )}
-              <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Email</span>
-                <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" as const }} />
-              </label>
               <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                 <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Password</span>
                 <div style={{ position: "relative" }}>
@@ -512,7 +584,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                     )}
                   </button>
                 </div>
-                {authMode === "signup" && loginPassword.length > 0 && (
+                {authMode === "signup" && !isEmployee && loginPassword.length > 0 && (
                   <div>
                     <div style={{ height: "3px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden", marginTop: "3px" }}>
                       <div style={{ height: "100%", width: `${pwStrength.width}%`, background: pwStrength.color, borderRadius: "999px", transition: "all 0.3s" }} />
@@ -521,11 +593,19 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   </div>
                 )}
               </label>
+              {authMode === "signup" && isEmployee && (
+                <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Confirm Password <span style={{ color: "#ef4444" }}>*</span></span>
+                  <div style={{ position: "relative" }}>
+                    <input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm your password" style={{ height: "40px", padding: "0 40px 0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", width: "100%", minWidth: 0, background: "#f9fafb" }} />
+                  </div>
+                </label>
+              )}
               {loginError && <div style={{ padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "11px", color: "#b91c1c" }}>{loginError}</div>}
               <button type="submit" disabled={isSubmitting} style={{ height: "38px", background: "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: isSubmitting ? 0.7 : 1, marginTop: "1px", boxShadow: "0 3px 10px rgba(51,68,230,0.25)", transition: "all 0.2s" }}
                 onMouseOver={e => { if (!isSubmitting) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
                 onMouseOut={e => { if (!isSubmitting) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}>
-                {isSubmitting ? "Processing..." : authMode === "signup" ? "Create account" : "Sign in"}
+                {isSubmitting ? "Processing..." : authMode === "signup" ? "Register" : "Sign in"}
               </button>
             </form>
             <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "12px" }}>

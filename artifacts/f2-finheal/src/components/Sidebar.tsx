@@ -221,6 +221,14 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   };
 
   const isUserAdvisor = (email?: string) => {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
     if (!email) return false;
     const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
     if (defaultEmails.includes(email.toLowerCase())) return true;

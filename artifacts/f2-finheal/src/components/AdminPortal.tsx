@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -13,6 +13,7 @@ interface AdminPortalProps {
 }
 
 interface Appointment {
+  id?: string;
   advisorId: string;
   advisorName: string;
   date: string;
@@ -21,6 +22,7 @@ interface Appointment {
   clientEmail?: string;
   bookedAt: string;
   completed?: boolean;
+  cancelled?: boolean;
   rating?: number;
   feedback?: string;
   meetUrl?: string;
@@ -129,11 +131,61 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
+  const [slotDate, setSlotDate] = useState("");
+  const [slotTime, setSlotTime] = useState("");
+  const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
-  // Dynamically map logged-in email prefix to advisor ID based on name slug
+  const timeSlots = [
+    "09:00 AM",
+    "09:45 AM",
+    "10:30 AM",
+    "11:15 AM",
+    "12:00 PM",
+    "12:45 PM",
+    "01:30 PM",
+    "02:15 PM",
+    "03:00 PM",
+    "03:45 PM",
+    "04:30 PM",
+    "05:15 PM",
+    "06:00 PM"
+  ];
+
+  const formatSlotValue = (dateStr: string, timeStr: string): string => {
+    if (!dateStr || !timeStr) return "";
+    const dateObj = new Date(dateStr);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[dateObj.getMonth()];
+    const day = dateObj.getDate();
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayName = days[dateObj.getDay()];
+    return `${month} ${day} (${dayName}), ${timeStr}`;
+  };
+
+  // Self profile state for specific Advisor Workspace
+  const [selfEditForm, setSelfEditForm] = useState({
+    name: "",
+    designation: "",
+    avatarUrl: "",
+    expertise: "",
+    strength: "",
+    bio: "",
+    fee: 899
+  });
+
+  // Dynamically map logged-in email prefix to advisor ID based on name slug or F2 Fintech ID
   const getExpertIdFromEmail = (email: string) => {
     if (!email) return null;
     const prefix = email.split("@")[0].toLowerCase().replace(".", "-");
+    
+    // Direct match against F2 ID or database ID first
+    const directMatch = advisors.find(a => 
+      (a.f2FintechId && a.f2FintechId.toLowerCase() === prefix) || 
+      (a.id && a.id.toLowerCase() === prefix)
+    );
+    if (directMatch) return directMatch.id || directMatch.f2FintechId;
+
     const found = advisors.find(a => {
       const slug = a.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       return slug.startsWith(prefix) || slug.includes(prefix) || prefix.includes(slug);
@@ -438,36 +490,78 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     };
   }, []);
 
-  // Sync specific Advisor next slot
+  // Sync specific Advisor next slot and self-edit form
   useEffect(() => {
     if (currentExpertId && advisors.length > 0) {
       const current = advisors.find(a => a.id === currentExpertId);
       if (current) {
         setExpertNextSlot(current.nextSlot);
+        setSelfEditForm({
+          name: current.name || "",
+          designation: current.designation || "",
+          avatarUrl: current.avatarUrl || "",
+          expertise: current.expertise ? current.expertise.join(", ") : "",
+          strength: current.strength || "",
+          bio: current.bio || "",
+          fee: current.fee || 899
+        });
       }
     }
   }, [currentExpertId, advisors]);
 
-  const loadGlobalAppointments = () => {
-    const list: Appointment[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("finheal_advisor_appointments:")) {
-        try {
-          const userAppts = JSON.parse(localStorage.getItem(key) || "[]");
-          const clientEmailStr = key.replace("finheal_advisor_appointments:", "");
-          userAppts.forEach((appt: any) => {
-            list.push({
-              ...appt,
-              clientEmail: clientEmailStr === "anonymous" ? "Guest User" : clientEmailStr
-            });
-          });
-        } catch (e) {}
+  useEffect(() => {
+    if (!expertNextSlot) return;
+    const regex = /^([a-zA-Z]{3})\s+(\d+)\s*\([a-zA-Z]{3}\),\s*(.+)$/;
+    const match = expertNextSlot.match(regex);
+    if (match) {
+      const [_, monthStr, dayStr, timeStr] = match;
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthIdx = months.indexOf(monthStr);
+      if (monthIdx !== -1) {
+        const currentYear = new Date().getFullYear();
+        const dateObj = new Date(currentYear, monthIdx, parseInt(dayStr, 10));
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const dd = String(dateObj.getDate()).padStart(2, "0");
+        setSlotDate(`${yyyy}-${mm}-${dd}`);
+        setSlotTime(timeStr);
+        return;
       }
     }
-    // Sort by date / bookedAt descending
-    list.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
-    setAllAppointments(list);
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    setSlotDate(`${yyyy}-${mm}-${dd}`);
+    setSlotTime("09:00 AM");
+  }, [expertNextSlot]);
+
+  const loadGlobalAppointments = async () => {
+    try {
+      const list = await fetchAllAppointments();
+      setAllAppointments(list);
+    } catch (err) {
+      console.error("Error loading appointments from backend:", err);
+      const list: Appointment[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("finheal_advisor_appointments:")) {
+          try {
+            const userAppts = JSON.parse(localStorage.getItem(key) || "[]");
+            const clientEmailStr = key.replace("finheal_advisor_appointments:", "");
+            userAppts.forEach((appt: any) => {
+              list.push({
+                ...appt,
+                clientEmail: clientEmailStr === "anonymous" ? "Guest User" : clientEmailStr
+              });
+            });
+          } catch (e) {}
+        }
+      }
+      // Sort by date / bookedAt descending
+      list.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
+      setAllAppointments(list);
+    }
   };
 
   const dispatchUpdateEvent = (eventName: string) => {
@@ -743,20 +837,95 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   const handleUpdateExpertNextSlot = async () => {
-    if (!currentExpertId || !expertNextSlot.trim()) return;
+    if (!currentExpertId || !slotDate || !slotTime) {
+      alert("Please select both a date and a time slot.");
+      return;
+    }
+    const formattedSlot = formatSlotValue(slotDate, slotTime);
     try {
-      await updateAdvisorNextSlot(currentExpertId, expertNextSlot.trim());
+      await updateAdvisorNextSlot(currentExpertId, formattedSlot);
       await loadAdvisors();
       alert("Next slot has been updated successfully!");
     } catch (err) {
       console.error("Error updating next slot:", err);
+      alert("Failed to update next slot.");
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeExpert) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      return;
+    }
+
+    const f2FintechId = activeExpert.f2FintechId || activeExpert.id;
+    try {
+      const response = await uploadAdvisorAvatar(f2FintechId, file);
+      setSelfEditForm(prev => ({
+        ...prev,
+        avatarUrl: response.url
+      }));
+      await loadAdvisors();
+      alert("Profile photo updated successfully!");
+    } catch (err) {
+      console.error("Error uploading avatar:", err);
+      alert("Failed to upload avatar image: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleSaveSelfProfile = async () => {
+    if (!currentExpertId || !activeExpert) return;
+    if (!selfEditForm.name.trim() || !selfEditForm.designation.trim()) {
+      alert("Name and designation are required!");
+      return;
+    }
+    const rawExpertise = selfEditForm.expertise.split(",").map((e: string) => e.trim()).filter(Boolean);
+    const resolvedExpertise = rawExpertise.length > 0 
+      ? rawExpertise 
+      : activeExpert.expertise;
+
+    const item: Advisor = {
+      ...activeExpert,
+      name: selfEditForm.name.trim(),
+      designation: selfEditForm.designation.trim(),
+      avatarUrl: selfEditForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+      expertise: resolvedExpertise,
+      strength: selfEditForm.strength.trim() || "Financial planning",
+      bio: selfEditForm.bio.trim() || "Certified Financial Advisor",
+      fee: Number(selfEditForm.fee) || 899
+    };
+
+    try {
+      await saveAdvisor(item);
+      await loadAdvisors();
+      alert("Your profile has been updated successfully!");
+    } catch (err) {
+      console.error("Error saving self profile:", err);
+      alert("Failed to update profile.");
+    }
+  };
+
+  const handleCancelAppointment = async (apptId: string) => {
+    if (!cancelReason.trim()) return;
+    try {
+      await updateAppointmentStatus(apptId, { cancelled: true, feedback: cancelReason.trim() });
+      setCancellingApptId(null);
+      setCancelReason("");
+      await loadGlobalAppointments();
+      alert("Consultation has been cancelled successfully.");
+    } catch (err) {
+      console.error("Error cancelling appointment:", err);
+      alert("Failed to cancel appointment.");
     }
   };
 
   const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
   const activeExpertAppointments = allAppointments.filter(a => a.advisorId === currentExpertId);
-  const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !hasSessionEnded(a.date, a.time));
-  const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || hasSessionEnded(a.date, a.time));
+  const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
+  const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
   // ==================== RENDERING WORKSPACE ====================
   return (
@@ -1168,7 +1337,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <div className="flex items-center gap-[8px] flex-wrap">
                             <strong className="text-[14px] text-gray-900">{appt.advisorName}</strong>
                             <span className="text-[10px] font-semibold bg-primary/10 text-primary px-[8px] py-[2px] rounded-full uppercase">Advisor ID: {appt.advisorId}</span>
-                            {appt.completed && appt.rating ? (
+                            {appt.cancelled ? (
+                              <span className="text-[9.5px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">🚫 Cancelled</span>
+                            ) : appt.completed && appt.rating ? (
                               <span className="text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[8px] py-[2px] rounded-full uppercase tracking-wide">✓ Completed & Rated</span>
                             ) : (hasSessionEnded(appt.date, appt.time) || appt.completed) ? (
                               <span className="text-[9.5px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[8px] py-[2px] rounded-full uppercase tracking-wide">✓ Completed</span>
@@ -1198,7 +1369,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <span className="text-gray-500">({appt.rating}/5 stars)</span>
                             </div>
                           )}
-                          {appt.completed ? (
+                          {appt.cancelled ? (
+                            appt.feedback && (
+                              <div className="text-[11px] italic text-rose-700 bg-rose-50/40 border border-rose-100/60 p-[10px] rounded-[12px] max-w-[480px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
+                                <span>&quot;{appt.feedback}&quot;</span>
+                              </div>
+                            )
+                          ) : appt.completed ? (
                             appt.feedback && (
                               <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[480px] mt-[6px] flex flex-col gap-[3px] text-left">
                                 <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
@@ -1475,7 +1653,29 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <>
                 {/* Advisor Workspace Welcome Banner */}
                 <div className="border border-primary/20 bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] flex flex-col sm:flex-row gap-[18px] items-center">
-                  <img src={activeExpert.avatarUrl} alt={activeExpert.name} className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white" />
+                  <div className="relative group shrink-0">
+                    <img 
+                      src={activeExpert.avatarUrl} 
+                      alt={activeExpert.name} 
+                      className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white" 
+                    />
+                    <label 
+                      htmlFor="avatar-upload-input" 
+                      className="absolute -bottom-1 -right-1 bg-primary text-white h-[28px] w-[28px] rounded-full flex items-center justify-center cursor-pointer border-2 border-white shadow-md hover:scale-105 transition-all"
+                      title="Upload new profile photo"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                      </svg>
+                    </label>
+                    <input 
+                      type="file" 
+                      id="avatar-upload-input" 
+                      accept="image/*" 
+                      onChange={handleAvatarUpload} 
+                      className="hidden" 
+                    />
+                  </div>
                   <div className="text-center sm:text-left flex-1 min-w-0">
                     <h2 className="text-[20px] font-serif font-bold text-gray-900">Welcome Back, {activeExpert.name}!</h2>
                     <p className="text-[12px] text-gray-500 mt-[2px]">{activeExpert.designation}</p>
@@ -1513,28 +1713,117 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 {/* Slot editor and appointments list */}
                 <div className="grid gap-[20px] md:grid-cols-3">
                   
-                  {/* Left Column: Next Slot Editor */}
-                  <Card className="border-gray-200 shadow-xs md:col-span-1 h-fit">
-                    <CardHeader className="p-[16px] pb-[4px]">
-                      <CardTitle className="text-[14px] font-bold">Update Next Slot</CardTitle>
-                      <CardDescription className="text-[11px] text-gray-400">Set the next available booking slot users will see on your card.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[16px] space-y-[12px]">
-                      <input
-                        type="text"
-                        value={expertNextSlot}
-                        onChange={(e) => setExpertNextSlot(e.target.value)}
-                        placeholder="e.g. Tomorrow, 10:00 AM"
-                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
-                      />
-                      <button
-                        onClick={handleUpdateExpertNextSlot}
-                        className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
-                      >
-                        Save Next Slot
-                      </button>
-                    </CardContent>
-                  </Card>
+                  {/* Left Column: Next Slot Editor & Profile Editor */}
+                  <div className="md:col-span-1 space-y-[20px] h-fit">
+                    {/* Card 1: Slot Editor */}
+                    <Card className="border-gray-200 shadow-xs">
+                      <CardHeader className="p-[16px] pb-[4px]">
+                        <CardTitle className="text-[14px] font-bold">Update Next Slot</CardTitle>
+                        <CardDescription className="text-[11px] text-gray-400">Set the next available booking slot users will see on your card.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-[16px] space-y-[12px]">
+                        <div className="space-y-[10px]">
+                          <div>
+                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Date</label>
+                            <input
+                              type="date"
+                              value={slotDate}
+                              onChange={(e) => setSlotDate(e.target.value)}
+                              className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Time Slot (45-min gaps)</label>
+                            <select
+                              value={slotTime}
+                              onChange={(e) => setSlotTime(e.target.value)}
+                              className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                            >
+                              {timeSlots.map((time) => (
+                                <option key={time} value={time}>{time}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleUpdateExpertNextSlot}
+                          className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
+                        >
+                          Save Next Slot
+                        </button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 2: Self Profile Editor */}
+                    <Card className="border-gray-200 shadow-xs">
+                      <CardHeader className="p-[16px] pb-[4px]">
+                        <CardTitle className="text-[14px] font-bold">Edit Profile Details</CardTitle>
+                        <CardDescription className="text-[11px] text-gray-400">Update your professional info visible to clients.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-[16px] space-y-[12px]">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Full Name</label>
+                          <input
+                            type="text"
+                            value={selfEditForm.name}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, name: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Designation</label>
+                          <input
+                            type="text"
+                            value={selfEditForm.designation}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, designation: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Hourly Fee (INR)</label>
+                          <input
+                            type="number"
+                            value={selfEditForm.fee}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, fee: Number(e.target.value) })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Expertise (Comma-separated)</label>
+                          <input
+                            type="text"
+                            value={selfEditForm.expertise}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, expertise: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Core Strength</label>
+                          <input
+                            type="text"
+                            value={selfEditForm.strength}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, strength: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Advisor Bio</label>
+                          <textarea
+                            value={selfEditForm.bio}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, bio: e.target.value })}
+                            rows={3}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <button
+                          onClick={handleSaveSelfProfile}
+                          className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
+                        >
+                          Save Profile Details
+                        </button>
+                      </CardContent>
+                    </Card>
+                  </div>
 
                   {/* Right Column: Booked consultations list */}
                   <div className="md:col-span-2 space-y-[18px]">
@@ -1552,54 +1841,98 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       ) : (
                         <div className="space-y-[10px]">
                           {expertUpcomingAppointments.map((appt, idx) => (
-                            <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
-                              <div className="space-y-[4px]">
-                                <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
-                                  Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
-                                  <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
+                            <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col gap-[10px]">
+                              <div className="flex flex-col justify-between sm:flex-row sm:items-center">
+                                <div className="space-y-[4px]">
+                                  <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                                    Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
+                                    <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
+                                  </div>
+                                  {appt.meetUrl && (
+                                    <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
+                                      <span>🌐 <strong>Room Link:</strong></span>
+                                      <a
+                                        href={appt.meetUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline font-bold"
+                                      >
+                                        {appt.meetUrl}
+                                      </a>
+                                    </div>
+                                  )}
+                                  {appt.notes && (
+                                    <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                      <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
+                                      <span>&quot;{appt.notes}&quot;</span>
+                                    </div>
+                                  )}
                                 </div>
-                                {appt.meetUrl && (
-                                  <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
-                                    <span>🌐 <strong>Room Link:</strong></span>
-                                    <a
-                                      href={appt.meetUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline font-bold"
+
+                                <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
+                                  <div className="text-[13px] font-bold text-primary">{appt.date}</div>
+                                  <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
+                                  <div className="mt-[8px] flex items-center justify-end gap-[8px]">
+                                    {appt.meetUrl ? (
+                                      <a
+                                        href={appt.meetUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
+                                      >
+                                        Join Call Room
+                                      </a>
+                                    ) : (
+                                      <button
+                                        onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
+                                        className="bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
+                                      >
+                                        Accept session
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        setCancellingApptId(appt.id || null);
+                                        setCancelReason("");
+                                      }}
+                                      className="border border-rose-200 hover:bg-rose-50 text-rose-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
                                     >
-                                      {appt.meetUrl}
-                                    </a>
+                                      Cancel Call
+                                    </button>
                                   </div>
-                                )}
-                                {appt.notes && (
-                                  <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
-                                    <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
-                                    <span>&quot;{appt.notes}&quot;</span>
-                                  </div>
-                                )}
+                                </div>
                               </div>
 
-                              <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
-                                <div className="text-[13px] font-bold text-primary">{appt.date}</div>
-                                <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
-                                {appt.meetUrl ? (
-                                  <a
-                                    href={appt.meetUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-[8px] inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
-                                  >
-                                    Join Call Room
-                                  </a>
-                                ) : (
-                                  <button
-                                    onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
-                                    className="mt-[8px] bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
-                                  >
-                                    Accept session
-                                  </button>
-                                )}
-                              </div>
+                              {cancellingApptId === appt.id && (
+                                <div className="mt-[4px] p-[12px] bg-rose-50/50 border border-rose-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                  <label className="text-[10px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
+                                  <textarea
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="Please write why you are cancelling the call (required to cancel)..."
+                                    rows={2}
+                                    className="w-full px-[10px] py-[8px] border border-rose-200 rounded-[8px] text-[12px] focus:outline-none focus:border-rose-400 bg-white"
+                                  />
+                                  <div className="flex gap-[8px] justify-end">
+                                    <button
+                                      onClick={() => {
+                                        setCancellingApptId(null);
+                                        setCancelReason("");
+                                      }}
+                                      className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                    >
+                                      Back
+                                    </button>
+                                    <button
+                                      onClick={() => appt.id && handleCancelAppointment(appt.id)}
+                                      disabled={!cancelReason.trim()}
+                                      className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                    >
+                                      Confirm Cancellation
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1624,7 +1957,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <div className="space-y-[4px]">
                                 <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
                                   Client Email: <span className="text-gray-600 font-bold">{appt.clientEmail}</span>
-                                  {appt.completed && appt.rating ? (
+                                  {appt.cancelled ? (
+                                    <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">🚫 Cancelled</span>
+                                  ) : appt.completed && appt.rating ? (
                                     <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
                                   ) : (
                                     <span className="text-[9px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed</span>
@@ -1643,13 +1978,19 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                     </div>
                                   </div>
                                 )}
-                                {appt.completed && appt.feedback && (
+                                {appt.cancelled && appt.feedback && (
+                                  <div className="text-[11px] italic text-rose-700 bg-rose-50/40 border border-rose-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                    <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
+                                    <span>&quot;{appt.feedback}&quot;</span>
+                                  </div>
+                                )}
+                                {!appt.cancelled && appt.completed && appt.feedback && (
                                   <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
                                     <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
                                     <span>&quot;{appt.feedback}&quot;</span>
                                   </div>
                                 )}
-                                {!appt.completed && (
+                                {!appt.completed && !appt.cancelled && (
                                   <div className="text-[10.5px] text-amber-600 font-bold mt-[4px] flex items-center gap-[4px]">
                                     <span>🕒</span> Awaiting client completion and rating
                                   </div>
