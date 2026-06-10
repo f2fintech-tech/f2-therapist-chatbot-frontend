@@ -1611,20 +1611,48 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
             {/* TAB: CIBIL ENQUIRIES */}
             {activeTab === "cibil-enquiries" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">
-                      CIBIL Credit Score Enquiries ({filteredEnquiries.length})
-                    </h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">
-                      {filterDate 
-                        ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
-                        : "Showing all credit score fetches across the platform."}
-                    </p>
+                <div className="border-b border-gray-100 pb-3 space-y-3">
+                  {/* Row 1: Title & Pagination */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-gray-900">
+                        CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                      </h3>
+                      <p className="text-[10px] text-gray-400 mt-[2px]">
+                        {filterDate 
+                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                          : "Showing all credit score fetches across the platform."}
+                      </p>
+                    </div>
+
+                    {/* Compact Pagination Controls */}
+                    {filteredEnquiries.length > 0 && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          disabled={safeCibilPage === 1}
+                          onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                          title="Previous Page"
+                        >
+                          ←
+                        </button>
+                        <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                          {safeCibilPage} / {totalPages}
+                        </span>
+                        <button
+                          disabled={safeCibilPage === totalPages}
+                          onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                          title="Next Page"
+                        >
+                          →
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Futuristic Filters & Pagination */}
-                  <div className="flex flex-wrap items-center gap-3">
+
+                  {/* Row 2: Filters & Export */}
+                  <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
@@ -1667,31 +1695,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         </button>
                       )}
                     </div>
-
-                    {/* Compact Pagination Controls */}
-                    {filteredEnquiries.length > 0 && (
-                      <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200">
-                        <button
-                          disabled={safeCibilPage === 1}
-                          onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
-                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
-                          title="Previous Page"
-                        >
-                          ←
-                        </button>
-                        <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
-                          {safeCibilPage} / {totalPages}
-                        </span>
-                        <button
-                          disabled={safeCibilPage === totalPages}
-                          onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
-                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
-                          title="Next Page"
-                        >
-                          →
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
