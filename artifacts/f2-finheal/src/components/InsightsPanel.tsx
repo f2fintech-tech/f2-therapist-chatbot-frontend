@@ -47,6 +47,13 @@ export default function InsightsPanel({
     return () => clearInterval(timer);
   }, []);
 
+  const hour = currentTime.getHours();
+  const displayHour = (hour % 12 || 12).toString().padStart(2, "0");
+  const displayMin = currentTime.getMinutes().toString().padStart(2, "0");
+  const displaySec = currentTime.getSeconds().toString().padStart(2, "0");
+  const displayTime = `${displayHour}:${displayMin}:${displaySec}`;
+  const ampmVal = hour >= 12 ? "PM" : "AM";
+
   // Goal Delete State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [goalIdToDelete, setGoalIdToDelete] = useState<string | null>(null);
@@ -158,24 +165,34 @@ export default function InsightsPanel({
   const panelContent = (
     <>
       {/* Live Digital Clock & Date */}
-      <div className="mb-[18px] bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px] flex items-center justify-between shadow-sm animate-fade-in">
+      <div className="mb-[18px] bg-white border border-gray-100 rounded-xl p-[14px] flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-300">
         <div className="flex flex-col">
-          <div className="font-mono text-[20px] font-bold text-gray-900 leading-[1.2]">
-            {currentTime.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: true
-            })}
+          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.15em] mb-1">
+            Local Time
+          </span>
+          <div className="flex items-baseline font-sans text-gray-900 leading-none">
+            <span className="text-2xl font-light tracking-tight">
+              {displayHour}:{displayMin}
+            </span>
+            <span className="ml-0.5 text-xs font-light text-gray-400 select-none">
+              :{displaySec}
+            </span>
+            <span className="ml-1.5 text-[10px] font-semibold text-indigo-600 uppercase tracking-wider select-none">
+              {ampmVal}
+            </span>
           </div>
-          <div className="text-[10px] text-gray-500 font-semibold uppercase tracking-[0.5px] mt-[3px]">
+        </div>
+        <div className="text-right flex flex-col items-end">
+          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.15em] mb-1">
+            Current Date
+          </span>
+          <span className="text-xs font-light text-gray-600">
             {currentTime.toLocaleDateString("en-US", {
               weekday: "short",
               month: "short",
-              day: "numeric",
-              year: "numeric"
+              day: "numeric"
             })}
-          </div>
+          </span>
         </div>
       </div>
 
