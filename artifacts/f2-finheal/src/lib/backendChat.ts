@@ -316,7 +316,16 @@ export function formatMessageTimestamp(rawTimestamp: string | undefined): string
     return "";
   }
 
-  const timestamp = new Date(rawTimestamp);
+  let parsedTimestamp = rawTimestamp;
+  if (
+    rawTimestamp.includes("T") &&
+    !rawTimestamp.endsWith("Z") &&
+    !/[+-]\d{2}:\d{2}$/.test(rawTimestamp)
+  ) {
+    parsedTimestamp = rawTimestamp + "Z";
+  }
+
+  const timestamp = new Date(parsedTimestamp);
   if (Number.isNaN(timestamp.getTime())) {
     return rawTimestamp;
   }
@@ -348,7 +357,16 @@ export function formatConversationDateLabel(rawTimestamp: string | undefined): s
     return "";
   }
 
-  const timestamp = new Date(rawTimestamp);
+  let parsedTimestamp = rawTimestamp;
+  if (
+    rawTimestamp.includes("T") &&
+    !rawTimestamp.endsWith("Z") &&
+    !/[+-]\d{2}:\d{2}$/.test(rawTimestamp)
+  ) {
+    parsedTimestamp = rawTimestamp + "Z";
+  }
+
+  const timestamp = new Date(parsedTimestamp);
   if (Number.isNaN(timestamp.getTime())) {
     return rawTimestamp;
   }
@@ -414,17 +432,74 @@ export async function getBackendHealth(): Promise<boolean> {
   return true;
 }
 
-export async function sendChatMessage(payload: {
-  message: string;
-  user_id: string;
-  conversation_id?: string;
-}, signal?: AbortSignal): Promise<BackendChatResponse> {
-  return request<BackendChatResponse>("chat/", {
+export async function sendChatMessage(
+  payload: {
+    message: string;
+    user_id: string;
+    conversation_id?: string;
+  },
+  onChunk: (chunk: any) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const url = buildUrl(normalizedApiBaseUrl, "chat/");
+  
+  const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: createHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(payload),
     signal,
   });
+
+  if (!response.ok) {
+    const body = await parseResponseBody<unknown>(response, true).catch(() => undefined);
+    throw createRequestError(response.statusText || "Backend request failed.", {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      details: body,
+    });
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("ReadableStream not supported by browser/response.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const parsed = JSON.parse(trimmed);
+          onChunk(parsed);
+        } catch (err) {
+          console.error("Error parsing stream line:", err, trimmed);
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      try {
+        const parsed = JSON.parse(buffer.trim());
+        onChunk(parsed);
+      } catch (err) {
+        console.error("Error parsing final stream buffer:", err, buffer);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export async function getConversations(userId: string, limit = 20, offset = 0): Promise<ConversationSummary[]> {
