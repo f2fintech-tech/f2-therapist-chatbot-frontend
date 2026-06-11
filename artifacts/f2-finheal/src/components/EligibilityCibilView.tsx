@@ -342,6 +342,31 @@ export default function EligibilityCibilView({
     };
   }, []);
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length <= 10) {
+      setCibilPhone(val);
+    }
+  };
+
+  const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (rawVal.length > 10) return;
+
+    let formatted = "";
+    for (let i = 0; i < rawVal.length; i++) {
+      const char = rawVal[i];
+      if (i < 5) {
+        if (/[A-Z]/.test(char)) formatted += char;
+      } else if (i < 9) {
+        if (/[0-9]/.test(char)) formatted += char;
+      } else {
+        if (/[A-Z]/.test(char)) formatted += char;
+      }
+    }
+    setCibilPan(formatted);
+  };
+
   const handleFetchCibilReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cibilName.trim()) {
@@ -1300,7 +1325,7 @@ export default function EligibilityCibilView({
                             type="tel"
                             required
                             value={cibilPhone}
-                            onChange={(e) => setCibilPhone(e.target.value)}
+                            onChange={handlePhoneChange}
                             placeholder="e.g. 98765XXXXX"
                             className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                           />
@@ -1316,8 +1341,8 @@ export default function EligibilityCibilView({
                             type="text"
                             required
                             value={cibilPan}
-                            onChange={(e) => setCibilPan(e.target.value.toUpperCase())}
-                            placeholder={cibilReportType === "company" ? "e.g. AAACAXXXXF" : "e.g. ABCDEXXXXF"}
+                            onChange={handlePanChange}
+                            placeholder="e.g. AAAAA1111B"
                             className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                           />
                         </div>

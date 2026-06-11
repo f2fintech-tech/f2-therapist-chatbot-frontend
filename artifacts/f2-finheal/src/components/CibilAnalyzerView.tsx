@@ -149,6 +149,32 @@ export default function CibilAnalyzerView({
     }
   }, [eligIncome, eligEmi]);
 
+  // Phone and PAN input change handlers to strictly enforce formatting rules
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length <= 10) {
+      setFormPhone(val);
+    }
+  };
+
+  const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (rawVal.length > 10) return;
+
+    let formatted = "";
+    for (let i = 0; i < rawVal.length; i++) {
+      const char = rawVal[i];
+      if (i < 5) {
+        if (/[A-Z]/.test(char)) formatted += char;
+      } else if (i < 9) {
+        if (/[0-9]/.test(char)) formatted += char;
+      } else {
+        if (/[A-Z]/.test(char)) formatted += char;
+      }
+    }
+    setFormPan(formatted);
+  };
+
   // Handle Form Submit
   const handleFetchReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -512,8 +538,8 @@ export default function CibilAnalyzerView({
                           type="tel"
                           required
                           value={formPhone}
-                          onChange={(e) => setFormPhone(e.target.value)}
-                          placeholder="e.g. 98765XXXXX"
+                          onChange={handlePhoneChange}
+                          placeholder="e.g. 9876543210"
                           className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
@@ -526,8 +552,8 @@ export default function CibilAnalyzerView({
                           type="text"
                           required
                           value={formPan}
-                          onChange={(e) => setFormPan(e.target.value.toUpperCase())}
-                          placeholder="e.g. ABCDEXXXXF"
+                          onChange={handlePanChange}
+                          placeholder="e.g. AAAAA1111B"
                           className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
                       </div>
