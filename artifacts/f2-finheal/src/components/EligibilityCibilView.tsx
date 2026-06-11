@@ -22,6 +22,56 @@ import {
 import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 
+export function getLenderLogoUrl(name: string): string | null {
+  const clean = name.toLowerCase();
+  if (clean.includes("icici")) return "/icici_bank.png";
+  if (clean.includes("axis")) return "/axis_bank.png";
+  if (clean.includes("bajaj")) return "/bajaj_finance.png";
+  if (clean.includes("aditya birla")) return "/aditya_birla_capital.png";
+  if (clean.includes("hdfc")) return "https://logo.clearbit.com/hdfcbank.com";
+  if (clean.includes("state bank") || clean.includes("sbi")) return "https://logo.clearbit.com/sbi.co.in";
+  if (clean.includes("kotak")) return "https://logo.clearbit.com/kotak.com";
+  if (clean.includes("tata capital")) return "https://logo.clearbit.com/tatacapital.com";
+  if (clean.includes("idfc")) return "https://logo.clearbit.com/idfcfirstbank.com";
+  if (clean.includes("federal")) return "https://logo.clearbit.com/federalbank.co.in";
+  return null;
+}
+
+export function LenderLogo({ name, className = "w-8 h-8" }: { name: string; className?: string }) {
+  const logoUrl = getLenderLogoUrl(name);
+  const [error, setError] = useState(false);
+
+  const initials = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+  const getFallbackStyle = (lenderName: string) => {
+    const clean = lenderName.toLowerCase();
+    if (clean.includes("hdfc")) return { bg: "bg-blue-600", text: "text-white" };
+    if (clean.includes("icici")) return { bg: "bg-orange-500", text: "text-white" };
+    if (clean.includes("axis")) return { bg: "bg-[#800020]", text: "text-white" };
+    if (clean.includes("sbi") || clean.includes("state bank")) return { bg: "bg-cyan-600", text: "text-white" };
+    if (clean.includes("kotak")) return { bg: "bg-red-600", text: "text-white" };
+    return { bg: "bg-primary/10", text: "text-primary" };
+  };
+
+  const style = getFallbackStyle(name);
+
+  if (logoUrl && !error) {
+    return (
+      <img
+        src={logoUrl}
+        alt={`${name} Logo`}
+        className={`${className} rounded-md object-contain p-0.5 bg-white border border-gray-150 shrink-0`}
+        onError={() => setError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`${className} rounded-md flex items-center justify-center font-bold text-[11px] uppercase shrink-0 ${style.bg} ${style.text} border border-gray-150`}>
+      {initials}
+    </div>
+  );
+}
+
 interface EligibilityCibilViewProps {
   userId: string;
   onToggleSidebar: () => void;
@@ -1713,7 +1763,10 @@ export default function EligibilityCibilView({
                       return (
                         <th key={offer.lender.id} className="py-4 px-4 w-1/3 min-w-[200px] align-top">
                           <div className="border border-gray-200 bg-gray-50/50 p-4 rounded-[16px] flex flex-col gap-1.5 shadow-sm">
-                            <span className="text-[14px] font-extrabold text-gray-800">{offer.lender.name}</span>
+                            <div className="flex items-center gap-2">
+                              <LenderLogo name={offer.lender.name} className="w-8 h-8" />
+                              <span className="text-[14px] font-extrabold text-gray-800">{offer.lender.name}</span>
+                            </div>
                             <span className="text-[10.5px] font-semibold text-gray-400 uppercase tracking-wide">
                               {offer.lender.lenderType}
                             </span>
@@ -2107,7 +2160,7 @@ function LenderOfferCard({
                 e.stopPropagation();
                 onToggleSelect();
               }}
-              className={`flex items-center justify-center h-[18px] w-[18px] rounded-[5px] border transition-all shrink-0 cursor-pointer mt-0.5 ${
+              className={`flex items-center justify-center h-[18px] w-[18px] rounded-[5px] border transition-all shrink-0 cursor-pointer mt-2 ${
                 isSelected 
                   ? "bg-primary border-primary text-white shadow-sm shadow-primary/25" 
                   : "border-gray-300 hover:border-primary/50 bg-white"
@@ -2116,6 +2169,7 @@ function LenderOfferCard({
               {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
             </button>
           )}
+          <LenderLogo name={lender.name} className="w-8 h-8 mt-0.5" />
           <div className="flex flex-col">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>

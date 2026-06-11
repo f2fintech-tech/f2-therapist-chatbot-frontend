@@ -495,3 +495,11 @@ export async function rescheduleAppointment(apptId: string, date: string, time: 
   });
   return mapBackendAppointmentToFrontend(result);
 }
+
+export async function updateAdvisorPassword(f2FintechId: string, newPassword: string): Promise<{ status: string; message: string }> {
+  return authRequest<{ status: string; message: string }>(`advisors/${encodeURIComponent(f2FintechId)}/password`, {
+    method: "PUT",
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+}
+

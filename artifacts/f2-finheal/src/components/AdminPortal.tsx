@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -228,6 +228,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     bio: "",
     fee: 899
   });
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
 
   // Dynamically map logged-in email prefix to advisor ID based on name slug or F2 Fintech ID
   const getExpertIdFromEmail = (email: string) => {
@@ -1037,6 +1041,35 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       alert("Failed to update profile.");
     }
   };
+
+  const handleUpdatePassword = async () => {
+    if (!currentExpertId || !activeExpert) return;
+    if (!newPassword) {
+      alert("Please enter a new password.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert("Password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert("Passwords do not match.");
+      return;
+    }
+
+    const f2FintechId = activeExpert.f2FintechId || activeExpert.id;
+
+    try {
+      await updateAdvisorPassword(f2FintechId, newPassword);
+      setNewPassword("");
+      setConfirmPassword("");
+      alert("Password updated successfully!");
+    } catch (err) {
+      console.error("Error updating advisor password:", err);
+      alert("Failed to update password: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
 
   const handleCancelAppointment = async (apptId: string) => {
     if (!cancelReason.trim()) return;
@@ -2039,6 +2072,42 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
                         >
                           Save Profile Details
+                        </button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 3: Change Password */}
+                    <Card className="border-gray-200 shadow-xs">
+                      <CardHeader className="p-[16px] pb-[4px]">
+                        <CardTitle className="text-[14px] font-bold">Change Password</CardTitle>
+                        <CardDescription className="text-[11px] text-gray-400">Update your advisor account password.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-[16px] space-y-[12px]">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">New Password</label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                            placeholder="At least 6 characters"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Confirm New Password</label>
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                            placeholder="Mismatches will fail validation"
+                          />
+                        </div>
+                        <button
+                          onClick={handleUpdatePassword}
+                          className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
+                        >
+                          Update Password
                         </button>
                       </CardContent>
                     </Card>
