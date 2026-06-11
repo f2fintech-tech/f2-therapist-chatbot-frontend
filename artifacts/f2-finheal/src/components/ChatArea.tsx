@@ -200,7 +200,9 @@ export default function ChatArea({
   const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
   const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
   const conversationStartDate = messages.find((message) => message.timestamp)?.timestamp;
-  const showTypingIndicator = isLoading || isSendingMessage;
+  const lastMessage = messages[messages.length - 1];
+  const isStreamingStarted = lastMessage && lastMessage.role === 'bot' && lastMessage.content !== "";
+  const showTypingIndicator = (isLoading || isSendingMessage) && !isStreamingStarted;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !isLoading && !isSendingMessage) {
@@ -406,38 +408,41 @@ export default function ChatArea({
           </div>
         )}
 
-        {messages.map((m) => (
-          <div key={m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            {m.role === 'bot' ? (
-              <div className="w-[36px] h-[36px] rounded-full shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
-                <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
-              </div>
-            ) : (
-              <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
-            )}
-            <div className="max-w-[82%] flex flex-col sm:max-w-[68%]">
-              {m.role === 'bot' && m.mood && m.mood.primary_emotion && (
-                <div className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[9px] py-[3px] rounded-[20px] mb-[5px] tracking-[0.3px] self-start ${
-                  m.mood.primary_emotion === 'calm' ? 'bg-[#ecfdf5] text-[#10b981]' : 
-                  m.mood.primary_emotion === 'anxious' ? 'bg-[#fffbeb] text-[#f59e0b]' : 
-                  'bg-[#fef2f2] text-[#ef4444]'
-                }`}>
-                  {m.mood.label || m.mood.primary_emotion}
+        {messages.map((m) => {
+          if (m.role === 'bot' && !m.content) return null;
+          return (
+            <div key={m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              {m.role === 'bot' ? (
+                <div className="w-[36px] h-[36px] rounded-full shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
+                  <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
                 </div>
+              ) : (
+                <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
               )}
-              <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] ${
-                m.role === 'bot' 
-                  ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
-                  : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
-              }`}>
-                {m.content}
-              </div>
-              <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>
-                {m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}
+              <div className="max-w-[82%] flex flex-col sm:max-w-[68%]">
+                {m.role === 'bot' && m.mood && m.mood.primary_emotion && (
+                  <div className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[9px] py-[3px] rounded-[20px] mb-[5px] tracking-[0.3px] self-start ${
+                    m.mood.primary_emotion === 'calm' ? 'bg-[#ecfdf5] text-[#10b981]' : 
+                    m.mood.primary_emotion === 'anxious' ? 'bg-[#fffbeb] text-[#f59e0b]' : 
+                    'bg-[#fef2f2] text-[#ef4444]'
+                  }`}>
+                    {m.mood.label || m.mood.primary_emotion}
+                  </div>
+                )}
+                <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] ${
+                  m.role === 'bot' 
+                    ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
+                    : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
+                }`}>
+                  {m.content}
+                </div>
+                <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>
+                  {m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {messages.length > 0 && messages[messages.length-1].role === 'bot' && messages[messages.length-1].suggestions && (
           <div className="flex flex-wrap gap-[6px] px-[40px] py-[4px] max-w-[800px] mx-auto animate-fade-up delay-100">
