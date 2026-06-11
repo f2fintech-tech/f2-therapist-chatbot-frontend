@@ -135,33 +135,72 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       const controller = new AbortController();
       activeSendControllerRef.current = controller;
       const optimisticMessage = createUserMessage(trimmedMessage);
-      setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const initialAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: "bot",
+        content: "",
+        time: formatMessageTimestamp(new Date().toISOString()),
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((currentMessages) => [...currentMessages, optimisticMessage, initialAssistantMessage]);
       setIsSendingMessage(true);
       setError(null);
 
       try {
-        const response = await sendChatMessage({
+        let accumulatedContent = "";
+        let finalMetadata: any = null;
+
+        await sendChatMessage({
           message: trimmedMessage,
           user_id: userId,
           conversation_id: conversationId ?? undefined,
+        }, (chunk) => {
+          if (chunk.type === "token") {
+            accumulatedContent += chunk.content;
+            setMessages((currentMessages) =>
+              currentMessages.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent }
+                  : msg
+              )
+            );
+          } else if (chunk.type === "metadata") {
+            finalMetadata = chunk;
+          } else if (chunk.type === "error") {
+            throw new Error(chunk.message);
+          }
         }, controller.signal);
 
-        setConversationId(response.conversation_id);
-        const assistantMsg = createAssistantMessage(response);
-        const conversationTitle = response.title?.trim() || trimmedMessage.substring(0, 60).trim();
-        setMessages((currentMessages) => {
-          const next = [...currentMessages, assistantMsg];
-          // Persist to localStorage as fallback
-          try {
-            upsertLocalConversation(response.conversation_id, userId, next, conversationTitle);
-          } catch {}
-          return next;
-        });
+        if (finalMetadata) {
+          setConversationId(finalMetadata.conversation_id);
+          setMessages((currentMessages) => {
+            const next = currentMessages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    id: finalMetadata.message_id,
+                    content: accumulatedContent || finalMetadata.response,
+                    mood: finalMetadata.mood,
+                    suggestions: finalMetadata.suggestions,
+                    timestamp: finalMetadata.timestamp,
+                    time: formatMessageTimestamp(finalMetadata.timestamp),
+                  }
+                : msg
+            );
+            const conversationTitle = finalMetadata.title?.trim() || trimmedMessage.substring(0, 60).trim();
+            try {
+              upsertLocalConversation(finalMetadata.conversation_id, userId, next, conversationTitle);
+            } catch {}
+            return next;
+          });
+        }
 
         await refreshConversations();
       } catch (caughtError) {
         const normalizedError = normalizeBackendError(caughtError);
-        setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id));
+        setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== optimisticMessage.id && entry.id !== assistantMessageId));
 
         if (normalizedError.code !== "cancelled") {
           if (normalizedError.message.includes("402") || normalizedError.message.includes("Not enough hearts")) {
@@ -278,25 +317,69 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       const controller = new AbortController();
       activeSendControllerRef.current = controller;
       const optimisticMessage = createUserMessage(trimmedMessage);
-      setMessages([optimisticMessage]);
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const initialAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        role: "bot",
+        content: "",
+        time: formatMessageTimestamp(new Date().toISOString()),
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages([optimisticMessage, initialAssistantMessage]);
 
       try {
-        const response = await sendChatMessage({
-          message: trimmedMessage,
-          user_id: userId,
-          conversation_id: undefined, // Force undefined to start a new conversation
-        }, controller.signal);
+        let accumulatedContent = "";
+        let finalMetadata: any = null;
 
-        setConversationId(response.conversation_id);
-        const assistantMsg = createAssistantMessage(response);
-        const conversationTitle = response.title?.trim() || trimmedMessage.substring(0, 60).trim();
-        setMessages((currentMessages) => {
-          const next = [...currentMessages, assistantMsg];
-          try {
-            upsertLocalConversation(response.conversation_id, userId, next, conversationTitle);
-          } catch {}
-          return next;
-        });
+        await sendChatMessage(
+          {
+            message: trimmedMessage,
+            user_id: userId,
+            conversation_id: undefined, // Force undefined to start a new conversation
+          },
+          (chunk) => {
+            if (chunk.type === "token") {
+              accumulatedContent += chunk.content;
+              setMessages((currentMessages) =>
+                currentMessages.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            } else if (chunk.type === "metadata") {
+              finalMetadata = chunk;
+            } else if (chunk.type === "error") {
+              throw new Error(chunk.message);
+            }
+          },
+          controller.signal
+        );
+
+        if (finalMetadata) {
+          setConversationId(finalMetadata.conversation_id);
+          setMessages((currentMessages) => {
+            const next = currentMessages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    id: finalMetadata.message_id,
+                    content: accumulatedContent || finalMetadata.response,
+                    mood: finalMetadata.mood,
+                    suggestions: finalMetadata.suggestions,
+                    timestamp: finalMetadata.timestamp,
+                    time: formatMessageTimestamp(finalMetadata.timestamp),
+                  }
+                : msg
+            );
+            const conversationTitle = finalMetadata.title?.trim() || trimmedMessage.substring(0, 60).trim();
+            try {
+              upsertLocalConversation(finalMetadata.conversation_id, userId, next, conversationTitle);
+            } catch {}
+            return next;
+          });
+        }
 
         await refreshConversations();
       } catch (caughtError) {
