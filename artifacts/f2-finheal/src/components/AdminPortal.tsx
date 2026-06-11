@@ -422,7 +422,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   useEffect(() => {
-    if (isAdmin && activeTab === "cibil-enquiries") {
+    if (isAdmin && (activeTab === "cibil-enquiries" || activeTab === "stats")) {
       fetchCibilEnquiries();
     }
   }, [isAdmin, activeTab]);
@@ -1196,35 +1196,35 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <div className="space-y-[20px] animate-fade-in">
                 
                 {/* Metrics Cards Grid */}
-                <div className="grid gap-[12px] grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-[12px] grid-cols-2 md:grid-cols-3">
                   
                   <Card className="border-gray-200 shadow-xs">
                     <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Platform Users</CardDescription>
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Total Platform Users</CardDescription>
                     </CardHeader>
                     <CardContent className="p-[14px] pt-0">
                       <div className="text-[32px] font-serif font-bold text-gray-900">
                         {statsLoading ? "..." : backendStats?.total_users ?? 0}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-[2px]">Real-time database records</div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Total users on platform: Guest + Registered users</div>
                     </CardContent>
                   </Card>
 
                   <Card className="border-gray-200 shadow-xs">
                     <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Registered Members</CardDescription>
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Registered Members</CardDescription>
                     </CardHeader>
                     <CardContent className="p-[14px] pt-0">
                       <div className="text-[32px] font-serif font-bold text-primary">
                         {statsLoading ? "..." : backendStats?.registered_users ?? 0}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-[2px]">Signed-up user accounts</div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Signed-up user accounts</div>
                     </CardContent>
                   </Card>
 
                   <Card className="border-gray-200 shadow-xs">
                     <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Conversion Rate</CardDescription>
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Conversion Rate</CardDescription>
                     </CardHeader>
                     <CardContent className="p-[14px] pt-0">
                       <div className="text-[32px] font-serif font-bold text-emerald-600">
@@ -1232,21 +1232,82 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           ? "0%" 
                           : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-[2px]">Guests who became members</div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Guests who became members</div>
                     </CardContent>
                   </Card>
 
                   <Card className="border-gray-200 shadow-xs">
                     <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Active Conversations</CardDescription>
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Active Conversations</CardDescription>
                     </CardHeader>
                     <CardContent className="p-[14px] pt-0">
                       <div className="text-[32px] font-serif font-bold text-indigo-600">
                         {statsLoading ? "..." : backendStats?.total_conversations ?? 0}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-[2px]">Total AI therapy chats started</div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Total AI chats started</div>
                     </CardContent>
                   </Card>
+
+                  <Card className="border-gray-200 shadow-xs">
+                    <CardHeader className="p-[14px] pb-[4px]">
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">User CIBIL Enquiries</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-[14px] pt-0">
+                      <div className="text-[32px] font-serif font-bold text-rose-600">
+                        {cibilLoading ? "..." : cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User").length}
+                      </div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">CIBIL Enquiries made by customers</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-gray-200 shadow-xs">
+                    <CardHeader className="p-[14px] pb-[4px]">
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Scheduled Calls</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-[14px] pt-0">
+                      <div className="text-[32px] font-serif font-bold text-blue-600">
+                        {allAppointments.filter(a => !a.completed && !a.cancelled).length}
+                      </div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Active booked consultations</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-gray-200 shadow-xs">
+                    <CardHeader className="p-[14px] pb-[4px]">
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Completed Calls</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-[14px] pt-0">
+                      <div className="text-[32px] font-serif font-bold text-emerald-600">
+                        {allAppointments.filter(a => a.completed).length}
+                      </div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Concluded consultations</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-gray-200 shadow-xs">
+                    <CardHeader className="p-[14px] pb-[4px]">
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Expert Advisors</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-[14px] pt-0">
+                      <div className="text-[32px] font-serif font-bold text-amber-600">
+                        {advisors.length}
+                      </div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Listed expert professionals</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-gray-200 shadow-xs col-span-2 md:col-span-1">
+                    <CardHeader className="p-[14px] pb-[4px]">
+                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Loan Products</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-[14px] pt-0">
+                      <div className="text-[32px] font-serif font-bold text-teal-600">
+                        {lenderList.length}
+                      </div>
+                      <div className="text-[12px] text-gray-500 mt-[2px]">Listed lender offerings</div>
+                    </CardContent>
+                  </Card>
+
                 </div>
 
                 {/* Additional Admin Visual Panel */}
@@ -1296,10 +1357,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       <p className="text-[12px] text-gray-500 mb-[16px]">Summary breakdown of all dynamic libraries managed by Admin.</p>
                       
                       <div className="space-y-[10px]">
-                        <div className="flex justify-between items-center text-[12px]">
-                          <span className="text-gray-600 font-medium flex items-center gap-[6px]">🧑‍💼 Expert Advisors</span>
-                          <strong className="text-gray-900">{advisors.length} active</strong>
-                        </div>
                         <div className="flex justify-between items-center text-[12px]">
                           <span className="text-gray-600 font-medium flex items-center gap-[6px]">📄 Educational Articles</span>
                           <strong className="text-gray-900">{educationContent.filter(c => c.type === "article").length} active</strong>
