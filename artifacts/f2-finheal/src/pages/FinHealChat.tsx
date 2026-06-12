@@ -623,6 +623,7 @@ export default function FinHealChat() {
         ) : mainView === "eligibility-cibil" ? (
           <EligibilityCibilView
             userId={userId}
+            userEmail={authSession.email || ""}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}
@@ -631,6 +632,7 @@ export default function FinHealChat() {
         ) : mainView === "cibil-analyzer" ? (
           <CibilAnalyzerView
             userId={userId}
+            userEmail={authSession.email || ""}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}

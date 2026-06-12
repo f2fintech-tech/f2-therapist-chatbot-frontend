@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
+import PolicyModal from "./PolicyModal";
 
 export function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
@@ -74,6 +75,7 @@ export function LenderLogo({ name, className = "w-8 h-8" }: { name: string; clas
 
 interface EligibilityCibilViewProps {
   userId: string;
+  userEmail?: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
@@ -215,8 +217,71 @@ const CURRENCIES = [
   { code: "JPY", symbol: "¥", locale: "ja-JP", name: "Japanese Yen (¥)" },
 ];
 
+
+
+export function isExemptRole(email?: string, name?: string): boolean {
+  const cleanEmail = (email || "").toLowerCase().trim();
+  const cleanName = (name || "").toLowerCase().trim();
+
+  // Admin Check
+  if (
+    cleanEmail === "admin@finheal.com" || 
+    cleanEmail === "admin@f2finheal.com" || 
+    cleanEmail.startsWith("admin@") ||
+    cleanName.includes("admin") ||
+    cleanName === "finheal admin"
+  ) {
+    return true;
+  }
+
+  // Manager & Advisor Check
+  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
+  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
+  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
+
+  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
+  const hasLeadershipName = leadershipPrefixes.some(pref => cleanName.includes(pref));
+  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
+  const hasManagerName = managerPrefixes.some(pref => cleanName.includes(pref));
+
+  if (hasLeadershipEmail || hasLeadershipName || hasManagerEmail || (isInternalDomain && hasManagerName)) {
+    return true;
+  }
+
+  // If email domain is f2fintech.com, it is an advisor/employee
+  if (cleanEmail.endsWith("@f2fintech.com")) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isReportFresh(fetchedAtStr?: string): boolean {
+  if (!fetchedAtStr) return false;
+  try {
+    const fetchedAt = new Date(fetchedAtStr);
+    const diffTime = Math.abs(new Date().getTime() - fetchedAt.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays < 30;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function getNextAvailableFetchDate(fetchedAtStr?: string): string {
+  if (!fetchedAtStr) return "";
+  try {
+    const date = new Date(fetchedAtStr);
+    date.setDate(date.getDate() + 30);
+    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+  } catch (e) {
+    return "";
+  }
+}
+
 export default function EligibilityCibilView({
   userId,
+  userEmail,
   onToggleSidebar,
   onToggleInsights,
   onApplyNow,
@@ -228,6 +293,7 @@ export default function EligibilityCibilView({
 
   // CIBIL Score States
   const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
+  const [storedCibilReport, setStoredCibilReport] = useState<CibilReport | null>(null);
   const [cibilLoading, setCibilLoading] = useState<boolean>(true);
   const [cibilFetching, setCibilFetching] = useState<boolean>(false);
   const [cibilError, setCibilError] = useState<string | null>(null);
@@ -241,7 +307,7 @@ export default function EligibilityCibilView({
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
-  const [activeTermsTab, setActiveTermsTab] = useState<"credit-report" | "terms-of-use" | "privacy-policy">("credit-report");
+  const [activeTermsTab, setActiveTermsTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("credit-consent");
 
   // Eligibility States
   const [eligLoanType, setEligLoanType] = useState<string>("home");
@@ -301,6 +367,7 @@ export default function EligibilityCibilView({
         if (stored) {
           // Keep score for dynamic eligibility calculations
           setEligCibil(String(stored.score));
+          setStoredCibilReport(stored);
           // Do not set cibilReport state on mount to ensure the Checker tab starts fresh
           // setCibilReport(stored);
         }
@@ -394,6 +461,7 @@ export default function EligibilityCibilView({
     try {
       const result = await fetchCibilReport(userId, cibilName, cibilPhone, cibilPan.toUpperCase(), cibilBureau, cibilReportType);
       setCibilReport(result);
+      setStoredCibilReport(result);
       setEligCibil(String(result.score));
       setCibilError(null);
       toast({ title: "Report Retrieved!", description: `${cibilBureau.toUpperCase()} Score: ${result.score}` });
@@ -1242,59 +1310,93 @@ export default function EligibilityCibilView({
               <div className="mx-auto max-w-[500px] my-6 animate-fade-up">
                 <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
-                  <div className="text-center mb-6">
-                    <div className="mx-auto w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2.5">
-                      <Lock className="w-5 h-5" />
+                  
+                  {storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
+                    <div className="text-center py-4">
+                      <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-[16px] font-bold text-gray-900">
+                        Credit Report Fetch Locked
+                      </h2>
+                      <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-200 text-amber-900 text-left">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[12px] leading-normal text-amber-700 font-medium">
+                              You have fetched your credit report recently (on {new Date(storedCibilReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
+                              To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
+                              You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedCibilReport.fetched_at)}</strong>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCibilReport(storedCibilReport)}
+                        className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                      >
+                        View Stored Report
+                      </button>
                     </div>
-                    <h2 className="text-[16px] font-bold text-gray-900">
-                      {cibilReportType === "company"
-                        ? `Check Company ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
-                        : `Check Your Official ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
-                      }
-                    </h2>
-                    <p className="text-[12px] text-gray-400 mt-1">
-                      {cibilReportType === "company"
-                        ? "Retrieve commercial credit rank and bureau report securely."
-                        : "Retrieve your credit score and bureau report securely."
-                      }
-                    </p>
-                  </div>
+                  ) : (
+                    <>
+                      
+                      <div className="text-center mb-6">
+                        <div className="mx-auto w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2.5">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-[16px] font-bold text-gray-900">
+                          {cibilReportType === "company"
+                            ? `Check Company ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                            : `Check Your Official ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                          }
+                        </h2>
+                        <p className="text-[12px] text-gray-400 mt-1">
+                          {cibilReportType === "company"
+                            ? "Retrieve commercial credit rank and bureau report securely."
+                            : "Retrieve your credit score and bureau report securely."
+                          }
+                        </p>
+                      </div>
 
-                  {/* Report Type Selector */}
-                  <div className="flex bg-gray-100 rounded-[12px] p-1 mb-5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCibilReportType("individual");
-                        setCibilName("");
-                        setCibilPhone("");
-                        setCibilPan("");
-                      }}
-                      className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
-                        cibilReportType === "individual"
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Individual CIBIL
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCibilReportType("company");
-                        setCibilName("");
-                        setCibilPhone("");
-                        setCibilPan("");
-                      }}
-                      className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
-                        cibilReportType === "company"
-                          ? "bg-white text-primary shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Company CIBIL
-                    </button>
-                  </div>
+                      {/* Report Type Selector */}
+                      <div className="flex bg-gray-100 rounded-[12px] p-1 mb-5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCibilReportType("individual");
+                            setCibilName("");
+                            setCibilPhone("");
+                            setCibilPan("");
+                          }}
+                          className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                            cibilReportType === "individual"
+                              ? "bg-white text-primary shadow-sm"
+                              : "text-gray-500 hover:text-gray-700"
+                          }`}
+                        >
+                          Individual CIBIL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCibilReportType("company");
+                            setCibilName("");
+                            setCibilPhone("");
+                            setCibilPan("");
+                          }}
+                          className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                            cibilReportType === "company"
+                              ? "bg-white text-primary shadow-sm"
+                              : "text-gray-500 hover:text-gray-700"
+                          }`}
+                        >
+                          Company CIBIL
+                        </button>
+                      </div>
+                    </>
+                  )}
 
                   <form onSubmit={handleFetchCibilReport} className="space-y-4">
                     <div className="flex flex-col">
@@ -1398,12 +1500,12 @@ export default function EligibilityCibilView({
                               type="button"
                               onClick={(e) => {
                                 e.preventDefault();
-                                setActiveTermsTab("credit-report");
+                                setActiveTermsTab("credit-consent");
                                 setIsTermsModalOpen(true);
                               }}
                               className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
                             >
-                              Credit Report Terms of Use
+                              Credit Consent
                             </button>
                             ,{" "}
                             <button
@@ -1416,8 +1518,8 @@ export default function EligibilityCibilView({
                               className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
                             >
                               Terms of Use
-                            </button>{" "}
-                            and{" "}
+                            </button>
+                            ,{" "}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1428,6 +1530,30 @@ export default function EligibilityCibilView({
                               className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
                             >
                               Privacy Policy
+                            </button>
+                            ,{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveTermsTab("dpdp-notice");
+                                setIsTermsModalOpen(true);
+                              }}
+                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                            >
+                              DPDP Notice
+                            </button>
+                            {" "}and{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveTermsTab("data-retention");
+                                setIsTermsModalOpen(true);
+                              }}
+                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                            >
+                              Data Retention Policy
                             </button>
                           </label>
                         </div>
@@ -1465,7 +1591,35 @@ export default function EligibilityCibilView({
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Gauge representation */}
                   <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
-                    <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 self-start">{cibilBureau.toUpperCase()} Bureau</h3>
+                    <div className="flex justify-between items-center w-full mb-3 shrink-0">
+                      <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{cibilBureau.toUpperCase()} Bureau</h3>
+                      {(() => {
+                        const fresh = isReportFresh(cibilReport?.fetched_at);
+                        const exempt = isExemptRole(userEmail, cibilReport?.name);
+                        
+                        if (fresh && !exempt) {
+                          const nextDate = getNextAvailableFetchDate(cibilReport?.fetched_at);
+                          return (
+                            <span className="text-[9.5px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-[5px] font-semibold" title={`Next update available on ${nextDate}`}>
+                              Next update: {nextDate}
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCibilReport(null);
+                                setCibilError(null);
+                              }}
+                              className="text-[10px] text-primary hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
+                            >
+                              Refresh Report {exempt && "(Admin)"}
+                            </button>
+                          );
+                        }
+                      })()}
+                    </div>
                     
                     <div className="relative w-[180px] h-[180px] flex items-center justify-center">
                       <svg className="w-full h-full transform -rotate-90">
@@ -1947,140 +2101,14 @@ export default function EligibilityCibilView({
         </div>
       )}
       {/* Terms & Conditions Modal */}
-      {isTermsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-[20px] border border-gray-250 shadow-[0_10px_40px_rgba(0,0,0,0.2)] w-full max-w-[620px] overflow-hidden flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-150 px-5 py-4 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <h3 className="text-[15px] font-bold text-gray-800">Legal Agreement & Policies</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTermsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-all"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Tab switch buttons */}
-            <div className="flex border-b border-gray-150 bg-gray-50/20 px-3">
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("credit-report")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "credit-report"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Credit Report Terms
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("terms-of-use")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "terms-of-use"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Terms of Use
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("privacy-policy")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "privacy-policy"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Privacy Policy
-              </button>
-            </div>
-
-            {/* Content area */}
-            <div className="flex-1 overflow-y-auto p-5 text-[12.5px] text-gray-600 leading-relaxed space-y-4 text-left">
-              {activeTermsTab === "credit-report" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Credit Report Terms of Use</h4>
-                  <p>
-                    By checking the agreement box and continuing, you hereby appoint **FinHeal Friend** and its associate group entities as your authorized agent to access, retrieve, and receive your Credit Information on your behalf from credit information bureaus (including Experian, CIBIL, Equifax, and CRIF High Mark).
-                  </p>
-                  <p className="font-bold text-gray-700">1. Purpose and Authorized Representation</p>
-                  <p>
-                    You explicitly authorize FinHeal to represent you to request your Credit Information from the bureaus. This information is fetched securely and parsed to provide a comprehensive analysis of your credit wellness, identify eligible loan products, and update your personal finance dashboard.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Storage and Data Retention</p>
-                  <p>
-                    You agree that FinHeal may store your Credit Information in a secure database to keep your credit history updated, send you periodic alerts about changes in your credit health, and deliver personalized product recommendations.
-                  </p>
-                  <p className="font-bold text-gray-700">3. Validity of Consent</p>
-                  <p>
-                    This authorization remains valid for a maximum period of 6 months from the date of submission or until you explicitly revoke this consent by writing to our support team.
-                  </p>
-                </div>
-              )}
-
-              {activeTermsTab === "terms-of-use" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Platform Terms of Use</h4>
-                  <p>
-                    Welcome to FinHeal. These Terms of Use govern your access and usage of the FinHeal credit analysis tools, EMI planners, and financial health calculators.
-                  </p>
-                  <p className="font-bold text-gray-700">1. Service Eligibility</p>
-                  <p>
-                    You represent that you are at least 18 years of age and hold a valid PAN card issued by the Income Tax Department of India. You agree to provide correct details, including your full name, PAN, and active mobile number.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Prohibited Uses</p>
-                  <p>
-                    You must not retrieve credit score information for individuals other than yourself, nor use false credentials, PAN numbers, or fake mobile phone records. FinHeal reserves the right to report unauthorized queries to credit bureaus.
-                  </p>
-                  <p className="font-bold text-gray-700">3. Disclaimers</p>
-                  <p>
-                    FinHeal calculates loan eligibility based on the criteria configured by partner banks. The final decision to approve a loan lies solely with the respective bank/lender.
-                  </p>
-                </div>
-              )}
-
-              {activeTermsTab === "privacy-policy" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Privacy Policy</h4>
-                  <p>
-                    At FinHeal, your privacy is paramount. We take all necessary security and privacy measures to safeguard your personal credentials and credit data.
-                  </p>
-                  <p className="font-bold text-gray-700">1. Data We Collect</p>
-                  <p>
-                    We collect your full name, contact information, mobile number, and PAN card number. We also collect and cache your credit history from bureaus only after you check the terms checkbox.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Encryption & Protection</p>
-                  <p>
-                    All credit information is transferred using state-of-the-art 256-bit SSL encryption. We secure your cached reports using PostgreSQL encrypted databases.
-                  </p>
-                  <p className="font-bold text-gray-700">3. No Unsolicited Data Sharing</p>
-                  <p>
-                    We do not share, sell, or rent your credit report to third parties. Your details are only shared with partner financial institutions when you explicitly apply for a financial offer.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-gray-150 px-5 py-3.5 bg-gray-50 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsTermsModalOpen(false)}
-                className="bg-primary hover:opacity-95 text-white font-bold px-5 py-2 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
-              >
-                I Understand
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PolicyModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        defaultTab={activeTermsTab}
+        showAcceptCheckbox={!cibilReport}
+        agreed={cibilAgreed}
+        onAgreeChange={setCibilAgreed}
+      />
     </div>
   );
 }

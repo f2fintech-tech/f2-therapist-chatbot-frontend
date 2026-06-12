@@ -23,10 +23,13 @@ import {
   X
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount } from "../services/cibil";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "./EligibilityCibilView";
 import { useToast } from "@/hooks/use-toast";
-
+import PolicyModal from "./PolicyModal";
+ 
 interface CibilAnalyzerViewProps {
   userId: string;
+  userEmail?: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onApplyNow?: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
@@ -52,6 +55,7 @@ interface LenderProduct {
 
 export default function CibilAnalyzerView({
   userId,
+  userEmail,
   onToggleSidebar,
   onToggleInsights,
   onApplyNow,
@@ -61,6 +65,7 @@ export default function CibilAnalyzerView({
 
   // Core CIBIL Report State
   const [report, setReport] = useState<CibilReport | null>(null);
+  const [storedReport, setStoredReport] = useState<CibilReport | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFetching, setIsFetching] = useState<boolean>(false);
 
@@ -110,7 +115,7 @@ export default function CibilAnalyzerView({
   // Privacy Policy state
   const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
-  const [activeTermsTab, setActiveTermsTab] = useState<"credit-report" | "terms-of-use" | "privacy-policy">("credit-report");
+  const [activeTermsTab, setActiveTermsTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("credit-consent");
 
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
@@ -118,6 +123,7 @@ export default function CibilAnalyzerView({
       try {
         const stored = await getStoredCibilReport(userId);
         setReport(stored);
+        setStoredReport(stored);
       } catch (err) {
         // No stored report is expected on first run, fail silently
       } finally {
@@ -197,6 +203,7 @@ export default function CibilAnalyzerView({
     try {
       const result = await fetchCibilReport(userId, formName, formPhone, formPan.toUpperCase());
       setReport(result);
+      setStoredReport(result);
       toast({ 
         title: "Report Retrieved!", 
         description: `Successfully fetched credit report. CIBIL Score: ${result.score}`,
@@ -485,146 +492,200 @@ export default function CibilAnalyzerView({
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-[20px] min-h-0">
-        {!report ? (
+      <div className="flex-1 overflow-y-auto p-[20px] min-h-0">        {!report ? (
           // State A: Form to retrieve CIBIL Report
           <div className="mx-auto max-w-[520px] my-[24px]">
             <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">
               {/* Premium top gradient line */}
               <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-primary via-[#4a5cf0] to-[#6366f1]" />
               
-              <div className="text-center mb-[24px]">
-                <div className="mx-auto w-[44px] h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary mb-[10px]">
-                  <Lock className="w-[20px] h-[20px]" />
-                </div>
-                <h2 className="text-[18px] font-bold text-gray-800">Check Your Official CIBIL Score</h2>
-                <p className="text-[13px] text-gray-500 mt-[4px]">Retrieve your actual credit report securely from the bureau.</p>
-              </div>
-
-              {isFetching ? (
-                <div className="flex flex-col items-center justify-center py-[48px] gap-[16px]">
-                  <div className="relative flex items-center justify-center">
-                    <div className="h-[72px] w-[72px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                    <CreditCard className="w-[24px] h-[24px] text-primary absolute animate-bounce" />
+              {storedReport && isReportFresh(storedReport.fetched_at) && !isExemptRole(userEmail, storedReport.name) ? (
+                <div className="text-center py-4">
+                  <div className="mx-auto w-[44px] h-[44px] rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+                    <Lock className="w-[20px] h-[20px]" />
                   </div>
-                  <div className="text-center">
-                    <p className="text-[14px] font-bold text-gray-700">Verifying Identity & PAN...</p>
-                    <p className="text-[12px] text-gray-400 mt-[2px] animate-pulse">Retrieving encrypted credit data from CIBIL bureau</p>
+                  <h2 className="text-[18px] font-bold text-gray-800">Credit Report Fetch Locked</h2>
+                  <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-220 text-amber-900 text-left">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[12.5px] leading-normal text-amber-700 font-semibold">
+                          You have fetched your credit report recently (on {new Date(storedReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
+                          To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
+                          You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedReport.fetched_at)}</strong>.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setReport(storedReport)}
+                    className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                  >
+                    View Stored Report
+                  </button>
                 </div>
               ) : (
-                <form onSubmit={handleFetchReport} className="space-y-[18px]">
-                  <div>
-                    <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
-                    <div className="relative">
-                      <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                      <input
-                        type="text"
-                        required
-                        value={formName}
-                        onChange={(e) => setFormName(e.target.value)}
-                        placeholder="e.g. Rahul Sharma"
-                        className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                      />
+                <>
+
+                  <div className="text-center mb-[24px]">
+                    <div className="mx-auto w-[44px] h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary mb-[10px]">
+                      <Lock className="w-[20px] h-[20px]" />
                     </div>
+                    <h2 className="text-[18px] font-bold text-gray-800">Check Your Official CIBIL Score</h2>
+                    <p className="text-[13px] text-gray-500 mt-[4px]">Retrieve your actual credit report securely from the bureau.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
-                    <div>
-                      <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
-                      <div className="relative">
-                        <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                        <input
-                          type="tel"
-                          required
-                          value={formPhone}
-                          onChange={handlePhoneChange}
-                          placeholder="e.g. 9876543210"
-                          className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
+                  {isFetching ? (
+                    <div className="flex flex-col items-center justify-center py-[48px] gap-[16px]">
+                      <div className="relative flex items-center justify-center">
+                        <div className="h-[72px] w-[72px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                        <CreditCard className="w-[24px] h-[24px] text-primary absolute animate-bounce" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[14px] font-bold text-gray-700">Verifying Identity & PAN...</p>
+                        <p className="text-[12px] text-gray-400 mt-[2px] animate-pulse">Retrieving encrypted credit data from CIBIL bureau</p>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
-                      <div className="relative">
-                        <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                        <input
-                          type="text"
-                          required
-                          value={formPan}
-                          onChange={handlePanChange}
-                          placeholder="e.g. AAAAA1111B"
-                          className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
+                  ) : (
+                    <form onSubmit={handleFetchReport} className="space-y-[18px]">
+                      <div>
+                        <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
+                        <div className="relative">
+                          <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                          <input
+                            type="text"
+                            required
+                            value={formName}
+                            onChange={(e) => setFormName(e.target.value)}
+                            placeholder="e.g. Rahul Sharma"
+                            className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-start gap-[10px] my-[12px] text-left">
-                    <input
-                      type="checkbox"
-                      id="cibil-privacy-policy"
-                      checked={agreedToTerms}
-                      onChange={(e) => setAgreedToTerms(e.target.checked)}
-                      className="mt-[2px] h-[16px] w-[16px] rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
-                    />
-                    <label htmlFor="cibil-privacy-policy" className="text-[11px] text-gray-500 leading-normal cursor-pointer select-none">
-                      By logging in, you agree to the following{" "}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
+                        <div>
+                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
+                          <div className="relative">
+                            <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                            <input
+                              type="tel"
+                              required
+                              value={formPhone}
+                              onChange={handlePhoneChange}
+                              placeholder="e.g. 9876543210"
+                              className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
+                          <div className="relative">
+                            <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                            <input
+                              type="text"
+                              required
+                              value={formPan}
+                              onChange={handlePanChange}
+                              placeholder="e.g. AAAAA1111B"
+                              className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-[10px] my-[12px] text-left">
+                        <input
+                          type="checkbox"
+                          id="cibil-privacy-policy"
+                          checked={agreedToTerms}
+                          onChange={(e) => setAgreedToTerms(e.target.checked)}
+                          className="mt-[2px] h-[16px] w-[16px] rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                        />
+                        <label htmlFor="cibil-privacy-policy" className="text-[11px] text-gray-500 leading-normal cursor-pointer select-none">
+                          By logging in, you agree to the following{" "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTermsTab("credit-consent");
+                              setIsTermsModalOpen(true);
+                            }}
+                            className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                          >
+                            Credit Consent
+                          </button>
+                          ,{" "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTermsTab("terms-of-use");
+                              setIsTermsModalOpen(true);
+                            }}
+                            className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                          >
+                            Terms of Use
+                          </button>
+                          ,{" "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTermsTab("privacy-policy");
+                              setIsTermsModalOpen(true);
+                            }}
+                            className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                          >
+                            Privacy Policy
+                          </button>
+                          ,{" "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTermsTab("dpdp-notice");
+                              setIsTermsModalOpen(true);
+                            }}
+                            className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                          >
+                            DPDP Notice
+                          </button>
+                          {" "}and{" "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTermsTab("data-retention");
+                              setIsTermsModalOpen(true);
+                            }}
+                            className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                          >
+                            Data Retention Policy
+                          </button>
+                        </label>
+                      </div>
+
                       <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setActiveTermsTab("credit-report");
-                          setIsTermsModalOpen(true);
-                        }}
-                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                        type="submit"
+                        disabled={!agreedToTerms}
+                        className={`w-full bg-primary text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] shadow-md ${
+                          agreedToTerms ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
+                        }`}
                       >
-                        Credit Report Terms of Use
+                        <Sparkles className="w-[16px] h-[16px]" />
+                        <span>Download CIBIL Credit Report</span>
                       </button>
-                      ,{" "}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setActiveTermsTab("terms-of-use");
-                          setIsTermsModalOpen(true);
-                        }}
-                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
-                      >
-                        Terms of Use
-                      </button>{" "}
-                      and{" "}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setActiveTermsTab("privacy-policy");
-                          setIsTermsModalOpen(true);
-                        }}
-                        className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
-                      >
-                        Privacy Policy
-                      </button>
-                    </label>
-                  </div>
 
-                  <button
-                    type="submit"
-                    disabled={!agreedToTerms}
-                    className={`w-full bg-primary text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] shadow-md ${
-                      agreedToTerms ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
-                    }`}
-                  >
-                    <Sparkles className="w-[16px] h-[16px]" />
-                    <span>Download CIBIL Credit Report</span>
-                  </button>
-
-                  {/* Encryption trust badge */}
-                  <div className="flex items-center justify-center gap-[6px] text-[11px] text-gray-400 mt-[12px]">
-                    <ShieldCheck className="w-[12px] h-[12px] text-emerald-500" />
-                    <span>256-bit SSL encrypted connection. Your data remains strictly confidential.</span>
-                  </div>
-                </form>
+                      {/* Encryption trust badge */}
+                      <div className="flex items-center justify-center gap-[6px] text-[11px] text-gray-400 mt-[12px]">
+                        <ShieldCheck className="w-[12px] h-[12px] text-emerald-500" />
+                        <span>256-bit SSL encrypted connection. Your data remains strictly confidential.</span>
+                      </div>
+                    </form>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -636,7 +697,34 @@ export default function CibilAnalyzerView({
               
               {/* Score Gauge Card */}
               <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
-                <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px] mb-[12px] self-start">Credit Score Bureau</h3>
+                <div className="flex justify-between items-center w-full mb-3 shrink-0">
+                  <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px]">Credit Score Bureau</h3>
+                  {(() => {
+                    const fresh = isReportFresh(report?.fetched_at);
+                    const exempt = isExemptRole(userEmail, report?.name);
+                    
+                    if (fresh && !exempt) {
+                      const nextDate = getNextAvailableFetchDate(report?.fetched_at);
+                      return (
+                        <span className="text-[9.5px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-[5px] font-semibold font-sans" title={`Next update available on ${nextDate}`}>
+                          Next update: {nextDate}
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReport(null);
+                          }}
+                          className="text-[11px] text-primary hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
+                        >
+                          Refresh Report {exempt && "(Admin)"}
+                        </button>
+                      );
+                    }
+                  })()}
+                </div>
                 
                 {/* SVG circular gauge */}
                 <div className="relative w-[180px] h-[180px] flex items-center justify-center">
@@ -1483,146 +1571,20 @@ export default function CibilAnalyzerView({
                   </div>
                 </div>
               )}
-
-            </div>
-          </div>
-        )}
-      </div>
-      {/* Terms & Conditions Modal */}
-      {isTermsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-[20px] border border-gray-250 shadow-[0_10px_40px_rgba(0,0,0,0.2)] w-full max-w-[620px] overflow-hidden flex flex-col max-h-[85vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-150 px-5 py-4 bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <h3 className="text-[15px] font-bold text-gray-800">Legal Agreement & Policies</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsTermsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer p-1 rounded-full hover:bg-gray-100 transition-all"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
-
-            {/* Tab switch buttons */}
-            <div className="flex border-b border-gray-150 bg-gray-50/20 px-3">
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("credit-report")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "credit-report"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Credit Report Terms
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("terms-of-use")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "terms-of-use"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Terms of Use
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTermsTab("privacy-policy")}
-                className={`py-3 px-3.5 text-[12px] font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTermsTab === "privacy-policy"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
-                }`}
-              >
-                Privacy Policy
-              </button>
-            </div>
-
-            {/* Content area */}
-            <div className="flex-1 overflow-y-auto p-5 text-[12.5px] text-gray-600 leading-relaxed space-y-4 text-left">
-              {activeTermsTab === "credit-report" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Credit Report Terms of Use</h4>
-                  <p>
-                    By checking the agreement box and continuing, you hereby appoint **FinHeal Friend** and its associate group entities as your authorized agent to access, retrieve, and receive your Credit Information on your behalf from credit information bureaus (including Experian, CIBIL, Equifax, and CRIF High Mark).
-                  </p>
-                  <p className="font-bold text-gray-700">1. Purpose and Authorized Representation</p>
-                  <p>
-                    You explicitly authorize FinHeal to represent you to request your Credit Information from the bureaus. This information is fetched securely and parsed to provide a comprehensive analysis of your credit wellness, identify eligible loan products, and update your personal finance dashboard.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Storage and Data Retention</p>
-                  <p>
-                    You agree that FinHeal may store your Credit Information in a secure database to keep your credit history updated, send you periodic alerts about changes in your credit health, and deliver personalized product recommendations.
-                  </p>
-                  <p className="font-bold text-gray-700">3. Validity of Consent</p>
-                  <p>
-                    This authorization remains valid for a maximum period of 6 months from the date of submission or until you explicitly revoke this consent by writing to our support team.
-                  </p>
-                </div>
-              )}
-
-              {activeTermsTab === "terms-of-use" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Platform Terms of Use</h4>
-                  <p>
-                    Welcome to FinHeal. These Terms of Use govern your access and usage of the FinHeal credit analysis tools, EMI planners, and financial health calculators.
-                  </p>
-                  <p className="font-bold text-gray-700">1. Service Eligibility</p>
-                  <p>
-                    You represent that you are at least 18 years of age and hold a valid PAN card issued by the Income Tax Department of India. You agree to provide correct details, including your full name, PAN, and active mobile number.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Prohibited Uses</p>
-                  <p>
-                    You must not retrieve credit score information for individuals other than yourself, nor use false credentials, PAN numbers, or fake mobile phone records. FinHeal reserves the right to report unauthorized queries to credit bureaus.
-                  </p>
-                  <p className="font-bold text-gray-700">3. Disclaimers</p>
-                  <p>
-                    FinHeal calculates loan eligibility based on the criteria configured by partner banks. The final decision to approve a loan lies solely with the respective bank/lender.
-                  </p>
-                </div>
-              )}
-
-              {activeTermsTab === "privacy-policy" && (
-                <div className="space-y-3">
-                  <h4 className="text-[13.5px] font-bold text-gray-800 uppercase tracking-wide">FinHeal Privacy Policy</h4>
-                  <p>
-                    At FinHeal, your privacy is paramount. We take all necessary security and privacy measures to safeguard your personal credentials and credit data.
-                  </p>
-                  <p className="font-bold text-gray-700">1. Data We Collect</p>
-                  <p>
-                    We collect your full name, contact information, mobile number, and PAN card number. We also collect and cache your credit history from bureaus only after you check the terms checkbox.
-                  </p>
-                  <p className="font-bold text-gray-700">2. Encryption & Protection</p>
-                  <p>
-                    All credit information is transferred using state-of-the-art 256-bit SSL encryption. We secure your cached reports using PostgreSQL encrypted databases.
-                  </p>
-                  <p className="font-bold text-gray-700">3. No Unsolicited Data Sharing</p>
-                  <p>
-                    We do not share, sell, or rent your credit report to third parties. Your details are only shared with partner financial institutions when you explicitly apply for a financial offer.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-gray-150 px-5 py-3.5 bg-gray-50 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsTermsModalOpen(false)}
-                className="bg-primary hover:opacity-95 text-white font-bold px-5 py-2 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
-              >
-                I Understand
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+
+      {/* Terms & Conditions Modal */}
+      <PolicyModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        defaultTab={activeTermsTab}
+        showAcceptCheckbox={!report}
+        agreed={agreedToTerms}
+        onAgreeChange={setAgreedToTerms}
+      />
     </div>
   );
 }

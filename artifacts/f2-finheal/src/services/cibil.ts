@@ -68,7 +68,15 @@ export async function fetchCibilReport(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Failed to fetch CIBIL report");
+    let errMsg = "Failed to fetch CIBIL report";
+    if (errorData.detail) {
+      if (typeof errorData.detail === "object" && errorData.detail !== null) {
+        errMsg = errorData.detail.message || JSON.stringify(errorData.detail);
+      } else {
+        errMsg = errorData.detail;
+      }
+    }
+    throw new Error(errMsg);
   }
 
   return response.json() as Promise<CibilReport>;
@@ -82,8 +90,17 @@ export async function getStoredCibilReport(userId: string): Promise<CibilReport>
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "No stored CIBIL report found");
+    let errMsg = "No stored CIBIL report found";
+    if (errorData.detail) {
+      if (typeof errorData.detail === "object" && errorData.detail !== null) {
+        errMsg = errorData.detail.message || JSON.stringify(errorData.detail);
+      } else {
+        errMsg = errorData.detail;
+      }
+    }
+    throw new Error(errMsg);
   }
 
   return response.json() as Promise<CibilReport>;
 }
+
