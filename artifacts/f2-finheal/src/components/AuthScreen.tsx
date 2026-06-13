@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
+import PolicyModal from "./PolicyModal";
 
 const loginDefaults = { username: "", password: "" };
 
@@ -67,6 +68,9 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [barTick, setBarTick] = useState(0);
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
   const [animateIn, setAnimateIn] = useState(false);
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [activeTermsTab, setActiveTermsTab] = useState<"terms-of-use" | "privacy-policy">("terms-of-use");
   
   const cardRef = useRef<HTMLDivElement>(null);
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -142,6 +146,10 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         const parsedAge = parseInt(age, 10);
         if (isNaN(parsedAge) || parsedAge < 18) {
           setLoginError("You must be 18 or older to create an account.");
+          return;
+        }
+        if (!agreedToPolicies) {
+          setLoginError("You must agree to the Terms of Use and Privacy Policy to create an account.");
           return;
         }
       } else {
@@ -601,10 +609,68 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   </div>
                 </label>
               )}
+              {authMode === "signup" && !isEmployee && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", margin: "4px 0", textAlign: "left" }}>
+                  <input
+                    type="checkbox"
+                    id="auth-privacy-agree"
+                    checked={agreedToPolicies}
+                    onChange={(e) => setAgreedToPolicies(e.target.checked)}
+                    style={{ width: "16px", height: "16px", accentColor: "#3344e6", cursor: "pointer", marginTop: "2px", flexShrink: 0 }}
+                  />
+                  <label htmlFor="auth-privacy-agree" style={{ fontSize: "11.5px", color: "#6b7280", lineHeight: "1.4", cursor: "pointer", userSelect: "none" }}>
+                    By registering, you agree to our{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveTermsTab("terms-of-use");
+                        setIsTermsModalOpen(true);
+                      }}
+                      style={{ background: "none", border: "none", padding: 0, color: "#3344e6", fontWeight: 600, cursor: "pointer", textDecoration: "underline", font: "inherit" }}
+                    >
+                      Terms of Use
+                    </button>{" "}
+                    and{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveTermsTab("privacy-policy");
+                        setIsTermsModalOpen(true);
+                      }}
+                      style={{ background: "none", border: "none", padding: 0, color: "#3344e6", fontWeight: 600, cursor: "pointer", textDecoration: "underline", font: "inherit" }}
+                    >
+                      Privacy Policy
+                    </button>
+                    .
+                  </label>
+                </div>
+              )}
               {loginError && <div style={{ padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "11px", color: "#b91c1c" }}>{loginError}</div>}
-              <button type="submit" disabled={isSubmitting} style={{ height: "38px", background: "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: isSubmitting ? 0.7 : 1, marginTop: "1px", boxShadow: "0 3px 10px rgba(51,68,230,0.25)", transition: "all 0.2s" }}
-                onMouseOver={e => { if (!isSubmitting) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
-                onMouseOut={e => { if (!isSubmitting) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}>
+              <button 
+                type="submit" 
+                disabled={isSubmitting || (authMode === "signup" && !isEmployee && !agreedToPolicies)} 
+                style={{ 
+                  height: "38px", 
+                  background: (authMode === "signup" && !isEmployee && !agreedToPolicies) 
+                    ? "#d1d5db" 
+                    : "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", 
+                  border: "none", 
+                  borderRadius: "10px", 
+                  color: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "#9ca3af" : "#fff", 
+                  fontSize: "13px", 
+                  fontWeight: 600, 
+                  cursor: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "not-allowed" : "pointer", 
+                  fontFamily: "inherit", 
+                  opacity: isSubmitting ? 0.7 : 1, 
+                  marginTop: "1px", 
+                  boxShadow: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "none" : "0 3px 10px rgba(51,68,230,0.25)", 
+                  transition: "all 0.2s" 
+                }}
+                onMouseOver={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
+                onMouseOut={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}
+              >
                 {isSubmitting ? "Processing..." : authMode === "signup" ? "Register" : "Sign in"}
               </button>
             </form>
@@ -637,6 +703,14 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         </div>
 
       </div>
+
+      <PolicyModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        defaultTab={activeTermsTab}
+        showAcceptCheckbox={false}
+        allowedTabs={["terms-of-use", "privacy-policy"]}
+      />
     </div>
   );
 }

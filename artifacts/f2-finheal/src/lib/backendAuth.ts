@@ -503,3 +503,10 @@ export async function updateAdvisorPassword(f2FintechId: string, newPassword: st
   });
 }
 
+export async function changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<{ status: string; message: string }> {
+  return authRequest<{ status: string; message: string }>("auth/change-password", {
+    method: "PUT",
+    body: JSON.stringify({ user_id: userId, current_password: currentPassword, new_password: newPassword }),
+  });
+}
+

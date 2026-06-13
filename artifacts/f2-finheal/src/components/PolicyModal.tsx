@@ -26,6 +26,7 @@ interface PolicyModalProps {
   showAcceptCheckbox?: boolean;
   agreed?: boolean;
   onAgreeChange?: (agreed: boolean) => void;
+  allowedTabs?: ("credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention")[];
 }
 
 const POLICY_TABS = [
@@ -87,9 +88,13 @@ export default function PolicyModal({
   defaultTab = "credit-consent",
   showAcceptCheckbox = false,
   agreed = false,
-  onAgreeChange
+  onAgreeChange,
+  allowedTabs
 }: PolicyModalProps) {
   const [activeTab, setActiveTab] = useState<typeof POLICY_TABS[number]["id"]>(defaultTab);
+  const visibleTabs = allowedTabs 
+    ? POLICY_TABS.filter(tab => allowedTabs.includes(tab.id))
+    : POLICY_TABS;
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +106,13 @@ export default function PolicyModal({
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(defaultTab);
+      if (allowedTabs && !allowedTabs.includes(defaultTab)) {
+        setActiveTab(allowedTabs[0]);
+      } else {
+        setActiveTab(defaultTab);
+      }
     }
-  }, [isOpen, defaultTab]);
+  }, [isOpen, defaultTab, allowedTabs]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -372,7 +381,7 @@ export default function PolicyModal({
                 </div>
                 
                 <div className="space-y-1.5">
-                  {POLICY_TABS.map((tab) => {
+                  {visibleTabs.map((tab) => {
                     const TabIcon = tab.icon;
                     const isActive = activeTab === tab.id;
                     return (
@@ -422,7 +431,7 @@ export default function PolicyModal({
                   {/* Tab icon in mobile */}
                   <div className="md:hidden">
                     {(() => {
-                      const activeInfo = POLICY_TABS.find(t => t.id === activeTab);
+                      const activeInfo = visibleTabs.find(t => t.id === activeTab);
                       if (!activeInfo) return null;
                       const Icon = activeInfo.icon;
                       return (
@@ -434,10 +443,10 @@ export default function PolicyModal({
                   </div>
                   <div>
                     <h3 className="text-[14px] font-black text-gray-800 leading-none">
-                      {POLICY_TABS.find(t => t.id === activeTab)?.title}
+                      {visibleTabs.find(t => t.id === activeTab)?.title}
                     </h3>
                     <p className="text-[10.5px] text-gray-400 font-bold uppercase tracking-wider mt-1.5 max-md:hidden">
-                      {POLICY_TABS.find(t => t.id === activeTab)?.desc}
+                      {visibleTabs.find(t => t.id === activeTab)?.desc}
                     </p>
                   </div>
                 </div>
@@ -469,7 +478,7 @@ export default function PolicyModal({
 
               {/* Mobile tab bar slider */}
               <div className="md:hidden flex border-b border-gray-150 bg-slate-50 px-3 py-1.5 overflow-x-auto shrink-0 scrollbar-none gap-2">
-                {POLICY_TABS.map((tab) => {
+                {visibleTabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
                     <button
