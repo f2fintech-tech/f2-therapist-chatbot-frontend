@@ -289,6 +289,8 @@ export interface BackendAdvisor {
   next_slot?: string;
   category: string;
   fee: number;
+  test_comment?: string;
+  test_rating?: number;
 }
 
 export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
@@ -320,11 +322,13 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     expertise: a.expertise || [],
     strength: a.strength || "",
     bio: a.bio || "",
-    rating: a.rating || 4.8,
-    reviews_count: a.reviewsCount || 15,
+    rating: a.rating !== undefined && a.rating !== null ? a.rating : 0.0,
+    reviews_count: a.reviewsCount !== undefined && a.reviewsCount !== null ? a.reviewsCount : 0,
     next_slot: a.nextSlot,
     category: a.category,
-    fee: a.fee || 899
+    fee: a.fee || 899,
+    test_comment: a.testComment,
+    test_rating: a.testRating
   };
 }
 
@@ -445,6 +449,13 @@ export async function fetchUserAppointments(userId: string): Promise<Appointment
 
 export async function fetchAllAppointments(): Promise<Appointment[]> {
   const list = await authRequest<any[]>("advisors/appointments/all", {
+    method: "GET"
+  });
+  return list.map(mapBackendAppointmentToFrontend);
+}
+
+export async function fetchAdvisorAppointments(advisorId: string): Promise<Appointment[]> {
+  const list = await authRequest<any[]>(`advisors/appointments/advisor/${encodeURIComponent(advisorId)}`, {
     method: "GET"
   });
   return list.map(mapBackendAppointmentToFrontend);

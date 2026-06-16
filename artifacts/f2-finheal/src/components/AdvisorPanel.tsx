@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment, rescheduleAppointment } from "@/lib/backendAuth";
+import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment, rescheduleAppointment, fetchAdvisorAppointments } from "@/lib/backendAuth";
 
 export interface Advisor {
   id: string;
@@ -17,6 +17,8 @@ export interface Advisor {
   nextSlot: string;
   category: string;
   fee: number; // Consultation fee in INR per session
+  testComment?: string;
+  testRating?: number;
 }
 
 interface Appointment {
@@ -132,12 +134,26 @@ export default function AdvisorPanel({
   const [selectedAdvisor, setSelectedAdvisor] = useState<Advisor | null>(null);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [categoriesList, setCategoriesList] = useState(categories);
+  const [advisorReviews, setAdvisorReviews] = useState<Record<string, Appointment[]>>({});
 
   const loadAdvisors = async () => {
     try {
       const list = await fetchAdvisors();
       setAdvisors(list);
       localStorage.setItem("finheal_advisors_list", JSON.stringify(list));
+
+      // Fetch reviews for each advisor in parallel/sequentially
+      const reviewsMap: Record<string, Appointment[]> = {};
+      for (const adv of list) {
+        try {
+          const appts = await fetchAdvisorAppointments(adv.id);
+          const completedReviews = appts.filter((a: any) => a.completed && a.feedback && a.rating);
+          reviewsMap[adv.id] = completedReviews;
+        } catch (e) {
+          console.error(`Error loading reviews for advisor ${adv.id}:`, e);
+        }
+      }
+      setAdvisorReviews(reviewsMap);
     } catch (err) {
       console.error("Error loading advisors:", err);
       const stored = localStorage.getItem("finheal_advisors_list");
@@ -258,6 +274,7 @@ export default function AdvisorPanel({
           feedback: userFeedbackText.trim()
         });
         await loadAppointments();
+        await loadAdvisors();
       } catch (e) {
         console.error("Failed to save rating on backend", e);
       }
@@ -1048,6 +1065,34 @@ export default function AdvisorPanel({
                       <div className="bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] text-[11.5px] text-gray-700 leading-relaxed mb-[8px]">
                         <strong>🎯 Strength:</strong> {advisor.strength}
                       </div>
+
+                      {/* Dynamic Reviews/Comments Section */}
+                      {advisorReviews[advisor.id] && advisorReviews[advisor.id].length > 0 && (
+                        <div className="mt-3 border-t border-gray-100 pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider">Recent Reviews</span>
+                            <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full">
+                              {advisorReviews[advisor.id].length} comment{advisorReviews[advisor.id].length > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 scrollbar-thin">
+                            {advisorReviews[advisor.id].map((rev, idx) => (
+                              <div key={idx} className="bg-amber-50/10 border border-amber-100/30 rounded-xl p-2.5 text-[11.5px]">
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex text-amber-400 text-[11px]">
+                                    {"★".repeat(rev.rating || 0)}
+                                    {"☆".repeat(5 - (rev.rating || 0))}
+                                  </div>
+                                  <span className="text-[9.5px] text-gray-400 font-medium">{rev.date || "Verified Review"}</span>
+                                </div>
+                                <p className="text-gray-600 italic leading-relaxed font-medium">
+                                  &quot;{rev.feedback}&quot;
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-[12px] pt-[12px] border-t border-gray-100 flex items-center justify-between gap-[8px]">
