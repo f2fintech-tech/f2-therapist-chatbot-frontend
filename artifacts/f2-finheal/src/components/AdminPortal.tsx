@@ -397,6 +397,38 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     document.body.removeChild(link);
   };
 
+  const handleGenerateCAM = async (userId: string, name: string) => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      
+      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to generate CAM Excel report.");
+      }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const cleanName = name.replace(/[^a-zA-Z0-9_]/g, "_");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      console.error("Error generating CAM:", err);
+      alert(err.message || "Failed to generate CAM Excel report.");
+    }
+  };
+
   const fetchCibilEnquiries = async () => {
     try {
       setCibilLoading(true);
@@ -1925,13 +1957,19 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                     href={enq.pdf_url} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="text-primary hover:underline font-bold text-[11px]"
+                                    className="text-primary hover:underline font-bold text-[11px] block"
                                   >
                                     View Report ↗
                                   </a>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-gray-400 block">-</span>
                                 )}
+                                <button
+                                  onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                  className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer"
+                                >
+                                  Generate CAM 📊
+                                </button>
                               </td>
                             </tr>
                           );
