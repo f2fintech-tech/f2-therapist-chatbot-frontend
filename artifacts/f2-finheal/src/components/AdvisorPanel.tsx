@@ -648,7 +648,7 @@ export default function AdvisorPanel({
               Get specific, action-oriented strategies on taxes, debt reduction, mutual funds, or home loan options. No sales pitches, just expert guidance.
             </p>
             <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">💬 45 Min Consultation</span>
+              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">💬 1 Hour Consultation</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🛡️ Verified Experts</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">⭐ 4.9/5 Advisor Rating</span>
               <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🔒 Private & Confidential</span>

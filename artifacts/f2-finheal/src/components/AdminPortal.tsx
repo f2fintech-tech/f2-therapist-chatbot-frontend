@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
@@ -193,17 +194,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const timeSlots = [
     "09:00 AM",
-    "09:45 AM",
-    "10:30 AM",
-    "11:15 AM",
+    "10:00 AM",
+    "11:00 AM",
     "12:00 PM",
-    "12:45 PM",
-    "01:30 PM",
-    "02:15 PM",
+    "01:00 PM",
+    "02:00 PM",
     "03:00 PM",
-    "03:45 PM",
-    "04:30 PM",
-    "05:15 PM",
+    "04:00 PM",
+    "05:00 PM",
     "06:00 PM"
   ];
 
@@ -229,8 +227,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     fee: 899
   });
 
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
 
   // Dynamically map logged-in email prefix to advisor ID based on name slug or F2 Fintech ID
@@ -454,10 +459,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   useEffect(() => {
-    if (isAdmin && (activeTab === "cibil-enquiries" || activeTab === "stats")) {
+    if ((isAdmin && (activeTab === "cibil-enquiries" || activeTab === "stats")) || currentExpertId) {
       fetchCibilEnquiries();
     }
-  }, [isAdmin, activeTab]);
+  }, [isAdmin, activeTab, currentExpertId]);
 
   // Lenders CRUD Handlers
   const handleOpenAddLender = () => {
@@ -1076,29 +1081,49 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const handleUpdatePassword = async () => {
     if (!currentExpertId || !activeExpert) return;
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
     if (!newPassword) {
-      alert("Please enter a new password.");
+      setPasswordError("Please enter a new password.");
       return;
     }
     if (newPassword.length < 6) {
-      alert("Password must be at least 6 characters long.");
+      setPasswordError("New password must be at least 6 characters.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert("Passwords do not match.");
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPasswordError("New password must be different from the current password.");
       return;
     }
 
     const f2FintechId = activeExpert.f2FintechId || activeExpert.id;
+    setIsChangingPassword(true);
 
     try {
-      await updateAdvisorPassword(f2FintechId, newPassword);
+      await updateAdvisorPassword(f2FintechId, currentPassword, newPassword);
+      setPasswordSuccess("Password changed successfully!");
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      alert("Password updated successfully!");
-    } catch (err) {
-      console.error("Error updating advisor password:", err);
-      alert("Failed to update password: " + (err instanceof Error ? err.message : String(err)));
+    } catch (err: any) {
+      const msg = err?.message || "Failed to change password";
+      try {
+        const parsed = JSON.parse(msg);
+        setPasswordError(parsed.detail || msg);
+      } catch {
+        setPasswordError(msg);
+      }
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -2080,7 +2105,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             />
                           </div>
                           <div>
-                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Time Slot (45-min gaps)</label>
+                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Time Slot (1-hour slots)</label>
                             <select
                               value={slotTime}
                               onChange={(e) => setSlotTime(e.target.value)}
@@ -2172,40 +2197,130 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </Card>
 
                     {/* Card 3: Change Password */}
-                    <Card className="border-gray-200 shadow-xs">
-                      <CardHeader className="p-[16px] pb-[4px]">
-                        <CardTitle className="text-[14px] font-bold">Change Password</CardTitle>
-                        <CardDescription className="text-[11px] text-gray-400">Update your advisor account password.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-[16px] space-y-[12px]">
-                        <div>
-                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">New Password</label>
-                          <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
-                            placeholder="At least 6 characters"
-                          />
+                    <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPasswordSection((prev) => !prev);
+                          setPasswordError("");
+                          setPasswordSuccess("");
+                          setCurrentPassword("");
+                          setNewPassword("");
+                          setConfirmPassword("");
+                        }}
+                        className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-all cursor-pointer border-none outline-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600">
+                            <Lock className="h-4 w-4" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-[14px] font-extrabold text-gray-900 tracking-tight">Change Password</div>
+                            <div className="text-[11px] text-gray-500 font-medium">Update your account security credentials</div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Confirm New Password</label>
-                          <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
-                            placeholder="Mismatches will fail validation"
-                          />
+                        <span className={`text-gray-400 text-[16px] transition-transform duration-200 ${showPasswordSection ? "rotate-180" : ""}`}>▾</span>
+                      </button>
+
+                      {showPasswordSection && (
+                        <div className="px-5 py-5 space-y-4 border-t border-gray-100 bg-white animate-fade-up">
+                          {passwordError && (
+                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>{passwordError}</span>
+                            </div>
+                          )}
+                          {passwordSuccess && (
+                            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
+                              <ShieldCheck className="h-4 w-4 shrink-0" />
+                              <span>{passwordSuccess}</span>
+                            </div>
+                          )}
+
+                          <div className="space-y-[6px] text-left">
+                            <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Current Password</label>
+                            <div className="relative">
+                              <input
+                                type={showCurrentPassword ? "text" : "password"}
+                                value={currentPassword}
+                                onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
+                                placeholder="Enter your current password"
+                                className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
+                                disabled={isChangingPassword}
+                              />
+                              <button type="button" onClick={() => setShowCurrentPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
+                                {showCurrentPassword ? "Hide" : "Show"}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 text-left">
+                            <div className="space-y-[6px]">
+                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">New Password</label>
+                              <div className="relative">
+                                <input
+                                  type={showNewPassword ? "text" : "password"}
+                                  value={newPassword}
+                                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
+                                  placeholder="Min 6 characters"
+                                  className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
+                                  disabled={isChangingPassword}
+                                />
+                                <button type="button" onClick={() => setShowNewPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
+                                  {showNewPassword ? "Hide" : "Show"}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="space-y-[6px]">
+                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Confirm New Password</label>
+                              <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
+                                placeholder="Re-enter new password"
+                                className={`w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px] ${confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:ring-red-200" : ""}`}
+                                disabled={isChangingPassword}
+                              />
+                              {confirmPassword && confirmPassword !== newPassword && (
+                                <p className="text-[10px] text-red-500 font-semibold mt-1">Passwords do not match</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Password strength indicator */}
+                          {newPassword && (
+                            <div className="space-y-1 text-left">
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4].map((level) => {
+                                  const strength = newPassword.length >= 12 ? 4 : newPassword.length >= 8 ? 3 : newPassword.length >= 6 ? 2 : 1;
+                                  const colors = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-emerald-500"];
+                                  return (
+                                    <div
+                                      key={level}
+                                      className={`h-[3px] flex-1 rounded-full transition-all duration-300 ${level <= strength ? colors[strength] : "bg-gray-200"}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              <p className="text-[10px] text-gray-400 font-medium">
+                                {newPassword.length < 6 ? "Too short" : newPassword.length < 8 ? "Fair" : newPassword.length < 12 ? "Good" : "Strong"}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end pt-1">
+                            <button
+                              onClick={handleUpdatePassword}
+                              disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                              className="rounded-full px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[13px] flex items-center gap-1.5 shadow-[0_8px_24px_rgba(225,29,72,0.18)] transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer"
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                              <span>{isChangingPassword ? "Changing..." : "Update Password"}</span>
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={handleUpdatePassword}
-                          className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
-                        >
-                          Update Password
-                        </button>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right Column: Booked consultations list */}
@@ -2461,6 +2576,216 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Section: CIBIL Enquiries */}
+                <div className="border border-gray-200 rounded-[20px] p-[20px] bg-white shadow-sm space-y-[16px] text-left animate-fade-in mt-[20px]">
+                  <div className="border-b border-gray-100 pb-3 space-y-3">
+                    {/* Row 1: Title & Pagination */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
+                          📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                        </h3>
+                        <p className="text-[10px] text-gray-400 mt-[2px]">
+                          {filterDate 
+                            ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                            : "Showing all credit score fetches across the platform."}
+                        </p>
+                      </div>
+
+                      {/* Compact Pagination Controls */}
+                      {filteredEnquiries.length > 0 && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            disabled={safeCibilPage === 1}
+                            onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                            className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                            title="Previous Page"
+                          >
+                            ←
+                          </button>
+                          <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                            {safeCibilPage} / {totalPages}
+                          </span>
+                          <button
+                            disabled={safeCibilPage === totalPages}
+                            onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                            className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                            title="Next Page"
+                          >
+                            →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Row 2: Filters & Export */}
+                    <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                      {/* Role Filter Selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
+                        <select
+                          value={filterRole}
+                          onChange={(e) => setFilterRole(e.target.value)}
+                          className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                        >
+                          <option value="all">All Enquirers</option>
+                          <option value="User">Regular Users (Leads)</option>
+                          <option value="Admin">Admins</option>
+                          <option value="Manager">Managers</option>
+                          <option value="Senior Leadership">Senior Leadership</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                        <input 
+                          type="date"
+                          value={filterDate}
+                          onChange={(e) => setFilterDate(e.target.value)}
+                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                        />
+                        {(filterDate || filterRole !== "all") && (
+                          <button
+                            onClick={() => { setFilterDate(""); setFilterRole("all"); }}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                          >
+                            Reset Filters
+                          </button>
+                        )}
+                        {filteredEnquiries.length > 0 && (
+                          <button
+                            onClick={handleExportCSV}
+                            className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                            title="Export leads to Excel/CSV sheet"
+                          >
+                            📥 Export Leads
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
+                    <table className="w-full text-left text-[12px] border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                          <th className="p-[12px]">User Identity</th>
+                          <th className="p-[12px]">Bureau</th>
+                          <th className="p-[12px]">PAN Card</th>
+                          <th className="p-[12px]">Credit Score</th>
+                          <th className="p-[12px]">Date & Time</th>
+                          <th className="p-[12px] text-right">PDF Report</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cibilLoading ? (
+                          <tr>
+                            <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
+                          </tr>
+                        ) : filteredEnquiries.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="text-center p-6 text-gray-400">
+                              {filterDate 
+                                ? "No CIBIL inquiries found for this particular day." 
+                                : "No CIBIL inquiries found on the platform."}
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedEnquiries.map((enq) => {
+                            let scoreColorClass = "text-red-500";
+                            let bandText = "Poor";
+                            if (enq.score >= 750) {
+                              scoreColorClass = "text-emerald-600";
+                              bandText = "Excellent";
+                            } else if (enq.score >= 700) {
+                              scoreColorClass = "text-green-500";
+                              bandText = "Good";
+                            } else if (enq.score >= 630) {
+                              scoreColorClass = "text-amber-500";
+                              bandText = "Fair";
+                            }
+                            
+                            const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+                            
+                            return (
+                              <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                <td className="p-[12px] max-w-[220px] break-words">
+                                  <strong className="text-gray-900 block">{enq.name}</strong>
+                                  {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
+                                  {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
+                                  <div className="mt-[4px]">
+                                    <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${
+                                      role === "Admin"
+                                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                                        : role === "Senior Leadership"
+                                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                                          : role === "Manager"
+                                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                                            : "bg-emerald-50 text-emerald-700 border-emerald-250"
+                                    }`}>
+                                      {role === "User" ? "User (Lead)" : role}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-[12px]">
+                                  <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${
+                                    enq.bureau.toLowerCase() === "experian"
+                                      ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                      : "bg-blue-100 text-blue-700 border border-blue-200"
+                                  }`}>
+                                    {enq.bureau}
+                                  </span>
+                                </td>
+                                <td className="p-[12px] font-mono font-semibold text-gray-700 uppercase">
+                                  {enq.pan || "-"}
+                                </td>
+                                <td className="p-[12px]">
+                                  <span className={`text-[15px] font-extrabold ${scoreColorClass}`}>
+                                    {enq.score}
+                                  </span>
+                                  <span className="text-[10px] text-gray-450 block font-medium">
+                                    {bandText}
+                                  </span>
+                                </td>
+                                <td className="p-[12px] text-gray-500">
+                                  {new Date(enq.fetched_at && !enq.fetched_at.endsWith("Z") && !enq.fetched_at.includes("+") ? `${enq.fetched_at}Z` : enq.fetched_at).toLocaleString("en-IN", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                  })}
+                                </td>
+                                <td className="p-[12px] text-right">
+                                  {enq.pdf_url ? (
+                                    <a 
+                                      href={enq.pdf_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline font-bold text-[11px] block"
+                                    >
+                                      View Report ↗
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-400 block">-</span>
+                                  )}
+                                  <button
+                                    onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                    className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                  >
+                                    Generate CAM 📊
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </>
