@@ -68,6 +68,7 @@ export default function CibilAnalyzerView({
   const [storedReport, setStoredReport] = useState<CibilReport | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFetching, setIsFetching] = useState<boolean>(false);
+  const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
 
   // Form inputs
   const [formName, setFormName] = useState<string>("");
@@ -220,6 +221,52 @@ export default function CibilAnalyzerView({
       });
     } finally {
       setIsFetching(false);
+    }
+  };
+
+  const handleGenerateCAM = async () => {
+    if (!report) return;
+    setIsGeneratingCAM(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      
+      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to generate CAM Excel report.");
+      }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const cleanName = report.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "CAM Generated!",
+        description: "Your Credit Appraisal Memorandum report has been downloaded successfully.",
+        variant: "default"
+      });
+    } catch (err: any) {
+      console.error("Error generating CAM:", err);
+      toast({
+        title: "Generation Failed",
+        description: err.message || "Failed to generate CAM Excel report.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingCAM(false);
     }
   };
 
@@ -477,16 +524,28 @@ export default function CibilAnalyzerView({
         
         {/* Connection status badge */}
         <div className="flex items-center gap-[12px] shrink-0">
-          {report && report.pdf_url && (
-            <a
-              href={report.pdf_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer"
-            >
-              <FileText className="w-[14px] h-[14px] text-emerald-600" />
-              <span>Download PDF Report</span>
-            </a>
+          {report && (
+            <div className="flex items-center gap-[10px]">
+              {report.pdf_url && (
+                <a
+                  href={report.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  <FileText className="w-[14px] h-[14px] text-emerald-600" />
+                  <span>Download PDF Report</span>
+                </a>
+              )}
+              <button
+                onClick={handleGenerateCAM}
+                disabled={isGeneratingCAM}
+                className="flex items-center gap-[6px] bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileText className="w-[14px] h-[14px] text-indigo-600" />
+                <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -775,6 +834,15 @@ export default function CibilAnalyzerView({
                     <span>Download PDF Report</span>
                   </a>
                 )}
+                
+                <button
+                  onClick={handleGenerateCAM}
+                  disabled={isGeneratingCAM}
+                  className="mt-[8px] flex items-center justify-center gap-[6px] bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileText className="w-[14px] h-[14px]" />
+                  <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
+                </button>
               </div>
 
               {/* Core Factors Card */}

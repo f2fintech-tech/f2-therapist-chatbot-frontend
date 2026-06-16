@@ -1989,12 +1989,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 ) : (
                                   <span className="text-gray-400 block">-</span>
                                 )}
-                                <button
-                                  onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
-                                  className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer"
-                                >
-                                  Generate CAM 📊
-                                </button>
                               </td>
                             </tr>
                           );
