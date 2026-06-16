@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
 
@@ -142,7 +142,7 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
 /* ─── Advisor card ─── */
 function AdvisorCard({ initials, name, title, rating, sessions, available, color, avatarUrl, delay = 0, onChat }: any) {
-  const isOnline = available === "available";
+  const isOnline = available === "available" || (available && available !== "unavailable" && available !== "Not Available" && available !== "in meeting" && isAdvisorSlotActive(available));
   const isInMeeting = available === "in meeting";
   const isActionable = isOnline || isInMeeting;
 
@@ -164,7 +164,9 @@ function AdvisorCard({ initials, name, title, rating, sessions, available, color
         {isOnline && (
           <div className="flex items-center gap-1.5 animate-fade-in">
             <div className="w-2 h-2 rounded-full bg-[#10b981]" />
-            <span className="text-[10px] font-medium text-[#10b981]">Online</span>
+            <span className="text-[10px] font-medium text-[#10b981]">
+              {available === "available" ? "Online" : available}
+            </span>
           </div>
         )}
         {isInMeeting && (
@@ -580,11 +582,41 @@ export default function Dashboard({
   const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const pastAppointments = appointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
+  const isUserAdvisor = (email?: string) => {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          )
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const isAdvisor = isUserAdvisor(userProfile?.email);
+
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
     { key: "loans", label: "Loans", icon: "💳" },
     { key: "reports", label: "Reports", icon: "📈" },
-    { key: "advisor", label: "Advisors", icon: "🧑‍💼" },
+    ...(!isAdvisor ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
 
   return (
@@ -815,49 +847,51 @@ export default function Dashboard({
             </div>
 
             {/* Goals overview */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
-                  <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
-                </div>
-                <button
-                  data-testid="btn-view-all-goals"
-                  onClick={() => onNavigate("Financial Goals")}
-                  className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
-                >
-                  View All
-                </button>
-              </div>
-              <div className="flex flex-col gap-4">
-                {localGoals.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+            {!isAdvisor && (
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
+                    <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
                   </div>
-                ) : (
-                  localGoals.map((g: any, i: number) => {
-                    const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
-                    const color = g.color;
-                    return (
-                      <div key={g.id} className="flex items-center gap-4">
-                        <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[12px] font-semibold text-gray-700">{g.name}</span>
-                            <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
-                          </div>
-                          <AnimBar pct={pct} color={color} delay={i * 150} />
-                          <div className="flex justify-between mt-1">
-                            <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
-                            <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
+                  <button
+                    data-testid="btn-view-all-goals"
+                    onClick={() => onNavigate("Financial Goals")}
+                    className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {localGoals.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+                    </div>
+                  ) : (
+                    localGoals.map((g: any, i: number) => {
+                      const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
+                      const color = g.color;
+                      return (
+                        <div key={g.id} className="flex items-center gap-4">
+                          <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1.5">
+                              <span className="text-[12px] font-semibold text-gray-700">{g.name}</span>
+                              <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
+                            </div>
+                            <AnimBar pct={pct} color={color} delay={i * 150} />
+                            <div className="flex justify-between mt-1">
+                              <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
+                              <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Recent sessions */}
             <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "350ms" }}>
@@ -1032,7 +1066,7 @@ export default function Dashboard({
 
                 const tiles = [
                   { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
-                  { icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` },
+                  ...(!isAdvisor ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
                   { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
                 ];
 

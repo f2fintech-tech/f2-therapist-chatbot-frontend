@@ -521,3 +521,30 @@ export async function changeUserPassword(userId: string, currentPassword: string
   });
 }
 
+export function isAdvisorSlotActive(availability: string): boolean {
+  if (!availability) return false;
+  if (availability === "available") return true;
+  if (availability === "unavailable" || availability === "Not Available") return false;
+
+  // Pattern check: "HH:MM AM/PM - HH:MM AM/PM"
+  const match = availability.match(/^(\d{2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return false;
+
+  const [_, startH, startM, startP, endH, endM, endP] = match;
+  
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  let startHrs = parseInt(startH, 10);
+  if (startP.toUpperCase() === "PM" && startHrs !== 12) startHrs += 12;
+  if (startP.toUpperCase() === "AM" && startHrs === 12) startHrs = 0;
+  const startMinutes = startHrs * 60 + parseInt(startM, 10);
+
+  let endHrs = parseInt(endH, 10);
+  if (endP.toUpperCase() === "PM" && endHrs !== 12) endHrs += 12;
+  if (endP.toUpperCase() === "AM" && endHrs === 12) endHrs = 0;
+  const endMinutes = endHrs * 60 + parseInt(endM, 10);
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+

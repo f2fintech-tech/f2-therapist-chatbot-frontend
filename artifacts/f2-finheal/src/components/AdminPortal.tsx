@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -311,6 +311,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   }, [filterDate, filterRole]);
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
+    // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
+    if (!isAdmin) {
+      const cleanUserEmail = (userEmail || "").toLowerCase().trim();
+      const cleanEnqEmail = (enq.email || "").toLowerCase().trim();
+      const cleanExpertId = (currentExpertId || "").toLowerCase().trim();
+      const cleanEnqUserId = (enq.user_id || "").toLowerCase().trim();
+
+      const isFetchedByMe = 
+        (cleanUserEmail && cleanEnqEmail === cleanUserEmail) ||
+        (cleanExpertId && cleanEnqUserId === cleanExpertId) ||
+        (cleanExpertId && cleanEnqEmail.startsWith(cleanExpertId + "@"));
+      
+      if (!isFetchedByMe) return false;
+    }
+
     // 1. Filter by Date
     if (filterDate) {
       if (!enq.fetched_at) return false;
@@ -1080,7 +1095,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       expertise: resolvedExpertise,
       strength: selfEditForm.strength.trim() || "Financial planning",
       bio: selfEditForm.bio.trim() || "Certified Financial Advisor",
-      fee: activeExpert.fee
+      fee: Number(selfEditForm.fee) || 899
     };
 
     try {
@@ -1494,8 +1509,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
                             ) : adv.availability === "in meeting" ? (
                               <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
-                            ) : (
+                            ) : adv.availability === "unavailable" || adv.availability === "Not Available" ? (
                               <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>
+                            ) : isAdvisorSlotActive(adv.availability) ? (
+                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Active: {adv.availability}</span>
+                            ) : (
+                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Inactive: {adv.availability}</span>
                             )}
                           </td>
                           <td className="p-[12px] text-right space-x-[6px]">
@@ -2058,31 +2077,34 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                   {/* Glowing Status Selection Segmented Control */}
                   <div className="shrink-0 flex flex-col items-center gap-[8px] p-[10px] bg-white border border-gray-100 rounded-[20px] shadow-inner">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Availability Status</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Availability Slot</span>
 
-                    <div className="flex bg-gray-100 p-[3px] rounded-full border border-gray-200">
+                    <div className="flex flex-wrap justify-center gap-[4px] bg-gray-100 p-[4px] rounded-[16px] border border-gray-200 max-w-[340px]">
                       {[
-                        { value: "available", label: "Available", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-sm" },
-                        { value: "unavailable", label: "Not Available", color: "bg-rose-500", text: "text-rose-700", activeBg: "bg-rose-50 border-rose-200 shadow-sm" },
-                        { value: "in meeting", label: "In Meeting", color: "bg-indigo-500", text: "text-indigo-700", activeBg: "bg-indigo-50 border-indigo-200 shadow-sm" }
+                        { value: "09:00 AM - 11:00 AM", label: "9-11 AM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
+                        { value: "11:00 AM - 01:00 PM", label: "11-1 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
+                        { value: "01:00 PM - 03:00 PM", label: "1-3 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
+                        { value: "03:00 PM - 05:00 PM", label: "3-5 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
+                        { value: "05:00 PM - 07:00 PM", label: "5-7 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
+                        { value: "unavailable", label: "Unavailable", color: "bg-rose-500", text: "text-rose-700", activeBg: "bg-rose-50 border-rose-200 shadow-xs" }
                       ].map((opt) => {
                         const isActive = activeExpert.availability === opt.value;
                         return (
                           <button
                             key={opt.value}
                             onClick={() => handleSetExpertAvailability(opt.value as any)}
-                            className={`flex items-center gap-[6px] px-[12px] py-[6px] rounded-full text-[11px] font-bold transition border border-transparent cursor-pointer ${isActive ? `${opt.activeBg} ${opt.text}` : "text-gray-500 hover:text-gray-700"
+                            className={`flex items-center gap-[4px] px-[10px] py-[5px] rounded-[10px] text-[10.5px] font-bold transition border border-transparent cursor-pointer ${isActive ? `${opt.activeBg} ${opt.text}` : "text-gray-500 hover:text-gray-700"
                               }`}
                           >
-                            <span className="relative flex h-2 w-2">
-                              <span className={`relative inline-flex rounded-full h-2 w-2 ${opt.color} ${isActive && opt.value === "available" ? "animate-pulse-ring" : ""}`} />
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${opt.color}`} />
                             </span>
                             {opt.label}
                           </button>
                         );
                       })}
                     </div>
-                    <span className="text-[9px] text-gray-400">Select status to update availability</span>
+                    <span className="text-[9px] text-gray-400">Select slot to update advisor availability status</span>
                   </div>
                 </div>
 
@@ -2170,6 +2192,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             type="text"
                             value={selfEditForm.strength}
                             onChange={(e) => setSelfEditForm({ ...selfEditForm, strength: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Consultation Fee / Hr (INR)</label>
+                          <input
+                            type="number"
+                            value={selfEditForm.fee}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, fee: Number(e.target.value) })}
+                            min={0}
                             className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
                           />
                         </div>
@@ -2616,22 +2648,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                     {/* Row 2: Filters & Export */}
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
-                      {/* Role Filter Selector */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
-                        <select
-                          value={filterRole}
-                          onChange={(e) => setFilterRole(e.target.value)}
-                          className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                        >
-                          <option value="all">All Enquirers</option>
-                          <option value="User">Regular Users (Leads)</option>
-                          <option value="Admin">Admins</option>
-                          <option value="Manager">Managers</option>
-                          <option value="Senior Leadership">Senior Leadership</option>
-                        </select>
-                      </div>
-
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
                         <input
