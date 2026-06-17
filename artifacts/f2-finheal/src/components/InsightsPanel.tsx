@@ -6,8 +6,8 @@ import tips from "@/data/insights.json";
 import { useState, useEffect, useCallback } from "react";
 import type { Goal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
-import { fetchAdvisorAppointments } from "@/lib/backendAuth";
-import type { Appointment } from "@/lib/backendAuth";
+import { fetchAdvisorAppointments, fetchUserReports } from "@/lib/backendAuth";
+import type { Appointment, UserReport } from "@/lib/backendAuth";
 
 interface InsightsPanelProps {
   userId: string;
@@ -42,6 +42,9 @@ export default function InsightsPanel({
   const [editAmount, setEditAmount] = useState<string>("");
   const [advisorCalls, setAdvisorCalls] = useState<Appointment[]>([]);
   const [loadingCalls, setLoadingCalls] = useState<boolean>(false);
+  const [reportsList, setReportsList] = useState<UserReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState<boolean>(false);
+  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
 
   // Live clock state
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -98,6 +101,38 @@ export default function InsightsPanel({
     };
     window.addEventListener("finheal:goals-updated", handleGoalsUpdated);
     return () => window.removeEventListener("finheal:goals-updated", handleGoalsUpdated);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let active = true;
+    async function loadReports() {
+      setLoadingReports(true);
+      try {
+        const list = await fetchUserReports(userId);
+        if (active) {
+          setReportsList(list);
+        }
+      } catch (err) {
+        console.error("Failed to load user reports in InsightsPanel:", err);
+      } finally {
+        if (active) {
+          setLoadingReports(false);
+        }
+      }
+    }
+    loadReports();
+
+    const handleWellnessUpdate = () => {
+      loadReports();
+    };
+    window.addEventListener("finheal:wellness_update", handleWellnessUpdate);
+
+    return () => {
+      active = false;
+      window.removeEventListener("finheal:wellness_update", handleWellnessUpdate);
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -378,6 +413,108 @@ export default function InsightsPanel({
             </div>
           </>
         )}
+      </div>
+
+      {/* Wellness Reports */}
+      <div className="mb-[18px]">
+        <div className="flex items-center justify-between mb-[10px]">
+          <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px]">Wellness Reports</div>
+          <div className="flex bg-gray-100 rounded-lg p-0.5 scale-90 origin-right">
+            {(["daily", "fortnightly", "monthly"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setActiveReportSubTab(type)}
+                className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all cursor-pointer ${
+                  activeReportSubTab === type
+                    ? "bg-white text-primary shadow-sm"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingReports && reportsList.length === 0 ? (
+          <div className="text-center py-6 bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px]">
+            <div className="text-[11px] text-gray-400 animate-pulse">Loading reports...</div>
+          </div>
+        ) : (() => {
+          const activeReport = reportsList.find((r) => r.reportType === activeReportSubTab);
+          if (!activeReport) {
+            return (
+              <div className="text-center py-6 bg-gray-50/50 border border-dashed border-gray-200 rounded-[10px] p-3">
+                <div className="text-[24px] mb-1">🎯</div>
+                <h4 className="text-[11.5px] font-bold text-gray-700">No {activeReportSubTab === "daily" ? "Daily" : activeReportSubTab === "fortnightly" ? "15-Day" : "30-Day"} Report Yet</h4>
+                <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
+                  Continue talking to your AI Therapist or use tools like CIBIL checker, tests, and calculators to unlock.
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[12px] flex flex-col gap-3">
+              {/* Therapist Analysis */}
+              <div className="bg-indigo-50/40 border border-indigo-100/30 rounded-lg p-2.5 text-left relative overflow-hidden">
+                <div className="absolute top-0 right-1 text-[24px] font-serif opacity-10 select-none pointer-events-none">“</div>
+                <span className="text-[8px] font-extrabold text-indigo-700 bg-indigo-100/40 px-1.5 py-0.5 rounded uppercase tracking-wider mb-1.5 inline-block">
+                  Therapist Analysis
+                </span>
+                <p className="text-[11px] italic text-gray-600 leading-normal font-medium relative z-10">
+                  &quot;{activeReport.summary}&quot;
+                </p>
+              </div>
+
+              {/* Stress & Telemetry Trend */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[8.5px] font-extrabold text-gray-400 uppercase tracking-wider">
+                  Telemetry Trend
+                </span>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "bg-red-500" },
+                    { label: "Urgency", val: activeReport.moodTrend?.urgency, color: "bg-orange-500" },
+                    { label: "Openness", val: activeReport.moodTrend?.openness, color: "bg-emerald-500" },
+                    { label: "Willingness", val: activeReport.moodTrend?.willingness, color: "bg-primary" },
+                    { label: "Emotion", val: activeReport.moodTrend?.emotion, color: "bg-amber-500" }
+                  ].map((dim) => {
+                    const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                    return (
+                      <div key={dim.label} className="flex items-center gap-2">
+                        <div className="text-[10px] text-gray-500 w-[60px] font-medium shrink-0">{dim.label}</div>
+                        <div className="flex-1 h-[3px] bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-1000 ${dim.color}`} style={{ width: `${dim.val ?? 0}%` }} />
+                        </div>
+                        <div className="text-[9px] text-gray-400 w-[20px] text-right shrink-0">{valLabel}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Takeaways / Action Steps */}
+              {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                <div className="border-t border-gray-200 pt-2 flex flex-col gap-1.5">
+                  <span className="text-[8.5px] font-extrabold text-gray-400 uppercase tracking-wider">
+                    Recommended Action Steps
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    {activeReport.keyTakeaways.map((takeaway, idx) => (
+                      <div key={idx} className="bg-amber-50/20 border border-amber-100/30 rounded-lg p-2.5 flex gap-2 items-start">
+                        <span className="text-amber-500 text-[11px] mt-0.5 shrink-0">⚡</span>
+                        <span className="text-[10.5px] text-gray-600 leading-normal font-medium">
+                          {takeaway}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Today's Insight */}

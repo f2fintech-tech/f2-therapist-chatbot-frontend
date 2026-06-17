@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
 
@@ -406,6 +406,9 @@ export default function Dashboard({
   const [activeTab, setActiveTab] = useState<"overview" | "loans" | "reports" | "advisor">("overview");
 
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
+  const [reportsList, setReportsList] = useState<UserReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState<boolean>(false);
+  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
   useEffect(() => {
     setLocalGoals(listUserGoals(userId));
 
@@ -581,6 +584,31 @@ export default function Dashboard({
 
   const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const pastAppointments = appointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
+
+  useEffect(() => {
+    if (!userId || activeTab !== "reports") return;
+    
+    let active = true;
+    async function loadReports() {
+      setLoadingReports(true);
+      try {
+        const list = await fetchUserReports(userId);
+        if (active) {
+          setReportsList(list);
+        }
+      } catch (err) {
+        console.error("Failed to load user reports:", err);
+      } finally {
+        if (active) {
+          setLoadingReports(false);
+        }
+      }
+    }
+    loadReports();
+    return () => {
+      active = false;
+    };
+  }, [userId, activeTab]);
 
   const isUserAdvisor = (email?: string) => {
     try {
@@ -1081,6 +1109,138 @@ export default function Dashboard({
                     <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
                   </div>
                 ));
+              })()}
+            </div>
+
+            {/* Personalized Wellness & Therapy Reports */}
+            <div className="dashboard-card animate-fade-up p-5 mt-6" style={{ animationDelay: "240ms" }}>
+              <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-800">💡 Personalized Wellness & Therapy Reports</h3>
+                  <p className="text-[11px] text-gray-400">Generated automatically from your chat logs and activities</p>
+                </div>
+                <div className="flex bg-gray-100 rounded-lg p-0.5 shrink-0">
+                  {(["daily", "fortnightly", "monthly"] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setActiveReportSubTab(type)}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        activeReportSubTab === type
+                          ? "bg-white text-primary shadow-xs"
+                          : "text-gray-500 hover:text-gray-800"
+                      }`}
+                    >
+                      {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loadingReports && reportsList.length === 0 ? (
+                <div className="text-center py-10">
+                  <div className="text-[12px] text-gray-400 animate-pulse">Loading wellness reports...</div>
+                </div>
+              ) : (() => {
+                const activeReport = reportsList.find((r) => r.reportType === activeReportSubTab);
+                if (!activeReport) {
+                  return (
+                    <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                      <div className="text-[32px] mb-2">🎯</div>
+                      <h4 className="text-[13px] font-bold text-gray-700">No {activeReportSubTab === "daily" ? "Daily" : activeReportSubTab === "fortnightly" ? "15-Day" : "30-Day"} Report Yet</h4>
+                      <p className="text-[11px] text-gray-400 max-w-[320px] mx-auto mt-1 leading-relaxed">
+                        To unlock this report, continue talking to your AI Therapist or use tools like CIBIL checker, tests, and calculators. Reports are pre-generated automatically at the end of the period.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Render active report content
+                return (
+                  <div className="space-y-5">
+                    {/* Compassionate Therapy Analysis */}
+                    <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                      <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                        Therapist Analysis
+                      </span>
+                      <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                        &quot;{activeReport.summary}&quot;
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Activity Summary Log */}
+                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                          Period Activity Log
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
+                            { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
+                            { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
+                            { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
+                            { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
+                          ].map((item) => (
+                            <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
+                              <span className="text-gray-500 font-medium flex items-center gap-1.5">
+                                <span>{item.icon}</span> {item.label}
+                              </span>
+                              <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
+                                {item.count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Mood Trend Analysis */}
+                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                        <span className="text-[10px] font-extrabold text-gray-550 uppercase tracking-wider mb-3 block">
+                          Avg Stress & Telemetry Trend
+                        </span>
+                        <div className="space-y-2.5">
+                          {[
+                            { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                            { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                            { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                            { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                            { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                          ].map((dim) => {
+                            const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                            return (
+                              <div key={dim.label} className="flex items-center gap-2">
+                                <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                </div>
+                                <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Recommendations & Takeaways */}
+                    {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                      <div className="border-t border-gray-100 pt-4">
+                        <span className="text-[10.5px] font-extrabold text-gray-550 uppercase tracking-wider mb-3 block">
+                          📋 Recommended Therapist Action Steps
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {activeReport.keyTakeaways.map((takeaway, idx) => (
+                            <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                              <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                {takeaway}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
               })()}
             </div>
           </div>

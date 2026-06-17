@@ -548,3 +548,70 @@ export function isAdvisorSlotActive(availability: string): boolean {
   return currentMinutes >= startMinutes && currentMinutes < endMinutes;
 }
 
+// ==================== User Session Reports APIs ====================
+
+export interface UserReport {
+  id: string;
+  userId: string;
+  reportType: "daily" | "fortnightly" | "monthly";
+  startDate: string;
+  endDate: string;
+  summary: string;
+  keyTakeaways: string[];
+  moodTrend: {
+    stress?: number;
+    urgency?: number;
+    openness?: number;
+    willingness?: number;
+    emotion?: number;
+    [key: string]: any;
+  };
+  activitySummary: {
+    msg_count?: number;
+    cibil_checks?: number;
+    calculator_runs?: number;
+    tests_completed?: number;
+    videos_watched?: number;
+    [key: string]: any;
+  };
+  createdAt: string;
+}
+
+export async function fetchUserReports(userId: string): Promise<UserReport[]> {
+  const list = await authRequest<any[]>(`chat/reports/${encodeURIComponent(userId)}`, {
+    method: "GET"
+  });
+  return list.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  }));
+}
+
+export async function triggerReportGeneration(userId: string, reportType: string): Promise<UserReport | null> {
+  const result = await authRequest<any>(`chat/reports/${encodeURIComponent(userId)}/trigger?report_type=${reportType}`, {
+    method: "POST"
+  });
+  if (result.status === "skipped" || !result.report) return null;
+  const r = result.report;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  };
+}
+
