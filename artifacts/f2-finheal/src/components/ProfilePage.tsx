@@ -16,6 +16,7 @@ interface ProfilePageProps {
   userId: string;
   userProfile: UserProfile;
   email?: string;
+  isAdvisor?: boolean;
   onBackToChat: () => void;
   onSaveProfile: (profile: { fullName: string; email?: string | null; avatarUrl?: string | null }) => void;
 }
@@ -122,7 +123,7 @@ function getStyleLabel(val: string): string {
   return map[val] || val;
 }
 
-export default function ProfilePage({ userId, userProfile, email, onBackToChat, onSaveProfile }: ProfilePageProps) {
+export default function ProfilePage({ userId, userProfile, email, isAdvisor = false, onBackToChat, onSaveProfile }: ProfilePageProps) {
   const [formData, setFormData] = useState<ProfileFormState>(() => toFormState(null, userProfile.displayName, email, userId));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userProfile.avatarUrl ?? null);
   const [isSaved, setIsSaved] = useState(false);
@@ -326,11 +327,15 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
             <CardContent className="space-y-[12px] text-left text-[13px] text-gray-600 p-4 border-t border-slate-50 bg-slate-50/20 flex-1">
               <div className="flex items-center gap-3 rounded-[12px] border-l-4 border-l-primary bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all hover:shadow-md">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-                  <Mail className="h-4 w-4" />
+                  {isAdvisor ? <Briefcase className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Email</div>
-                  <div className="mt-0.5 break-all text-[12.5px] font-semibold text-gray-800">{isLoading ? "Loading..." : formData.email || "Not set"}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    {isAdvisor ? "F2 Fintech ID" : "Email"}
+                  </div>
+                  <div className="mt-0.5 break-all text-[12.5px] font-semibold text-gray-800">
+                    {isLoading ? "Loading..." : (isAdvisor ? (((formData.email || "").split("@")[0] || "").toUpperCase() || "Not set") : formData.email || "Not set")}
+                  </div>
                 </div>
               </div>
 
@@ -422,10 +427,12 @@ export default function ProfilePage({ userId, userProfile, email, onBackToChat, 
                     <label className="text-[11.5px] font-bold text-gray-600 uppercase tracking-wide">Full name</label>
                     <Input value={formData.fullName} onChange={(event) => handleChange("fullName", event.target.value)} placeholder="Your full name" className="h-11 rounded-[12px] focus-visible:ring-primary/20 focus-visible:border-primary transition-all" disabled={isLoading} />
                   </div>
-                  <div className="space-y-[6px]">
-                    <label className="text-[11.5px] font-bold text-gray-600 uppercase tracking-wide">Email Address</label>
-                    <Input type="email" value={formData.email} onChange={(event) => handleChange("email", event.target.value)} placeholder="you@example.com" className="h-11 rounded-[12px] focus-visible:ring-primary/20 focus-visible:border-primary transition-all" disabled={isLoading} />
-                  </div>
+                  {!isAdvisor && (
+                    <div className="space-y-[6px]">
+                      <label className="text-[11.5px] font-bold text-gray-600 uppercase tracking-wide">Email Address</label>
+                      <Input type="email" value={formData.email} onChange={(event) => handleChange("email", event.target.value)} placeholder="you@example.com" className="h-11 rounded-[12px] focus-visible:ring-primary/20 focus-visible:border-primary transition-all" disabled={isLoading} />
+                    </div>
+                  )}
                   <div className="space-y-[6px]">
                     <label className="text-[11.5px] font-bold text-gray-600 uppercase tracking-wide">Phone Number</label>
                     <Input value={formData.phone} onChange={(event) => handleChange("phone", event.target.value)} placeholder="Phone number" className="h-11 rounded-[12px] focus-visible:ring-primary/20 focus-visible:border-primary transition-all" disabled={isLoading} />

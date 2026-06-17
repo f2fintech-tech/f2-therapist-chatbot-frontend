@@ -560,7 +560,9 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             </button>
             <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
             <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
-            <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
+            {!isUserAdvisor(userEmail) && (
+              <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
+            )}
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
             <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => { setActiveNav("Financial Education"); onOpenEducation?.(); }} />
@@ -569,8 +571,12 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
 
-            <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
-            <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
+            {!isUserAdvisor(userEmail) && (
+              <>
+                <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
+                <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
+              </>
+            )}
             
             {/* If Admin */}
             {(userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com") && (

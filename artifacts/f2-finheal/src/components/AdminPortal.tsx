@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -36,8 +36,8 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
 
   // 1. Admin Classification
   if (
-    cleanEmail === "admin@finheal.com" || 
-    cleanEmail === "admin@f2finheal.com" || 
+    cleanEmail === "admin@finheal.com" ||
+    cleanEmail === "admin@f2finheal.com" ||
     cleanEmail.startsWith("admin@") ||
     cleanName.includes("admin") ||
     cleanName === "finheal admin"
@@ -48,7 +48,7 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
   // 2. Senior Leadership Classification
   const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
   const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
-  
+
   const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
   const hasLeadershipName = cleanName.includes("ceo") || cleanName.includes("cto") || cleanName.includes("cfo") || cleanName.includes("coo") || cleanName.includes("vp") || cleanName.includes("president") || cleanName.includes("founder") || cleanName.includes("director") || cleanName.includes("executive");
 
@@ -82,7 +82,7 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
 
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
-  
+
 
 
   // Active Admin Tabs: stats, experts, education, tests, appointments, lenders, cibil-enquiries
@@ -122,14 +122,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     processingFee: "As per offer at login",
     emiPerLakhMin: "",
   });
-  
+
   // Loading and Error States
   const [statsLoading, setStatsLoading] = useState(false);
+  const [savingExpert, setSavingExpert] = useState(false);
 
   // Edit / Add Modal States
   const [expertModalOpen, setExpertModalOpen] = useState(false);
   const [editingExpert, setEditingExpert] = useState<Advisor | null>(null);
-  
+
   const [educationModalOpen, setEducationModalOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<ContentItem | null>(null);
 
@@ -142,16 +143,18 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     name: "",
     designation: "",
     avatarUrl: "",
-    availability: "available" as "available" | "unavailable" | "in meeting",
+    availability: "available" as string,
     expertise: "",
     strength: "",
     bio: "",
     category: "wealth" as any,
     customCategory: "",
-    rating: 4.8,
-    reviewsCount: 45,
+    rating: 0.0,
+    reviewsCount: 0,
     nextSlot: "Tomorrow, 10:00 AM",
-    fee: 899
+    fee: 899,
+    testComment: "",
+    testRating: 5
   });
 
   // Education form state
@@ -183,7 +186,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
   const [slotDate, setSlotDate] = useState("");
-  const [slotTime, setSlotTime] = useState("");
+  const [slotFromTime, setSlotFromTime] = useState("");
+  const [slotToTime, setSlotToTime] = useState("");
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -193,6 +197,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [rescheduleTime, setRescheduleTime] = useState("");
 
   const timeSlots = [
+    "08:00 AM",
     "09:00 AM",
     "10:00 AM",
     "11:00 AM",
@@ -202,7 +207,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     "03:00 PM",
     "04:00 PM",
     "05:00 PM",
-    "06:00 PM"
+    "06:00 PM",
+    "07:00 PM",
+    "08:00 PM",
+    "09:00 PM"
   ];
 
   const formatSlotValue = (dateStr: string, timeStr: string): string => {
@@ -236,16 +244,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [testReviewHoverRating, setTestReviewHoverRating] = useState(0);
 
 
   // Dynamically map logged-in email prefix to advisor ID based on name slug or F2 Fintech ID
   const getExpertIdFromEmail = (email: string) => {
     if (!email) return null;
     const prefix = email.split("@")[0].toLowerCase().replace(".", "-");
-    
+
     // Direct match against F2 ID or database ID first
-    const directMatch = advisors.find(a => 
-      (a.f2FintechId && a.f2FintechId.toLowerCase() === prefix) || 
+    const directMatch = advisors.find(a =>
+      (a.f2FintechId && a.f2FintechId.toLowerCase() === prefix) ||
       (a.id && a.id.toLowerCase() === prefix)
     );
     if (directMatch) return directMatch.id || directMatch.f2FintechId;
@@ -256,7 +265,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     });
     return found ? found.id : null;
   };
-  
+
   const currentExpertId = getExpertIdFromEmail(userEmail);
 
   // Load backend stats
@@ -307,6 +316,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   }, [filterDate, filterRole]);
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
+    // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
+    if (!isAdmin) {
+      const cleanUserEmail = (userEmail || "").toLowerCase().trim();
+      const cleanEnqEmail = (enq.email || "").toLowerCase().trim();
+      const cleanExpertId = (currentExpertId || "").toLowerCase().trim();
+      const cleanEnqUserId = (enq.user_id || "").toLowerCase().trim();
+
+      const isFetchedByMe = 
+        (cleanUserEmail && cleanEnqEmail === cleanUserEmail) ||
+        (cleanExpertId && cleanEnqUserId === cleanExpertId) ||
+        (cleanExpertId && cleanEnqEmail.startsWith(cleanExpertId + "@"));
+      
+      if (!isFetchedByMe) return false;
+    }
+
     // 1. Filter by Date
     if (filterDate) {
       if (!enq.fetched_at) return false;
@@ -340,22 +364,22 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
     // Header row
     const headers = ["Name", "Phone", "Email", "CIBIL Score", "Bureau", "Existing Open Accounts", "Date Fetched"];
-    
+
     // Map rows
     const rows = filteredEnquiries.map(enq => {
       // 1. Get only active (open) accounts
       const activeAccountsList = (enq.accounts || []).filter((acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1);
-      
+
       // 2. Format active accounts list
-      const formattedAccounts = activeAccountsList.length > 0 
+      const formattedAccounts = activeAccountsList.length > 0
         ? activeAccountsList.map((acc: any) => {
-            const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
-            return `${acc.lender} (${acc.type}) - Bal: Rs.${bal}`;
-          }).join("; ")
+          const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
+          return `${acc.lender} (${acc.type}) - Bal: Rs.${bal}`;
+        }).join("; ")
         : "No open accounts";
 
       // 3. Date formatting
-      const dateFormatted = enq.fetched_at 
+      const dateFormatted = enq.fetched_at
         ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
         : "-";
 
@@ -373,7 +397,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     // Convert to CSV string, escaping quotes
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => 
+      ...rows.map(row =>
         row.map(val => {
           const strVal = String(val);
           // Escape double quotes by doubling them
@@ -391,7 +415,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    
+
     const roleName = filterRole === "all" ? "All" : filterRole === "User" ? "Leads" : filterRole;
     const dateStr = filterDate ? `_${filterDate}` : "";
     link.setAttribute("href", url);
@@ -411,13 +435,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         headers["Authorization"] = `Bearer ${configuredApiKey}`;
         headers["X-API-Key"] = configuredApiKey;
       }
-      
+
       const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
       }
-      
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -526,7 +550,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
 
     const generatedId = lenderForm.id?.trim() || `${lenderForm.category}-${lenderForm.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}`;
-    
+
     const item: LenderProduct = {
       id: generatedId,
       name: lenderForm.name.trim(),
@@ -653,7 +677,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const handleUpdate = () => {
       const stored = localStorage.getItem("finheal_advisors_list");
       if (stored) {
-        try { setAdvisors(JSON.parse(stored)); } catch {}
+        try { setAdvisors(JSON.parse(stored)); } catch { }
       }
       loadGlobalAppointments();
     };
@@ -700,7 +724,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
         const dd = String(dateObj.getDate()).padStart(2, "0");
         setSlotDate(`${yyyy}-${mm}-${dd}`);
-        setSlotTime(timeStr);
+        
+        const timeParts = timeStr.split(/\s*-\s*/);
+        if (timeParts.length === 2) {
+          setSlotFromTime(timeParts[0]);
+          setSlotToTime(timeParts[1]);
+        } else {
+          setSlotFromTime(timeStr || "09:00 AM");
+          setSlotToTime(timeStr || "10:00 AM");
+        }
         return;
       }
     }
@@ -709,7 +741,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
     setSlotDate(`${yyyy}-${mm}-${dd}`);
-    setSlotTime("09:00 AM");
+    setSlotFromTime("09:00 AM");
+    setSlotToTime("10:00 AM");
   }, [expertNextSlot]);
 
   const loadGlobalAppointments = async () => {
@@ -731,7 +764,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 clientEmail: clientEmailStr === "anonymous" ? "Guest User" : clientEmailStr
               });
             });
-          } catch (e) {}
+          } catch (e) { }
         }
       }
       // Sort by date / bookedAt descending
@@ -758,10 +791,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       bio: "",
       category: "wealth",
       customCategory: "",
-      rating: 4.8,
-      reviewsCount: 15,
+      rating: 0.0,
+      reviewsCount: 0,
       nextSlot: "Tomorrow, 10:00 AM",
-      fee: 899
+      fee: 899,
+      testComment: "",
+      testRating: 5
     });
     setExpertModalOpen(true);
   };
@@ -783,7 +818,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       rating: adv.rating,
       reviewsCount: adv.reviewsCount,
       nextSlot: adv.nextSlot,
-      fee: adv.fee || 899
+      fee: adv.fee || 899,
+      testComment: "",
+      testRating: 5
     });
     setExpertModalOpen(true);
   };
@@ -805,8 +842,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
 
     const rawExpertise = expertForm.expertise.split(",").map((e: string) => e.trim()).filter(Boolean);
-    const resolvedExpertise = rawExpertise.length > 0 
-      ? rawExpertise 
+    const resolvedExpertise = rawExpertise.length > 0
+      ? rawExpertise
       : resolvedCategory.split(",").map((c: string) => c.trim()).filter(Boolean);
 
     const f2FintechIdClean = expertForm.f2FintechId.trim();
@@ -825,9 +862,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       rating: expertForm.rating,
       reviewsCount: expertForm.reviewsCount,
       nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM",
-      fee: Number(expertForm.fee) || 899
+      fee: Number(expertForm.fee) || 899,
+      testComment: expertForm.testComment?.trim() || "",
+      testRating: expertForm.testRating || 5
     };
 
+    if (savingExpert) return;
+    setSavingExpert(true);
     try {
       await saveAdvisor(item);
       await loadAdvisors();
@@ -835,6 +876,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     } catch (err) {
       console.error("Error saving advisor to backend:", err);
       alert("Failed to save expert to the database.");
+    } finally {
+      setSavingExpert(false);
     }
   };
 
@@ -999,7 +1042,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   // ==================== Expert Workspace Actions ====================
-  const handleSetExpertAvailability = async (nextAvail: "available" | "unavailable" | "in meeting") => {
+  const handleSetExpertAvailability = async (nextAvail: string) => {
     if (!currentExpertId) return;
     try {
       await updateAdvisorAvailability(currentExpertId, nextAvail);
@@ -1011,14 +1054,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   const handleUpdateExpertNextSlot = async () => {
-    if (!currentExpertId || !slotDate || !slotTime) {
-      alert("Please select both a date and a time slot.");
+    if (!currentExpertId || !slotDate || !slotFromTime || !slotToTime) {
+      alert("Please select a date, From time, and To time.");
       return;
     }
-    const formattedSlot = formatSlotValue(slotDate, slotTime);
+    const combinedTime = `${slotFromTime} - ${slotToTime}`;
+    const formattedSlot = formatSlotValue(slotDate, combinedTime);
     try {
       await updateAdvisorNextSlot(currentExpertId, formattedSlot);
+      await updateAdvisorAvailability(currentExpertId, combinedTime);
       await loadAdvisors();
+      dispatchUpdateEvent("finheal:advisors_update");
       alert("Next slot has been updated successfully!");
     } catch (err) {
       console.error("Error updating next slot:", err);
@@ -1057,8 +1103,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       return;
     }
     const rawExpertise = selfEditForm.expertise.split(",").map((e: string) => e.trim()).filter(Boolean);
-    const resolvedExpertise = rawExpertise.length > 0 
-      ? rawExpertise 
+    const resolvedExpertise = rawExpertise.length > 0
+      ? rawExpertise
       : activeExpert.expertise;
 
     const item: Advisor = {
@@ -1187,7 +1233,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // ==================== RENDERING WORKSPACE ====================
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      
+
       {/* HEADER SECTION */}
       <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
         <button
@@ -1204,8 +1250,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
             {isAdmin ? "Super Admin Portal" : "Advisor Workspace"}
           </div>
           <div className="text-[10px] text-gray-400 sm:text-[11px]">
-            {isAdmin 
-              ? "Exclusively managing advisors, educational logs, test catalogs, and platform stats." 
+            {isAdmin
+              ? "Exclusively managing advisors, educational logs, test catalogs, and platform stats."
               : `Managing professional logs and live availability for ${activeExpert?.name || "Expert"}.`}
           </div>
         </div>
@@ -1221,13 +1267,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px] scrollbar-thin">
-        
+
         {/* ========================================================================= */}
         {/* ===================== SUPER ADMIN VIEW RENDER =========================== */}
         {/* ========================================================================= */}
         {isAdmin ? (
           <div className="space-y-[24px]">
-            
+
             {/* TABS MENU */}
             <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb" }}>
               {[
@@ -1239,12 +1285,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 { id: "lenders", label: "🏦 Lenders Catalog" },
                 { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" }
               ].map(t => (
-                <button 
-                  key={t.id} 
+                <button
+                  key={t.id}
                   onClick={() => setActiveTab(t.id as any)}
-                  className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${
-                    activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
-                  }`}
+                  className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
+                    }`}
                 >
                   {t.label}
                 </button>
@@ -1254,10 +1299,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
             {/* TAB: STATS & ANALYTICS */}
             {activeTab === "stats" && (
               <div className="space-y-[20px] animate-fade-in">
-                
+
                 {/* Metrics Cards Grid */}
                 <div className="grid gap-[12px] grid-cols-2 md:grid-cols-3">
-                  
+
                   <Card className="border-gray-200 shadow-xs">
                     <CardHeader className="p-[14px] pb-[4px]">
                       <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Total Platform Users</CardDescription>
@@ -1288,8 +1333,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </CardHeader>
                     <CardContent className="p-[14px] pt-0">
                       <div className="text-[32px] font-serif font-bold text-emerald-600">
-                        {statsLoading || !backendStats?.total_users 
-                          ? "0%" 
+                        {statsLoading || !backendStats?.total_users
+                          ? "0%"
                           : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`}
                       </div>
                       <div className="text-[12px] text-gray-500 mt-[2px]">Guests who became members</div>
@@ -1372,14 +1417,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                 {/* Additional Admin Visual Panel */}
                 <div className="grid gap-[18px] md:grid-cols-2">
-                  
+
                   {/* Platform Wellness Summary Card */}
                   <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs">
                     <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
                       🏆 Platform Wellness Average
                     </h3>
                     <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                    
+
                     <div className="flex items-end gap-[10px] mb-[12px]">
                       <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
                       <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
@@ -1415,7 +1460,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         📚 Catalog Content Distribution
                       </h3>
                       <p className="text-[12px] text-gray-500 mb-[16px]">Summary breakdown of all dynamic libraries managed by Admin.</p>
-                      
+
                       <div className="space-y-[10px]">
                         <div className="flex justify-between items-center text-[12px]">
                           <span className="text-gray-600 font-medium flex items-center gap-[6px]">📄 Educational Articles</span>
@@ -1446,7 +1491,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <div className="space-y-[16px] animate-fade-in">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[14px] font-bold text-gray-900">Manage Advisors ({advisors.length})</h3>
-                  <button 
+                  <button
                     onClick={handleOpenAddExpert}
                     className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
                   >
@@ -1484,18 +1529,22 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
                             ) : adv.availability === "in meeting" ? (
                               <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
-                            ) : (
+                            ) : adv.availability === "unavailable" || adv.availability === "Not Available" ? (
                               <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>
+                            ) : isAdvisorSlotActive(adv.availability) ? (
+                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Active: {adv.availability}</span>
+                            ) : (
+                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Inactive: {adv.availability}</span>
                             )}
                           </td>
                           <td className="p-[12px] text-right space-x-[6px]">
-                            <button 
+                            <button
                               onClick={() => handleOpenEditExpert(adv)}
                               className="text-primary hover:underline font-bold cursor-pointer"
                             >
                               Edit
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteExpert(adv.id)}
                               className="text-rose-500 hover:underline font-bold cursor-pointer"
                             >
@@ -1515,7 +1564,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <div className="space-y-[16px] animate-fade-in">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[14px] font-bold text-gray-900">Manage Education Content ({educationContent.length})</h3>
-                  <button 
+                  <button
                     onClick={handleOpenAddEdu}
                     className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
                   >
@@ -1558,13 +1607,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <td className="p-[12px] text-gray-500">{item.level}</td>
                           <td className="p-[12px] text-gray-400 font-medium">{item.source}</td>
                           <td className="p-[12px] text-right space-x-[6px]">
-                            <button 
+                            <button
                               onClick={() => handleOpenEditEdu(item)}
                               className="text-primary hover:underline font-bold cursor-pointer"
                             >
                               Edit
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteEdu(item.id)}
                               className="text-rose-500 hover:underline font-bold cursor-pointer"
                             >
@@ -1584,7 +1633,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <div className="space-y-[16px] animate-fade-in">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({testCatalog.length})</h3>
-                  <button 
+                  <button
                     onClick={handleOpenAddTest}
                     className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
                   >
@@ -1614,13 +1663,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <td className="p-[12px] text-gray-500">{test.focus}</td>
                           <td className="p-[12px] text-gray-400">{test.result}</td>
                           <td className="p-[12px] text-right space-x-[6px]">
-                            <button 
+                            <button
                               onClick={() => handleOpenEditTest(test)}
                               className="text-primary hover:underline font-bold cursor-pointer"
                             >
                               Edit
                             </button>
-                            <button 
+                            <button
                               onClick={() => handleDeleteTest(test.id)}
                               className="text-rose-500 hover:underline font-bold cursor-pointer"
                             >
@@ -1639,7 +1688,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
             {activeTab === "appointments" && (
               <div className="space-y-[16px] animate-fade-in">
                 <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({allAppointments.length})</h3>
-                
+
                 {allAppointments.length === 0 ? (
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
@@ -1726,7 +1775,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <div className="space-y-[16px] animate-fade-in">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({lenderList.length})</h3>
-                  <button 
+                  <button
                     onClick={handleOpenAddLender}
                     className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
                   >
@@ -1768,21 +1817,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             <td className="p-[12px] font-semibold text-gray-500 uppercase">{l.category}</td>
                             <td className="p-[12px] font-bold text-emerald-600">{l.minRate}% - {l.maxRate}%</td>
                             <td className="p-[12px] font-semibold text-gray-800">
-                              ₹{l.minAmount >= 10000000 ? `${(l.minAmount/10000000).toFixed(1)}Cr` : l.minAmount >= 100000 ? `${(l.minAmount/100000).toFixed(0)}L` : l.minAmount} - 
-                              ₹{l.maxAmount >= 10000000 ? `${(l.maxAmount/10000000).toFixed(0)}Cr` : l.maxAmount >= 100000 ? `${(l.maxAmount/100000).toFixed(0)}L` : l.maxAmount}
+                              ₹{l.minAmount >= 10000000 ? `${(l.minAmount / 10000000).toFixed(1)}Cr` : l.minAmount >= 100000 ? `${(l.minAmount / 100000).toFixed(0)}L` : l.minAmount} -
+                              ₹{l.maxAmount >= 10000000 ? `${(l.maxAmount / 10000000).toFixed(0)}Cr` : l.maxAmount >= 100000 ? `${(l.maxAmount / 100000).toFixed(0)}L` : l.maxAmount}
                             </td>
                             <td className="p-[12px] text-gray-500">
                               <span>CIBIL: ≥{l.minCibil}</span>
                               <span className="block text-[10px] text-gray-400">Min Income: ₹{l.minMonthlyIncome}</span>
                             </td>
                             <td className="p-[12px] text-right space-x-[6px]">
-                              <button 
+                              <button
                                 onClick={() => handleOpenEditLender(l)}
                                 className="text-primary hover:underline font-bold cursor-pointer"
                               >
                                 Edit
                               </button>
-                              <button 
+                              <button
                                 onClick={() => handleDeleteLender(l.id)}
                                 className="text-rose-500 hover:underline font-bold cursor-pointer"
                               >
@@ -1808,8 +1857,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                       </h3>
                       <p className="text-[10px] text-gray-400 mt-[2px]">
-                        {filterDate 
-                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                        {filterDate
+                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
                           : "Showing all credit score fetches across the platform."}
                       </p>
                     </div>
@@ -1860,7 +1909,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                      <input 
+                      <input
                         type="date"
                         value={filterDate}
                         onChange={(e) => setFilterDate(e.target.value)}
@@ -1907,8 +1956,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       ) : filteredEnquiries.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">
-                            {filterDate 
-                              ? "No CIBIL inquiries found for this particular day." 
+                            {filterDate
+                              ? "No CIBIL inquiries found for this particular day."
                               : "No CIBIL inquiries found on the platform."}
                           </td>
                         </tr>
@@ -1926,9 +1975,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             scoreColorClass = "text-amber-500";
                             bandText = "Fair";
                           }
-                          
+
                           const role = classifyEnquiryRole(enq.email, enq.name, advisors);
-                          
+
                           return (
                             <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                               <td className="p-[12px] max-w-[220px] break-words">
@@ -1936,25 +1985,23 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
                                 {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
                                 <div className="mt-[4px]">
-                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${
-                                    role === "Admin"
-                                      ? "bg-rose-50 text-rose-700 border-rose-200"
-                                      : role === "Senior Leadership"
-                                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                                        : role === "Manager"
-                                          ? "bg-blue-50 text-blue-700 border-blue-200"
-                                          : "bg-emerald-50 text-emerald-700 border-emerald-250"
-                                  }`}>
+                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : role === "Senior Leadership"
+                                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                                      : role === "Manager"
+                                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                                        : "bg-emerald-50 text-emerald-700 border-emerald-250"
+                                    }`}>
                                     {role === "User" ? "User (Lead)" : role}
                                   </span>
                                 </div>
                               </td>
                               <td className="p-[12px]">
-                                <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${
-                                  enq.bureau.toLowerCase() === "experian"
-                                    ? "bg-purple-100 text-purple-700 border border-purple-200"
-                                    : "bg-blue-100 text-blue-700 border border-blue-200"
-                                }`}>
+                                <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${enq.bureau.toLowerCase() === "experian"
+                                  ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                  : "bg-blue-100 text-blue-700 border border-blue-200"
+                                  }`}>
                                   {enq.bureau}
                                 </span>
                               </td>
@@ -1981,9 +2028,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               </td>
                               <td className="p-[12px] text-right">
                                 {enq.pdf_url ? (
-                                  <a 
-                                    href={enq.pdf_url} 
-                                    target="_blank" 
+                                  <a
+                                    href={enq.pdf_url}
+                                    target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:underline font-bold text-[11px] block"
                                   >
@@ -2019,13 +2066,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 {/* Advisor Workspace Welcome Banner */}
                 <div className="border border-primary/20 bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] flex flex-col sm:flex-row gap-[18px] items-center">
                   <div className="relative group shrink-0">
-                    <img 
-                      src={activeExpert.avatarUrl} 
-                      alt={activeExpert.name} 
-                      className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white" 
+                    <img
+                      src={activeExpert.avatarUrl}
+                      alt={activeExpert.name}
+                      className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white"
                     />
-                    <label 
-                      htmlFor="avatar-upload-input" 
+                    <label
+                      htmlFor="avatar-upload-input"
                       className="absolute -bottom-1 -right-1 bg-primary text-white h-[28px] w-[28px] rounded-full flex items-center justify-center cursor-pointer border-2 border-white shadow-md hover:scale-105 transition-all"
                       title="Upload new profile photo"
                     >
@@ -2033,18 +2080,18 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                       </svg>
                     </label>
-                    <input 
-                      type="file" 
-                      id="avatar-upload-input" 
-                      accept="image/*" 
-                      onChange={handleAvatarUpload} 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      id="avatar-upload-input"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
                     />
                   </div>
                   <div className="text-center sm:text-left flex-1 min-w-0">
                     <h2 className="text-[20px] font-serif font-bold text-gray-900">Welcome Back, {activeExpert.name}!</h2>
                     <p className="text-[12px] text-gray-500 mt-[2px]">{activeExpert.designation}</p>
-                    
+ 
                     <div className="flex flex-wrap gap-[6px] mt-[8px] justify-center sm:justify-start">
                       {activeExpert.expertise.map((exp, idx) => (
                         <span key={idx} className="bg-white border border-[#d4d8fa] text-primary text-[10px] font-bold px-[8px] py-[2px] rounded-full">
@@ -2053,41 +2100,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       ))}
                     </div>
                   </div>
-                  
-                  {/* Glowing Status Selection Segmented Control */}
-                  <div className="shrink-0 flex flex-col items-center gap-[8px] p-[10px] bg-white border border-gray-100 rounded-[20px] shadow-inner">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Availability Status</span>
-                    
-                    <div className="flex bg-gray-100 p-[3px] rounded-full border border-gray-200">
-                      {[
-                        { value: "available", label: "Available", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-sm" },
-                        { value: "unavailable", label: "Not Available", color: "bg-rose-500", text: "text-rose-700", activeBg: "bg-rose-50 border-rose-200 shadow-sm" },
-                        { value: "in meeting", label: "In Meeting", color: "bg-indigo-500", text: "text-indigo-700", activeBg: "bg-indigo-50 border-indigo-200 shadow-sm" }
-                      ].map((opt) => {
-                        const isActive = activeExpert.availability === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            onClick={() => handleSetExpertAvailability(opt.value as any)}
-                            className={`flex items-center gap-[6px] px-[12px] py-[6px] rounded-full text-[11px] font-bold transition border border-transparent cursor-pointer ${
-                              isActive ? `${opt.activeBg} ${opt.text}` : "text-gray-500 hover:text-gray-700"
-                            }`}
-                          >
-                            <span className="relative flex h-2 w-2">
-                              <span className={`relative inline-flex rounded-full h-2 w-2 ${opt.color} ${isActive && opt.value === "available" ? "animate-pulse-ring" : ""}`} />
-                            </span>
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <span className="text-[9px] text-gray-400">Select status to update availability</span>
-                  </div>
                 </div>
 
                 {/* Slot editor and appointments list */}
                 <div className="grid gap-[20px] md:grid-cols-3">
-                  
+
                   {/* Left Column: Next Slot Editor & Profile Editor */}
                   <div className="md:col-span-1 space-y-[20px] h-fit">
                     {/* Card 1: Slot Editor */}
@@ -2107,17 +2124,31 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
                             />
                           </div>
-                          <div>
-                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Time Slot (1-hour slots)</label>
-                            <select
-                              value={slotTime}
-                              onChange={(e) => setSlotTime(e.target.value)}
-                              className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
-                            >
-                              {timeSlots.map((time) => (
-                                <option key={time} value={time}>{time}</option>
-                              ))}
-                            </select>
+                          <div className="grid grid-cols-2 gap-[10px]">
+                            <div>
+                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">From Time</label>
+                              <select
+                                value={slotFromTime}
+                                onChange={(e) => setSlotFromTime(e.target.value)}
+                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">To Time</label>
+                              <select
+                                value={slotToTime}
+                                onChange={(e) => setSlotToTime(e.target.value)}
+                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <button
@@ -2155,15 +2186,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Hourly Fee (INR)</label>
-                          <input
-                            type="number"
-                            value={selfEditForm.fee}
-                            onChange={(e) => setSelfEditForm({ ...selfEditForm, fee: Number(e.target.value) })}
-                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
-                          />
-                        </div>
-                        <div>
                           <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Expertise (Comma-separated)</label>
                           <input
                             type="text"
@@ -2178,6 +2200,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             type="text"
                             value={selfEditForm.strength}
                             onChange={(e) => setSelfEditForm({ ...selfEditForm, strength: e.target.value })}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase block mb-[2px]">Consultation Fee / Hr (INR)</label>
+                          <input
+                            type="number"
+                            value={selfEditForm.fee}
+                            onChange={(e) => setSelfEditForm({ ...selfEditForm, fee: Number(e.target.value) })}
+                            min={0}
                             className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px]"
                           />
                         </div>
@@ -2199,131 +2231,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       </CardContent>
                     </Card>
 
-                    {/* Card 3: Change Password */}
-                    <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPasswordSection((prev) => !prev);
-                          setPasswordError("");
-                          setPasswordSuccess("");
-                          setCurrentPassword("");
-                          setNewPassword("");
-                          setConfirmPassword("");
-                        }}
-                        className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-all cursor-pointer border-none outline-none"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600">
-                            <Lock className="h-4 w-4" />
-                          </div>
-                          <div className="text-left">
-                            <div className="text-[14px] font-extrabold text-gray-900 tracking-tight">Change Password</div>
-                            <div className="text-[11px] text-gray-500 font-medium">Update your account security credentials</div>
-                          </div>
-                        </div>
-                        <span className={`text-gray-400 text-[16px] transition-transform duration-200 ${showPasswordSection ? "rotate-180" : ""}`}>▾</span>
-                      </button>
-
-                      {showPasswordSection && (
-                        <div className="px-5 py-5 space-y-4 border-t border-gray-100 bg-white animate-fade-up">
-                          {passwordError && (
-                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>{passwordError}</span>
-                            </div>
-                          )}
-                          {passwordSuccess && (
-                            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
-                              <ShieldCheck className="h-4 w-4 shrink-0" />
-                              <span>{passwordSuccess}</span>
-                            </div>
-                          )}
-
-                          <div className="space-y-[6px] text-left">
-                            <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Current Password</label>
-                            <div className="relative">
-                              <input
-                                type={showCurrentPassword ? "text" : "password"}
-                                value={currentPassword}
-                                onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                placeholder="Enter your current password"
-                                className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
-                                disabled={isChangingPassword}
-                              />
-                              <button type="button" onClick={() => setShowCurrentPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
-                                {showCurrentPassword ? "Hide" : "Show"}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4 text-left">
-                            <div className="space-y-[6px]">
-                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">New Password</label>
-                              <div className="relative">
-                                <input
-                                  type={showNewPassword ? "text" : "password"}
-                                  value={newPassword}
-                                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                  placeholder="Min 6 characters"
-                                  className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
-                                  disabled={isChangingPassword}
-                                />
-                                <button type="button" onClick={() => setShowNewPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
-                                  {showNewPassword ? "Hide" : "Show"}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="space-y-[6px]">
-                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Confirm New Password</label>
-                              <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                placeholder="Re-enter new password"
-                                className={`w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px] ${confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:ring-red-200" : ""}`}
-                                disabled={isChangingPassword}
-                              />
-                              {confirmPassword && confirmPassword !== newPassword && (
-                                <p className="text-[10px] text-red-500 font-semibold mt-1">Passwords do not match</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Password strength indicator */}
-                          {newPassword && (
-                            <div className="space-y-1 text-left">
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4].map((level) => {
-                                  const strength = newPassword.length >= 12 ? 4 : newPassword.length >= 8 ? 3 : newPassword.length >= 6 ? 2 : 1;
-                                  const colors = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-emerald-500"];
-                                  return (
-                                    <div
-                                      key={level}
-                                      className={`h-[3px] flex-1 rounded-full transition-all duration-300 ${level <= strength ? colors[strength] : "bg-gray-200"}`}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <p className="text-[10px] text-gray-400 font-medium">
-                                {newPassword.length < 6 ? "Too short" : newPassword.length < 8 ? "Fair" : newPassword.length < 12 ? "Good" : "Strong"}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex justify-end pt-1">
-                            <button
-                              onClick={handleUpdatePassword}
-                              disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-                              className="rounded-full px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[13px] flex items-center gap-1.5 shadow-[0_8px_24px_rgba(225,29,72,0.18)] transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer"
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                              <span>{isChangingPassword ? "Changing..." : "Update Password"}</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
                   </div>
 
                   {/* Right Column: Booked consultations list */}
@@ -2333,7 +2240,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
                         📅 Upcoming Scheduled Consultations ({expertUpcomingAppointments.length})
                       </h3>
-                      
+
                       {expertUpcomingAppointments.length === 0 ? (
                         <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
                           <div className="text-[24px]">🕒</div>
@@ -2456,11 +2363,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                       <button
                                         key={idx}
                                         onClick={() => { setRescheduleDate(dt.fullStr); setRescheduleTime(""); }}
-                                        className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${
-                                          rescheduleDate === dt.fullStr
-                                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
-                                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                                        }`}
+                                        className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${rescheduleDate === dt.fullStr
+                                          ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
+                                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                          }`}
                                       >
                                         <span className={`text-[9px] font-medium leading-none ${rescheduleDate === dt.fullStr ? "text-white/80" : "text-gray-400"}`}>{dt.dayName}</span>
                                         <span className="text-[14px] font-bold mt-[3px] leading-none">{dt.dayNum}</span>
@@ -2474,11 +2380,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                           key={slot}
                                           type="button"
                                           onClick={() => setRescheduleTime(slot)}
-                                          className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${
-                                            rescheduleTime === slot
-                                              ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                          }`}
+                                          className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${rescheduleTime === slot
+                                            ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
+                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                            }`}
                                         >
                                           {slot}
                                         </button>
@@ -2517,7 +2422,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
                         📜 Past Consultations History ({expertPastAppointments.length})
                       </h3>
-                      
+
                       {expertPastAppointments.length === 0 ? (
                         <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
                           <div className="text-[24px]">📜</div>
@@ -2592,8 +2497,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                         </h3>
                         <p className="text-[10px] text-gray-400 mt-[2px]">
-                          {filterDate 
-                            ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}` 
+                          {filterDate
+                            ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
                             : "Showing all credit score fetches across the platform."}
                         </p>
                       </div>
@@ -2626,25 +2531,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                     {/* Row 2: Filters & Export */}
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
-                      {/* Role Filter Selector */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
-                        <select
-                          value={filterRole}
-                          onChange={(e) => setFilterRole(e.target.value)}
-                          className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                        >
-                          <option value="all">All Enquirers</option>
-                          <option value="User">Regular Users (Leads)</option>
-                          <option value="Admin">Admins</option>
-                          <option value="Manager">Managers</option>
-                          <option value="Senior Leadership">Senior Leadership</option>
-                        </select>
-                      </div>
-
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                        <input 
+                        <input
                           type="date"
                           value={filterDate}
                           onChange={(e) => setFilterDate(e.target.value)}
@@ -2691,8 +2580,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         ) : filteredEnquiries.length === 0 ? (
                           <tr>
                             <td colSpan={6} className="text-center p-6 text-gray-400">
-                              {filterDate 
-                                ? "No CIBIL inquiries found for this particular day." 
+                              {filterDate
+                                ? "No CIBIL inquiries found for this particular day."
                                 : "No CIBIL inquiries found on the platform."}
                             </td>
                           </tr>
@@ -2710,9 +2599,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               scoreColorClass = "text-amber-500";
                               bandText = "Fair";
                             }
-                            
+
                             const role = classifyEnquiryRole(enq.email, enq.name, advisors);
-                            
+
                             return (
                               <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                                 <td className="p-[12px] max-w-[220px] break-words">
@@ -2720,25 +2609,23 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                   {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
                                   {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
                                   <div className="mt-[4px]">
-                                    <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${
-                                      role === "Admin"
-                                        ? "bg-rose-50 text-rose-700 border-rose-200"
-                                        : role === "Senior Leadership"
-                                          ? "bg-amber-50 text-amber-800 border-amber-200"
-                                          : role === "Manager"
-                                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                                            : "bg-emerald-50 text-emerald-700 border-emerald-250"
-                                    }`}>
+                                    <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                                      : role === "Senior Leadership"
+                                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                                        : role === "Manager"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : "bg-emerald-50 text-emerald-700 border-emerald-250"
+                                      }`}>
                                       {role === "User" ? "User (Lead)" : role}
                                     </span>
                                   </div>
                                 </td>
                                 <td className="p-[12px]">
-                                  <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${
-                                    enq.bureau.toLowerCase() === "experian"
-                                      ? "bg-purple-100 text-purple-700 border border-purple-200"
-                                      : "bg-blue-100 text-blue-700 border border-blue-200"
-                                  }`}>
+                                  <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${enq.bureau.toLowerCase() === "experian"
+                                    ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                    : "bg-blue-100 text-blue-700 border border-blue-200"
+                                    }`}>
                                     {enq.bureau}
                                   </span>
                                 </td>
@@ -2765,9 +2652,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 </td>
                                 <td className="p-[12px] text-right">
                                   {enq.pdf_url ? (
-                                    <a 
-                                      href={enq.pdf_url} 
-                                      target="_blank" 
+                                    <a
+                                      href={enq.pdf_url}
+                                      target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-primary hover:underline font-bold text-[11px] block"
                                     >
@@ -2809,7 +2696,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       {expertModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
           <div className="bg-white rounded-[24px] max-w-[500px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
                 {editingExpert ? `Edit Profile: ${editingExpert.name}` : "Add New Advisor Profile"}
@@ -2933,6 +2820,33 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Rating (0.0 to 5.0)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5"
+                    value={expertForm.rating}
+                    onChange={(e) => setExpertForm({ ...expertForm, rating: Number(e.target.value) })}
+                    placeholder="e.g. 4.8"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Reviews Count</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={expertForm.reviewsCount}
+                    onChange={(e) => setExpertForm({ ...expertForm, reviewsCount: Number(e.target.value) })}
+                    placeholder="e.g. 15"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags (Comma-separated)</label>
                 <input
@@ -2965,14 +2879,61 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
                 />
               </div>
+
+              <div className="border border-amber-100 bg-amber-50/20 p-[12px] rounded-[16px] space-y-[6px]">
+                <label className="text-[12.5px] font-bold text-amber-700 uppercase tracking-[0.5px] block">
+                  Add a Comment
+                </label>
+
+                <div className="flex items-center gap-[6px] py-[2px]">
+                  <span className="text-[11px] font-bold text-amber-800 tracking-[0.3px]">Rating:</span>
+                  <div className="flex items-center gap-[4px]">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setTestReviewHoverRating(star)}
+                        onMouseLeave={() => setTestReviewHoverRating(0)}
+                        onClick={() => setExpertForm({ ...expertForm, testRating: star })}
+                        className="text-[20px] cursor-pointer transition-all duration-150 hover:scale-125 border-none bg-transparent outline-none focus:outline-none select-none p-0"
+                        aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                      >
+                        <span
+                          className={`transition-colors duration-150 ${star <= (testReviewHoverRating || expertForm.testRating)
+                            ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]"
+                            : "text-gray-200"
+                            }`}
+                        >
+                          ★
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-100/50 px-[6px] py-[2px] rounded-full">
+                    {expertForm.testRating} Star{expertForm.testRating > 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                <textarea
+                  value={expertForm.testComment}
+                  onChange={(e) => setExpertForm({ ...expertForm, testComment: e.target.value })}
+                  placeholder="e.g. Excellent advice! (Writing here creates a completed test appointment in the database with the selected Rating above)."
+                  rows={2}
+                  className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
+                />
+              </div>
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
               <button onClick={() => setExpertModalOpen(false)} className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer">
                 Cancel
               </button>
-              <button onClick={handleSaveExpert} className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 transition cursor-pointer shadow-md">
-                Save Expert
+              <button
+                onClick={handleSaveExpert}
+                disabled={savingExpert}
+                className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {savingExpert ? "Saving..." : "Save Expert"}
               </button>
             </div>
           </div>
@@ -2985,7 +2946,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       {educationModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
           <div className="bg-white rounded-[24px] max-w-[500px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
                 {editingContent ? `Edit Dynamic Content` : "Add Educational Article or Video"}
@@ -3139,7 +3100,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       {testModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
           <div className="bg-white rounded-[24px] max-w-[500px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
                 {editingTest ? `Edit Test Catalog Card` : "Add New Financial Health Test Card"}
@@ -3240,7 +3201,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       {lenderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
           <div className="bg-white rounded-[24px] max-w-[550px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
                 {editingLender ? `Edit Lender: ${editingLender.name}` : "Add New Lender Product"}

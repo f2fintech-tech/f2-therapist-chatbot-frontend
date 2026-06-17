@@ -50,7 +50,17 @@ function resolveApiBaseUrl(): string {
 }
 
 const apiBaseUrl = resolveApiBaseUrl();
-setBaseUrl(new URL(apiBaseUrl).origin);
+const getOrigin = () => {
+  if (apiBaseUrl.startsWith("/")) {
+    return typeof window !== "undefined" ? window.location.origin : "";
+  }
+  try {
+    return new URL(apiBaseUrl).origin;
+  } catch (e) {
+    return typeof window !== "undefined" ? window.location.origin : "";
+  }
+};
+setBaseUrl(getOrigin());
 
 const queryClient = new QueryClient();
 

@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
 
@@ -142,7 +142,7 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
 /* ─── Advisor card ─── */
 function AdvisorCard({ initials, name, title, rating, sessions, available, color, avatarUrl, delay = 0, onChat }: any) {
-  const isOnline = available === "available";
+  const isOnline = available === "available" || (available && available !== "unavailable" && available !== "Not Available" && available !== "in meeting" && isAdvisorSlotActive(available));
   const isInMeeting = available === "in meeting";
   const isActionable = isOnline || isInMeeting;
 
@@ -164,7 +164,9 @@ function AdvisorCard({ initials, name, title, rating, sessions, available, color
         {isOnline && (
           <div className="flex items-center gap-1.5 animate-fade-in">
             <div className="w-2 h-2 rounded-full bg-[#10b981]" />
-            <span className="text-[10px] font-medium text-[#10b981]">Online</span>
+            <span className="text-[10px] font-medium text-[#10b981]">
+              {available === "available" ? "Online" : available}
+            </span>
           </div>
         )}
         {isInMeeting && (
@@ -404,6 +406,9 @@ export default function Dashboard({
   const [activeTab, setActiveTab] = useState<"overview" | "loans" | "reports" | "advisor">("overview");
 
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
+  const [reportsList, setReportsList] = useState<UserReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState<boolean>(false);
+  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
   useEffect(() => {
     setLocalGoals(listUserGoals(userId));
 
@@ -580,11 +585,66 @@ export default function Dashboard({
   const activeAppointments = appointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const pastAppointments = appointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
+  useEffect(() => {
+    if (!userId || activeTab !== "reports") return;
+    
+    let active = true;
+    async function loadReports() {
+      setLoadingReports(true);
+      try {
+        const list = await fetchUserReports(userId);
+        if (active) {
+          setReportsList(list);
+        }
+      } catch (err) {
+        console.error("Failed to load user reports:", err);
+      } finally {
+        if (active) {
+          setLoadingReports(false);
+        }
+      }
+    }
+    loadReports();
+    return () => {
+      active = false;
+    };
+  }, [userId, activeTab]);
+
+  const isUserAdvisor = (email?: string) => {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          )
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const isAdvisor = isUserAdvisor(userProfile?.email);
+
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
     { key: "loans", label: "Loans", icon: "💳" },
     { key: "reports", label: "Reports", icon: "📈" },
-    { key: "advisor", label: "Advisors", icon: "🧑‍💼" },
+    ...(!isAdvisor ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
 
   return (
@@ -815,49 +875,51 @@ export default function Dashboard({
             </div>
 
             {/* Goals overview */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
-                  <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
-                </div>
-                <button
-                  data-testid="btn-view-all-goals"
-                  onClick={() => onNavigate("Financial Goals")}
-                  className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
-                >
-                  View All
-                </button>
-              </div>
-              <div className="flex flex-col gap-4">
-                {localGoals.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+            {!isAdvisor && (
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
+                    <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
                   </div>
-                ) : (
-                  localGoals.map((g: any, i: number) => {
-                    const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
-                    const color = g.color;
-                    return (
-                      <div key={g.id} className="flex items-center gap-4">
-                        <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[12px] font-semibold text-gray-700">{g.name}</span>
-                            <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
-                          </div>
-                          <AnimBar pct={pct} color={color} delay={i * 150} />
-                          <div className="flex justify-between mt-1">
-                            <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
-                            <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
+                  <button
+                    data-testid="btn-view-all-goals"
+                    onClick={() => onNavigate("Financial Goals")}
+                    className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {localGoals.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+                    </div>
+                  ) : (
+                    localGoals.map((g: any, i: number) => {
+                      const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
+                      const color = g.color;
+                      return (
+                        <div key={g.id} className="flex items-center gap-4">
+                          <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1.5">
+                              <span className="text-[12px] font-semibold text-gray-700">{g.name}</span>
+                              <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
+                            </div>
+                            <AnimBar pct={pct} color={color} delay={i * 150} />
+                            <div className="flex justify-between mt-1">
+                              <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
+                              <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Recent sessions */}
             <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "350ms" }}>
@@ -941,8 +1003,6 @@ export default function Dashboard({
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-
           </div>
         )}
 
@@ -950,9 +1010,141 @@ export default function Dashboard({
         {activeTab === "reports" && (
           <div className="flex flex-col gap-6">
 
+            {/* Personalized Wellness & Therapy Reports */}
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "0ms" }}>
+              <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-800">💡 Personalized Wellness & Therapy Reports</h3>
+                  <p className="text-[11px] text-gray-400">Generated automatically from your chat logs and activities</p>
+                </div>
+                <div className="flex bg-gray-100 rounded-lg p-0.5 shrink-0">
+                  {(["daily", "fortnightly", "monthly"] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setActiveReportSubTab(type)}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        activeReportSubTab === type
+                          ? "bg-white text-primary shadow-xs"
+                          : "text-gray-500 hover:text-gray-800"
+                      }`}
+                    >
+                      {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loadingReports && reportsList.length === 0 ? (
+                <div className="text-center py-10">
+                  <div className="text-[12px] text-gray-400 animate-pulse">Loading wellness reports...</div>
+                </div>
+              ) : (() => {
+                const activeReport = reportsList.find((r) => r.reportType === activeReportSubTab);
+                if (!activeReport) {
+                  return (
+                    <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                      <div className="text-[32px] mb-2">🎯</div>
+                      <h4 className="text-[13px] font-bold text-gray-700">No {activeReportSubTab === "daily" ? "Daily" : activeReportSubTab === "fortnightly" ? "15-Day" : "30-Day"} Report Yet</h4>
+                      <p className="text-[11px] text-gray-400 max-w-[320px] mx-auto mt-1 leading-relaxed">
+                        To unlock this report, continue talking to your AI Therapist or use tools like CIBIL checker, tests, and calculators. Reports are pre-generated automatically at the end of the period.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Render active report content
+                return (
+                  <div className="space-y-5">
+                    {/* Compassionate Therapy Analysis */}
+                    <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                      <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                        Therapist Analysis
+                      </span>
+                      <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                        &quot;{activeReport.summary}&quot;
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Activity Summary Log */}
+                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                          Period Activity Log
+                        </span>
+                        <div className="space-y-2">
+                          {[
+                            { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
+                            { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
+                            { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
+                            { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
+                            { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
+                          ].map((item) => (
+                            <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
+                              <span className="text-gray-500 font-medium flex items-center gap-1.5">
+                                <span>{item.icon}</span> {item.label}
+                              </span>
+                              <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
+                                {item.count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Mood Trend Analysis */}
+                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                          Avg Stress & Telemetry Trend
+                        </span>
+                        <div className="space-y-2.5">
+                          {[
+                            { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                            { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                            { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                            { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                            { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                          ].map((dim) => {
+                            const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                            return (
+                              <div key={dim.label} className="flex items-center gap-2">
+                                <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                </div>
+                                <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Recommendations & Takeaways */}
+                    {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                      <div className="border-t border-gray-100 pt-4">
+                        <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                          📋 Recommended Therapist Action Steps
+                        </span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {activeReport.keyTakeaways.map((takeaway, idx) => (
+                            <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                              <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                {takeaway}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Health summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "0ms" }}>
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
                 <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
                 {[
                   { label: "Savings Rate", pct: 27, color: "#10b981" },
@@ -971,7 +1163,7 @@ export default function Dashboard({
                 ))}
               </div>
 
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
                 <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Net Worth Trend</div>
                 <div className="text-[11px] text-gray-400 mb-3">↑ ₹78K growth in 6 months</div>
                 <ResponsiveContainer width="100%" height={200}>
@@ -993,7 +1185,7 @@ export default function Dashboard({
             </div>
 
             {/* Full income/expense bar */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="text-[13px] font-semibold text-gray-800">Monthly Cash Flow</div>
@@ -1017,7 +1209,7 @@ export default function Dashboard({
             </div>
 
             {/* Insight tiles */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "220ms" }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "240ms" }}>
               {(() => {
                 const currentScore = cibilReport?.score || 742;
                 const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
@@ -1032,7 +1224,7 @@ export default function Dashboard({
 
                 const tiles = [
                   { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
-                  { icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` },
+                  ...(!isAdvisor ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
                   { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
                 ];
 

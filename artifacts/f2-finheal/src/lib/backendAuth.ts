@@ -289,6 +289,8 @@ export interface BackendAdvisor {
   next_slot?: string;
   category: string;
   fee: number;
+  test_comment?: string;
+  test_rating?: number;
 }
 
 export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
@@ -320,11 +322,13 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     expertise: a.expertise || [],
     strength: a.strength || "",
     bio: a.bio || "",
-    rating: a.rating || 4.8,
-    reviews_count: a.reviewsCount || 15,
+    rating: a.rating !== undefined && a.rating !== null ? a.rating : 0.0,
+    reviews_count: a.reviewsCount !== undefined && a.reviewsCount !== null ? a.reviewsCount : 0,
     next_slot: a.nextSlot,
     category: a.category,
-    fee: a.fee || 899
+    fee: a.fee || 899,
+    test_comment: a.testComment,
+    test_rating: a.testRating
   };
 }
 
@@ -424,7 +428,7 @@ function mapBackendAppointmentToFrontend(a: any): Appointment {
     feedback: a.feedback,
     meetUrl: a.meet_url,
     joined: a.joined,
-    clientEmail: a.clientEmail
+    clientEmail: a.client_email || a.clientEmail
   };
 }
 
@@ -445,6 +449,13 @@ export async function fetchUserAppointments(userId: string): Promise<Appointment
 
 export async function fetchAllAppointments(): Promise<Appointment[]> {
   const list = await authRequest<any[]>("advisors/appointments/all", {
+    method: "GET"
+  });
+  return list.map(mapBackendAppointmentToFrontend);
+}
+
+export async function fetchAdvisorAppointments(advisorId: string): Promise<Appointment[]> {
+  const list = await authRequest<any[]>(`advisors/appointments/advisor/${encodeURIComponent(advisorId)}`, {
     method: "GET"
   });
   return list.map(mapBackendAppointmentToFrontend);
@@ -508,5 +519,118 @@ export async function changeUserPassword(userId: string, currentPassword: string
     method: "PUT",
     body: JSON.stringify({ user_id: userId, current_password: currentPassword, new_password: newPassword }),
   });
+}
+
+export function isAdvisorSlotActive(availability: string): boolean {
+  if (!availability) return false;
+  if (availability === "available") return true;
+  if (availability === "unavailable" || availability === "Not Available") return false;
+
+  // Pattern check: "HH:MM AM/PM - HH:MM AM/PM"
+  const match = availability.match(/^(\d{2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return false;
+
+  const [_, startH, startM, startP, endH, endM, endP] = match;
+  
+  const now = new Date();
+  let hours = now.getHours();
+  let minutes = now.getMinutes();
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find(p => p.type === "hour");
+    const minutePart = parts.find(p => p.type === "minute");
+    if (hourPart && minutePart) {
+      hours = parseInt(hourPart.value, 10);
+      minutes = parseInt(minutePart.value, 10);
+    }
+  } catch (e) {
+    console.error("Error formatting timezone for slot check:", e);
+  }
+  const currentMinutes = hours * 60 + minutes;
+
+  let startHrs = parseInt(startH, 10);
+  if (startP.toUpperCase() === "PM" && startHrs !== 12) startHrs += 12;
+  if (startP.toUpperCase() === "AM" && startHrs === 12) startHrs = 0;
+  const startMinutes = startHrs * 60 + parseInt(startM, 10);
+
+  let endHrs = parseInt(endH, 10);
+  if (endP.toUpperCase() === "PM" && endHrs !== 12) endHrs += 12;
+  if (endP.toUpperCase() === "AM" && endHrs === 12) endHrs = 0;
+  const endMinutes = endHrs * 60 + parseInt(endM, 10);
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
+// ==================== User Session Reports APIs ====================
+
+export interface UserReport {
+  id: string;
+  userId: string;
+  reportType: "daily" | "fortnightly" | "monthly";
+  startDate: string;
+  endDate: string;
+  summary: string;
+  keyTakeaways: string[];
+  moodTrend: {
+    stress?: number;
+    urgency?: number;
+    openness?: number;
+    willingness?: number;
+    emotion?: number;
+    [key: string]: any;
+  };
+  activitySummary: {
+    msg_count?: number;
+    cibil_checks?: number;
+    calculator_runs?: number;
+    tests_completed?: number;
+    videos_watched?: number;
+    [key: string]: any;
+  };
+  createdAt: string;
+}
+
+export async function fetchUserReports(userId: string): Promise<UserReport[]> {
+  const list = await authRequest<any[]>(`chat/reports/${encodeURIComponent(userId)}`, {
+    method: "GET"
+  });
+  return list.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  }));
+}
+
+export async function triggerReportGeneration(userId: string, reportType: string): Promise<UserReport | null> {
+  const result = await authRequest<any>(`chat/reports/${encodeURIComponent(userId)}/trigger?report_type=${reportType}`, {
+    method: "POST"
+  });
+  if (result.status === "skipped" || !result.report) return null;
+  const r = result.report;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  };
 }
 
