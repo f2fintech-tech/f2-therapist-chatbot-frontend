@@ -168,7 +168,16 @@ function createHeaders(headers?: HeadersInit): Headers {
 }
 
 function createRequestError(message: string, init: Partial<BackendRequestError> = {}): BackendRequestError {
-  const error = new Error(message) as BackendRequestError;
+  let finalMessage = message;
+  if (init.details && typeof init.details === "object" && "detail" in (init.details as any)) {
+    const detail = (init.details as any).detail;
+    if (typeof detail === "string") {
+      finalMessage = detail;
+    } else if (Array.isArray(detail)) {
+      finalMessage = detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join(", ");
+    }
+  }
+  const error = new Error(finalMessage) as BackendRequestError;
   error.name = "BackendRequestError";
   error.status = init.status;
   error.statusText = init.statusText;
@@ -178,6 +187,7 @@ function createRequestError(message: string, init: Partial<BackendRequestError> 
   error.isTimeout = init.isTimeout;
   return error;
 }
+
 
 export function normalizeBackendError(error: unknown): BackendRequestError {
   if (error instanceof Error && error.name === "BackendRequestError") {

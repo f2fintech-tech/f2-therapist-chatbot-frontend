@@ -568,6 +568,7 @@ export default function FinHealChat() {
             userId={userId}
             userProfile={userProfile}
             email={authSession.email}
+            isAdvisor={isUserAdvisor(authSession.email)}
             onBackToChat={openChatView}
             onSaveProfile={handleProfileSave}
           />

@@ -143,7 +143,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     name: "",
     designation: "",
     avatarUrl: "",
-    availability: "available" as "available" | "unavailable" | "in meeting",
+    availability: "available" as string,
     expertise: "",
     strength: "",
     bio: "",
@@ -1025,7 +1025,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   // ==================== Expert Workspace Actions ====================
-  const handleSetExpertAvailability = async (nextAvail: "available" | "unavailable" | "in meeting") => {
+  const handleSetExpertAvailability = async (nextAvail: string) => {
     if (!currentExpertId) return;
     try {
       await updateAdvisorAvailability(currentExpertId, nextAvail);
@@ -2065,7 +2065,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   <div className="text-center sm:text-left flex-1 min-w-0">
                     <h2 className="text-[20px] font-serif font-bold text-gray-900">Welcome Back, {activeExpert.name}!</h2>
                     <p className="text-[12px] text-gray-500 mt-[2px]">{activeExpert.designation}</p>
-
+ 
                     <div className="flex flex-wrap gap-[6px] mt-[8px] justify-center sm:justify-start">
                       {activeExpert.expertise.map((exp, idx) => (
                         <span key={idx} className="bg-white border border-[#d4d8fa] text-primary text-[10px] font-bold px-[8px] py-[2px] rounded-full">
@@ -2074,37 +2074,56 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       ))}
                     </div>
                   </div>
-
-                  {/* Glowing Status Selection Segmented Control */}
-                  <div className="shrink-0 flex flex-col items-center gap-[8px] p-[10px] bg-white border border-gray-100 rounded-[20px] shadow-inner">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Availability Slot</span>
-
-                    <div className="flex flex-wrap justify-center gap-[4px] bg-gray-100 p-[4px] rounded-[16px] border border-gray-200 max-w-[340px]">
+ 
+                  {/* Modern Live Availability Status Widget */}
+                  <div className="shrink-0 w-full sm:w-[340px] flex flex-col gap-[10px] p-[14px] bg-white border border-gray-200/80 rounded-[20px] shadow-xs">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-[8px]">
+                      <div className="flex items-center gap-[6px]">
+                        <span className="relative flex h-2 w-2">
+                          {activeExpert.availability !== "unavailable" && (
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          )}
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${activeExpert.availability === "unavailable" ? "bg-rose-500" : "bg-emerald-500"}`}></span>
+                        </span>
+                        <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">Select Availability Slot</span>
+                      </div>
+                      <span className={`text-[9px] font-extrabold px-[8px] py-[2px] rounded-full uppercase border ${activeExpert.availability === "unavailable" ? "bg-rose-50 text-rose-700 border-rose-100/50" : "bg-emerald-50 text-emerald-700 border-emerald-100/50"}`}>
+                        {activeExpert.availability === "unavailable" ? "Off Duty" : "Active"}
+                      </span>
+                    </div>
+ 
+                    <div className="grid grid-cols-2 gap-[6px]">
                       {[
-                        { value: "09:00 AM - 11:00 AM", label: "9-11 AM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
-                        { value: "11:00 AM - 01:00 PM", label: "11-1 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
-                        { value: "01:00 PM - 03:00 PM", label: "1-3 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
-                        { value: "03:00 PM - 05:00 PM", label: "3-5 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
-                        { value: "05:00 PM - 07:00 PM", label: "5-7 PM", color: "bg-emerald-500", text: "text-emerald-700", activeBg: "bg-emerald-50 border-emerald-200 shadow-xs" },
-                        { value: "unavailable", label: "Unavailable", color: "bg-rose-500", text: "text-rose-700", activeBg: "bg-rose-50 border-rose-200 shadow-xs" }
+                        { value: "09:00 AM - 11:00 AM", label: "9-11 AM", desc: "Morning", icon: "🌅", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
+                        { value: "11:00 AM - 01:00 PM", label: "11-1 PM", desc: "Midday", icon: "☀️", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
+                        { value: "01:00 PM - 03:00 PM", label: "1-3 PM", desc: "Early Afternoon", icon: "🌤️", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
+                        { value: "03:00 PM - 05:00 PM", label: "3-5 PM", desc: "Late Afternoon", icon: "⛅", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
+                        { value: "05:00 PM - 07:00 PM", label: "5-7 PM", desc: "Evening", icon: "🌙", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
+                        { value: "unavailable", label: "Unavailable", desc: "Off Duty", icon: "🚫", activeTheme: "bg-rose-50/60 text-rose-800 border-rose-500/80 ring-rose-500/20" }
                       ].map((opt) => {
                         const isActive = activeExpert.availability === opt.value;
                         return (
                           <button
                             key={opt.value}
-                            onClick={() => handleSetExpertAvailability(opt.value as any)}
-                            className={`flex items-center gap-[4px] px-[10px] py-[5px] rounded-[10px] text-[10.5px] font-bold transition border border-transparent cursor-pointer ${isActive ? `${opt.activeBg} ${opt.text}` : "text-gray-500 hover:text-gray-700"
-                              }`}
+                            onClick={() => handleSetExpertAvailability(opt.value)}
+                            className={`flex flex-col items-start gap-[1px] p-[8px] rounded-[12px] text-left transition-all border cursor-pointer relative ${
+                              isActive
+                                ? `${opt.activeTheme} shadow-xs ring-1`
+                                : "bg-gray-50 text-gray-655 border-transparent hover:bg-gray-100 hover:text-gray-900"
+                            }`}
                           >
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${opt.color}`} />
-                            </span>
-                            {opt.label}
+                            <div className="flex items-center gap-[4px] w-full">
+                              <span className="text-[12px]">{opt.icon}</span>
+                              <span className="text-[11px] font-bold leading-tight">{opt.label}</span>
+                            </div>
+                            <span className={`text-[8.5px] font-medium ${isActive ? "opacity-90" : "text-gray-400"}`}>{opt.desc}</span>
+                            {isActive && (
+                              <span className={`absolute top-[8px] right-[8px] h-[12px] w-[12px] text-white rounded-full flex items-center justify-center text-[8px] font-bold ${opt.value === "unavailable" ? "bg-rose-500" : "bg-emerald-500"}`}>✓</span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
-                    <span className="text-[9px] text-gray-400">Select slot to update advisor availability status</span>
                   </div>
                 </div>
 
@@ -2223,131 +2242,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       </CardContent>
                     </Card>
 
-                    {/* Card 3: Change Password */}
-                    <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPasswordSection((prev) => !prev);
-                          setPasswordError("");
-                          setPasswordSuccess("");
-                          setCurrentPassword("");
-                          setNewPassword("");
-                          setConfirmPassword("");
-                        }}
-                        className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-all cursor-pointer border-none outline-none"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600">
-                            <Lock className="h-4 w-4" />
-                          </div>
-                          <div className="text-left">
-                            <div className="text-[14px] font-extrabold text-gray-900 tracking-tight">Change Password</div>
-                            <div className="text-[11px] text-gray-500 font-medium">Update your account security credentials</div>
-                          </div>
-                        </div>
-                        <span className={`text-gray-400 text-[16px] transition-transform duration-200 ${showPasswordSection ? "rotate-180" : ""}`}>▾</span>
-                      </button>
-
-                      {showPasswordSection && (
-                        <div className="px-5 py-5 space-y-4 border-t border-gray-100 bg-white animate-fade-up">
-                          {passwordError && (
-                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
-                              <AlertTriangle className="h-4 w-4 shrink-0" />
-                              <span>{passwordError}</span>
-                            </div>
-                          )}
-                          {passwordSuccess && (
-                            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] font-semibold px-4 py-2.5 rounded-[10px] animate-fade-up text-left">
-                              <ShieldCheck className="h-4 w-4 shrink-0" />
-                              <span>{passwordSuccess}</span>
-                            </div>
-                          )}
-
-                          <div className="space-y-[6px] text-left">
-                            <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Current Password</label>
-                            <div className="relative">
-                              <input
-                                type={showCurrentPassword ? "text" : "password"}
-                                value={currentPassword}
-                                onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                placeholder="Enter your current password"
-                                className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
-                                disabled={isChangingPassword}
-                              />
-                              <button type="button" onClick={() => setShowCurrentPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
-                                {showCurrentPassword ? "Hide" : "Show"}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4 text-left">
-                            <div className="space-y-[6px]">
-                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">New Password</label>
-                              <div className="relative">
-                                <input
-                                  type={showNewPassword ? "text" : "password"}
-                                  value={newPassword}
-                                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                  placeholder="Min 6 characters"
-                                  className="w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] pr-10 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px]"
-                                  disabled={isChangingPassword}
-                                />
-                                <button type="button" onClick={() => setShowNewPassword((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[12px] cursor-pointer bg-transparent border-none">
-                                  {showNewPassword ? "Hide" : "Show"}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="space-y-[6px]">
-                              <label className="text-[11.5px] font-bold text-gray-650 uppercase tracking-wide">Confirm New Password</label>
-                              <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); setPasswordSuccess(""); }}
-                                placeholder="Re-enter new password"
-                                className={`w-full h-11 px-[10px] py-[6px] border border-gray-300 rounded-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-[12px] ${confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:ring-red-200" : ""}`}
-                                disabled={isChangingPassword}
-                              />
-                              {confirmPassword && confirmPassword !== newPassword && (
-                                <p className="text-[10px] text-red-500 font-semibold mt-1">Passwords do not match</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Password strength indicator */}
-                          {newPassword && (
-                            <div className="space-y-1 text-left">
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4].map((level) => {
-                                  const strength = newPassword.length >= 12 ? 4 : newPassword.length >= 8 ? 3 : newPassword.length >= 6 ? 2 : 1;
-                                  const colors = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-emerald-500"];
-                                  return (
-                                    <div
-                                      key={level}
-                                      className={`h-[3px] flex-1 rounded-full transition-all duration-300 ${level <= strength ? colors[strength] : "bg-gray-200"}`}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <p className="text-[10px] text-gray-400 font-medium">
-                                {newPassword.length < 6 ? "Too short" : newPassword.length < 8 ? "Fair" : newPassword.length < 12 ? "Good" : "Strong"}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex justify-end pt-1">
-                            <button
-                              onClick={handleUpdatePassword}
-                              disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-                              className="rounded-full px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[13px] flex items-center gap-1.5 shadow-[0_8px_24px_rgba(225,29,72,0.18)] transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer"
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                              <span>{isChangingPassword ? "Changing..." : "Update Password"}</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
                   </div>
 
                   {/* Right Column: Booked consultations list */}
