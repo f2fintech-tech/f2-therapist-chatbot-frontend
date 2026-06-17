@@ -152,6 +152,8 @@ export default function AdvisorPanel({
   useEffect(() => {
     loadAdvisors();
 
+    const intervalId = setInterval(loadAdvisors, 8000);
+
     const handleUpdate = () => {
       const nextStored = localStorage.getItem("finheal_advisors_list");
       if (nextStored) {
@@ -161,6 +163,7 @@ export default function AdvisorPanel({
     window.addEventListener("storage", handleUpdate);
     window.addEventListener("finheal:advisors_update", handleUpdate);
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("finheal:advisors_update", handleUpdate);
     };

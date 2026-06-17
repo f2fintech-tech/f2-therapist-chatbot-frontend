@@ -627,6 +627,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   useEffect(() => {
     loadAdvisors();
 
+    const intervalId = setInterval(loadAdvisors, 8000);
+
     // 2. Educational content
     const storedContent = localStorage.getItem("finheal_education_content");
     if (storedContent) {
@@ -658,6 +660,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     window.addEventListener("finheal:advisors_update", handleUpdate);
     window.addEventListener("storage", handleUpdate);
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener("finheal:advisors_update", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };
@@ -1989,6 +1992,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 ) : (
                                   <span className="text-gray-400 block">-</span>
                                 )}
+                                <button
+                                  onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                  className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                >
+                                  Generate CAM 📊
+                                </button>
                               </td>
                             </tr>
                           );

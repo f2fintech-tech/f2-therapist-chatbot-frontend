@@ -265,7 +265,7 @@ export default function FinHealChat() {
   const openAdmin = () => setMainView("admin");
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
-  const openEligibilityCibil = () => setMainView("eligibility-cibil");
+  const openEligibilityCibil = () => setMainView("cibil-analyzer");
   const openDashboard = () => setMainView("dashboard");
 
 

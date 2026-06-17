@@ -296,6 +296,7 @@ export default function EligibilityCibilView({
   const [storedCibilReport, setStoredCibilReport] = useState<CibilReport | null>(null);
   const [cibilLoading, setCibilLoading] = useState<boolean>(true);
   const [cibilFetching, setCibilFetching] = useState<boolean>(false);
+  const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
   const [cibilError, setCibilError] = useState<string | null>(null);
   const [cibilName, setCibilName] = useState<string>("");
   const [cibilPhone, setCibilPhone] = useState<string>("");
@@ -475,6 +476,53 @@ export default function EligibilityCibilView({
       toast({ title: "Fetch Failed", description: errorMsg, variant: "destructive" });
     } finally {
       setCibilFetching(false);
+    }
+  };
+
+  const handleGenerateCAM = async () => {
+    const report = cibilReport || storedCibilReport;
+    if (!report) return;
+    setIsGeneratingCAM(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      
+      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to generate CAM Excel report.");
+      }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const cleanName = report.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "CAM Generated!",
+        description: "Your Credit Appraisal Memorandum report has been downloaded successfully.",
+        variant: "default"
+      });
+    } catch (err: any) {
+      console.error("Error generating CAM:", err);
+      toast({
+        title: "Generation Failed",
+        description: err.message || "Failed to generate CAM Excel report.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingCAM(false);
     }
   };
 
@@ -1664,6 +1712,15 @@ export default function EligibilityCibilView({
                         <span>Download PDF Report</span>
                       </a>
                     )}
+                    <button
+                      type="button"
+                      onClick={handleGenerateCAM}
+                      disabled={isGeneratingCAM}
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setCibilReport(null)}
