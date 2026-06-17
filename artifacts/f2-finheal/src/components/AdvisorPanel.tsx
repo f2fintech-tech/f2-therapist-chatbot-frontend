@@ -1036,7 +1036,7 @@ export default function AdvisorPanel({
                       alt={advisor.name}
                       className="w-[64px] h-[64px] rounded-2xl object-cover shadow-sm border border-gray-100"
                     />
-                    <div className="min-w-0">
+                    <div className="flex-1 min-w-0 pr-[85px]">
                       <CardTitle className="text-[15px] font-bold text-gray-900 leading-tight">{advisor.name}</CardTitle>
                       <div className="text-[11px] font-medium text-gray-500 truncate mt-[2px]">{advisor.designation}</div>
                       <div className="flex items-center gap-[4px] mt-[4px] text-[11px] font-semibold text-amber-500">

@@ -659,6 +659,7 @@ export default function FinHealChat() {
           userId={userId}
           isOpen={insightsOpen}
           onClose={closeInsights}
+          isAdvisor={isUserAdvisor(authSession?.email)}
         />
       </div>
     </>

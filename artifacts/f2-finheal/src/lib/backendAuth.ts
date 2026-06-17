@@ -428,7 +428,7 @@ function mapBackendAppointmentToFrontend(a: any): Appointment {
     feedback: a.feedback,
     meetUrl: a.meet_url,
     joined: a.joined,
-    clientEmail: a.clientEmail
+    clientEmail: a.client_email || a.clientEmail
   };
 }
 
