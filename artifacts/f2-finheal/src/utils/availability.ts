@@ -1,0 +1,152 @@
+/**
+ * Dynamic advisor availability parser and resolver.
+ */
+
+// Helper to convert 12-hour values to 24-hour hour and minute
+function to24Hour(hours: number, minutes: number, meridiem: string | null): { h: number; m: number } {
+  let h = hours;
+  const m = minutes;
+  if (meridiem === "pm" && h !== 12) {
+    h += 12;
+  } else if (meridiem === "am" && h === 12) {
+    h = 0;
+  }
+  return { h, m };
+}
+
+/**
+ * Parses slot string and checks if current time falls within slot range.
+ */
+export function isSlotActive(nextSlotStr: string): boolean {
+  if (!nextSlotStr) return false;
+
+  try {
+    const str = nextSlotStr.toLowerCase().trim();
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let date = now.getDate();
+
+    const monthsShort = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const monthsLong = [
+      "january", "february", "march", "april", "may", "june",
+      "july", "august", "september", "october", "november", "december"
+    ];
+
+    // Determine the target date
+    if (str.includes("tomorrow")) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      year = tomorrow.getFullYear();
+      month = tomorrow.getMonth();
+      date = tomorrow.getDate();
+    } else if (str.includes("today")) {
+      // already initialized to today
+    } else {
+      // Try to match standard month day patterns
+      const dateMatch = str.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/i);
+      const dateMatchReverse = str.match(/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i);
+
+      if (dateMatch) {
+        const mStr = dateMatch[1].toLowerCase().slice(0, 3);
+        const mIdx = monthsShort.indexOf(mStr);
+        if (mIdx !== -1) {
+          month = mIdx;
+          date = parseInt(dateMatch[2], 10);
+        }
+      } else if (dateMatchReverse) {
+        const mStr = dateMatchReverse[2].toLowerCase().slice(0, 3);
+        const mIdx = monthsShort.indexOf(mStr);
+        if (mIdx !== -1) {
+          month = mIdx;
+          date = parseInt(dateMatchReverse[1], 10);
+        }
+      }
+    }
+
+    // Clean dates out to search times
+    const timeSearchStr = str
+      .replace(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}/gi, "")
+      .replace(/\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/gi, "")
+      .replace(/today|tomorrow/gi, "");
+
+    // Match times: e.g. "09:00 am", "6 pm", "9", "09:30"
+    const rx = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi;
+    const timeMatches = [];
+    let match;
+    while ((match = rx.exec(timeSearchStr)) !== null) {
+      timeMatches.push({
+        hours: parseInt(match[1], 10),
+        minutes: match[2] ? parseInt(match[2], 10) : 0,
+        meridiem: match[3] ? match[3].toLowerCase() : null
+      });
+    }
+
+    if (timeMatches.length === 0) {
+      return false;
+    }
+
+    const startMatch = timeMatches[0];
+    const endMatch = timeMatches[1] || null;
+
+    let startMeridiem = startMatch.meridiem;
+    let endMeridiem = endMatch ? endMatch.meridiem : null;
+
+    // Resolve missing meridiems (e.g. "9 to 6 pm" -> start am, end pm)
+    if (endMatch && !endMeridiem && startMeridiem) {
+      endMeridiem = startMeridiem;
+    }
+    if (endMatch && !startMeridiem && endMeridiem) {
+      if (startMatch.hours > endMatch.hours) {
+        startMeridiem = endMeridiem === "pm" ? "am" : "pm";
+      } else {
+        startMeridiem = endMeridiem;
+      }
+    }
+
+    // Guess defaults if still missing
+    if (!startMeridiem) {
+      startMeridiem = startMatch.hours >= 8 && startMatch.hours < 12 ? "am" : "pm";
+    }
+    if (endMatch && !endMeridiem) {
+      endMeridiem = endMatch.hours >= 8 && endMatch.hours < 12 ? "am" : "pm";
+    }
+
+    const start24 = to24Hour(startMatch.hours, startMatch.minutes, startMeridiem);
+    const end24 = endMatch 
+      ? to24Hour(endMatch.hours, endMatch.minutes, endMeridiem)
+      : { h: (start24.h + 1) % 24, m: start24.m }; // default 1hr duration
+
+    const startDate = new Date(year, month, date, start24.h, start24.m, 0, 0);
+    const endDate = new Date(year, month, date, end24.h, end24.m, 0, 0);
+
+    if (endDate.getTime() < startDate.getTime()) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+
+    const currentMillis = now.getTime();
+    return currentMillis >= startDate.getTime() && currentMillis <= endDate.getTime();
+  } catch (e) {
+    console.error("Error parsing slot status:", e);
+    return false;
+  }
+}
+
+/**
+ * Dynamically resolves advisor availability status based on DB value and active slot range.
+ */
+export function getEffectiveAvailability(
+  dbAvailability: string,
+  nextSlotStr: string
+): "available" | "unavailable" | "in meeting" {
+  if (dbAvailability === "in meeting") {
+    return "in meeting";
+  }
+
+  // Next slot active check
+  if (isSlotActive(nextSlotStr)) {
+    return "available";
+  }
+
+  return "unavailable";
+}

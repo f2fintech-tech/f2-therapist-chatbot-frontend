@@ -12,6 +12,7 @@ import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
 import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
+import { getEffectiveAvailability } from "@/utils/availability";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
 
 
@@ -1280,7 +1281,8 @@ export default function Dashboard({
                   const title = a.designation || a.title || "Advisor";
                   const rating = a.rating || 4.8;
                   const sessions = a.reviewsCount !== undefined ? a.reviewsCount : (a.sessions || 15);
-                  const isAvailable = a.availability || (a.available ? "available" : "unavailable");
+                  const dbStatus = a.availability || (a.available ? "available" : "unavailable");
+                  const isAvailable = a.nextSlot ? getEffectiveAvailability(dbStatus, a.nextSlot) : dbStatus;
                   
                   const colors = ["#3244e6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
                   const color = a.color || colors[i % colors.length];

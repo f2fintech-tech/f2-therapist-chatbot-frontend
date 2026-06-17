@@ -3,6 +3,7 @@ import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
+import { getEffectiveAvailability } from "@/utils/availability";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
 import { type LenderProduct } from "./LoanCalculatorView";
@@ -1525,17 +1526,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <td className="p-[12px] uppercase font-bold text-[10.5px] text-gray-400">{adv.category}</td>
                           <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                           <td className="p-[12px]">
-                            {adv.availability === "available" ? (
-                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
-                            ) : adv.availability === "in meeting" ? (
-                              <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
-                            ) : adv.availability === "unavailable" || adv.availability === "Not Available" ? (
-                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>
-                            ) : isAdvisorSlotActive(adv.availability) ? (
-                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Active: {adv.availability}</span>
-                            ) : (
-                              <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Inactive: {adv.availability}</span>
-                            )}
+                            {(() => {
+                              const effectiveAvail = getEffectiveAvailability(adv.availability, adv.nextSlot);
+                              return effectiveAvail === "available" ? (
+                                <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
+                              ) : effectiveAvail === "in meeting" ? (
+                                <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
+                              ) : (
+                                <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>
+                              );
+                            })()}
                           </td>
                           <td className="p-[12px] text-right space-x-[6px]">
                             <button
