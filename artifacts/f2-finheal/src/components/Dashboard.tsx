@@ -1003,8 +1003,6 @@ export default function Dashboard({
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-
           </div>
         )}
 
@@ -1012,108 +1010,8 @@ export default function Dashboard({
         {activeTab === "reports" && (
           <div className="flex flex-col gap-6">
 
-            {/* Health summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "0ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
-                {[
-                  { label: "Savings Rate", pct: 27, color: "#10b981" },
-                  { label: "Debt Ratio", pct: emiPct, color: "#ef4444" },
-                  { label: "Credit Score", pct: Math.min(100, Math.max(0, Math.round(((cibilReport?.score || 742) - 300) / 600 * 100))), color: BRAND },
-                  { label: "Emergency Fund", pct: 20, color: "#f59e0b" },
-                  { label: "Investment Rate", pct: 12, color: "#8b5cf6" },
-                ].map((item, i) => (
-                  <div key={item.label} className="mb-3 last:mb-0">
-                    <div className="flex justify-between text-[11px] mb-1.5">
-                      <span className="text-gray-500 font-medium">{item.label}</span>
-                      <span className="font-semibold" style={{ color: item.color }}>{item.pct}%</span>
-                    </div>
-                    <AnimBar pct={item.pct} color={item.color} delay={i * 120} />
-                  </div>
-                ))}
-              </div>
-
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Net Worth Trend</div>
-                <div className="text-[11px] text-gray-400 mb-3">↑ ₹78K growth in 6 months</div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={netWorthData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
-                    <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
-                    <Area type="monotone" dataKey="worth" name="Net Worth" stroke="#10b981" strokeWidth={2.5} fill="url(#gradNW)" dot={{ fill: "#10b981", r: 3 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Full income/expense bar */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800">Monthly Cash Flow</div>
-                  <div className="text-[11px] text-gray-400">Income vs total outflows</div>
-                </div>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: BRAND }} />Income</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#ef4444]" />Expenses</span>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="income" name="Income" fill={BRAND} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Insight tiles */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "220ms" }}>
-              {(() => {
-                const currentScore = cibilReport?.score || 742;
-                const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
-                const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
-                const scoreDesc = cibilReport 
-                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.` 
-                  : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
-
-                const avgGoalProgress = localGoals.length > 0 
-                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100) 
-                  : 0;
-
-                const tiles = [
-                  { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
-                  ...(!isAdvisor ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
-                  { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
-                ];
-
-                return tiles.map((tile) => (
-                  <div key={tile.title} className="dashboard-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[18px]">{tile.icon}</span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
-                    </div>
-                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
-                    <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
-                    <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
-                  </div>
-                ));
-              })()}
-            </div>
-
             {/* Personalized Wellness & Therapy Reports */}
-            <div className="dashboard-card animate-fade-up p-5 mt-6" style={{ animationDelay: "240ms" }}>
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "0ms" }}>
               <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
                 <div>
                   <h3 className="text-[14px] font-bold text-gray-800">💡 Personalized Wellness & Therapy Reports</h3>
@@ -1196,7 +1094,7 @@ export default function Dashboard({
 
                       {/* Mood Trend Analysis */}
                       <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                        <span className="text-[10px] font-extrabold text-gray-550 uppercase tracking-wider mb-3 block">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
                           Avg Stress & Telemetry Trend
                         </span>
                         <div className="space-y-2.5">
@@ -1225,7 +1123,7 @@ export default function Dashboard({
                     {/* Key Recommendations & Takeaways */}
                     {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
                       <div className="border-t border-gray-100 pt-4">
-                        <span className="text-[10.5px] font-extrabold text-gray-550 uppercase tracking-wider mb-3 block">
+                        <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
                           📋 Recommended Therapist Action Steps
                         </span>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1241,6 +1139,106 @@ export default function Dashboard({
                     )}
                   </div>
                 );
+              })()}
+            </div>
+
+            {/* Health summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
+                <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
+                {[
+                  { label: "Savings Rate", pct: 27, color: "#10b981" },
+                  { label: "Debt Ratio", pct: emiPct, color: "#ef4444" },
+                  { label: "Credit Score", pct: Math.min(100, Math.max(0, Math.round(((cibilReport?.score || 742) - 300) / 600 * 100))), color: BRAND },
+                  { label: "Emergency Fund", pct: 20, color: "#f59e0b" },
+                  { label: "Investment Rate", pct: 12, color: "#8b5cf6" },
+                ].map((item, i) => (
+                  <div key={item.label} className="mb-3 last:mb-0">
+                    <div className="flex justify-between text-[11px] mb-1.5">
+                      <span className="text-gray-500 font-medium">{item.label}</span>
+                      <span className="font-semibold" style={{ color: item.color }}>{item.pct}%</span>
+                    </div>
+                    <AnimBar pct={item.pct} color={item.color} delay={i * 120} />
+                  </div>
+                ))}
+              </div>
+
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
+                <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Net Worth Trend</div>
+                <div className="text-[11px] text-gray-400 mb-3">↑ ₹78K growth in 6 months</div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={netWorthData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
+                    <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
+                    <Area type="monotone" dataKey="worth" name="Net Worth" stroke="#10b981" strokeWidth={2.5} fill="url(#gradNW)" dot={{ fill: "#10b981", r: 3 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Full income/expense bar */}
+            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-[13px] font-semibold text-gray-800">Monthly Cash Flow</div>
+                  <div className="text-[11px] text-gray-400">Income vs total outflows</div>
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: BRAND }} />Income</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#ef4444]" />Expenses</span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="income" name="Income" fill={BRAND} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Insight tiles */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "240ms" }}>
+              {(() => {
+                const currentScore = cibilReport?.score || 742;
+                const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
+                const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
+                const scoreDesc = cibilReport 
+                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.` 
+                  : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
+
+                const avgGoalProgress = localGoals.length > 0 
+                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100) 
+                  : 0;
+
+                const tiles = [
+                  { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
+                  ...(!isAdvisor ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
+                  { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
+                ];
+
+                return tiles.map((tile) => (
+                  <div key={tile.title} className="dashboard-card p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[18px]">{tile.icon}</span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
+                    </div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
+                    <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
+                    <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
+                  </div>
+                ));
               })()}
             </div>
           </div>
