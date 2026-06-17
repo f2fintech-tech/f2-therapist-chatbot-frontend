@@ -186,7 +186,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
   const [slotDate, setSlotDate] = useState("");
-  const [slotTime, setSlotTime] = useState("");
+  const [slotFromTime, setSlotFromTime] = useState("");
+  const [slotToTime, setSlotToTime] = useState("");
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -196,6 +197,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [rescheduleTime, setRescheduleTime] = useState("");
 
   const timeSlots = [
+    "08:00 AM",
     "09:00 AM",
     "10:00 AM",
     "11:00 AM",
@@ -205,7 +207,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     "03:00 PM",
     "04:00 PM",
     "05:00 PM",
-    "06:00 PM"
+    "06:00 PM",
+    "07:00 PM",
+    "08:00 PM",
+    "09:00 PM"
   ];
 
   const formatSlotValue = (dateStr: string, timeStr: string): string => {
@@ -716,7 +721,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
         const dd = String(dateObj.getDate()).padStart(2, "0");
         setSlotDate(`${yyyy}-${mm}-${dd}`);
-        setSlotTime(timeStr);
+        
+        const timeParts = timeStr.split(/\s*-\s*/);
+        if (timeParts.length === 2) {
+          setSlotFromTime(timeParts[0]);
+          setSlotToTime(timeParts[1]);
+        } else {
+          setSlotFromTime(timeStr || "09:00 AM");
+          setSlotToTime(timeStr || "10:00 AM");
+        }
         return;
       }
     }
@@ -725,7 +738,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
     setSlotDate(`${yyyy}-${mm}-${dd}`);
-    setSlotTime("09:00 AM");
+    setSlotFromTime("09:00 AM");
+    setSlotToTime("10:00 AM");
   }, [expertNextSlot]);
 
   const loadGlobalAppointments = async () => {
@@ -1037,14 +1051,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   const handleUpdateExpertNextSlot = async () => {
-    if (!currentExpertId || !slotDate || !slotTime) {
-      alert("Please select both a date and a time slot.");
+    if (!currentExpertId || !slotDate || !slotFromTime || !slotToTime) {
+      alert("Please select a date, From time, and To time.");
       return;
     }
-    const formattedSlot = formatSlotValue(slotDate, slotTime);
+    const combinedTime = `${slotFromTime} - ${slotToTime}`;
+    const formattedSlot = formatSlotValue(slotDate, combinedTime);
     try {
       await updateAdvisorNextSlot(currentExpertId, formattedSlot);
+      await updateAdvisorAvailability(currentExpertId, combinedTime);
       await loadAdvisors();
+      dispatchUpdateEvent("finheal:advisors_update");
       alert("Next slot has been updated successfully!");
     } catch (err) {
       console.error("Error updating next slot:", err);
@@ -2074,57 +2091,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       ))}
                     </div>
                   </div>
- 
-                  {/* Modern Live Availability Status Widget */}
-                  <div className="shrink-0 w-full sm:w-[340px] flex flex-col gap-[10px] p-[14px] bg-white border border-gray-200/80 rounded-[20px] shadow-xs">
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-[8px]">
-                      <div className="flex items-center gap-[6px]">
-                        <span className="relative flex h-2 w-2">
-                          {activeExpert.availability !== "unavailable" && (
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          )}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${activeExpert.availability === "unavailable" ? "bg-rose-500" : "bg-emerald-500"}`}></span>
-                        </span>
-                        <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider">Select Availability Slot</span>
-                      </div>
-                      <span className={`text-[9px] font-extrabold px-[8px] py-[2px] rounded-full uppercase border ${activeExpert.availability === "unavailable" ? "bg-rose-50 text-rose-700 border-rose-100/50" : "bg-emerald-50 text-emerald-700 border-emerald-100/50"}`}>
-                        {activeExpert.availability === "unavailable" ? "Off Duty" : "Active"}
-                      </span>
-                    </div>
- 
-                    <div className="grid grid-cols-2 gap-[6px]">
-                      {[
-                        { value: "09:00 AM - 11:00 AM", label: "9-11 AM", desc: "Morning", icon: "🌅", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
-                        { value: "11:00 AM - 01:00 PM", label: "11-1 PM", desc: "Midday", icon: "☀️", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
-                        { value: "01:00 PM - 03:00 PM", label: "1-3 PM", desc: "Early Afternoon", icon: "🌤️", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
-                        { value: "03:00 PM - 05:00 PM", label: "3-5 PM", desc: "Late Afternoon", icon: "⛅", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
-                        { value: "05:00 PM - 07:00 PM", label: "5-7 PM", desc: "Evening", icon: "🌙", activeTheme: "bg-emerald-50/60 text-emerald-800 border-emerald-500/80 ring-emerald-500/20" },
-                        { value: "unavailable", label: "Unavailable", desc: "Off Duty", icon: "🚫", activeTheme: "bg-rose-50/60 text-rose-800 border-rose-500/80 ring-rose-500/20" }
-                      ].map((opt) => {
-                        const isActive = activeExpert.availability === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            onClick={() => handleSetExpertAvailability(opt.value)}
-                            className={`flex flex-col items-start gap-[1px] p-[8px] rounded-[12px] text-left transition-all border cursor-pointer relative ${
-                              isActive
-                                ? `${opt.activeTheme} shadow-xs ring-1`
-                                : "bg-gray-50 text-gray-655 border-transparent hover:bg-gray-100 hover:text-gray-900"
-                            }`}
-                          >
-                            <div className="flex items-center gap-[4px] w-full">
-                              <span className="text-[12px]">{opt.icon}</span>
-                              <span className="text-[11px] font-bold leading-tight">{opt.label}</span>
-                            </div>
-                            <span className={`text-[8.5px] font-medium ${isActive ? "opacity-90" : "text-gray-400"}`}>{opt.desc}</span>
-                            {isActive && (
-                              <span className={`absolute top-[8px] right-[8px] h-[12px] w-[12px] text-white rounded-full flex items-center justify-center text-[8px] font-bold ${opt.value === "unavailable" ? "bg-rose-500" : "bg-emerald-500"}`}>✓</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Slot editor and appointments list */}
@@ -2149,17 +2115,31 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
                             />
                           </div>
-                          <div>
-                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Time Slot (1-hour slots)</label>
-                            <select
-                              value={slotTime}
-                              onChange={(e) => setSlotTime(e.target.value)}
-                              className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
-                            >
-                              {timeSlots.map((time) => (
-                                <option key={time} value={time}>{time}</option>
-                              ))}
-                            </select>
+                          <div className="grid grid-cols-2 gap-[10px]">
+                            <div>
+                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">From Time</label>
+                              <select
+                                value={slotFromTime}
+                                onChange={(e) => setSlotFromTime(e.target.value)}
+                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">To Time</label>
+                              <select
+                                value={slotToTime}
+                                onChange={(e) => setSlotToTime(e.target.value)}
+                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                              >
+                                {timeSlots.map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <button

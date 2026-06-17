@@ -1019,7 +1019,7 @@ export default function AdvisorPanel({
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        {advisor.availability === "available" ? "Available" : advisor.availability}
+                        Available
                       </div>
                     ) : (
                       <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-[9.5px] font-bold animate-fade-in">

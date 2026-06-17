@@ -533,7 +533,26 @@ export function isAdvisorSlotActive(availability: string): boolean {
   const [_, startH, startM, startP, endH, endM, endP] = match;
   
   const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  let hours = now.getHours();
+  let minutes = now.getMinutes();
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find(p => p.type === "hour");
+    const minutePart = parts.find(p => p.type === "minute");
+    if (hourPart && minutePart) {
+      hours = parseInt(hourPart.value, 10);
+      minutes = parseInt(minutePart.value, 10);
+    }
+  } catch (e) {
+    console.error("Error formatting timezone for slot check:", e);
+  }
+  const currentMinutes = hours * 60 + minutes;
 
   let startHrs = parseInt(startH, 10);
   if (startP.toUpperCase() === "PM" && startHrs !== 12) startHrs += 12;
