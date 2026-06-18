@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor } from "@/lib/backendAuth";
+import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 import PolicyModal from "./PolicyModal";
 
@@ -175,12 +175,13 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         if (guestUserId && payload.userId && guestUserId !== payload.userId) {
           migrateConversationsFromUserId(guestUserId, payload.userId);
           try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/test-results/migrate`, {
+            await authRequest("test-results/migrate", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ from_user_id: guestUserId, to_user_id: payload.userId }),
             });
-          } catch {}
+          } catch (err) {
+            console.error("Failed to migrate test results:", err);
+          }
           try {
             await migrateCalculatorActivities(guestUserId, payload.userId);
           } catch (err) {

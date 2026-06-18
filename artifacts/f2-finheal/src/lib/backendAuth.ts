@@ -75,7 +75,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
-async function authRequest<T>(path: string, init: RequestInit): Promise<T> {
+export async function authRequest<T>(path: string, init: RequestInit): Promise<T> {
   const url = buildUrl(path);
   const response = await fetch(url, {
     ...init,
