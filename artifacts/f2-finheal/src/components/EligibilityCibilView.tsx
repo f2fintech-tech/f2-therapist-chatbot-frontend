@@ -433,18 +433,27 @@ export default function EligibilityCibilView({
       toast({ title: "Invalid Phone", description: "Please enter a valid 10-digit number.", variant: "destructive" });
       return;
     }
-    if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(cibilPan.trim())) {
-      toast({
-        title: cibilReportType === "company" ? "Invalid Company PAN" : "Invalid PAN",
-        description: "Standard PAN card format is ABCDE1234F.",
-        variant: "destructive"
-      });
-      return;
+    if (cibilBureau !== "experian") {
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(cibilPan.trim())) {
+        toast({
+          title: cibilReportType === "company" ? "Invalid Company PAN" : "Invalid PAN",
+          description: "Standard PAN card format is ABCDE1234F.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
     setCibilFetching(true);
     setCibilError(null);
     try {
-      const result = await fetchCibilReport(userId, cibilName, cibilPhone, cibilPan.toUpperCase(), cibilBureau, cibilReportType);
+      const result = await fetchCibilReport(
+        userId, 
+        cibilName, 
+        cibilPhone, 
+        cibilBureau === "experian" ? undefined : cibilPan.toUpperCase(), 
+        cibilBureau, 
+        cibilReportType
+      );
       setCibilReport(result);
       setStoredCibilReport(result);
       setEligCibil(String(result.score));
@@ -1448,7 +1457,7 @@ export default function EligibilityCibilView({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={cibilBureau === "experian" ? "flex flex-col" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
                       <div className="flex flex-col">
                         <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
                           {cibilReportType === "company" ? "Authorized Mobile Number" : "Mobile Number"}
@@ -1465,22 +1474,24 @@ export default function EligibilityCibilView({
                           />
                         </div>
                       </div>
-                      <div className="flex flex-col">
-                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                          {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
-                        </label>
-                        <div className="relative">
-                          <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                          <input
-                            type="text"
-                            required
-                            value={cibilPan}
-                            onChange={handlePanChange}
-                            placeholder="e.g. AAAAA1111B"
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
+                      {cibilBureau !== "experian" && (
+                        <div className="flex flex-col">
+                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                            {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
+                          </label>
+                          <div className="relative">
+                            <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              required={cibilBureau !== "experian"}
+                              value={cibilPan}
+                              onChange={handlePanChange}
+                              placeholder="e.g. AAAAA1111B"
+                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col mb-4">

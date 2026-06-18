@@ -49,7 +49,7 @@ export async function fetchCibilReport(
   userId: string,
   name: string,
   phone: string,
-  pan: string,
+  pan?: string,
   bureau: "cibil" | "experian" | "company_cibil" | "company_experian" = "cibil",
   reportType: "individual" | "company" = "individual"
 ): Promise<CibilReport> {
@@ -60,7 +60,7 @@ export async function fetchCibilReport(
       user_id: userId,
       name,
       phone,
-      pan,
+      pan: pan || "",
       bureau,
       report_type: reportType,
     }),
