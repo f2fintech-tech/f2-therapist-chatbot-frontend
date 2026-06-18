@@ -121,16 +121,9 @@ export default function CibilAnalyzerView({
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
-      try {
-        const stored = await getStoredCibilReport(userId);
-        setReport(stored);
-        setStoredReport(stored);
-      } catch (err) {
-        // No stored report is expected on first run, fail silently
-      } finally {
-        setIsLoading(false);
-      }
-
+      // We disable loading the stored CIBIL report on mount/refresh so the checker tab always starts fresh
+      setIsLoading(false);
+ 
       try {
         const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
         const res = await fetch(`${apiBase}/lenders`);

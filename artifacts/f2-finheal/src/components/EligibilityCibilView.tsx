@@ -361,24 +361,8 @@ export default function EligibilityCibilView({
 
   // Load CIBIL score from local storage / API
   useEffect(() => {
-    async function loadCibil() {
-      try {
-        setCibilLoading(true);
-        const stored = await getStoredCibilReport(userId);
-        if (stored) {
-          // Keep score for dynamic eligibility calculations
-          setEligCibil(String(stored.score));
-          setStoredCibilReport(stored);
-          // Do not set cibilReport state on mount to ensure the Checker tab starts fresh
-          // setCibilReport(stored);
-        }
-      } catch (err) {
-        console.error("Failed to load CIBIL report:", err);
-      } finally {
-        setCibilLoading(false);
-      }
-    }
-    loadCibil();
+    // We disable loading the stored CIBIL report on mount/refresh so the checker tab always starts fresh
+    setCibilLoading(false);
   }, [userId]);
 
   // Load lenders catalog on mount
