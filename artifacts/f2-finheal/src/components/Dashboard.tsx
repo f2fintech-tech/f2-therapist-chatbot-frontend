@@ -190,8 +190,8 @@ function AdvisorCard({ initials, name, title, rating, sessions, available, color
       <button
         data-testid={`btn-book-${initials}`}
         onClick={onChat}
-        className="w-full py-2.5 rounded-[10px] text-[12px] font-semibold transition-all active:scale-95 cursor-pointer"
-        style={{ background: isActionable ? BRAND : "#f3f4f6", color: isActionable ? "#fff" : "#6b7280" }}
+        className="w-full py-2.5 rounded-[10px] text-[12px] font-semibold transition-all active:scale-95 cursor-pointer hover:-translate-y-px hover:shadow-md hover:opacity-95"
+        style={{ background: BRAND, color: "#fff" }}
       >
         {isActionable ? "Book Session" : "View Profile"}
       </button>
