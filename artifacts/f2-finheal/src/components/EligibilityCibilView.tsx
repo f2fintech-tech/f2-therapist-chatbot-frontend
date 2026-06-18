@@ -299,6 +299,8 @@ export default function EligibilityCibilView({
   const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
   const [cibilError, setCibilError] = useState<string | null>(null);
   const [cibilName, setCibilName] = useState<string>("");
+  const [cibilFirstName, setCibilFirstName] = useState<string>("");
+  const [cibilLastName, setCibilLastName] = useState<string>("");
   const [cibilPhone, setCibilPhone] = useState<string>("");
   const [cibilPan, setCibilPan] = useState<string>("");
   const [cibilBureau, setCibilBureau] = useState<"cibil" | "experian">("cibil");
@@ -421,14 +423,28 @@ export default function EligibilityCibilView({
 
   const handleFetchCibilReport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cibilName.trim()) {
-      toast({
-        title: cibilReportType === "company" ? "Company Name Required" : "Name Required",
-        description: cibilReportType === "company" ? "Please enter company name." : "Please enter your name.",
-        variant: "destructive"
-      });
-      return;
+
+    // For Experian: validate first + last name separately
+    if (cibilBureau === "experian") {
+      if (!cibilFirstName.trim()) {
+        toast({ title: "First Name Required", description: "Please enter your first name.", variant: "destructive" });
+        return;
+      }
+      if (!cibilLastName.trim()) {
+        toast({ title: "Last Name Required", description: "Please enter your last name.", variant: "destructive" });
+        return;
+      }
+    } else {
+      if (!cibilName.trim()) {
+        toast({
+          title: cibilReportType === "company" ? "Company Name Required" : "Name Required",
+          description: cibilReportType === "company" ? "Please enter company name." : "Please enter your name.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
+
     if (cibilPhone.replace(/\D/g, "").length < 10) {
       toast({ title: "Invalid Phone", description: "Please enter a valid 10-digit number.", variant: "destructive" });
       return;
@@ -443,12 +459,17 @@ export default function EligibilityCibilView({
         return;
       }
     }
+    // For Experian, combine first + last name; backend will split them
+    const effectiveName = cibilBureau === "experian"
+      ? `${cibilFirstName.trim()} ${cibilLastName.trim()}`.trim()
+      : cibilName;
+
     setCibilFetching(true);
     setCibilError(null);
     try {
       const result = await fetchCibilReport(
         userId, 
-        cibilName, 
+        effectiveName, 
         cibilPhone, 
         cibilBureau === "experian" ? undefined : cibilPan.toUpperCase(), 
         cibilBureau, 
@@ -1440,22 +1461,56 @@ export default function EligibilityCibilView({
                   )}
 
                   <form onSubmit={handleFetchCibilReport} className="space-y-4">
-                    <div className="flex flex-col">
-                      <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                        {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
-                      </label>
-                      <div className="relative">
-                        <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                        <input
-                          type="text"
-                          required
-                          value={cibilName}
-                          onChange={(e) => setCibilName(e.target.value)}
-                          placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
-                          className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
+                    {/* Experian: separate First + Last Name fields */}
+                    {cibilBureau === "experian" ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col">
+                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">First Name</label>
+                          <div className="relative">
+                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              required
+                              value={cibilFirstName}
+                              onChange={(e) => setCibilFirstName(e.target.value)}
+                              placeholder="e.g. Rahul"
+                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Last Name</label>
+                          <div className="relative">
+                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                              type="text"
+                              required
+                              value={cibilLastName}
+                              onChange={(e) => setCibilLastName(e.target.value)}
+                              placeholder="e.g. Sharma"
+                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                          {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
+                        </label>
+                        <div className="relative">
+                          <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            required
+                            value={cibilName}
+                            onChange={(e) => setCibilName(e.target.value)}
+                            placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
+                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <div className={cibilBureau === "experian" ? "flex flex-col" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
                       <div className="flex flex-col">
