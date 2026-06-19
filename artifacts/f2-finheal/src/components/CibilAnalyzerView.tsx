@@ -26,6 +26,7 @@ import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount } fro
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "./EligibilityCibilView";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
  
 interface CibilAnalyzerViewProps {
   userId: string;
@@ -600,52 +601,86 @@ export default function CibilAnalyzerView({
                       </div>
                     </div>
                   ) : (
-                    <form onSubmit={handleFetchReport} className="space-y-[18px]">
-                      <div>
-                        <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
-                        <div className="relative">
-                          <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                          <input
-                            type="text"
-                            required
-                            value={formName}
-                            onChange={(e) => setFormName(e.target.value)}
-                            placeholder="e.g. Rahul Sharma"
-                            className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
+                    <TooltipProvider delayDuration={0}>
+                      <form onSubmit={handleFetchReport} className="space-y-[18px]">
+                        <div>
+                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
+                          <div className="relative">
+                            <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <input
+                                  type="text"
+                                  required
+                                  value={formName}
+                                  onChange={(e) => setFormName(e.target.value)}
+                                  placeholder="e.g. Rahul Sharma"
+                                  className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                sideOffset={10}
+                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                              >
+                                Please fill out this field
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
-                        <div>
-                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
-                          <div className="relative">
-                            <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                            <input
-                              type="tel"
-                              required
-                              value={formPhone}
-                              onChange={handlePhoneChange}
-                              placeholder="e.g. 9876543210"
-                              className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
+                          <div>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
+                            <div className="relative">
+                              <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <input
+                                    type="tel"
+                                    required
+                                    value={formPhone}
+                                    onChange={handlePhoneChange}
+                                    placeholder="e.g. 9876543210"
+                                    className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={10}
+                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                                >
+                                  Please fill out this field
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
+                            <div className="relative">
+                              <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={formPan}
+                                    onChange={handlePanChange}
+                                    placeholder="e.g. AAAAA1111B"
+                                    className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={10}
+                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                                >
+                                  Please fill out this field
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
-                          <div className="relative">
-                            <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                            <input
-                              type="text"
-                              required
-                              value={formPan}
-                              onChange={handlePanChange}
-                              placeholder="e.g. AAAAA1111B"
-                              className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
-                        </div>
-                      </div>
 
                       <div className="flex items-start gap-[10px] my-[12px] text-left">
                         <input
@@ -736,6 +771,7 @@ export default function CibilAnalyzerView({
                         <span>256-bit SSL encrypted connection. Your data remains strictly confidential.</span>
                       </div>
                     </form>
+                  </TooltipProvider>
                   )}
                 </>
               )}

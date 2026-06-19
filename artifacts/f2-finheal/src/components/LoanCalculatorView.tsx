@@ -310,6 +310,23 @@ export default function LoanCalculatorView({
   const [eduPrepayLump, setEduPrepayLump] = useState<string>("0");
   const [eduPrepayStrategy, setEduPrepayStrategy] = useState<"reduce-emi" | "reduce-tenure">("reduce-tenure");
 
+  const [profStructure, setProfStructure] = useState<"standard" | "flexi" | "dropdown">("standard");
+
+  // Flexi OD States
+  const [flexiLimit, setFlexiLimit] = useState<string>("5000000"); // default 50L
+  const [flexiUtilized, setFlexiUtilized] = useState<string>("2000000"); // default 20L
+  const [flexiRate, setFlexiRate] = useState<string>("10.75");
+  const [flexiDeposit, setFlexiDeposit] = useState<string>("100000"); // default 1L
+
+  // Drop Down OD States
+  const [dropdownLimit, setDropdownLimit] = useState<string>("5000000"); // default 50L
+  const [dropdownRate, setDropdownRate] = useState<string>("10.5");
+  const [dropdownTenure, setDropdownTenure] = useState<string>("10");
+  const [dropdownReductionPct, setDropdownReductionPct] = useState<string>("5");
+
+  // Interactive graph hover state
+  const [hoveredDDYear, setHoveredDDYear] = useState<number | null>(null);
+
   // Sync state when config changes
   useEffect(() => {
     setEmiAmount(String(activeConfig.defaultAmount));
@@ -321,6 +338,7 @@ export default function LoanCalculatorView({
     setIsGraphExpanded(false);
     setExpandedGraphType("stacked");
     setHoveredYearIndex(null);
+    setProfStructure("standard");
 
     // Sync Education Loan states
     setEduMode("quick");
@@ -344,9 +362,13 @@ export default function LoanCalculatorView({
     setEduPrepayStrategy("reduce-tenure");
   }, [activeConfig]);
 
-  // Sync education default amounts on currency scale shifts
+  // Sync education and Professional OD default amounts on currency scale shifts
   useEffect(() => {
     setEduPartialPaymentAmount(String(Math.round(5000 * currencyScale)));
+    setFlexiLimit(String(Math.round(5000000 * currencyScale)));
+    setFlexiUtilized(String(Math.round(2000000 * currencyScale)));
+    setFlexiDeposit(String(Math.round(100000 * currencyScale)));
+    setDropdownLimit(String(Math.round(5000000 * currencyScale)));
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
@@ -895,6 +917,57 @@ export default function LoanCalculatorView({
     currencyScale
   ]);
 
+  // Calculations for Flexi OD (Doctors)
+  const flexiODCalculations = useMemo(() => {
+    const limit = Number(flexiLimit) || 0;
+    const utilized = Number(flexiUtilized) || 0;
+    const rate = Number(flexiRate) || 0;
+    const deposit = Number(flexiDeposit) || 0;
+
+    const used = utilized;
+    const available = Math.max(0, limit - utilized);
+    const utilizationPct = limit > 0 ? Math.min(100, (utilized / limit) * 100) : 0;
+
+    const dailyInterest = (utilized * (rate / 100)) / 365;
+    const monthlyInterest = (utilized * (rate / 100)) / 12;
+    const annualInterest = utilized * (rate / 100);
+
+    return {
+      limit,
+      utilized,
+      rate,
+      deposit,
+      used,
+      available,
+      utilizationPct,
+      dailyInterest,
+      monthlyInterest,
+      annualInterest,
+    };
+  }, [flexiLimit, flexiUtilized, flexiRate, flexiDeposit]);
+
+  // Calculations for Drop Down OD (Doctors)
+  const dropdownODCalculations = useMemo(() => {
+    const initialLimit = Number(dropdownLimit) || 0;
+    const rate = Number(dropdownRate) || 0;
+    const tenure = Number(dropdownTenure) || 0;
+    const reductionPct = Number(dropdownReductionPct) || 0;
+
+    const yearlyLimits: { year: number; limit: number }[] = [];
+    for (let t = 1; t <= tenure; t++) {
+      const currentLimit = Math.max(0, initialLimit * (1 - (t - 1) * (reductionPct / 100)));
+      yearlyLimits.push({ year: t, limit: currentLimit });
+    }
+
+    return {
+      initialLimit,
+      rate,
+      tenure,
+      reductionPct,
+      yearlyLimits,
+    };
+  }, [dropdownLimit, dropdownRate, dropdownTenure, dropdownReductionPct]);
+
   // Chart data calculations for Cumulative Amortization curve
   const emiChartData = useMemo(() => {
     const amountVal = activeTab === "education" ? (eduMode === "quick" ? (Number(emiAmount) || 0) : (Number(eduSanctionedAmount) || 0)) : (Number(emiAmount) || 0);
@@ -1143,11 +1216,20 @@ export default function LoanCalculatorView({
     let detailsStr = "";
 
     if (calcType === "emi") {
-      detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
-        `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
-        `EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo. ` +
-        `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
-        (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
+      if (activeTab === "professional" && profStructure === "flexi") {
+        detailsStr = `Calculated a Professional Loan (Doctors) with Flexi OD structure on the EMI Calculator. ` +
+          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}. ` +
+          `Estimated Monthly Interest: ${formatCurrency(flexiODCalculations.monthlyInterest)}, Daily Interest: ${formatCurrency(flexiODCalculations.dailyInterest)}, Annual Interest: ${formatCurrency(flexiODCalculations.annualInterest)}.`;
+      } else if (activeTab === "professional" && profStructure === "dropdown") {
+        detailsStr = `Calculated a Professional Loan (Doctors) with Drop Down OD structure on the EMI Calculator. ` +
+          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Tenure: ${Number(dropdownTenure) || 0} Years, Reduction Schedule: ${Number(dropdownReductionPct) || 0}% / Year.`;
+      } else {
+        detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
+          `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
+          `EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo. ` +
+          `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
+          (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
+      }
     } else if (calcType === "compare") {
       const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
       const typeB = LOAN_TYPES.find((t) => t.id === compTypeB) || LOAN_TYPES[0];
@@ -1166,15 +1248,31 @@ export default function LoanCalculatorView({
     onApplyNow(
       calcType === "compare"
         ? `${typeA.name} vs Alternative`
+        : activeTab === "professional" && profStructure === "flexi"
+        ? "Professional Loan (Flexi OD)"
+        : activeTab === "professional" && profStructure === "dropdown"
+        ? "Professional Loan (Drop Down OD)"
         : activeConfig.name,
       calcType === "compare"
         ? (Number(compAmountA) || 0)
+        : activeTab === "professional" && profStructure === "flexi"
+        ? (Number(flexiLimit) || 0)
+        : activeTab === "professional" && profStructure === "dropdown"
+        ? (Number(dropdownLimit) || 0)
         : (Number(emiAmount) || 0),
       calcType === "compare"
         ? (Number(compRateA) || 0)
+        : activeTab === "professional" && profStructure === "flexi"
+        ? (Number(flexiRate) || 0)
+        : activeTab === "professional" && profStructure === "dropdown"
+        ? (Number(dropdownRate) || 0)
         : (Number(emiRate) || 0),
       calcType === "compare"
         ? (Number(compTenureA) || 0)
+        : activeTab === "professional" && profStructure === "flexi"
+        ? 0
+        : activeTab === "professional" && profStructure === "dropdown"
+        ? (Number(dropdownTenure) || 0)
         : (Number(emiTenure) || 0),
       detailsStr
     );
@@ -1575,6 +1673,35 @@ export default function LoanCalculatorView({
                 </button>
               ))}
             </div>
+
+            {activeTab === "professional" && (
+              <div className="bg-gray-50 border border-gray-100 rounded-[14px] p-4 mb-[20px] animate-fade-up">
+                <div className="text-[12px] font-bold text-gray-400 uppercase tracking-wider mb-2.5">
+                  Professional Loan Structure
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: "standard", name: "Standard EMI", icon: "📊" },
+                    { id: "flexi", name: "Flexi OD", icon: "🔄" },
+                    { id: "dropdown", name: "Drop Down OD", icon: "📉" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setProfStructure(item.id as any)}
+                      className={`px-4 py-2 rounded-[10px] text-[12.5px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                        profStructure === item.id
+                          ? "bg-primary border-primary text-white shadow-sm"
+                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`}
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="relative">
               {isGuest && (
@@ -2231,6 +2358,323 @@ export default function LoanCalculatorView({
                       </div>
                     )}
                   </div>
+                ) : activeTab === "professional" && profStructure === "flexi" ? (
+                  <div className="flex flex-col gap-6 animate-fade-up">
+                    {/* Input 1: Credit Limit */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Credit Limit</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(flexiLimit) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={flexiLimit}
+                          onChange={(e) => {
+                            setFlexiLimit(e.target.value);
+                            const limitVal = Number(e.target.value) || 0;
+                            if (Number(flexiUtilized) > limitVal) {
+                              setFlexiUtilized(String(limitVal));
+                            }
+                            if (Number(flexiDeposit) > limitVal) {
+                              setFlexiDeposit(String(limitVal));
+                            }
+                          }}
+                          onBlur={() => {
+                            const val = Number(flexiLimit) || 0;
+                            const maxVal = Math.round(50000000 * currencyScale);
+                            const minVal = Math.round(100000 * currencyScale);
+                            const clamped = Math.max(minVal, Math.min(maxVal, val));
+                            setFlexiLimit(String(clamped));
+                            if (Number(flexiUtilized) > clamped) {
+                              setFlexiUtilized(String(clamped));
+                            }
+                            if (Number(flexiDeposit) > clamped) {
+                              setFlexiDeposit(String(clamped));
+                            }
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={Math.round(100000 * currencyScale)}
+                        max={Math.round(50000000 * currencyScale)}
+                        step={Math.round(50000 * currencyScale)}
+                        value={Number(flexiLimit) || 0}
+                        onChange={(e) => {
+                          setFlexiLimit(e.target.value);
+                          const limitVal = Number(e.target.value) || 0;
+                          if (Number(flexiUtilized) > limitVal) {
+                            setFlexiUtilized(String(limitVal));
+                          }
+                          if (Number(flexiDeposit) > limitVal) {
+                            setFlexiDeposit(String(limitVal));
+                          }
+                        }}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{formatCompact(Math.round(100000 * currencyScale))}</span>
+                        <span>{formatCompact(Math.round(50000000 * currencyScale))}</span>
+                      </div>
+                    </div>
+
+                    {/* Input 2: Utilized Amount */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Utilized Amount</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(flexiUtilized) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={flexiUtilized}
+                          onChange={(e) => setFlexiUtilized(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(flexiUtilized) || 0;
+                            const limitVal = Number(flexiLimit) || 0;
+                            const clamped = Math.max(0, Math.min(limitVal, val));
+                            setFlexiUtilized(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Number(flexiLimit) || 0}
+                        step={Math.round(10000 * currencyScale)}
+                        value={Number(flexiUtilized) || 0}
+                        onChange={(e) => setFlexiUtilized(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{currency.symbol}0</span>
+                        <span>{formatCompact(Number(flexiLimit) || 0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Input 3: Interest Rate */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(flexiRate) || 0}%</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={flexiRate}
+                          onChange={(e) => setFlexiRate(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(flexiRate) || 0;
+                            const clamped = Math.max(8.5, Math.min(20.0, val));
+                            setFlexiRate(String(Number(clamped.toFixed(2))));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[14px] pr-1">%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={8.5}
+                        max={20.0}
+                        step={0.05}
+                        value={Number(flexiRate) || 0}
+                        onChange={(e) => setFlexiRate(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>8.5%</span>
+                        <span>20.0%</span>
+                      </div>
+                    </div>
+
+                    {/* Input 4: Expected Monthly Deposit */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Expected Monthly Deposit</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(flexiDeposit) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={flexiDeposit}
+                          onChange={(e) => setFlexiDeposit(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(flexiDeposit) || 0;
+                            const limitVal = Number(flexiLimit) || 1000000;
+                            const clamped = Math.max(0, Math.min(limitVal, val));
+                            setFlexiDeposit(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Number(flexiLimit) || 1000000}
+                        step={Math.round(10000 * currencyScale)}
+                        value={Number(flexiDeposit) || 0}
+                        onChange={(e) => setFlexiDeposit(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{currency.symbol}0</span>
+                        <span>{formatCompact(Number(flexiLimit) || 1000000)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeTab === "professional" && profStructure === "dropdown" ? (
+                  <div className="flex flex-col gap-6 animate-fade-up">
+                    {/* Input 1: Initial Limit */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Initial Limit</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(dropdownLimit) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={dropdownLimit}
+                          onChange={(e) => setDropdownLimit(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(dropdownLimit) || 0;
+                            const maxVal = Math.round(50000000 * currencyScale);
+                            const minVal = Math.round(100000 * currencyScale);
+                            const clamped = Math.max(minVal, Math.min(maxVal, val));
+                            setDropdownLimit(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={Math.round(100000 * currencyScale)}
+                        max={Math.round(50000000 * currencyScale)}
+                        step={Math.round(50000 * currencyScale)}
+                        value={Number(dropdownLimit) || 0}
+                        onChange={(e) => setDropdownLimit(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{formatCompact(Math.round(100000 * currencyScale))}</span>
+                        <span>{formatCompact(Math.round(50000000 * currencyScale))}</span>
+                      </div>
+                    </div>
+
+                    {/* Input 2: Interest Rate */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(dropdownRate) || 0}%</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={dropdownRate}
+                          onChange={(e) => setDropdownRate(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(dropdownRate) || 0;
+                            const clamped = Math.max(8.5, Math.min(20.0, val));
+                            setDropdownRate(String(Number(clamped.toFixed(2))));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[14px] pr-1">%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={8.5}
+                        max={20.0}
+                        step={0.05}
+                        value={Number(dropdownRate) || 0}
+                        onChange={(e) => setDropdownRate(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>8.5%</span>
+                        <span>20.0%</span>
+                      </div>
+                    </div>
+
+                    {/* Input 3: Tenure */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Tenure</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(dropdownTenure) || 0} Years</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          value={dropdownTenure}
+                          onChange={(e) => setDropdownTenure(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(dropdownTenure) || 0;
+                            const clamped = Math.max(1, Math.min(15, val));
+                            setDropdownTenure(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={15}
+                        step={1}
+                        value={Number(dropdownTenure) || 0}
+                        onChange={(e) => setDropdownTenure(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>1 Year</span>
+                        <span>15 Years</span>
+                      </div>
+                    </div>
+
+                    {/* Input 4: Reduction Schedule */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Reduction Schedule</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(dropdownReductionPct) || 0}% / Year</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={dropdownReductionPct}
+                          onChange={(e) => setDropdownReductionPct(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(dropdownReductionPct) || 0;
+                            const clamped = Math.max(1.0, Math.min(20.0, val));
+                            setDropdownReductionPct(String(Number(clamped.toFixed(2))));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[12px] pr-1">% / Yr</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1.0}
+                        max={20.0}
+                        step={0.5}
+                        value={Number(dropdownReductionPct) || 0}
+                        onChange={(e) => setDropdownReductionPct(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>1.0%</span>
+                        <span>20.0%</span>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-6">
                     {/* Input 1: Loan Amount */}
@@ -2365,20 +2809,28 @@ export default function LoanCalculatorView({
                 )}
 
                 {/* Dashboard Summary Card */}
-                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2">
+                <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
-                      Calculated Monthly EMI
+                      {activeTab === "professional" && profStructure === "flexi"
+                        ? "Est. Monthly Interest"
+                        : activeTab === "professional" && profStructure === "dropdown"
+                        ? "Initial Credit Limit"
+                        : "Calculated Monthly EMI"}
                     </span>
                     <span className="text-[25px] font-bold text-primary mt-1">
-                      {formatCurrency(emiCalculations.monthlyEmi)}
+                      {activeTab === "professional" && profStructure === "flexi"
+                        ? formatCurrency(flexiODCalculations.monthlyInterest)
+                        : activeTab === "professional" && profStructure === "dropdown"
+                        ? formatCurrency(dropdownODCalculations.initialLimit)
+                        : formatCurrency(emiCalculations.monthlyEmi)}
                     </span>
                   </div>
-                  <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                  <div className="flex gap-2 shrink-0 w-full md:w-auto">
                     <button
                       type="button"
                       onClick={handleAskAssistant}
-                      className="flex-1 sm:flex-none px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
+                      className="flex-1 md:flex-none px-5 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                     >
                       Apply & Chat
                     </button>
@@ -2386,7 +2838,7 @@ export default function LoanCalculatorView({
                       <button
                         type="button"
                         onClick={onTalkToAdvisor}
-                        className="flex-1 sm:flex-none px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
+                        className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] hover:-translate-y-0.5 whitespace-nowrap"
                       >
                         Talk to Advisor
                       </button>
@@ -2397,373 +2849,573 @@ export default function LoanCalculatorView({
 
               {/* Visualizations Side */}
               <div className="lg:col-span-6 flex flex-col gap-[20px] items-center">
-                {/* Horizontal Outflow Progress Bar */}
-                <div className="w-full max-w-[640px] flex flex-col gap-2 mt-1 animate-fade-up">
-                  <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-                    <span>Outflow Breakdown</span>
-                    <span>Total: {formatCurrency(emiCalculations.totalPayable)}</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-100 rounded-full flex overflow-hidden border border-gray-200/50">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${emiCalculations.principalPct}%` }}
-                    />
-                    {emiCalculations.capitalizedInterestPct > 0 && (
-                      <div
-                        className="h-full bg-purple-500 transition-all duration-500"
-                        style={{ width: `${emiCalculations.capitalizedInterestPct}%` }}
-                      />
-                    )}
-                    {emiCalculations.totalInterest > 0 && (
-                      <div
-                        className="h-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${emiCalculations.interestPct}%` }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Legends */}
-                <div className={`w-full max-w-[640px] grid gap-4 ${
-                  activeTab === "education" && emiCalculations.capitalizedInterestPct > 0
-                    ? "grid-cols-3"
-                    : "grid-cols-2"
-                }`}>
-                  <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
-                      <span>Principal Amount</span>
+                {activeTab === "professional" && profStructure === "flexi" ? (
+                  <>
+                    {/* Flexi OD Visuals */}
+                    {/* OD Utilization Progress Bar */}
+                    <div className="w-full max-w-[640px] bg-white border border-gray-250 rounded-[18px] p-5 shadow-sm flex flex-col gap-3 animate-fade-up">
+                      <div className="flex justify-between items-center text-[12px] font-bold text-gray-550 uppercase tracking-wide">
+                        <span>OD Utilization</span>
+                        <span className="text-primary">{flexiODCalculations.utilizationPct.toFixed(0)}% Utilized</span>
+                      </div>
+                      <div className="w-full h-4 bg-gray-100 rounded-full flex overflow-hidden border border-gray-200/50">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{ width: `${flexiODCalculations.utilizationPct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-[12.5px] font-bold mt-1 text-gray-700">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
+                          <span>Used: <span className="text-gray-900">{formatCurrency(flexiODCalculations.used)}</span></span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-gray-300 block shrink-0" />
+                          <span>Available: <span className="text-gray-900">{formatCurrency(flexiODCalculations.available)}</span></span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[14px] font-bold text-gray-900 mt-1">
-                      {formatCurrency(
-                        activeTab === "education"
-                          ? eduMode === "quick"
-                            ? Number(emiAmount) || 0
-                            : Number(eduSanctionedAmount) || 0
-                          : Number(emiAmount) || 0
+
+                    {/* Interest Summary Card */}
+                    <div className="w-full max-w-[640px] bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-[18px] p-5 shadow-sm flex flex-col gap-4 animate-fade-up">
+                      <div className="flex items-center gap-1.5 border-b border-indigo-100/60 pb-2">
+                        <span className="text-[16px]">🩺</span>
+                        <span className="text-[12.5px] font-bold text-indigo-900 uppercase tracking-wide">Interest Summary</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Daily Interest</span>
+                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.dailyInterest)}</span>
+                        </div>
+                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Monthly Interest</span>
+                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.monthlyInterest)}</span>
+                        </div>
+                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Annual Interest</span>
+                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.annualInterest)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : activeTab === "professional" && profStructure === "dropdown" ? (
+                  <>
+                    {/* Drop Down OD Visuals */}
+                    {/* Reduction Payoff Chart */}
+                    <div className="w-full max-w-[640px] bg-white border border-gray-200 rounded-[18px] p-5 shadow-sm flex flex-col gap-3 animate-fade-up text-left">
+                      <div className="flex justify-between items-center text-[12px] font-bold text-gray-555 uppercase tracking-wide">
+                        <span>Limit Reduction Timeline</span>
+                        <span className="text-primary font-bold normal-case text-[11px]">Hover points for limits</span>
+                      </div>
+
+                      <div className="relative w-full h-[130px] flex items-center justify-center bg-gray-55 border border-gray-100 rounded-[12px] p-1 overflow-visible">
+                        <svg viewBox="0 0 256 110" className="w-full h-full max-h-[110px] overflow-visible">
+                          <defs>
+                            <linearGradient id="dd-chart-gradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#3344e6" stopOpacity="0.2" />
+                              <stop offset="100%" stopColor="#3344e6" stopOpacity="0.0" />
+                            </linearGradient>
+                          </defs>
+
+                          {/* Grid lines */}
+                          <line x1="10" y1="10" x2="246" y2="10" stroke="#e9ecef" strokeWidth="1" />
+                          <line x1="10" y1="55" x2="246" y2="55" stroke="#e9ecef" strokeWidth="1" />
+                          <line x1="10" y1="100" x2="246" y2="100" stroke="#dee2e6" strokeWidth="1" strokeDasharray="3 3" />
+
+                          {/* Fill Area */}
+                          {(() => {
+                            const initialLimit = dropdownODCalculations.initialLimit || 1;
+                            const pts = dropdownODCalculations.yearlyLimits;
+                            const nPts = pts.length || 1;
+                            let fPath = "";
+                            pts.forEach((pt, idx) => {
+                              const x = 10 + (idx / (nPts - 1 || 1)) * 236;
+                              const y = 10 + (1 - pt.limit / initialLimit) * 90;
+                              if (idx === 0) {
+                                fPath = `M ${x} 100 L ${x} ${y}`;
+                              } else {
+                                fPath += ` L ${x} ${y}`;
+                              }
+                            });
+                            if (nPts > 0) {
+                              const lastX = 10 + 236;
+                              fPath += ` L ${lastX} 100 Z`;
+                            }
+                            return fPath ? <path d={fPath} fill="url(#dd-chart-gradient)" /> : null;
+                          })()}
+
+                          {/* Line stroke */}
+                          {(() => {
+                            const initialLimit = dropdownODCalculations.initialLimit || 1;
+                            const pts = dropdownODCalculations.yearlyLimits;
+                            const nPts = pts.length || 1;
+                            let lPath = "";
+                            pts.forEach((pt, idx) => {
+                              const x = 10 + (idx / (nPts - 1 || 1)) * 236;
+                              const y = 10 + (1 - pt.limit / initialLimit) * 90;
+                              if (idx === 0) {
+                                lPath = `M ${x} ${y}`;
+                              } else {
+                                lPath += ` L ${x} ${y}`;
+                              }
+                            });
+                            return lPath ? (
+                              <path
+                                d={lPath}
+                                fill="none"
+                                stroke="#3344e6"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            ) : null;
+                          })()}
+
+                          {/* Interaction Dots */}
+                          {dropdownODCalculations.yearlyLimits.map((pt, idx) => {
+                            const initialLimit = dropdownODCalculations.initialLimit || 1;
+                            const pts = dropdownODCalculations.yearlyLimits;
+                            const nPts = pts.length || 1;
+                            const x = 10 + (idx / (nPts - 1 || 1)) * 236;
+                            const y = 10 + (1 - pt.limit / initialLimit) * 90;
+
+                            const isHovered = hoveredDDYear === pt.year;
+
+                            return (
+                              <g key={pt.year} className="cursor-pointer">
+                                <circle
+                                  cx={x}
+                                  cy={y}
+                                  r={isHovered ? 5 : 3.5}
+                                  fill={isHovered ? "#3344e6" : "#ffffff"}
+                                  stroke="#3344e6"
+                                  strokeWidth={2}
+                                  onMouseEnter={() => setHoveredDDYear(pt.year)}
+                                  onMouseLeave={() => setHoveredDDYear(null)}
+                                  className="transition-all duration-155"
+                                />
+                                {isHovered && (
+                                  <g>
+                                    <rect
+                                      x={x - 45}
+                                      y={y - 25 < 5 ? y + 10 : y - 28}
+                                      width="90"
+                                      height="18"
+                                      rx="4"
+                                      fill="#1e293b"
+                                      className="shadow-sm"
+                                    />
+                                    <text
+                                      x={x}
+                                      y={y - 25 < 5 ? y + 22 : y - 16}
+                                      fill="#ffffff"
+                                      fontSize="7.5"
+                                      fontWeight="bold"
+                                      textAnchor="middle"
+                                    >
+                                      Yr {pt.year}: {formatCompact(pt.limit)}
+                                    </text>
+                                  </g>
+                                )}
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+                      <div className="flex justify-between text-[9px] text-gray-400 font-bold px-0.5 w-full">
+                        <span>Year 1 ({formatCompact(dropdownODCalculations.initialLimit)})</span>
+                        <span>Midway</span>
+                        <span>Year {dropdownODCalculations.tenure} ({formatCompact(dropdownODCalculations.yearlyLimits[dropdownODCalculations.yearlyLimits.length - 1]?.limit || 0)})</span>
+                      </div>
+                    </div>
+
+                    {/* Limit Schedule Grid */}
+                    <div className="w-full max-w-[640px] bg-gray-50 border border-gray-200 rounded-[18px] p-4 flex flex-col gap-2 animate-fade-up">
+                      <span className="text-[11px] font-bold text-gray-550 uppercase tracking-wide">Year-by-Year Limit Schedule</span>
+                      <div className="max-h-[140px] overflow-y-auto pr-1 grid grid-cols-2 gap-2 text-[12px] font-semibold text-gray-700">
+                        {dropdownODCalculations.yearlyLimits.map((pt) => (
+                          <div key={pt.year} className="flex justify-between bg-white border border-gray-150 rounded-[8px] p-2 hover:border-primary/20 transition-all">
+                            <span className="text-gray-400">Year {pt.year}</span>
+                            <span className="text-gray-800 font-bold">{formatCurrency(pt.limit)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Horizontal Outflow Progress Bar */}
+                    <div className="w-full max-w-[640px] flex flex-col gap-2 mt-1 animate-fade-up">
+                      <div className="flex justify-between text-[11px] font-bold text-gray-550 uppercase tracking-wide">
+                        <span>Outflow Breakdown</span>
+                        <span>Total: {formatCurrency(emiCalculations.totalPayable)}</span>
+                      </div>
+                      <div className="w-full h-4 bg-gray-100 rounded-full flex overflow-hidden border border-gray-200/50">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{ width: `${emiCalculations.principalPct}%` }}
+                        />
+                        {emiCalculations.capitalizedInterestPct > 0 && (
+                          <div
+                            className="h-full bg-purple-500 transition-all duration-500"
+                            style={{ width: `${emiCalculations.capitalizedInterestPct}%` }}
+                          />
+                        )}
+                        {emiCalculations.totalInterest > 0 && (
+                          <div
+                            className="h-full bg-emerald-500 transition-all duration-500"
+                            style={{ width: `${emiCalculations.interestPct}%` }}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Legends */}
+                    <div className={`w-full max-w-[640px] grid gap-4 ${
+                      activeTab === "education" && emiCalculations.capitalizedInterestPct > 0
+                        ? "grid-cols-3"
+                        : "grid-cols-2"
+                    }`}>
+                      <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-550">
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary block shrink-0" />
+                          <span>Principal Amount</span>
+                        </div>
+                        <span className="text-[14px] font-bold text-gray-900 mt-1">
+                          {formatCurrency(
+                            activeTab === "education"
+                              ? eduMode === "quick"
+                                ? Number(emiAmount) || 0
+                                : Number(eduSanctionedAmount) || 0
+                              : Number(emiAmount) || 0
+                          )}
+                        </span>
+                        <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.principalPct)}%)</span>
+                      </div>
+
+                      {activeTab === "education" && emiCalculations.capitalizedInterestPct > 0 && (
+                        <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-550">
+                            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
+                            <span className="whitespace-nowrap">Capitalized Interest</span>
+                          </div>
+                          <span className="text-[14px] font-bold text-gray-900 mt-1">
+                            {formatCurrency(emiCalculations.capitalizedInterest)}
+                          </span>
+                          <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.capitalizedInterestPct)}%)</span>
+                        </div>
                       )}
-                    </span>
-                    <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.principalPct)}%)</span>
-                  </div>
 
-                  {activeTab === "education" && emiCalculations.capitalizedInterestPct > 0 && (
-                    <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
-                        <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block shrink-0" />
-                        <span className="whitespace-nowrap">Capitalized Interest</span>
-                      </div>
-                      <span className="text-[14px] font-bold text-gray-900 mt-1">
-                        {formatCurrency(emiCalculations.capitalizedInterest)}
-                      </span>
-                      <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.capitalizedInterestPct)}%)</span>
-                    </div>
-                  )}
-
-                  <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block shrink-0" />
-                      <span>Total Interest</span>
-                    </div>
-                    <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(emiCalculations.totalInterest)}</span>
-                    <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.interestPct)}%)</span>
-                  </div>
-                </div>
-
-                {/* Payoff Progress Amortization Timeline stacked bar chart */}
-                <button
-                  type="button"
-                  onClick={() => setIsGraphExpanded(true)}
-                  className="w-full max-w-[640px] bg-gray-50 border border-gray-150 rounded-[14px] p-3 flex flex-col gap-2 hover:border-primary/30 hover:shadow-md transition-all text-left cursor-pointer group relative animate-fade-up"
-                  aria-label="Expand detailed amortization graph"
-                >
-                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-wide w-full">
-                    <span>Payoff Progress Timeline</span>
-                    <span className="text-primary group-hover:underline flex items-center gap-1 font-bold normal-case">
-                      Click to expand
-                    </span>
-                  </div>
-
-                  <div className="relative w-full h-[115px] flex items-center justify-center bg-white border border-gray-100 rounded-[10px] p-1 overflow-hidden">
-                    <svg viewBox="0 0 256 110" className="w-full h-full max-h-[110px] overflow-visible">
-                      {/* Grid lines */}
-                      <line x1="0" y1="5" x2="256" y2="5" stroke="#f1f3f5" strokeWidth="1" />
-                      <line x1="0" y1="55" x2="256" y2="55" stroke="#f1f3f5" strokeWidth="1" />
-                      <line x1="0" y1="105" x2="256" y2="105" stroke="#e9ecef" strokeWidth="1" strokeDasharray="3 3" />
-
-                      {/* Bars Render */}
-                      {(() => {
-                        const N = emiCalculations.yearlyAmortization.length || 1;
-                        const usableWidth = 236;
-                        const usableHeight = 90;
-                        const gap = Math.max(1, Math.min(6, Math.floor(100 / N)));
-                        const colWidth = (usableWidth - (N - 1) * gap) / N;
-                        const maxOutflow = emiCalculations.maxYearlyOutflow || 1;
-
-                        return emiCalculations.yearlyAmortization.map((yr, idx) => {
-                          const h_p = (yr.principal / maxOutflow) * usableHeight;
-                          const h_i = (yr.interest / maxOutflow) * usableHeight;
-                          const h_e = (yr.extra / maxOutflow) * usableHeight;
-
-                          const x = 10 + idx * (colWidth + gap);
-                          const y_p = 100 - h_p;
-                          const y_i = y_p - h_i;
-                          const y_e = y_i - h_e;
-
-                          return (
-                            <g key={yr.year}>
-                              {/* Principal segment */}
-                              {h_p > 0 && (
-                                <rect
-                                  x={x}
-                                  y={y_p}
-                                  width={colWidth}
-                                  height={h_p}
-                                  fill="#3344e6"
-                                  className="transition-all duration-300"
-                                />
-                              )}
-                              {/* Interest segment */}
-                              {h_i > 0 && (
-                                <rect
-                                  x={x}
-                                  y={y_i}
-                                  width={colWidth}
-                                  height={h_i}
-                                  fill="#10b981"
-                                  className="transition-all duration-300"
-                                />
-                              )}
-                              {/* Extra segment */}
-                              {h_e > 0 && (
-                                <rect
-                                  x={x}
-                                  y={y_e}
-                                  width={colWidth}
-                                  height={h_e}
-                                  fill="#8b5cf6"
-                                  className="transition-all duration-300"
-                                />
-                              )}
-                            </g>
-                          );
-                        });
-                      })()}
-                    </svg>
-                  </div>
-
-                  {/* Chart Labels */}
-                  <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5 w-full">
-                    <span>Start (Year 0)</span>
-                    <span>Midway</span>
-                    <span>End (Year {Number(emiTenure) || 0})</span>
-                  </div>
-                </button>
-
-                {/* Optimized impact card (Standard) */}
-                {activeTab !== "education" && emiOptimize && (
-                  <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[16px]">✨</span>
-                      <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Optimization Benefits</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
-                        <span className="text-[10px] font-semibold text-gray-400">Interest Saved</span>
-                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
-                          {formatCurrency(emiCalculations.interestSaved)}
-                        </span>
-                      </div>
-                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
-                        <span className="text-[10px] font-semibold text-gray-400">Tenure Reduced</span>
-                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
-                          {Math.floor(emiCalculations.monthsSaved / 12) > 0
-                            ? `${Math.floor(emiCalculations.monthsSaved / 12)} Yr ${emiCalculations.monthsSaved % 12} Mo`
-                            : `${emiCalculations.monthsSaved} Months`}
-                        </span>
+                      <div className="flex flex-col items-center border border-gray-100 rounded-[10px] p-2.5 bg-gray-50">
+                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-550">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block shrink-0" />
+                          <span>Total Interest</span>
+                        </div>
+                        <span className="text-[14px] font-bold text-gray-900 mt-1">{formatCurrency(emiCalculations.totalInterest)}</span>
+                        <span className="text-[9px] font-semibold text-gray-400">({Math.round(emiCalculations.interestPct)}%)</span>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Prepayment Benefits Card (Education) */}
-                {activeTab === "education" && emiCalculations.interestSaved > 0 && (
-                  <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[16px]">✨</span>
-                      <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Prepayment Benefits</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
-                        <span className="text-[10px] font-semibold text-gray-400">Interest Saved</span>
-                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
-                          {formatCurrency(emiCalculations.interestSaved)}
+                    {/* Payoff Progress Amortization Timeline stacked bar chart */}
+                    <button
+                      type="button"
+                      onClick={() => setIsGraphExpanded(true)}
+                      className="w-full max-w-[640px] bg-gray-50 border border-gray-150 rounded-[14px] p-3 flex flex-col gap-2 hover:border-primary/30 hover:shadow-md transition-all text-left cursor-pointer group relative animate-fade-up"
+                      aria-label="Expand detailed amortization graph"
+                    >
+                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-550 uppercase tracking-wide w-full">
+                        <span>Payoff Progress Timeline</span>
+                        <span className="text-primary group-hover:underline flex items-center gap-1 font-bold normal-case">
+                          Click to expand
                         </span>
                       </div>
-                      <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
-                        <span className="text-[10px] font-semibold text-gray-400">Tenure Reduced</span>
-                        <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
-                          {Math.floor(emiCalculations.monthsSaved / 12) > 0
-                            ? `${Math.floor(emiCalculations.monthsSaved / 12)} Yr ${emiCalculations.monthsSaved % 12} Mo`
-                            : `${emiCalculations.monthsSaved} Months`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Servicing Strategy Comparison Card (Education) */}
-                {activeTab === "education" && emiCalculations.comparison && (
-                  <div className="w-full max-w-[640px] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-250 rounded-[14px] p-4 flex flex-col gap-3 animate-fade-up">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[16px]">💡</span>
-                      <span className="text-[12.5px] font-bold text-emerald-800 uppercase tracking-wide">
-                        Servicing Strategy Comparison
-                      </span>
-                    </div>
-                    <p className="text-[11.5px] leading-normal text-emerald-800">
-                      Paying interest during the study period prevents it from compounding/capitalizing, saving you money.
-                    </p>
-                    <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase border-b border-emerald-100 pb-1.5 mt-1">
-                      <span>Parameter</span>
-                      <span className="text-right">No Payment</span>
-                      <span className="text-right">Full Serviced</span>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
-                        <span>Repayment Principal:</span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.noPayment.effectiveRepaymentPrincipal)}
-                        </span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.fullServiced.effectiveRepaymentPrincipal)}
-                        </span>
+                      <div className="relative w-full h-[115px] flex items-center justify-center bg-white border border-gray-100 rounded-[10px] p-1 overflow-hidden">
+                        <svg viewBox="0 0 256 110" className="w-full h-full max-h-[110px] overflow-visible">
+                          {/* Grid lines */}
+                          <line x1="0" y1="5" x2="256" y2="5" stroke="#f1f3f5" strokeWidth="1" />
+                          <line x1="0" y1="55" x2="256" y2="55" stroke="#f1f3f5" strokeWidth="1" />
+                          <line x1="0" y1="105" x2="256" y2="105" stroke="#e9ecef" strokeWidth="1" strokeDasharray="3 3" />
+
+                          {/* Bars Render */}
+                          {(() => {
+                            const N = emiCalculations.yearlyAmortization.length || 1;
+                            const usableWidth = 236;
+                            const usableHeight = 90;
+                            const gap = Math.max(1, Math.min(6, Math.floor(100 / N)));
+                            const colWidth = (usableWidth - (N - 1) * gap) / N;
+                            const maxOutflow = emiCalculations.maxYearlyOutflow || 1;
+
+                            return emiCalculations.yearlyAmortization.map((yr, idx) => {
+                              const h_p = (yr.principal / maxOutflow) * usableHeight;
+                              const h_i = (yr.interest / maxOutflow) * usableHeight;
+                              const h_e = (yr.extra / maxOutflow) * usableHeight;
+
+                              const x = 10 + idx * (colWidth + gap);
+                              const y_p = 100 - h_p;
+                              const y_i = y_p - h_i;
+                              const y_e = y_i - h_e;
+
+                              return (
+                                <g key={yr.year}>
+                                  {/* Principal segment */}
+                                  {h_p > 0 && (
+                                    <rect
+                                      x={x}
+                                      y={y_p}
+                                      width={colWidth}
+                                      height={h_p}
+                                      fill="#3344e6"
+                                      className="transition-all duration-300"
+                                    />
+                                  )}
+                                  {/* Interest segment */}
+                                  {h_i > 0 && (
+                                    <rect
+                                      x={x}
+                                      y={y_i}
+                                      width={colWidth}
+                                      height={h_i}
+                                      fill="#10b981"
+                                      className="transition-all duration-300"
+                                    />
+                                  )}
+                                  {/* Extra segment */}
+                                  {h_e > 0 && (
+                                    <rect
+                                      x={x}
+                                      y={y_e}
+                                      width={colWidth}
+                                      height={h_e}
+                                      fill="#8b5cf6"
+                                      className="transition-all duration-300"
+                                    />
+                                  )}
+                                </g>
+                              );
+                            });
+                          })()}
+                        </svg>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
-                        <span>Monthly EMI:</span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.noPayment.initialEmi)}
-                        </span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.fullServiced.initialEmi)}
-                        </span>
+
+                      {/* Chart Labels */}
+                      <div className="flex justify-between text-[9px] text-gray-400 font-semibold px-0.5 w-full">
+                        <span>Start (Year 0)</span>
+                        <span>Midway</span>
+                        <span>End (Year {Number(emiTenure) || 0})</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
-                        <span>Total Interest:</span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.noPayment.totalInterest)}
-                        </span>
-                        <span className="text-right font-semibold text-gray-900">
-                          {formatCurrency(emiCalculations.comparison.fullServiced.totalInterest)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[12px] font-bold text-gray-900 border-t border-emerald-100 pt-1.5">
-                        <span>Total Cost:</span>
-                        <span className="text-right">
-                          {formatCurrency(emiCalculations.comparison.noPayment.totalPayable)}
-                        </span>
-                        <span className="text-right text-emerald-600">
-                          {formatCurrency(emiCalculations.comparison.fullServiced.totalPayable)}
-                        </span>
-                      </div>
-                    </div>
-                    {emiCalculations.comparison.savings > 0 && (
-                      <div className="bg-white/80 border border-emerald-200 rounded-[10px] p-2.5 mt-1 flex justify-between items-center text-[11.5px]">
-                        <span className="font-bold text-emerald-800">Total Interest Saved:</span>
-                        <span className="font-extrabold text-emerald-600 text-[13.5px]">
-                          {formatCurrency(emiCalculations.comparison.savings)}
-                        </span>
+                    </button>
+
+                    {/* Optimized impact card (Standard) */}
+                    {activeTab !== "education" && emiOptimize && (
+                      <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[16px]">✨</span>
+                          <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Optimization Benefits</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                          <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                            <span className="text-[10px] font-semibold text-gray-400">Interest Saved</span>
+                            <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                              {formatCurrency(emiCalculations.interestSaved)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                            <span className="text-[10px] font-semibold text-gray-400">Tenure Reduced</span>
+                            <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                              {Math.floor(emiCalculations.monthsSaved / 12) > 0
+                                ? `${Math.floor(emiCalculations.monthsSaved / 12)} Yr ${emiCalculations.monthsSaved % 12} Mo`
+                                : `${emiCalculations.monthsSaved} Months`}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
-                  </div>
+
+                    {/* Prepayment Benefits Card (Education) */}
+                    {activeTab === "education" && emiCalculations.interestSaved > 0 && (
+                      <div className="w-full max-w-[640px] bg-emerald-50 border border-emerald-200 rounded-[14px] p-4 flex flex-col gap-2.5 animate-fade-up">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[16px]">✨</span>
+                          <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-[0.5px]">Prepayment Benefits</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                          <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                            <span className="text-[10px] font-semibold text-gray-400">Interest Saved</span>
+                            <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                              {formatCurrency(emiCalculations.interestSaved)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-emerald-100 rounded-[8px] p-2">
+                            <span className="text-[10px] font-semibold text-gray-400">Tenure Reduced</span>
+                            <span className="text-[15px] font-bold text-emerald-600 mt-0.5">
+                              {Math.floor(emiCalculations.monthsSaved / 12) > 0
+                                ? `${Math.floor(emiCalculations.monthsSaved / 12)} Yr ${emiCalculations.monthsSaved % 12} Mo`
+                                : `${emiCalculations.monthsSaved} Months`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Servicing Strategy Comparison Card (Education) */}
+                    {activeTab === "education" && emiCalculations.comparison && (
+                      <div className="w-full max-w-[640px] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-250 rounded-[14px] p-4 flex flex-col gap-3 animate-fade-up">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[16px]">💡</span>
+                          <span className="text-[12.5px] font-bold text-emerald-800 uppercase tracking-wide">
+                            Servicing Strategy Comparison
+                          </span>
+                        </div>
+                        <p className="text-[11.5px] leading-normal text-emerald-800">
+                          Paying interest during the study period prevents it from compounding/capitalizing, saving you money.
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 text-[10px] font-bold text-gray-400 uppercase border-b border-emerald-100 pb-1.5 mt-1">
+                          <span>Parameter</span>
+                          <span className="text-right">No Payment</span>
+                          <span className="text-right">Full Serviced</span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
+                            <span>Repayment Principal:</span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.noPayment.effectiveRepaymentPrincipal)}
+                            </span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.fullServiced.effectiveRepaymentPrincipal)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
+                            <span>Monthly EMI:</span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.noPayment.initialEmi)}
+                            </span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.fullServiced.initialEmi)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[12px] font-medium text-gray-700">
+                            <span>Total Interest:</span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.noPayment.totalInterest)}
+                            </span>
+                            <span className="text-right font-semibold text-gray-900">
+                              {formatCurrency(emiCalculations.comparison.fullServiced.totalInterest)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[12px] font-bold text-gray-900 border-t border-emerald-100 pt-1.5">
+                            <span>Total Cost:</span>
+                            <span className="text-right">
+                              {formatCurrency(emiCalculations.comparison.noPayment.totalPayable)}
+                            </span>
+                            <span className="text-right text-emerald-600">
+                              {formatCurrency(emiCalculations.comparison.fullServiced.totalPayable)}
+                            </span>
+                          </div>
+                        </div>
+                        {emiCalculations.comparison.savings > 0 && (
+                          <div className="bg-white/80 border border-emerald-200 rounded-[10px] p-2.5 mt-1 flex justify-between items-center text-[11.5px]">
+                            <span className="font-bold text-emerald-800">Total Interest Saved:</span>
+                            <span className="font-extrabold text-emerald-600 text-[13.5px]">
+                              {formatCurrency(emiCalculations.comparison.savings)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
             {/* Amortization Schedule section */}
-            <div className="mt-8 border-t border-gray-100 pt-6">
-              <button
-                type="button"
-                onClick={() => setShowAmortization(!showAmortization)}
-                className="w-full flex items-center justify-between p-3.5 bg-gray-50 border border-gray-200 rounded-[12px] hover:bg-gray-100 transition-colors text-[13px] font-bold text-gray-800"
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4.5 w-4.5 text-primary" />
-                  <span>Amortization Schedule (Year-by-Year)</span>
-                </div>
-                {showAmortization ? <ChevronUp className="h-4.5 w-4.5" /> : <ChevronDown className="h-4.5 w-4.5" />}
-              </button>
-
-              {showAmortization && (
-                <div className="mt-4 border border-gray-200 rounded-[12px] overflow-hidden animate-fade-up">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-gray-50 border-b border-gray-200">
-                    <div className="text-[12px] text-gray-500 font-semibold">
-                      Download complete month-wise breakdown for Excel, Google Sheets, or Numbers.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleExportExcel}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[12.5px] font-bold rounded-[10px] shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
-                    >
-                      <Download className="h-4 w-4" />
-                      <span>Export Monthly Schedule (Excel)</span>
-                    </button>
+            {!(activeTab === "professional" && profStructure !== "standard") && (
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAmortization(!showAmortization)}
+                  className="w-full flex items-center justify-between p-3.5 bg-gray-50 border border-gray-200 rounded-[12px] hover:bg-gray-100 transition-colors text-[13px] font-bold text-gray-800"
+                >
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4.5 w-4.5 text-primary" />
+                    <span>Amortization Schedule (Year-by-Year)</span>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                          <th className="p-3">Year</th>
-                          <th className="p-3">Principal Paid</th>
-                          <th className="p-3">Interest Paid</th>
-                          {emiOptimize && <th className="p-3">Prepayments</th>}
-                          <th className="p-3">End Balance</th>
-                          <th className="p-3 text-right">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 text-[12.5px] font-medium text-gray-700">
-                        {emiCalculations.yearlyAmortization.map((yr) => (
-                          <React.Fragment key={yr.year}>
-                            <tr className="hover:bg-gray-50/50">
-                              <td className="p-3 font-bold text-primary">Year {yr.year}</td>
-                              <td className="p-3">{formatCurrency(yr.principal)}</td>
-                              <td className="p-3 text-emerald-600">{formatCurrency(yr.interest)}</td>
-                              {emiOptimize && <td className="p-3 text-blue-600">{formatCurrency(yr.extra)}</td>}
-                              <td className="p-3 font-semibold text-gray-900">{formatCurrency(yr.endBalance)}</td>
-                              <td className="p-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedYear(expandedYear === yr.year ? null : yr.year)}
-                                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
-                                >
-                                  {expandedYear === yr.year ? "Hide" : "Show Months"}
-                                </button>
-                              </td>
-                            </tr>
-                            {expandedYear === yr.year && (
-                              <tr>
-                                <td colSpan={emiOptimize ? 6 : 5} className="bg-gray-50/70 p-3">
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-lg border border-gray-200 bg-white p-3 text-[11.5px] text-gray-600 animate-fade-up">
-                                    {yr.months.map((m) => (
-                                      <div key={m.month} className="border-b border-gray-100 pb-1.5">
-                                        <div className="font-bold text-gray-800">Month {m.month}</div>
-                                        <div>P: {formatCurrency(m.principal)}</div>
-                                        <div className="text-emerald-600">I: {formatCurrency(m.interest)}</div>
-                                        {m.extra > 0 && <div className="text-blue-600">Extra: {formatCurrency(m.extra)}</div>}
-                                        <div className="text-[10px] text-gray-400 mt-0.5">Bal: {formatCurrency(m.balance)}</div>
-                                      </div>
-                                    ))}
-                                  </div>
+                  {showAmortization ? <ChevronUp className="h-4.5 w-4.5" /> : <ChevronDown className="h-4.5 w-4.5" />}
+                </button>
+
+                {showAmortization && (
+                  <div className="mt-4 border border-gray-200 rounded-[12px] overflow-hidden animate-fade-up">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-gray-50 border-b border-gray-200">
+                      <div className="text-[12px] text-gray-500 font-semibold">
+                        Download complete month-wise breakdown for Excel, Google Sheets, or Numbers.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[12.5px] font-bold rounded-[10px] shadow-sm hover:shadow transition-all cursor-pointer shrink-0"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Export Monthly Schedule (Excel)</span>
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                            <th className="p-3">Year</th>
+                            <th className="p-3">Principal Paid</th>
+                            <th className="p-3">Interest Paid</th>
+                            {emiOptimize && <th className="p-3">Prepayments</th>}
+                            <th className="p-3">End Balance</th>
+                            <th className="p-3 text-right">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {emiCalculations.yearlyAmortization.map((yr) => (
+                            <React.Fragment key={yr.year}>
+                              <tr className="border-b border-gray-150 hover:bg-gray-50/50 text-[12.5px] font-bold text-gray-700">
+                                <td className="p-3">Year {yr.year}</td>
+                                <td className="p-3">{formatCurrency(yr.principal)}</td>
+                                <td className="p-3 text-emerald-600">{formatCurrency(yr.interest)}</td>
+                                {emiOptimize && <td className="p-3 text-purple-600">{formatCurrency(yr.extra)}</td>}
+                                <td className="p-3 text-gray-900">{formatCurrency(yr.endBalance)}</td>
+                                <td className="p-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedYear(expandedYear === yr.year ? null : yr.year)}
+                                    className="px-2.5 py-1 text-[11px] font-extrabold text-primary bg-primary/5 hover:bg-primary/10 rounded-[6px] border border-primary/10 cursor-pointer inline-flex items-center gap-1"
+                                  >
+                                    <span>{expandedYear === yr.year ? "Hide" : "Show"} Months</span>
+                                    {expandedYear === yr.year ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                  </button>
                                 </td>
                               </tr>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
+                              {expandedYear === yr.year && (
+                                <tr>
+                                  <td colSpan={emiOptimize ? 6 : 5} className="bg-gray-50/70 p-3 border-b border-gray-200">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+                                      {yr.months.map((m) => (
+                                        <div key={m.month} className="bg-white border border-gray-200 rounded-[8px] p-2.5 text-[11.5px] shadow-xs flex flex-col font-bold">
+                                          <div className="text-gray-400 border-b border-gray-50 pb-1 mb-1">Month {m.month}</div>
+                                          <div className="text-gray-700">Prin: {formatCurrency(m.principal)}</div>
+                                          <div className="text-emerald-600 my-0.5">Int: {formatCurrency(m.interest)}</div>
+                                          {m.extra > 0 && <div className="text-blue-600">Extra: {formatCurrency(m.extra)}</div>}
+                                          <div className="text-[10px] text-gray-400 mt-0.5">Bal: {formatCurrency(m.balance)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
           </div>
           </div>

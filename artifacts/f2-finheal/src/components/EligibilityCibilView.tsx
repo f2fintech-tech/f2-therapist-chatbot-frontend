@@ -22,6 +22,7 @@ import {
 import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
@@ -1460,94 +1461,150 @@ export default function EligibilityCibilView({
                     </>
                   )}
 
-                  <form onSubmit={handleFetchCibilReport} className="space-y-4">
-                    {/* Experian: separate First + Last Name fields */}
-                    {cibilBureau === "experian" ? (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col">
-                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">First Name</label>
-                          <div className="relative">
-                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <input
-                              type="text"
-                              required
-                              value={cibilFirstName}
-                              onChange={(e) => setCibilFirstName(e.target.value)}
-                              placeholder="e.g. Rahul"
-                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                  <TooltipProvider delayDuration={0}>
+                    <form onSubmit={handleFetchCibilReport} className="space-y-4">
+                      {/* Experian: separate First + Last Name fields */}
+                      {cibilBureau === "experian" ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col">
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">First Name</label>
+                            <div className="relative">
+                              <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={cibilFirstName}
+                                    onChange={(e) => setCibilFirstName(e.target.value)}
+                                    placeholder="e.g. Rahul"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={10}
+                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                                >
+                                  Please fill out this field
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Last Name</label>
+                            <div className="relative">
+                              <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={cibilLastName}
+                                    onChange={(e) => setCibilLastName(e.target.value)}
+                                    placeholder="e.g. Sharma"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={10}
+                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                                >
+                                  Please fill out this field
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex flex-col">
-                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Last Name</label>
-                          <div className="relative">
-                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <input
-                              type="text"
-                              required
-                              value={cibilLastName}
-                              onChange={(e) => setCibilLastName(e.target.value)}
-                              placeholder="e.g. Sharma"
-                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col">
-                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                          {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
-                        </label>
-                        <div className="relative">
-                          <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                          <input
-                            type="text"
-                            required
-                            value={cibilName}
-                            onChange={(e) => setCibilName(e.target.value)}
-                            placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={cibilBureau === "experian" ? "flex flex-col" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
-                      <div className="flex flex-col">
-                        <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                          {cibilReportType === "company" ? "Authorized Mobile Number" : "Mobile Number"}
-                        </label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                          <input
-                            type="tel"
-                            required
-                            value={cibilPhone}
-                            onChange={handlePhoneChange}
-                            placeholder="e.g. 98765XXXXX"
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-                      {cibilBureau !== "experian" && (
+                      ) : (
                         <div className="flex flex-col">
                           <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                            {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
+                            {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
                           </label>
                           <div className="relative">
-                            <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <input
-                              type="text"
-                              required={cibilBureau !== "experian"}
-                              value={cibilPan}
-                              onChange={handlePanChange}
-                              placeholder="e.g. AAAAA1111B"
-                              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <input
+                                  type="text"
+                                  required
+                                  value={cibilName}
+                                  onChange={(e) => setCibilName(e.target.value)}
+                                  placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
+                                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                sideOffset={10}
+                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                              >
+                                Please fill out this field
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                       )}
-                    </div>
+
+                      <div className={cibilBureau === "experian" ? "flex flex-col" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
+                        <div className="flex flex-col">
+                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                            {cibilReportType === "company" ? "Authorized Mobile Number" : "Mobile Number"}
+                          </label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <input
+                                  type="tel"
+                                  required
+                                  value={cibilPhone}
+                                  onChange={handlePhoneChange}
+                                  placeholder="e.g. 98765XXXXX"
+                                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                sideOffset={10}
+                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                              >
+                                Please fill out this field
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                        {cibilBureau !== "experian" && (
+                          <div className="flex flex-col">
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                              {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
+                            </label>
+                            <div className="relative">
+                              <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={cibilPan}
+                                    onChange={handlePanChange}
+                                    placeholder="e.g. AAAAA1111B"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={10}
+                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                                >
+                                  Please fill out this field
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                     <div className="flex flex-col mb-4">
                       <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Select Credit Bureau</label>
@@ -1679,6 +1736,7 @@ export default function EligibilityCibilView({
                       <span>Secure connection. Your credit history is safe with us.</span>
                     </div>
                   </form>
+                </TooltipProvider>
                 </div>
               </div>
             ) : (
