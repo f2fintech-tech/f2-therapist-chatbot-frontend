@@ -34,8 +34,10 @@ export interface UseBackendChatResult {
 
 function createUserMessage(content: string): ChatMessage {
   const timestamp = new Date().toISOString();
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id,
+    key: id,
     role: "user",
     content,
     timestamp,
@@ -54,6 +56,7 @@ function createAssistantMessage(response: {
   const timestamp = new Date().toISOString();
   return {
     id: response.message_id,
+    key: response.message_id,
     role: "bot",
     content: response.response,
     timestamp,
@@ -138,6 +141,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       const assistantMessageId = `assistant-${Date.now()}`;
       const initialAssistantMessage: ChatMessage = {
         id: assistantMessageId,
+        key: assistantMessageId,
         role: "bot",
         content: "",
         time: formatMessageTimestamp(new Date().toISOString()),
@@ -320,6 +324,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       const assistantMessageId = `assistant-${Date.now()}`;
       const initialAssistantMessage: ChatMessage = {
         id: assistantMessageId,
+        key: assistantMessageId,
         role: "bot",
         content: "",
         time: formatMessageTimestamp(new Date().toISOString()),

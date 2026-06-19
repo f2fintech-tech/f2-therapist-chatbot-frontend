@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿﻿﻿﻿﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
-import type { UserProfile } from "@/utils/user";
+
+import StreamingMessage from "./StreamingMessage";
 
 interface ChatAreaProps {
   conversationId: string | null;
@@ -26,6 +27,7 @@ interface ChatAreaProps {
   prefillMessage?: { text: string; card: string };
   onClearPrefill?: () => void;
   onOpenEligibilityCibil?: () => void;
+  streamingMessageId?: string | null;
 }
 
 
@@ -52,6 +54,7 @@ export default function ChatArea({
   prefillMessage,
   onClearPrefill,
   onOpenEligibilityCibil,
+  streamingMessageId,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -199,10 +202,13 @@ export default function ChatArea({
 
   const statusLabel = isHealthy === null ? "Checking backend..." : isHealthy ? "Backend connected" : "Backend unavailable";
   const latestConversation = conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New conversation";
+
   const conversationStartDate = messages.find((message) => message.timestamp)?.timestamp;
   const lastMessage = messages[messages.length - 1];
   const isStreamingStarted = lastMessage && lastMessage.role === 'bot' && lastMessage.content !== "";
-  const showTypingIndicator = (isLoading || isSendingMessage) && !isStreamingStarted;
+  const isMessageStreaming = (msgId: string) =>
+    isSendingMessage && msgId === lastMessage?.id && lastMessage?.role === 'bot';
+
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !isLoading && !isSendingMessage) {
@@ -409,9 +415,9 @@ export default function ChatArea({
         )}
 
         {messages.map((m) => {
-          if (m.role === 'bot' && !m.content) return null;
+          if (m.role === 'bot' && !m.content && !isMessageStreaming(m.id)) return null;
           return (
-            <div key={m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div key={m.key || m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {m.role === 'bot' ? (
                 <div className="w-[36px] h-[36px] rounded-full shrink-0 mt-[18px] shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
                   <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
@@ -433,8 +439,7 @@ export default function ChatArea({
                   m.role === 'bot' 
                     ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
                     : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
-                }`}>
-                  {m.content}
+                }`}>{m.role === 'bot' ? (<StreamingMessage content={m.content} isStreaming={isMessageStreaming(m.id)} />) : (m.content)}
                 </div>
                 <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>
                   {m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}
@@ -455,19 +460,6 @@ export default function ChatArea({
                 {s}
               </button>
             ))}
-          </div>
-        )}
-
-        {showTypingIndicator && (
-          <div className="flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto pb-[14px]">
-            <div className="w-[36px] h-[36px] rounded-full shrink-0 shadow-[0_2px_8px_rgba(50,68,230,0.3)] overflow-hidden border-2 border-primary/20 bg-white">
-                <img src="/owl-avatar.gif" alt="FinHeal" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top",transform:"scale(1.4)",marginTop:"4px"}} />
-              </div>
-            <div className="bg-white border-[1.5px] border-gray-100 rounded-[4px_14px_14px_14px] p-[14px_18px] flex gap-[5px] items-center shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <div className="w-[6px] h-[6px] rounded-full bg-primary opacity-40 animate-bounce-dot" />
-              <div className="w-[6px] h-[6px] rounded-full bg-primary opacity-40 animate-bounce-dot delay-150" />
-              <div className="w-[6px] h-[6px] rounded-full bg-primary opacity-40 animate-bounce-dot delay-300" />
-            </div>
           </div>
         )}
       </div>

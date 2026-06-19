@@ -71,6 +71,7 @@ export interface BackendMood {
 
 export interface ChatMessage {
   id: string;
+  key?: string;
   role: "bot" | "user";
   content: string;
   timestamp?: string;

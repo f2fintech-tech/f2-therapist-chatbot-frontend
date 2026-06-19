@@ -484,6 +484,7 @@ export default function FinHealChat() {
             isHealthy={chat.isHealthy}
             isLoading={chat.isLoading}
             isSendingMessage={chat.isSendingMessage}
+            streamingMessageId={chat.streamingMessageId}
             messages={chat.messages}
             userProfile={userProfile}
             remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
