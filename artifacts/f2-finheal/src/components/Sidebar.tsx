@@ -27,9 +27,10 @@ interface SidebarProps {
   onOpenLoanCalculator?: () => void;
   onOpenEligibilityCibil?: () => void;
   onOpenDashboard?: () => void;
+  onOpenReminders?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard, onOpenReminders }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -278,6 +279,15 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const handleOpenDashboard = () => {
     setActiveNav("My Dashboard");
     onOpenDashboard?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenReminders = () => {
+    setActiveNav("Reminders");
+    onOpenReminders?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -569,7 +579,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
             <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
-            <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={() => setActiveNav("Reminders")} />
+            <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
             {!isUserAdvisor(userEmail) && (
               <>
