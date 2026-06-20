@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
@@ -191,6 +191,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [slotToTime, setSlotToTime] = useState("");
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  
+  // Referrals State
+  const [referrals, setReferrals] = useState<ReferralCode[]>([]);
+  const [referralsLoading, setReferralsLoading] = useState(false);
+  const [generatingReferral, setGeneratingReferral] = useState(false);
 
   // Reschedule meeting states
   const [reschedulingApptId, setReschedulingApptId] = useState<string | null>(null);
@@ -711,6 +716,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   }, [currentExpertId, advisors]);
 
   useEffect(() => {
+    if (currentExpertId && !isAdmin) {
+      setReferralsLoading(true);
+      listReferrals(currentExpertId)
+        .then(data => {
+           // Sort by latest first
+           const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+           setReferrals(sorted);
+        })
+        .catch(err => console.error("Error loading referrals", err))
+        .finally(() => setReferralsLoading(false));
+    }
+  }, [currentExpertId, isAdmin]);
+
+  useEffect(() => {
     if (!expertNextSlot) return;
     const regex = /^([a-zA-Z]{3})\s+(\d+)\s*\([a-zA-Z]{3}\),\s*(.+)$/;
     const match = expertNextSlot.match(regex);
@@ -1127,6 +1146,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       console.error("Error saving self profile:", err);
       alert("Failed to update profile.");
     }
+  };
+
+  const handleGenerateReferral = async () => {
+    if (!currentExpertId) return;
+    setGeneratingReferral(true);
+    try {
+      const newRef = await generateReferral(currentExpertId);
+      setReferrals(prev => [newRef, ...prev]);
+    } catch (err) {
+      console.error("Error generating referral", err);
+      alert("Failed to generate referral code.");
+    } finally {
+      setGeneratingReferral(false);
+    }
+  };
+
+  const copyReferralLink = (code: string) => {
+    const signupUrl = `${window.location.origin}/?ref=${code}`;
+    const message = `Join me on FinHeal, the platform for professional financial advice and health. Use my invite link to get a 50% discount on premium plans and expert sessions!\n\n${signupUrl}`;
+    navigator.clipboard.writeText(message);
+    alert("Invite message and link copied to clipboard!");
   };
 
   const handleUpdatePassword = async () => {
@@ -2484,6 +2524,81 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Referral Engine */}
+                <div className="border border-[#e0e7ff] bg-gradient-to-r from-[#f8faff] to-[#f3f6ff] rounded-[20px] p-[20px] shadow-sm animate-fade-in mt-[20px]">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-[16px] gap-[12px]">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-indigo-900 flex items-center gap-[8px]">
+                        🎁 Refer & Earn (Advisor Referral Engine)
+                      </h3>
+                      <p className="text-[12px] text-indigo-600/80 mt-[2px]">
+                        Generate unique referral invites for your clients. They get a 50% discount on premium plans and sessions.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleGenerateReferral}
+                      disabled={generatingReferral}
+                      className="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-indigo-200"
+                    >
+                      {generatingReferral ? "Generating..." : "+ Generate Unique Invite"}
+                    </button>
+                  </div>
+
+                  <div className="border border-white/50 rounded-[16px] overflow-hidden bg-white/60 shadow-inner">
+                    <table className="w-full text-left text-[12px] border-collapse">
+                      <thead>
+                        <tr className="bg-indigo-50/50 border-b border-indigo-100 text-indigo-800/70 font-bold">
+                          <th className="p-[12px]">Referral Code</th>
+                          <th className="p-[12px]">Status</th>
+                          <th className="p-[12px]">Generated On</th>
+                          <th className="p-[12px]">Expires On</th>
+                          <th className="p-[12px] text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {referralsLoading ? (
+                          <tr>
+                            <td colSpan={5} className="text-center p-6 text-indigo-400 font-medium">Loading referral history...</td>
+                          </tr>
+                        ) : referrals.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="text-center p-6 text-indigo-400 font-medium">No referrals generated yet. Click the button above to create one!</td>
+                          </tr>
+                        ) : (
+                          referrals.map((ref) => (
+                            <tr key={ref.id} className="border-b border-indigo-50/50 hover:bg-white/80 transition-colors">
+                              <td className="p-[12px]">
+                                <span className="font-mono font-bold text-indigo-900 bg-white border border-indigo-100 px-[8px] py-[3px] rounded-[6px] tracking-widest">{ref.code}</span>
+                              </td>
+                              <td className="p-[12px]">
+                                {ref.status === "pending" ? (
+                                  <span className="bg-amber-100 text-amber-800 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-amber-200 uppercase tracking-wider">Pending</span>
+                                ) : (
+                                  <span className="bg-emerald-100 text-emerald-800 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-200 uppercase tracking-wider">Used</span>
+                                )}
+                              </td>
+                              <td className="p-[12px] text-indigo-600/80 font-medium">
+                                {new Date(ref.created_at + "Z").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                              </td>
+                              <td className="p-[12px] text-indigo-600/80 font-medium">
+                                {new Date(ref.expires_at + "Z").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                              </td>
+                              <td className="p-[12px] text-right">
+                                <button
+                                  onClick={() => copyReferralLink(ref.code)}
+                                  className="text-indigo-600 hover:text-indigo-800 font-bold bg-white border border-indigo-200 hover:border-indigo-300 px-[12px] py-[4px] rounded-[8px] cursor-pointer transition shadow-xs"
+                                >
+                                  Copy Link
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 

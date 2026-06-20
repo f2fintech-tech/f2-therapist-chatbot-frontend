@@ -553,6 +553,20 @@ export async function deleteConversation(conversationId: string, userId: string)
   await request<void>(`conversations/${conversationId}?${params.toString()}`, { method: "DELETE", expectJson: false });
 }
 
+export async function updateConversationTitle(
+  conversationId: string,
+  userId: string,
+  title: string
+): Promise<void> {
+  const params = new URLSearchParams({ user_id: userId });
+  await request<void>(`conversations/${conversationId}?${params.toString()}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+    expectJson: false,
+  });
+}
+
 export async function submitWellnessTestResult(payload: WellnessTestResultInput): Promise<void> {
   await request<void>("wellness/test-results", {
     method: "POST",

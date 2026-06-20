@@ -18,6 +18,7 @@ interface InsightsPanelProps {
   conversations: ConversationSummary[];
   onConversationSelect: (conversationId: string) => Promise<void>;
   onDeleteConversation?: (conversationId: string) => Promise<void>;
+  onRenameConversation?: (conversationId: string, title: string) => Promise<void>;
   isOpen: boolean;
   onClose: () => void;
   isAdvisor?: boolean;
@@ -32,6 +33,7 @@ export default function InsightsPanel({
   conversations,
   onConversationSelect,
   onDeleteConversation,
+  onRenameConversation,
   isOpen,
   onClose,
   isAdvisor = false,
@@ -45,6 +47,18 @@ export default function InsightsPanel({
   const [reportsList, setReportsList] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
   const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [renameTitle, setRenameTitle] = useState<string>("");
+
+  const handleSaveRename = useCallback(async (chatId: string) => {
+    const trimmedTitle = renameTitle.trim();
+    if (!trimmedTitle) return;
+
+    if (onRenameConversation) {
+      await onRenameConversation(chatId, trimmedTitle);
+    }
+    setEditingChatId(null);
+  }, [renameTitle, onRenameConversation]);
 
   // Live clock state
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -527,36 +541,93 @@ export default function InsightsPanel({
         </div>
       </div>
 
-      {/* Past Conversations with Delete Button */}
+      {/* Past Conversations with Delete & Rename Buttons */}
       <div className="mb-[18px]">
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Past Conversations</div>
-        <div>
-          {sessionsList.map(s => (
-            <div key={s.id} className="group relative">
-              <button
-                type="button"
-                onClick={() => void onConversationSelect(s.id)}
-                className={`flex w-full items-center gap-[8px] p-[7px_8px] rounded-[6px] transition-colors mb-[1px] hover:bg-gray-50 ${s.id === conversationId ? "bg-[#eef0fd]" : ""}`}
-              >
-                <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
-                <div className="text-[11.5px] text-gray-600 flex-1 truncate text-left pr-6">{s.title}</div>
-                <div className="text-[10px] text-gray-400 shrink-0">{formatConversationDateLabel(s.createdAt)}</div>
-              </button>
+        <div className="flex flex-col gap-[3px]">
+          {sessionsList.map(s => {
+            const isEditing = editingChatId === s.id;
+            return (
+              <div key={s.id} className="group relative">
+                {isEditing ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleSaveRename(s.id);
+                    }}
+                    className="flex w-full items-center gap-[6px] p-[5px_6px] bg-gray-50 border border-gray-200 rounded-[6px] shadow-inner"
+                  >
+                    <input
+                      type="text"
+                      value={renameTitle}
+                      onChange={(e) => setRenameTitle(e.target.value)}
+                      className="flex-1 text-[11.5px] text-gray-800 bg-white border border-gray-300 rounded px-2 py-0.5 focus:outline-none focus:border-indigo-500"
+                      autoFocus
+                      maxLength={100}
+                    />
+                    <button
+                      type="submit"
+                      className="text-[12px] text-green-600 hover:text-green-800 cursor-pointer font-bold px-1"
+                      title="Save"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingChatId(null)}
+                      className="text-[12px] text-red-500 hover:text-red-700 cursor-pointer font-bold px-1"
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void onConversationSelect(s.id)}
+                      className={`flex w-full items-center gap-[8px] p-[7px_8px] rounded-[6px] transition-colors mb-[1px] hover:bg-gray-50 ${s.id === conversationId ? "bg-[#eef0fd]" : ""}`}
+                    >
+                      <div className="w-[5px] h-[5px] rounded-full shrink-0" style={{ backgroundColor: s.moodColor || 'var(--color-primary)' }} />
+                      <div className="text-[11.5px] text-gray-600 flex-1 truncate text-left pr-12">{s.title}</div>
+                      <div className="text-[10px] text-gray-400 shrink-0">{formatConversationDateLabel(s.createdAt)}</div>
+                    </button>
 
-              <button
-                type="button"
-                onClick={(e) => handleDeleteChatClick(e, s.id)}
-                aria-label="Delete conversation"
-                title="Delete conversation"
-                disabled={isChatDeleteDialogOpen}
-                className={`absolute right-16 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-gray-400 transition-all transform px-2 ${isChatDeleteDialogOpen ? 'cursor-not-allowed opacity-50' : 'hover:text-red-500 hover:scale-110'}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M9 3v1H4v2h16V4h-5V3H9zm1 6v8h2V9H10zm4 0v8h2V9h-2z" />
-                </svg>
-              </button>
-            </div>
-          ))}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-[4px] opacity-0 group-hover:opacity-100 bg-white/90 backdrop-blur-sm rounded px-1 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingChatId(s.id);
+                          setRenameTitle(s.title);
+                        }}
+                        aria-label="Rename conversation"
+                        title="Rename conversation"
+                        className="text-gray-450 hover:text-primary transition-all p-1 cursor-pointer"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteChatClick(e, s.id)}
+                        aria-label="Delete conversation"
+                        title="Delete conversation"
+                        disabled={isChatDeleteDialogOpen}
+                        className={`text-gray-450 transition-all p-1 ${isChatDeleteDialogOpen ? 'cursor-not-allowed opacity-50' : 'hover:text-red-500 hover:scale-110 cursor-pointer'}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

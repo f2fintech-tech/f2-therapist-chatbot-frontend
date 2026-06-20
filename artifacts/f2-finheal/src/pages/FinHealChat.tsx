@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
@@ -12,7 +13,6 @@ import AuthScreen from "@/components/AuthScreen";
 import ProfilePage from "@/components/ProfilePage";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
-import { deleteLocalConversation } from "@/utils/localConversations";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
@@ -31,24 +31,7 @@ import Dashboard from "@/components/Dashboard";
 
 export default function FinHealChat() {
 
-  const getInitialMainView = () => {
-    if (typeof window === "undefined") return "chat" as const;
-    const view = new URLSearchParams(window.location.search).get("view");
-    if (view === "financial-literacy") return "financial-literacy" as const;
-    if (view === "emergency-fund") return "emergency-fund" as const;
-    if (view === "tests") return "tests" as const;
-    if (view === "loan-fit") return "loan-fit" as const;
-    if (view === "credit-readiness") return "credit-readiness" as const;
-    if (view === "debt-balance") return "debt-balance" as const;
-    if (view === "profile") return "profile" as const;
-    if (view === "advisor") return "advisor" as const;
-    if (view === "admin") return "admin" as const;
-    if (view === "loan-calculator") return "loan-calculator" as const;
-    if (view === "cibil-analyzer") return "cibil-analyzer" as const;
-    if (view === "eligibility-cibil") return "eligibility-cibil" as const;
-    if (view === "dashboard") return "dashboard" as const;
-    return "chat" as const;
-  };
+  // Replaced getInitialMainView with wouter useLocation
 
   const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
   const [showWelcome, setShowWelcome] = useState(false);
@@ -56,7 +39,48 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  const [mainView, setMainView] = useState<"chat" | "goals" | "tests" | "financial-literacy" | "education" | "emergency-fund" | "loan-fit" | "debt-balance" | "credit-readiness" | "profile" | "advisor" | "admin" | "loan-calculator" | "cibil-analyzer" | "eligibility-cibil" | "dashboard">(getInitialMainView);
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (location === "/") {
+      setLocation("/chat", { replace: true });
+    }
+  }, [location, setLocation]);
+
+  useEffect(() => {
+    if (authSession && !authSession.isGuest && (location === "/login" || location === "/signup")) {
+      setLocation("/chat", { replace: true });
+    }
+  }, [authSession, location, setLocation]);
+
+  const mainView = useMemo(() => {
+    if (location === "/profile") return "profile";
+    if (location === "/advisor") return "advisor";
+    if (location === "/admin") return "admin";
+    if (location === "/dashboard") return "dashboard";
+    if (location === "/education") return "education";
+    if (location === "/loan-calculator") return "loan-calculator";
+    if (location === "/cibil-analyzer") return "cibil-analyzer";
+    if (location === "/eligibility-cibil") return "eligibility-cibil";
+    if (location === "/tests") return "tests";
+    if (location === "/goals") return "goals";
+    if (location === "/tests/financial-literacy" || location === "/financial-literacy") return "financial-literacy";
+    if (location === "/tests/emergency-fund" || location === "/emergency-fund") return "emergency-fund";
+    if (location === "/tests/loan-fit" || location === "/loan-fit") return "loan-fit";
+    if (location === "/tests/credit-readiness" || location === "/credit-readiness") return "credit-readiness";
+    if (location === "/tests/debt-balance" || location === "/debt-balance") return "debt-balance";
+    return "chat";
+  }, [location]) as any;
+
+  const setMainView = (view: string) => {
+    if (view === "chat") setLocation("/chat");
+    else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
+    else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
+    else if (view === "loan-fit") setLocation("/tests/loan-fit");
+    else if (view === "credit-readiness") setLocation("/tests/credit-readiness");
+    else if (view === "debt-balance") setLocation("/tests/debt-balance");
+    else setLocation(`/${view}`);
+  };
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [authPromptReason, setAuthPromptReason] = useState("");
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
@@ -241,10 +265,9 @@ export default function FinHealChat() {
     try {
       await apiDeleteConversation(conversationId, userId);
     } catch (e) {
-      try { deleteLocalConversation(conversationId, userId); } catch {}
+      console.error("Failed to delete conversation from backend:", e);
     } finally {
       try {
-        try { deleteLocalConversation(conversationId, userId); } catch {}
         await chat.refreshConversations();
       } catch {}
       if (chat.conversationId === conversationId) {
@@ -656,6 +679,7 @@ export default function FinHealChat() {
           moodDimensions={currentMoodDims}
           onConversationSelect={handleConversationSelect}
           onDeleteConversation={handleConversationDelete}
+          onRenameConversation={chat.renameConversation}
           sessionId={chat.conversationId ?? "new-conversation"}
           userId={userId}
           isOpen={insightsOpen}

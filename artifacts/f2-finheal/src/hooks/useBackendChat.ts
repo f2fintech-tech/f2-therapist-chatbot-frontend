@@ -6,12 +6,12 @@ import {
   formatMessageTimestamp,
   normalizeBackendError,
   sendChatMessage,
+  updateConversationTitle,
   type BackendRequestError,
   type ChatMessage,
   type ConversationSummary,
   type MoodDimensions,
 } from "@/lib/backendChat";
-import { listLocalConversations, upsertLocalConversation, getLocalConversationMessages } from "@/utils/localConversations";
 
 export interface UseBackendChatResult {
   messages: ChatMessage[];
@@ -30,6 +30,7 @@ export interface UseBackendChatResult {
   clearConversation: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
 }
 
 function createUserMessage(content: string): ChatMessage {
@@ -87,13 +88,8 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     }
 
     const nextConversations = await getConversations(userId).catch(() => []);
-    // Merge in any locally-saved conversations (localStorage) so user doesn't lose recent chats when backend absent
-    const local = listLocalConversations(userId);
-    const merged = [...local, ...nextConversations].reduce<ConversationSummary[]>((acc, cur) => {
-      if (!acc.find((c) => c.id === cur.id)) acc.push(cur);
-      return acc;
-    }, []).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-    setConversations(merged);
+    const sorted = [...nextConversations].sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
+    setConversations(sorted);
     return;
   }, [userId]);
 
@@ -112,15 +108,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
         setConversationId(nextConversationId);
         await refreshConversations();
       } catch (caughtError) {
-        // Try local fallback if backend messages are unavailable
-        const localMsgs = getLocalConversationMessages(nextConversationId, userId);
-        if (localMsgs && localMsgs.length > 0) {
-          setMessages(localMsgs);
-          setConversationId(nextConversationId);
-          await refreshConversations();
-        } else {
-          setError(normalizeBackendError(caughtError));
-        }
+        setError(normalizeBackendError(caughtError));
       } finally {
         setIsLoading(false);
       }
@@ -193,10 +181,6 @@ export function useBackendChat(userId: string): UseBackendChatResult {
                   }
                 : msg
             );
-            const conversationTitle = finalMetadata.title?.trim() || trimmedMessage.substring(0, 60).trim();
-            try {
-              upsertLocalConversation(finalMetadata.conversation_id, userId, next, conversationTitle);
-            } catch {}
             return next;
           });
         }
@@ -262,14 +246,10 @@ export function useBackendChat(userId: string): UseBackendChatResult {
 
         setIsHealthy(healthyResult);
 
-        // Load conversations with localStorage fallback (handles backend failure gracefully)
+        // Load conversations from database
         const nextConversations = await getConversations(userId).catch(() => []);
-        const local = listLocalConversations(userId);
-        const merged = [...local, ...nextConversations].reduce<ConversationSummary[]>((acc, cur) => {
-          if (!acc.find((c) => c.id === cur.id)) acc.push(cur);
-          return acc;
-        }, []).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-        setConversations(merged);
+        const sorted = [...nextConversations].sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
+        setConversations(sorted);
 
         if (isCancelled) {
           return;
@@ -378,10 +358,6 @@ export function useBackendChat(userId: string): UseBackendChatResult {
                   }
                 : msg
             );
-            const conversationTitle = finalMetadata.title?.trim() || trimmedMessage.substring(0, 60).trim();
-            try {
-              upsertLocalConversation(finalMetadata.conversation_id, userId, next, conversationTitle);
-            } catch {}
             return next;
           });
         }
@@ -425,6 +401,26 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     setIsSendingMessage(false);
   }, []);
 
+  const renameConversation = useCallback(
+    async (nextConversationId: string, title: string) => {
+      if (!userId || !nextConversationId) {
+        return;
+      }
+
+      setConversations((current) =>
+        current.map((c) => (c.id === nextConversationId ? { ...c, title } : c))
+      );
+
+      try {
+        await updateConversationTitle(nextConversationId, userId, title);
+      } catch (caughtError) {
+        await refreshConversations();
+        setError(normalizeBackendError(caughtError));
+      }
+    },
+    [refreshConversations, userId]
+  );
+
   return {
     messages,
     isLoading,
@@ -442,5 +438,6 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     clearConversation,
     loadConversation,
     refreshConversations,
+    renameConversation,
   };
 }

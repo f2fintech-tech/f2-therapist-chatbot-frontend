@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useLocation } from "wouter";
 import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 import PolicyModal from "./PolicyModal";
@@ -52,7 +53,18 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [loginAge, setLoginAge] = useState("");
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
   const [showPassword, setShowPassword] = useState(false);
+  const [location, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  useEffect(() => {
+    if (location === "/signup") setAuthMode("signup");
+    else if (location === "/login") setAuthMode("login");
+  }, [location]);
+
+  const handleSetAuthMode = (mode: "login" | "signup") => {
+    setAuthMode(mode);
+    setLocation(`/${mode}`);
+  };
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,12 +83,19 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [agreedToPolicies, setAgreedToPolicies] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [activeTermsTab, setActiveTermsTab] = useState<"terms-of-use" | "privacy-policy">("terms-of-use");
+  const [referralCode, setReferralCode] = useState<string | null>(null);
   
   const cardRef = useRef<HTMLDivElement>(null);
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
   useEffect(() => {
     const timer = setTimeout(() => setAnimateIn(true), 60);
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref") || params.get("referral_code");
+    if (ref) {
+      setReferralCode(ref);
+      handleSetAuthMode("signup");
+    }
     return () => clearTimeout(timer);
   }, []);
 
@@ -170,7 +189,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
       } else {
         const guestUserId = currentSession?.isGuest ? currentSession.userId : null;
         payload = authMode === "signup"
-          ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email)
+          ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email, referralCode || undefined)
           : await signInUser(email, password);
         if (guestUserId && payload.userId && guestUserId !== payload.userId) {
           migrateConversationsFromUserId(guestUserId, payload.userId);
@@ -516,8 +535,8 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", minHeight: "560px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", flexWrap: "wrap" }}>
               <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
-                <button type="button" onClick={() => setAuthMode("login")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
-                <button type="button" onClick={() => setAuthMode("signup")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
+                <button type="button" onClick={() => handleSetAuthMode("login")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
+                <button type="button" onClick={() => handleSetAuthMode("signup")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", userSelect: "none" }}>
                 <input type="checkbox" checked={isEmployee} onChange={(e) => { setIsEmployee(e.target.checked); setLoginError(null); }} style={{ width: "15px", height: "15px", accentColor: "#3344e6", cursor: "pointer" }} />
@@ -536,6 +555,12 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   : (authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey")}
               </div>
             </div>
+            {referralCode && authMode === "signup" && !isEmployee && (
+              <div style={{ padding: "8px 12px", background: "rgba(20, 184, 166, 0.1)", border: "1px solid rgba(20, 184, 166, 0.2)", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                <span style={{ fontSize: "16px" }}>🎁</span>
+                <span style={{ fontSize: "11px", color: "#0f766e", fontWeight: 600 }}>Referral Code Applied. You'll unlock discounted expert sessions!</span>
+              </div>
+            )}
             <form className="auth-screen-form" onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "9px" : "16px", minWidth: 0 }}>
               {isEmployee ? (
                 <>
@@ -686,7 +711,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
               </button>
               <div style={{ textAlign: "center", fontSize: "11px", color: "#9ca3af" }}>
                 {authMode === "signup" ? "Already have an account? " : "No account yet? "}
-                <button type="button" onClick={() => setAuthMode(authMode === "signup" ? "login" : "signup")} style={{ background: "none", border: "none", color: "#3344e6", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: "11px" }}>
+                <button type="button" onClick={() => handleSetAuthMode(authMode === "signup" ? "login" : "signup")} style={{ background: "none", border: "none", color: "#3344e6", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: "11px" }}>
                   {authMode === "signup" ? "Sign in" : "Create account"}
                 </button>
               </div>

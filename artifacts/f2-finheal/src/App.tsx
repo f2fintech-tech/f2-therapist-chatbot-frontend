@@ -68,6 +68,19 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={FinHealChat} />
+      <Route path="/chat" component={FinHealChat} />
+      <Route path="/login" component={FinHealChat} />
+      <Route path="/signup" component={FinHealChat} />
+      <Route path="/profile" component={FinHealChat} />
+      <Route path="/advisor" component={FinHealChat} />
+      <Route path="/admin" component={FinHealChat} />
+      <Route path="/dashboard" component={FinHealChat} />
+      <Route path="/education" component={FinHealChat} />
+      <Route path="/loan-calculator" component={FinHealChat} />
+      <Route path="/cibil-analyzer" component={FinHealChat} />
+      <Route path="/eligibility-cibil" component={FinHealChat} />
+      <Route path="/tests/:id" component={FinHealChat} />
+      <Route path="/tests" component={FinHealChat} />
       <Route component={NotFound} />
     </Switch>
   );

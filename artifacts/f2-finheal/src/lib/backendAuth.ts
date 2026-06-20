@@ -129,10 +129,10 @@ export async function signInUser(email: string, password: string): Promise<AuthS
   };
 }
 
-export async function signUpUser(email: string, password: string, guestUserId?: string, name?: string): Promise<AuthSession> {
+export async function signUpUser(email: string, password: string, guestUserId?: string, name?: string, referralCode?: string): Promise<AuthSession> {
   const result = await authRequest<AuthResponse>("auth/signup", {
     method: "POST",
-    body: JSON.stringify({ email, password, name: name || email, guest_user_id: guestUserId }),
+    body: JSON.stringify({ email, password, name: name || email, guest_user_id: guestUserId, referral_code: referralCode }),
   });
 
   return {
@@ -634,3 +634,23 @@ export async function triggerReportGeneration(userId: string, reportType: string
   };
 }
 
+export interface ReferralCode {
+  id: string;
+  code: string;
+  advisor_id: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export async function generateReferral(advisorId: string): Promise<ReferralCode> {
+  return authRequest<ReferralCode>(`advisors/${encodeURIComponent(advisorId)}/referrals`, {
+    method: "POST"
+  });
+}
+
+export async function listReferrals(advisorId: string): Promise<ReferralCode[]> {
+  return authRequest<ReferralCode[]>(`advisors/${encodeURIComponent(advisorId)}/referrals`, {
+    method: "GET"
+  });
+}
