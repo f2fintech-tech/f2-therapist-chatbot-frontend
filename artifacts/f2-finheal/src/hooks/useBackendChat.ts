@@ -12,6 +12,7 @@ import {
   type ConversationSummary,
   type MoodDimensions,
 } from "@/lib/backendChat";
+import { upsertLocalConversation } from "@/utils/localConversations";
 
 export interface UseBackendChatResult {
   messages: ChatMessage[];
@@ -31,6 +32,7 @@ export interface UseBackendChatResult {
   clearConversation: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
 }
 
 function createUserMessage(content: string): ChatMessage {

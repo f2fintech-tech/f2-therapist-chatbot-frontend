@@ -53,6 +53,14 @@ export default function FinHealChat() {
     }
   }, [authSession, location, setLocation]);
 
+  useEffect(() => {
+    if (!authSession) {
+      if (location !== "/login" && location !== "/signup") {
+        setLocation("/login", { replace: true });
+      }
+    }
+  }, [authSession, location, setLocation]);
+
   const mainView = useMemo(() => {
     if (location === "/profile") return "profile";
     if (location === "/advisor") return "advisor";
@@ -507,7 +515,6 @@ export default function FinHealChat() {
             isHealthy={chat.isHealthy}
             isLoading={chat.isLoading}
             isSendingMessage={chat.isSendingMessage}
-            streamingMessageId={chat.streamingMessageId}
             messages={chat.messages}
             userProfile={userProfile}
             remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}

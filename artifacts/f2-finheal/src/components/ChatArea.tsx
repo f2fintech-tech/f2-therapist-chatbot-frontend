@@ -29,7 +29,6 @@ interface ChatAreaProps {
   prefillMessage?: { text: string; card: string };
   onClearPrefill?: () => void;
   onOpenEligibilityCibil?: () => void;
-  streamingMessageId?: string | null;
 }
 
 
@@ -57,7 +56,6 @@ export default function ChatArea({
   prefillMessage,
   onClearPrefill,
   onOpenEligibilityCibil,
-  streamingMessageId,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
