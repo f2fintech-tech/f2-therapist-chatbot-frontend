@@ -514,6 +514,7 @@ export default function FinHealChat() {
             onClearChat={chat.clearMessages}
             onMoodUpdate={handleMoodUpdate}
             onSendMessage={handleSendMessage}
+            onEditMessage={chat.editMessage}
             onStopSendingMessage={chat.stopSendingMessage}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}

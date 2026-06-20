@@ -24,13 +24,13 @@ export interface UseBackendChatResult {
   conversations: ConversationSummary[];
   conversationCount: number;
   sendMessage: (message: string) => Promise<void>;
+  editMessage: (messageId: string, message: string) => Promise<void>;
   startNewChatWithMessage: (message: string) => Promise<void>;
   stopSendingMessage: () => void;
   clearMessages: () => void;
   clearConversation: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
-  renameConversation: (conversationId: string, title: string) => Promise<void>;
 }
 
 function createUserMessage(content: string): ChatMessage {
@@ -207,6 +207,121 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       }
     },
     [conversationId, isSendingMessage, refreshConversations, userId],
+  );
+
+  const editMessage = useCallback(
+    async (messageId: string, message: string) => {
+      const trimmedMessage = message.trim();
+      if (!trimmedMessage || !userId || isSendingMessage) {
+        return;
+      }
+
+      const controller = new AbortController();
+      activeSendControllerRef.current = controller;
+
+      // Find edited message index in our memory state
+      const messageIndex = messages.findIndex((msg) => msg.id === messageId);
+      if (messageIndex === -1) return;
+
+      const originalMessage = messages[messageIndex];
+      const updatedMessage: ChatMessage = {
+        ...originalMessage,
+        content: trimmedMessage,
+      };
+
+      // Truncate the assistant placeholder and subsequent turns
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const initialAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
+        key: assistantMessageId,
+        role: "bot",
+        content: "",
+        time: formatMessageTimestamp(new Date().toISOString()),
+        timestamp: new Date().toISOString(),
+      };
+
+      const nextMessages = [...messages.slice(0, messageIndex), updatedMessage, initialAssistantMessage];
+      setMessages(nextMessages);
+      setIsSendingMessage(true);
+      setError(null);
+
+      try {
+        let accumulatedContent = "";
+        let finalMetadata: any = null;
+
+        await sendChatMessage(
+          {
+            message: trimmedMessage,
+            user_id: userId,
+            conversation_id: conversationId ?? undefined,
+            message_id: messageId,
+          },
+          (chunk) => {
+            if (chunk.type === "token") {
+              accumulatedContent += chunk.content;
+              setMessages((currentMessages) =>
+                currentMessages.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+            } else if (chunk.type === "metadata") {
+              finalMetadata = chunk;
+            } else if (chunk.type === "error") {
+              throw new Error(chunk.message);
+            }
+          },
+          controller.signal
+        );
+
+        if (finalMetadata) {
+          setConversationId(finalMetadata.conversation_id);
+          setMessages((currentMessages) => {
+            const next = currentMessages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    id: finalMetadata.message_id,
+                    content: accumulatedContent || finalMetadata.response,
+                    mood: finalMetadata.mood,
+                    suggestions: finalMetadata.suggestions,
+                    timestamp: finalMetadata.timestamp,
+                    time: formatMessageTimestamp(finalMetadata.timestamp),
+                  }
+                : msg
+            );
+            const conversationTitle = finalMetadata.title?.trim() || trimmedMessage.substring(0, 60).trim();
+            try {
+              upsertLocalConversation(finalMetadata.conversation_id, userId, next, conversationTitle);
+            } catch {}
+            return next;
+          });
+        }
+
+        await refreshConversations();
+      } catch (caughtError) {
+        const normalizedError = normalizeBackendError(caughtError);
+        // Clear streaming placeholder on failure
+        setMessages((currentMessages) => currentMessages.filter((entry) => entry.id !== assistantMessageId));
+
+        if (normalizedError.code !== "cancelled") {
+          if (normalizedError.message.includes("402") || normalizedError.message.includes("Not enough hearts")) {
+            setHeartsExhausted(true);
+          } else {
+            setError(normalizedError);
+          }
+        } else {
+          setError(null);
+        }
+      } finally {
+        if (activeSendControllerRef.current === controller) {
+          activeSendControllerRef.current = null;
+        }
+        setIsSendingMessage(false);
+      }
+    },
+    [conversationId, isSendingMessage, messages, refreshConversations, userId]
   );
 
   const stopSendingMessage = useCallback(() => {
@@ -432,6 +547,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
     conversations,
     conversationCount,
     sendMessage,
+    editMessage,
     startNewChatWithMessage,
     stopSendingMessage,
     clearMessages,

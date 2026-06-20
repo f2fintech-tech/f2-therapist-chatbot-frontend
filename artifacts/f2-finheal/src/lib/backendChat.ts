@@ -448,6 +448,7 @@ export async function sendChatMessage(
     message: string;
     user_id: string;
     conversation_id?: string;
+    message_id?: string;
   },
   onChunk: (chunk: any) => void,
   signal?: AbortSignal

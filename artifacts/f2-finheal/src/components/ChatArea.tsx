@@ -1,6 +1,7 @@
-﻿﻿﻿﻿﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
+import type { UserProfile } from "@/utils/user";
 
 import StreamingMessage from "./StreamingMessage";
 
@@ -17,6 +18,7 @@ interface ChatAreaProps {
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions | null) => void;
   onSendMessage: (text: string) => Promise<void>;
+  onEditMessage?: (messageId: string, text: string) => Promise<void>;
   onStopSendingMessage: () => void;
   onLogout?: () => void;
   onSignupPrompt?: () => void;
@@ -44,6 +46,7 @@ export default function ChatArea({
   onClearChat,
   onMoodUpdate,
   onSendMessage,
+  onEditMessage,
   onStopSendingMessage,
   onLogout,
   onSignupPrompt,
@@ -59,6 +62,28 @@ export default function ChatArea({
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [showAd, setShowAd] = useState(true);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  const handleStartEdit = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId);
+    setEditingValue(currentContent);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingValue("");
+  };
+
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editingValue.trim() || isLoading || isSendingMessage) return;
+    const newContent = editingValue.trim();
+    setEditingMessageId(null);
+    setEditingValue("");
+    if (onEditMessage) {
+      await onEditMessage(messageId, newContent);
+    }
+  };
   useEffect(() => {
     if (prefillMessage?.text) {
       setInputValue(prefillMessage.text);
@@ -416,6 +441,7 @@ export default function ChatArea({
 
         {messages.map((m) => {
           if (m.role === 'bot' && !m.content && !isMessageStreaming(m.id)) return null;
+          const isEditing = editingMessageId === m.id;
           return (
             <div key={m.key || m.id} data-message-id={m.id} className={`flex gap-[10px] mb-[14px] max-w-[800px] w-full mx-auto animate-fade-up-fast ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {m.role === 'bot' ? (
@@ -425,7 +451,7 @@ export default function ChatArea({
               ) : (
                 <div className="w-[30px] h-[30px] rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-[11px] font-bold shrink-0 mt-[18px]">{userProfile.initials}</div>
               )}
-              <div className="max-w-[82%] flex flex-col sm:max-w-[68%]">
+              <div className="max-w-[82%] flex flex-col sm:max-w-[68%] w-full">
                 {m.role === 'bot' && m.mood && m.mood.primary_emotion && (
                   <div className={`inline-flex items-center gap-[4px] text-[10px] font-semibold px-[9px] py-[3px] rounded-[20px] mb-[5px] tracking-[0.3px] self-start ${
                     m.mood.primary_emotion === 'calm' ? 'bg-[#ecfdf5] text-[#10b981]' : 
@@ -435,15 +461,50 @@ export default function ChatArea({
                     {m.mood.label || m.mood.primary_emotion}
                   </div>
                 )}
-                <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] ${
-                  m.role === 'bot' 
-                    ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
-                    : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
-                }`}>{m.role === 'bot' ? (<StreamingMessage content={m.content} isStreaming={isMessageStreaming(m.id)} />) : (m.content)}
-                </div>
-                <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] ${m.role === 'user' ? 'text-right' : ''}`}>
-                  {m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}
-                </div>
+                {isEditing ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-[14px] p-[10px] w-full flex flex-col gap-[8px] self-end">
+                    <textarea
+                      value={editingValue}
+                      onChange={(e) => setEditingValue(e.target.value)}
+                      className="w-full bg-white text-gray-900 border border-gray-200 rounded-[10px] p-[8px] text-[13px] sm:text-[13.5px] outline-none focus:border-primary resize-y min-h-[50px] leading-relaxed shadow-sm font-sans"
+                    />
+                    <div className="flex justify-end gap-[8px]">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-[12px] py-[5px] rounded-[18px] border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition cursor-pointer text-[11px] font-semibold shadow-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveEdit(m.id)}
+                        disabled={!editingValue.trim() || isLoading || isSendingMessage}
+                        className="px-[12px] py-[5px] rounded-[18px] bg-primary text-white hover:bg-[#1e2db8] transition cursor-pointer text-[11px] font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Save & Submit
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] w-fit ${
+                      m.role === 'bot' 
+                        ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px] self-start'
+                        : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px] self-end'
+                    }`}>{m.role === 'bot' ? (<StreamingMessage content={m.content} isStreaming={isMessageStreaming(m.id)} />) : (m.content)}
+                    </div>
+                    <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] flex items-center gap-[8px] w-fit ${m.role === 'user' ? 'text-right justify-end self-end' : 'self-start'}`}>
+                      {m.role === 'user' && !isLoading && !isSendingMessage && (
+                        <button
+                          onClick={() => handleStartEdit(m.id, m.content)}
+                          className="text-slate-400 hover:text-primary transition-colors cursor-pointer text-[10.5px] font-medium flex items-center gap-[3px] select-none hover:underline focus:outline-none"
+                        >
+                          ✏️ Edit
+                        </button>
+                      )}
+                      <span>{m.timestamp ? formatMessageTimestamp(m.timestamp) : m.time}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );
