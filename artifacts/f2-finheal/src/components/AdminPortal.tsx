@@ -1163,7 +1163,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   const copyReferralLink = (code: string) => {
-    const signupUrl = `${window.location.origin}/?ref=${code}`;
+    const signupUrl = `${window.location.origin}/signup?ref=${code}`;
     const message = `Join me on FinHeal, the platform for professional financial advice and health. Use my invite link to get a 50% discount on premium plans and expert sessions!\n\n${signupUrl}`;
     navigator.clipboard.writeText(message);
     alert("Invite message and link copied to clipboard!");
