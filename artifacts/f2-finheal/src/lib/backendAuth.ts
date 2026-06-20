@@ -290,6 +290,7 @@ export interface BackendAdvisor {
   category: string;
   fee: number;
   original_fee?: number | null;
+  discount_expires_at?: string | null;
   test_comment?: string | null;
   test_rating?: number | null;
 }
@@ -310,6 +311,7 @@ export interface Advisor {
   category: string;
   fee: number;
   originalFee?: number;
+  discountExpiresAt?: string;
   testComment?: string;
   testRating?: number;
 }
@@ -331,6 +333,7 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     category: a.category,
     fee: a.fee,
     originalFee: a.original_fee || undefined,
+    discountExpiresAt: a.discount_expires_at || undefined,
     testComment: a.test_comment || undefined,
     testRating: a.test_rating || undefined
   };

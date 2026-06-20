@@ -18,9 +18,52 @@ export interface Advisor {
   nextSlot: string;
   category: string;
   fee: number; // Consultation fee in INR per session
+  originalFee?: number;
+  discountExpiresAt?: string;
   testComment?: string;
   testRating?: number;
 }
+
+const DiscountTimer = ({ expiresAt }: { expiresAt: string }) => {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date().getTime();
+      const end = new Date(expiresAt).getTime();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeLeft("Expired");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (days > 0) {
+        setTimeLeft(`Offer ends in ${days}d ${hours}h ${mins}m ${secs}s`);
+      } else {
+        setTimeLeft(`Offer ends in ${hours}h ${mins}m ${secs}s`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  if (timeLeft === "Expired") return null;
+
+  return (
+    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium mt-1 animate-fade-up">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      {timeLeft}
+    </div>
+  );
+};
 
 interface Appointment {
   id?: string;
@@ -1246,6 +1289,9 @@ export default function AdvisorPanel({
                                 )}
                               </span>
                             </div>
+                            {advisor.discountExpiresAt && (
+                              <DiscountTimer expiresAt={advisor.discountExpiresAt} />
+                            )}
                           </div>
                           <button
                             onClick={() => handleOpenBooking(advisor)}
@@ -1370,18 +1416,25 @@ export default function AdvisorPanel({
 
                   {/* Pricing Breakdown */}
                   <div className="space-y-[6px] border-b border-gray-100 pb-[12px]">
-                    <div className="flex justify-between text-[12px] text-gray-500">
-                      <span>Hourly Consultation Fee</span>
-                      <span className="font-semibold text-gray-800">
-                        {selectedAdvisor.originalFee ? (
-                          <>
-                            <span className="line-through text-gray-400 font-normal mr-2">₹{selectedAdvisor.originalFee}</span>
-                            <span className="text-emerald-600 animate-price-pulse font-bold text-[14px]">₹{selectedAdvisor.fee}</span>
-                          </>
-                        ) : (
-                          `₹${selectedAdvisor.fee}`
-                        )}
-                      </span>
+                    <div className="flex flex-col">
+                      <div className="flex justify-between text-[12px] text-gray-500">
+                        <span>Hourly Consultation Fee</span>
+                        <span className="font-semibold text-gray-800 flex flex-col items-end">
+                          <div>
+                            {selectedAdvisor.originalFee ? (
+                              <>
+                                <span className="line-through text-gray-400 font-normal mr-2">₹{selectedAdvisor.originalFee}</span>
+                                <span className="text-emerald-600 animate-price-pulse font-bold text-[14px]">₹{selectedAdvisor.fee}</span>
+                              </>
+                            ) : (
+                              `₹${selectedAdvisor.fee}`
+                            )}
+                          </div>
+                          {selectedAdvisor.discountExpiresAt && (
+                            <DiscountTimer expiresAt={selectedAdvisor.discountExpiresAt} />
+                          )}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex justify-between text-[11px] text-gray-400">
                       <span>CGST (9%)</span>
