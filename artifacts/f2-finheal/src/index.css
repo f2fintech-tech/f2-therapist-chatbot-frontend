@@ -215,3 +215,15 @@
   border-color: #e5e7eb;
 }
 
+@keyframes pricePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.10); color: #059669; } /* emerald-600 */
+  100% { transform: scale(1); }
+}
+
+.animate-price-pulse {
+  display: inline-block;
+  transform-origin: center;
+  animation: pricePulse 2s ease-in-out infinite;
+}
+
