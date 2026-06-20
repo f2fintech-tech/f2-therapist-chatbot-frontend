@@ -27,6 +27,7 @@ import LoanCalculatorView from "@/components/LoanCalculatorView";
 import CibilAnalyzerView from "@/components/CibilAnalyzerView";
 import EligibilityCibilView from "@/components/EligibilityCibilView";
 import Dashboard from "@/components/Dashboard";
+import RemindersView from "@/components/RemindersView";
 
 
 export default function FinHealChat() {
@@ -82,6 +83,7 @@ export default function FinHealChat() {
     if (location === "/eligibility-cibil") return "eligibility-cibil";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
+    if (location === "/reminders") return "reminders";
     if (location === "/tests/financial-literacy" || location === "/financial-literacy") return "financial-literacy";
     if (location === "/tests/emergency-fund" || location === "/emergency-fund") return "emergency-fund";
     if (location === "/tests/loan-fit" || location === "/loan-fit") return "loan-fit";
@@ -308,6 +310,7 @@ export default function FinHealChat() {
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
   const openDashboard = () => setMainView("dashboard");
+  const openReminders = () => setMainView("reminders");
 
 
   const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
@@ -406,7 +409,9 @@ export default function FinHealChat() {
                   ? "Eligibility & CIBIL Checker"
                   : mainView === "dashboard"
                     ? "My Dashboard"
-                    : "Financial Health Test";
+                    : mainView === "reminders"
+                      ? "Reminders"
+                      : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -516,6 +521,7 @@ export default function FinHealChat() {
           onOpenLoanCalculator={openLoanCalculator}
           onOpenEligibilityCibil={openEligibilityCibil}
           onOpenDashboard={openDashboard}
+          onOpenReminders={openReminders}
         />
         {mainView === "chat" || mainView === "goals" ? (
           <ChatArea
@@ -680,6 +686,13 @@ export default function FinHealChat() {
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}
             onTalkToAdvisor={() => setMainView("advisor")}
+          />
+        ) : mainView === "reminders" ? (
+          <RemindersView
+            userId={userId}
+            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+            onToggleInsights={() => setInsightsOpen((open) => !open)}
+            onOpenFinancialWellnessAssistant={openChatView}
           />
         ) : (
           <DebtBalanceReviewView
