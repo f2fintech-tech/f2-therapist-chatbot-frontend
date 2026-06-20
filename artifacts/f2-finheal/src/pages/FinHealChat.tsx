@@ -43,7 +43,12 @@ export default function FinHealChat() {
 
   useEffect(() => {
     if (location === "/") {
-      setLocation("/chat", { replace: true });
+      const query = window.location.search;
+      if (query.includes("ref=") || query.includes("referral_code=")) {
+        setLocation(`/signup${query}`, { replace: true });
+      } else {
+        setLocation(`/chat${query}`, { replace: true });
+      }
     }
   }, [location, setLocation]);
 
@@ -56,7 +61,12 @@ export default function FinHealChat() {
   useEffect(() => {
     if (!authSession) {
       if (location !== "/login" && location !== "/signup") {
-        setLocation("/login", { replace: true });
+        const query = window.location.search;
+        if (query.includes("ref=") || query.includes("referral_code=")) {
+          setLocation(`/signup${query}`, { replace: true });
+        } else {
+          setLocation(`/login${query}`, { replace: true });
+        }
       }
     }
   }, [authSession, location, setLocation]);

@@ -132,7 +132,7 @@ export async function signInUser(email: string, password: string): Promise<AuthS
 export async function signUpUser(email: string, password: string, guestUserId?: string, name?: string, referralCode?: string): Promise<AuthSession> {
   const result = await authRequest<AuthResponse>("auth/signup", {
     method: "POST",
-    body: JSON.stringify({ email, password, name: name || email, guest_user_id: guestUserId, referral_code: referralCode }),
+    body: JSON.stringify({ email, password, name: name || email, guest_user_id: guestUserId, invite_token: referralCode }),
   });
 
   return {
@@ -279,18 +279,39 @@ export interface BackendAdvisor {
   f2_fintech_id: string;
   name: string;
   designation: string;
-  avatar_url?: string;
-  availability: "available" | "unavailable" | "in meeting";
-  expertise?: string[];
-  strength?: string;
-  bio?: string;
+  avatar_url?: string | null;
+  availability: string;
+  expertise?: string[] | null;
+  strength?: string | null;
+  bio?: string | null;
   rating: number;
   reviews_count: number;
-  next_slot?: string;
+  next_slot?: string | null;
   category: string;
   fee: number;
-  test_comment?: string;
-  test_rating?: number;
+  original_fee?: number | null;
+  test_comment?: string | null;
+  test_rating?: number | null;
+}
+
+export interface Advisor {
+  id: string;
+  f2FintechId?: string;
+  name: string;
+  designation: string;
+  avatarUrl: string;
+  availability: string;
+  expertise: string[];
+  strength: string;
+  bio: string;
+  rating: number;
+  reviewsCount: number;
+  nextSlot: string;
+  category: string;
+  fee: number;
+  originalFee?: number;
+  testComment?: string;
+  testRating?: number;
 }
 
 export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
@@ -308,7 +329,10 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     reviewsCount: a.reviews_count,
     nextSlot: a.next_slot || "Tomorrow, 10:00 AM",
     category: a.category,
-    fee: a.fee
+    fee: a.fee,
+    originalFee: a.original_fee || undefined,
+    testComment: a.test_comment || undefined,
+    testRating: a.test_rating || undefined
   };
 }
 
@@ -332,8 +356,9 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
   };
 }
 
-export async function fetchAdvisors(): Promise<any[]> {
-  const list = await authRequest<BackendAdvisor[]>("advisors", { method: "GET" });
+export async function fetchAdvisors(userId?: string): Promise<any[]> {
+  const url = userId ? `advisors?user_id=${encodeURIComponent(userId)}` : "advisors";
+  const list = await authRequest<BackendAdvisor[]>(url, { method: "GET" });
   return list.map(mapBackendAdvisorToFrontend);
 }
 
