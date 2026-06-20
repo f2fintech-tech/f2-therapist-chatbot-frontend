@@ -552,7 +552,7 @@ export default function Dashboard({
     let active = true;
     async function loadAdvisors() {
       try {
-        const list = await fetchAdvisors();
+        const list = await fetchAdvisors(userId);
         if (active) {
           setAdvisors(list);
         }

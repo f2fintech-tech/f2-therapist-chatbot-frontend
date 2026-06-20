@@ -139,7 +139,7 @@ export default function AdvisorPanel({
 
   const loadAdvisors = async () => {
     try {
-      const list = await fetchAdvisors();
+      const list = await fetchAdvisors(userId);
       setAdvisors(list);
       localStorage.setItem("finheal_advisors_list", JSON.stringify(list));
 
@@ -1234,8 +1234,17 @@ export default function AdvisorPanel({
                         <>
                           <div className="text-left">
                             <div className="text-[9.5px] text-gray-400 uppercase tracking-[0.5px]">Next Slot • Fee</div>
-                            <div className="text-[11px] font-bold text-gray-800">
-                              {advisor.nextSlot} • <span className="text-primary font-extrabold">₹{advisor.fee}</span>
+                            <div className="text-[12.5px] font-medium text-gray-700 mt-[1px]">
+                              {advisor.nextSlot} • <span className="text-primary font-extrabold">
+                                {advisor.originalFee ? (
+                                  <>
+                                    <span className="line-through text-gray-400 font-normal mr-1 text-[11.5px]">₹{advisor.originalFee}</span>
+                                    <span className="text-emerald-600 animate-price-pulse">₹{advisor.fee}</span>
+                                  </>
+                                ) : (
+                                  `₹${advisor.fee}`
+                                )}
+                              </span>
                             </div>
                           </div>
                           <button
@@ -1363,7 +1372,16 @@ export default function AdvisorPanel({
                   <div className="space-y-[6px] border-b border-gray-100 pb-[12px]">
                     <div className="flex justify-between text-[12px] text-gray-500">
                       <span>Hourly Consultation Fee</span>
-                      <span className="font-semibold text-gray-800">₹{selectedAdvisor.fee}</span>
+                      <span className="font-semibold text-gray-800">
+                        {selectedAdvisor.originalFee ? (
+                          <>
+                            <span className="line-through text-gray-400 font-normal mr-2">₹{selectedAdvisor.originalFee}</span>
+                            <span className="text-emerald-600 animate-price-pulse font-bold text-[14px]">₹{selectedAdvisor.fee}</span>
+                          </>
+                        ) : (
+                          `₹${selectedAdvisor.fee}`
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between text-[11px] text-gray-400">
                       <span>CGST (9%)</span>
