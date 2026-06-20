@@ -486,13 +486,13 @@ export default function ChatArea({
                   </div>
                 ) : (
                   <>
-                    <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] ${
+                    <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] w-fit ${
                       m.role === 'bot' 
-                        ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px]'
-                        : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px]'
+                        ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px] self-start'
+                        : 'bg-primary text-white shadow-[0_4px_16px_rgba(50,68,230,0.1)] rounded-[14px_4px_14px_14px] self-end'
                     }`}>{m.role === 'bot' ? (<StreamingMessage content={m.content} isStreaming={isMessageStreaming(m.id)} />) : (m.content)}
                     </div>
-                    <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] flex items-center gap-[8px] ${m.role === 'user' ? 'text-right justify-end' : ''}`}>
+                    <div className={`text-[10px] text-gray-400 mt-[4px] px-[4px] flex items-center gap-[8px] w-fit ${m.role === 'user' ? 'text-right justify-end self-end' : 'self-start'}`}>
                       {m.role === 'user' && !isLoading && !isSendingMessage && (
                         <button
                           onClick={() => handleStartEdit(m.id, m.content)}
