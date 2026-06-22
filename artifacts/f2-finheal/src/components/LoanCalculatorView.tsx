@@ -317,12 +317,14 @@ export default function LoanCalculatorView({
   const [flexiUtilized, setFlexiUtilized] = useState<string>("2000000"); // default 20L
   const [flexiRate, setFlexiRate] = useState<string>("10.75");
   const [flexiDeposit, setFlexiDeposit] = useState<string>("100000"); // default 1L
+  const [flexiInterestOnlyTenure, setFlexiInterestOnlyTenure] = useState<string>("3");
+  const [flexiRepaymentTenure, setFlexiRepaymentTenure] = useState<string>("5");
 
   // Drop Down OD States
   const [dropdownLimit, setDropdownLimit] = useState<string>("5000000"); // default 50L
   const [dropdownRate, setDropdownRate] = useState<string>("10.5");
-  const [dropdownTenure, setDropdownTenure] = useState<string>("10");
-  const [dropdownReductionPct, setDropdownReductionPct] = useState<string>("5");
+  const [dropdownTenure, setDropdownTenure] = useState<string>("5");
+  const [dropdownUtilized, setDropdownUtilized] = useState<string>("2000000"); // default 20L
 
   // Interactive graph hover state
   const [hoveredDDYear, setHoveredDDYear] = useState<number | null>(null);
@@ -369,6 +371,7 @@ export default function LoanCalculatorView({
     setFlexiUtilized(String(Math.round(2000000 * currencyScale)));
     setFlexiDeposit(String(Math.round(100000 * currencyScale)));
     setDropdownLimit(String(Math.round(5000000 * currencyScale)));
+    setDropdownUtilized(String(Math.round(2000000 * currencyScale)));
   }, [currencyScale]);
 
   // Tab 3: Compare Loans Inputs
@@ -923,6 +926,8 @@ export default function LoanCalculatorView({
     const utilized = Number(flexiUtilized) || 0;
     const rate = Number(flexiRate) || 0;
     const deposit = Number(flexiDeposit) || 0;
+    const interestOnlyTenure = Number(flexiInterestOnlyTenure) || 3;
+    const repaymentTenure = Number(flexiRepaymentTenure) || 5;
 
     const used = utilized;
     const available = Math.max(0, limit - utilized);
@@ -931,6 +936,15 @@ export default function LoanCalculatorView({
     const dailyInterest = (utilized * (rate / 100)) / 365;
     const monthlyInterest = (utilized * (rate / 100)) / 12;
     const annualInterest = utilized * (rate / 100);
+
+    const monthlyRate = rate / 12 / 100;
+    const amortMonths = repaymentTenure * 12;
+    const monthlyEMI = amortMonths === 0 ? 0 : (
+      monthlyRate === 0
+        ? utilized / amortMonths
+        : (utilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
+          (Math.pow(1 + monthlyRate, amortMonths) - 1)
+    );
 
     return {
       limit,
@@ -943,30 +957,64 @@ export default function LoanCalculatorView({
       dailyInterest,
       monthlyInterest,
       annualInterest,
+      interestOnlyTenure,
+      repaymentTenure,
+      monthlyEMI,
     };
-  }, [flexiLimit, flexiUtilized, flexiRate, flexiDeposit]);
+  }, [flexiLimit, flexiUtilized, flexiRate, flexiDeposit, flexiInterestOnlyTenure, flexiRepaymentTenure]);
 
   // Calculations for Drop Down OD (Doctors)
   const dropdownODCalculations = useMemo(() => {
     const initialLimit = Number(dropdownLimit) || 0;
+    const utilized = Number(dropdownUtilized) || 0;
     const rate = Number(dropdownRate) || 0;
     const tenure = Number(dropdownTenure) || 0;
-    const reductionPct = Number(dropdownReductionPct) || 0;
+
+    const isFullyUtilized = utilized >= initialLimit;
+    const monthlyRate = rate / 12 / 100;
+
+    const year1Interest = (utilized * (rate / 100)) / 12;
+
+    const fullMonths = (1 + tenure) * 12;
+    const fullEMI = fullMonths === 0 ? 0 : (
+      monthlyRate === 0
+        ? utilized / fullMonths
+        : (utilized * monthlyRate * Math.pow(1 + monthlyRate, fullMonths)) /
+          (Math.pow(1 + monthlyRate, fullMonths) - 1)
+    );
+
+    const amortMonths = tenure * 12;
+    const subsequentEMI = amortMonths === 0 ? 0 : (
+      monthlyRate === 0
+        ? utilized / amortMonths
+        : (utilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
+          (Math.pow(1 + monthlyRate, amortMonths) - 1)
+    );
 
     const yearlyLimits: { year: number; limit: number }[] = [];
-    for (let t = 1; t <= tenure; t++) {
-      const currentLimit = Math.max(0, initialLimit * (1 - (t - 1) * (reductionPct / 100)));
+    const totalYears = 1 + tenure;
+    for (let t = 1; t <= totalYears; t++) {
+      const currentLimit = t <= 2
+        ? initialLimit
+        : (tenure === 0 ? 0 : Math.max(0, initialLimit * (1 - (t - 2) / tenure)));
       yearlyLimits.push({ year: t, limit: currentLimit });
     }
 
+    const calculatedReductionPct = tenure > 0 ? (100 / tenure) : 0;
+
     return {
       initialLimit,
+      utilized,
       rate,
       tenure,
-      reductionPct,
+      reductionPct: calculatedReductionPct,
+      isFullyUtilized,
+      year1Interest,
+      fullEMI,
+      subsequentEMI,
       yearlyLimits,
     };
-  }, [dropdownLimit, dropdownRate, dropdownTenure, dropdownReductionPct]);
+  }, [dropdownLimit, dropdownUtilized, dropdownRate, dropdownTenure]);
 
   // Chart data calculations for Cumulative Amortization curve
   const emiChartData = useMemo(() => {
@@ -1218,11 +1266,14 @@ export default function LoanCalculatorView({
     if (calcType === "emi") {
       if (activeTab === "professional" && profStructure === "flexi") {
         detailsStr = `Calculated a Professional Loan (Doctors) with Flexi OD structure on the EMI Calculator. ` +
-          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}. ` +
-          `Estimated Monthly Interest: ${formatCurrency(flexiODCalculations.monthlyInterest)}, Daily Interest: ${formatCurrency(flexiODCalculations.dailyInterest)}, Annual Interest: ${formatCurrency(flexiODCalculations.annualInterest)}.`;
+          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years. ` +
+          `Interest-only payment (Years 1-${flexiInterestOnlyTenure}): ${formatCurrency(flexiODCalculations.monthlyInterest)}/mo, Subsequent Monthly EMI (Years ${Number(flexiInterestOnlyTenure) + 1}-${Number(flexiInterestOnlyTenure) + Number(flexiRepaymentTenure)}): ${formatCurrency(flexiODCalculations.monthlyEMI)}/mo.`;
       } else if (activeTab === "professional" && profStructure === "dropdown") {
         detailsStr = `Calculated a Professional Loan (Doctors) with Drop Down OD structure on the EMI Calculator. ` +
-          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Tenure: ${Number(dropdownTenure) || 0} Years, Reduction Schedule: ${Number(dropdownReductionPct) || 0}% / Year.`;
+          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(dropdownUtilized) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Amortization Tenure: ${Number(dropdownTenure) || 0} Years (Plan: 1+${Number(dropdownTenure)} Y), Reduction Schedule: ${dropdownODCalculations.reductionPct.toFixed(1)}% / Year. ` +
+          (dropdownODCalculations.isFullyUtilized
+            ? `Fully Utilized: full monthly EMI of ${formatCurrency(dropdownODCalculations.fullEMI)}/mo paid from Year 1.`
+            : `Partially Utilized: Year 1 interest-only payment of ${formatCurrency(dropdownODCalculations.year1Interest)}/mo, followed by full monthly EMI of ${formatCurrency(dropdownODCalculations.subsequentEMI)}/mo for Years 2-${1 + Number(dropdownTenure)}.`);
       } else {
         detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
           `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
@@ -1270,9 +1321,9 @@ export default function LoanCalculatorView({
       calcType === "compare"
         ? (Number(compTenureA) || 0)
         : activeTab === "professional" && profStructure === "flexi"
-        ? 0
+        ? (Number(flexiInterestOnlyTenure) + Number(flexiRepaymentTenure))
         : activeTab === "professional" && profStructure === "dropdown"
-        ? (Number(dropdownTenure) || 0)
+        ? (1 + Number(dropdownTenure))
         : (Number(emiTenure) || 0),
       detailsStr
     );
@@ -2528,6 +2579,76 @@ export default function LoanCalculatorView({
                         <span>{formatCompact(Number(flexiLimit) || 1000000)}</span>
                       </div>
                     </div>
+
+                    {/* Input 5: Interest-Only Period */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Interest-Only Period</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(flexiInterestOnlyTenure) || 0} Years</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          value={flexiInterestOnlyTenure}
+                          onChange={(e) => setFlexiInterestOnlyTenure(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(flexiInterestOnlyTenure) || 0;
+                            const clamped = Math.max(1, Math.min(5, val));
+                            setFlexiInterestOnlyTenure(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={1}
+                        value={Number(flexiInterestOnlyTenure) || 0}
+                        onChange={(e) => setFlexiInterestOnlyTenure(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>1 Year</span>
+                        <span>5 Years</span>
+                      </div>
+                    </div>
+
+                    {/* Input 6: Amortization Period */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Amortization Period</label>
+                        <span className="text-[13px] font-bold text-primary">{Number(flexiRepaymentTenure) || 0} Years</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="number"
+                          value={flexiRepaymentTenure}
+                          onChange={(e) => setFlexiRepaymentTenure(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(flexiRepaymentTenure) || 0;
+                            const clamped = Math.max(1, Math.min(10, val));
+                            setFlexiRepaymentTenure(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="text-gray-400 font-bold text-[12px] pr-1">Years</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={10}
+                        step={1}
+                        value={Number(flexiRepaymentTenure) || 0}
+                        onChange={(e) => setFlexiRepaymentTenure(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>1 Year</span>
+                        <span>10 Years</span>
+                      </div>
+                    </div>
                   </div>
                 ) : activeTab === "professional" && profStructure === "dropdown" ? (
                   <div className="flex flex-col gap-6 animate-fade-up">
@@ -2542,13 +2663,22 @@ export default function LoanCalculatorView({
                         <input
                           type="number"
                           value={dropdownLimit}
-                          onChange={(e) => setDropdownLimit(e.target.value)}
+                          onChange={(e) => {
+                            setDropdownLimit(e.target.value);
+                            const limitVal = Number(e.target.value) || 0;
+                            if (Number(dropdownUtilized) > limitVal) {
+                              setDropdownUtilized(String(limitVal));
+                            }
+                          }}
                           onBlur={() => {
                             const val = Number(dropdownLimit) || 0;
                             const maxVal = Math.round(50000000 * currencyScale);
                             const minVal = Math.round(100000 * currencyScale);
                             const clamped = Math.max(minVal, Math.min(maxVal, val));
                             setDropdownLimit(String(clamped));
+                            if (Number(dropdownUtilized) > clamped) {
+                              setDropdownUtilized(String(clamped));
+                            }
                           }}
                           className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                         />
@@ -2559,7 +2689,13 @@ export default function LoanCalculatorView({
                         max={Math.round(50000000 * currencyScale)}
                         step={Math.round(50000 * currencyScale)}
                         value={Number(dropdownLimit) || 0}
-                        onChange={(e) => setDropdownLimit(e.target.value)}
+                        onChange={(e) => {
+                          setDropdownLimit(e.target.value);
+                          const limitVal = Number(e.target.value) || 0;
+                          if (Number(dropdownUtilized) > limitVal) {
+                            setDropdownUtilized(String(limitVal));
+                          }
+                        }}
                         className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
                       />
                       <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
@@ -2568,7 +2704,43 @@ export default function LoanCalculatorView({
                       </div>
                     </div>
 
-                    {/* Input 2: Interest Rate */}
+                    {/* Input 2: Utilized Amount */}
+                    <div className="flex flex-col">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[13px] font-semibold text-gray-700">Utilized Amount</label>
+                        <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(dropdownUtilized) || 0)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-gray-400 font-bold text-[14px]">{currency.symbol}</span>
+                        <input
+                          type="number"
+                          value={dropdownUtilized}
+                          onChange={(e) => setDropdownUtilized(e.target.value)}
+                          onBlur={() => {
+                            const val = Number(dropdownUtilized) || 0;
+                            const limitVal = Number(dropdownLimit) || 0;
+                            const clamped = Math.max(0, Math.min(limitVal, val));
+                            setDropdownUtilized(String(clamped));
+                          }}
+                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={Number(dropdownLimit) || 0}
+                        step={Math.round(10000 * currencyScale)}
+                        value={Number(dropdownUtilized) || 0}
+                        onChange={(e) => setDropdownUtilized(e.target.value)}
+                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
+                        <span>{currency.symbol}0</span>
+                        <span>{formatCompact(Number(dropdownLimit) || 0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Input 3: Interest Rate */}
                     <div className="flex flex-col">
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-[13px] font-semibold text-gray-700">Interest Rate</label>
@@ -2604,10 +2776,10 @@ export default function LoanCalculatorView({
                       </div>
                     </div>
 
-                    {/* Input 3: Tenure */}
+                    {/* Input 4: Amortization Period */}
                     <div className="flex flex-col">
                       <div className="flex justify-between items-center mb-1">
-                        <label className="text-[13px] font-semibold text-gray-700">Tenure</label>
+                        <label className="text-[13px] font-semibold text-gray-700">Amortization Period</label>
                         <span className="text-[13px] font-bold text-primary">{Number(dropdownTenure) || 0} Years</span>
                       </div>
                       <div className="flex items-center gap-2 mb-3">
@@ -2639,42 +2811,7 @@ export default function LoanCalculatorView({
                       </div>
                     </div>
 
-                    {/* Input 4: Reduction Schedule */}
-                    <div className="flex flex-col">
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[13px] font-semibold text-gray-700">Reduction Schedule</label>
-                        <span className="text-[13px] font-bold text-primary">{Number(dropdownReductionPct) || 0}% / Year</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={dropdownReductionPct}
-                          onChange={(e) => setDropdownReductionPct(e.target.value)}
-                          onBlur={() => {
-                            const val = Number(dropdownReductionPct) || 0;
-                            const clamped = Math.max(1.0, Math.min(20.0, val));
-                            setDropdownReductionPct(String(Number(clamped.toFixed(2))));
-                          }}
-                          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-[8px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                        />
-                        <span className="text-gray-400 font-bold text-[12px] pr-1">% / Yr</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={1.0}
-                        max={20.0}
-                        step={0.5}
-                        value={Number(dropdownReductionPct) || 0}
-                        onChange={(e) => setDropdownReductionPct(e.target.value)}
-                        className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                      />
-                      <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-medium">
-                        <span>1.0%</span>
-                        <span>20.0%</span>
-                      </div>
                     </div>
-                  </div>
                 ) : (
                   <div className="flex flex-col gap-6">
                     {/* Input 1: Loan Amount */}
@@ -2810,21 +2947,50 @@ export default function LoanCalculatorView({
 
                 {/* Dashboard Summary Card */}
                 <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-col gap-3.5 mt-2">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-1 text-left">
                     <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
                       {activeTab === "professional" && profStructure === "flexi"
-                        ? "Est. Monthly Interest"
+                        ? `Repayment Schedule (${flexiODCalculations.interestOnlyTenure} + ${flexiODCalculations.repaymentTenure} Years)`
                         : activeTab === "professional" && profStructure === "dropdown"
-                        ? "Initial Credit Limit"
+                        ? `Repayment Schedule (1 + ${dropdownODCalculations.tenure} Years)`
                         : "Calculated Monthly EMI"}
                     </span>
-                    <span className="text-[25px] font-bold text-primary mt-1">
-                      {activeTab === "professional" && profStructure === "flexi"
-                        ? formatCurrency(flexiODCalculations.monthlyInterest)
-                        : activeTab === "professional" && profStructure === "dropdown"
-                        ? formatCurrency(dropdownODCalculations.initialLimit)
-                        : formatCurrency(emiCalculations.monthlyEmi)}
-                    </span>
+                    {activeTab === "professional" && profStructure === "flexi" ? (
+                      <div className="flex flex-col gap-1 mt-1 text-gray-800 font-semibold text-[12.5px] w-full">
+                        <div className="flex justify-between items-center gap-4">
+                          <span className="text-gray-500 text-[11px] font-bold">Years 1–{flexiODCalculations.interestOnlyTenure} (Interest-Only):</span>
+                          <span className="text-[15px] font-black text-primary">{formatCurrency(flexiODCalculations.monthlyInterest)}/mo</span>
+                        </div>
+                        <div className="flex justify-between items-center gap-4 border-t border-gray-100 pt-1 mt-0.5">
+                          <span className="text-gray-500 text-[11px] font-bold">Years {flexiODCalculations.interestOnlyTenure + 1}–{flexiODCalculations.interestOnlyTenure + flexiODCalculations.repaymentTenure} (Full EMI):</span>
+                          <span className="text-[15px] font-black text-primary">{formatCurrency(flexiODCalculations.monthlyEMI)}/mo</span>
+                        </div>
+                      </div>
+                    ) : activeTab === "professional" && profStructure === "dropdown" ? (
+                      dropdownODCalculations.isFullyUtilized ? (
+                        <div className="flex flex-col gap-1 mt-1 text-gray-800 font-semibold text-[12.5px] w-full">
+                          <div className="flex justify-between items-center gap-4">
+                            <span className="text-gray-500 text-[11px] font-bold">Years 1–{1 + dropdownODCalculations.tenure} (Full EMI):</span>
+                            <span className="text-[15px] font-black text-primary">{formatCurrency(dropdownODCalculations.fullEMI)}/mo</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1 mt-1 text-gray-800 font-semibold text-[12.5px] w-full">
+                          <div className="flex justify-between items-center gap-4">
+                            <span className="text-gray-500 text-[11px] font-bold">Year 1 (Interest-Only):</span>
+                            <span className="text-[15px] font-black text-primary">{formatCurrency(dropdownODCalculations.year1Interest)}/mo</span>
+                          </div>
+                          <div className="flex justify-between items-center gap-4 border-t border-gray-100 pt-1 mt-0.5">
+                            <span className="text-gray-500 text-[11px] font-bold">Years 2–{1 + dropdownODCalculations.tenure} (Full EMI):</span>
+                            <span className="text-[15px] font-black text-primary">{formatCurrency(dropdownODCalculations.subsequentEMI)}/mo</span>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <span className="text-[25px] font-bold text-primary mt-1">
+                        {formatCurrency(emiCalculations.monthlyEmi)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 w-full">
                     <button
@@ -2880,20 +3046,42 @@ export default function LoanCalculatorView({
                     <div className="w-full max-w-[640px] bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-[18px] p-5 shadow-sm flex flex-col gap-4 animate-fade-up">
                       <div className="flex items-center gap-1.5 border-b border-indigo-100/60 pb-2">
                         <span className="text-[16px]">🩺</span>
-                        <span className="text-[12.5px] font-bold text-indigo-900 uppercase tracking-wide">Interest Summary</span>
+                        <span className="text-[12.5px] font-bold text-indigo-900 uppercase tracking-wide">Payment Breakdown</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Daily Interest</span>
-                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.dailyInterest)}</span>
+                      
+                      {/* Section 1: Interest-Only Phase */}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[11px] font-bold text-indigo-800/80 uppercase tracking-wide text-left">Phase 1: Interest-Only Period (Years 1–{flexiODCalculations.interestOnlyTenure})</span>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Daily Interest</span>
+                            <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.dailyInterest)}</span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Monthly Interest</span>
+                            <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.monthlyInterest)}</span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Annual Interest</span>
+                            <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.annualInterest)}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Monthly Interest</span>
-                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.monthlyInterest)}</span>
-                        </div>
-                        <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Annual Interest</span>
-                          <span className="text-[14px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.annualInterest)}</span>
+                      </div>
+
+                      {/* Section 2: Amortization Phase */}
+                      <div className="flex flex-col gap-2 border-t border-indigo-100/60 pt-3">
+                        <span className="text-[11px] font-bold text-indigo-800/80 uppercase tracking-wide text-left">Phase 2: Amortization Period (Years {flexiODCalculations.interestOnlyTenure + 1}–{flexiODCalculations.interestOnlyTenure + flexiODCalculations.repaymentTenure})</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Monthly EMI (P + I)</span>
+                            <span className="text-[15px] font-black text-indigo-700 mt-1">{formatCurrency(flexiODCalculations.monthlyEMI)}</span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Interest (Amortization)</span>
+                            <span className="text-[15px] font-black text-indigo-700 mt-1">
+                              {formatCurrency(Math.max(0, (flexiODCalculations.monthlyEMI * flexiODCalculations.repaymentTenure * 12) - flexiODCalculations.utilized))}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -3025,8 +3213,42 @@ export default function LoanCalculatorView({
                       <div className="flex justify-between text-[9px] text-gray-400 font-bold px-0.5 w-full">
                         <span>Year 1 ({formatCompact(dropdownODCalculations.initialLimit)})</span>
                         <span>Midway</span>
-                        <span>Year {dropdownODCalculations.tenure} ({formatCompact(dropdownODCalculations.yearlyLimits[dropdownODCalculations.yearlyLimits.length - 1]?.limit || 0)})</span>
+                        <span>Year {1 + dropdownODCalculations.tenure} ({formatCompact(dropdownODCalculations.yearlyLimits[dropdownODCalculations.yearlyLimits.length - 1]?.limit || 0)})</span>
                       </div>
+                    </div>
+
+                    {/* Repayment Schedule Card */}
+                    <div className="w-full max-w-[640px] bg-gradient-to-br from-indigo-50/50 to-blue-50/50 border border-indigo-100 rounded-[18px] p-5 shadow-sm flex flex-col gap-4 animate-fade-up">
+                      <div className="flex items-center gap-1.5 border-b border-indigo-100/60 pb-2 text-left">
+                        <span className="text-[16px]">🩺</span>
+                        <span className="text-[12.5px] font-bold text-indigo-900 uppercase tracking-wide">Repayment Breakdown</span>
+                      </div>
+                      
+                      {dropdownODCalculations.isFullyUtilized ? (
+                        <div className="flex flex-col gap-2 text-left bg-white border border-indigo-100/40 rounded-[12px] p-4 shadow-xs">
+                          <span className="text-[11px] font-bold text-indigo-800 uppercase tracking-wide">Fully Utilized (P + I)</span>
+                          <p className="text-[12px] text-gray-600 font-medium leading-normal mt-1">
+                            Since you have utilized the full credit limit, you pay full EMI from Year 1 over the entire plan duration of {1 + dropdownODCalculations.tenure} years.
+                          </p>
+                          <div className="flex justify-between items-center border-t border-gray-100 pt-2.5 mt-2">
+                            <span className="text-[12px] font-bold text-gray-500">Monthly EMI:</span>
+                            <span className="text-[16px] font-black text-indigo-700">{formatCurrency(dropdownODCalculations.fullEMI)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 text-left">
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Year 1 (Interest-Only)</span>
+                            <span className="text-[15px] font-black text-indigo-700 mt-1">{formatCurrency(dropdownODCalculations.year1Interest)}/mo</span>
+                            <span className="text-[9.5px] text-gray-400 font-medium mt-1">Pay only interest on utilized {formatCompact(dropdownODCalculations.utilized)}</span>
+                          </div>
+                          <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 shadow-xs">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Years 2–{1 + dropdownODCalculations.tenure} (EMI)</span>
+                            <span className="text-[15px] font-black text-indigo-700 mt-1">{formatCurrency(dropdownODCalculations.subsequentEMI)}/mo</span>
+                            <span className="text-[9.5px] text-gray-400 font-medium mt-1">Principal + Interest amortized over {dropdownODCalculations.tenure} years</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Limit Schedule Grid */}
