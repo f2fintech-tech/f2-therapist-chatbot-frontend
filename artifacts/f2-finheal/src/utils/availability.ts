@@ -112,7 +112,7 @@ export function getSlotDates(nextSlotStr: string): SlotRange[] | null {
       }
 
       const start24 = to24Hour(startMatch.hours, startMatch.minutes, startMeridiem);
-      const end24 = endMatch 
+      const end24 = endMatch
         ? to24Hour(endMatch.hours, endMatch.minutes, endMeridiem)
         : { h: (start24.h + 1) % 24, m: start24.m };
 
@@ -123,10 +123,13 @@ export function getSlotDates(nextSlotStr: string): SlotRange[] | null {
         endDate.setDate(endDate.getDate() + 1);
       }
 
-      ranges.push({ startDate, endDate });
+      const currentMillis = now.getTime();
+      if (currentMillis >= startDate.getTime() && currentMillis <= endDate.getTime()) {
+        return true;
+      }
     }
-
-    return ranges.length > 0 ? ranges : null;
+    return false;
+>>>>>>> 290a542da40f7d218db1187492387dd350881aae
   } catch (e) {
     console.error("Error parsing slot dates:", e);
     return null;
