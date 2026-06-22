@@ -189,6 +189,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [slotDate, setSlotDate] = useState("");
   const [slotFromTime, setSlotFromTime] = useState("");
   const [slotToTime, setSlotToTime] = useState("");
+  const [addedSlots, setAddedSlots] = useState<string[]>([]);
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   
@@ -730,7 +731,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   }, [currentExpertId, isAdmin]);
 
   useEffect(() => {
-    if (!expertNextSlot) return;
+    if (!expertNextSlot) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      setSlotDate(`${yyyy}-${mm}-${dd}`);
+      setSlotFromTime("09:00 AM");
+      setSlotToTime("10:00 AM");
+      setAddedSlots([]);
+      return;
+    }
     const regex = /^([a-zA-Z]{3})\s+(\d+)\s*\([a-zA-Z]{3}\),\s*(.+)$/;
     const match = expertNextSlot.match(regex);
     if (match) {
@@ -745,14 +756,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         const dd = String(dateObj.getDate()).padStart(2, "0");
         setSlotDate(`${yyyy}-${mm}-${dd}`);
         
-        const timeParts = timeStr.split(/\s*-\s*/);
-        if (timeParts.length === 2) {
-          setSlotFromTime(timeParts[0]);
-          setSlotToTime(timeParts[1]);
-        } else {
-          setSlotFromTime(timeStr || "09:00 AM");
-          setSlotToTime(timeStr || "10:00 AM");
-        }
+        // Split by ampersand to load multiple slots
+        const ranges = timeStr.split(/\s*&\s*/);
+        setAddedSlots(ranges);
+        
+        setSlotFromTime("09:00 AM");
+        setSlotToTime("10:00 AM");
         return;
       }
     }
@@ -763,6 +772,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     setSlotDate(`${yyyy}-${mm}-${dd}`);
     setSlotFromTime("09:00 AM");
     setSlotToTime("10:00 AM");
+    setAddedSlots([]);
   }, [expertNextSlot]);
 
   const loadGlobalAppointments = async () => {
@@ -1073,16 +1083,44 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
-  const handleUpdateExpertNextSlot = async () => {
-    if (!currentExpertId || !slotDate || !slotFromTime || !slotToTime) {
-      alert("Please select a date, From time, and To time.");
+  const handleAddTimeRange = () => {
+    if (!slotFromTime || !slotToTime) {
+      alert("Please select both From and To times.");
       return;
     }
-    const combinedTime = `${slotFromTime} - ${slotToTime}`;
+    const range = `${slotFromTime} - ${slotToTime}`;
+    if (addedSlots.includes(range)) {
+      alert("This time range has already been added.");
+      return;
+    }
+    setAddedSlots(prev => [...prev, range]);
+  };
+
+  const handleRemoveTimeRange = (index: number) => {
+    setAddedSlots(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUpdateExpertNextSlot = async () => {
+    if (!currentExpertId || !slotDate) {
+      alert("Please select a date.");
+      return;
+    }
+
+    let slotsToSave = [...addedSlots];
+    if (slotsToSave.length === 0) {
+      if (slotFromTime && slotToTime) {
+        slotsToSave.push(`${slotFromTime} - ${slotToTime}`);
+      } else {
+        alert("Please add at least one time range.");
+        return;
+      }
+    }
+
+    const combinedTime = slotsToSave.join(" & ");
     const formattedSlot = formatSlotValue(slotDate, combinedTime);
     try {
       await updateAdvisorNextSlot(currentExpertId, formattedSlot);
-      await updateAdvisorAvailability(currentExpertId, combinedTime);
+      await updateAdvisorAvailability(currentExpertId, slotsToSave[0]);
       await loadAdvisors();
       dispatchUpdateEvent("finheal:advisors_update");
       alert("Next slot has been updated successfully!");
@@ -2190,7 +2228,34 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               </select>
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={handleAddTimeRange}
+                            className="w-full border border-primary text-primary hover:bg-primary/5 font-semibold py-[8px] rounded-[10px] text-[11.5px] transition cursor-pointer"
+                          >
+                            + Add Time Range
+                          </button>
                         </div>
+                        {addedSlots.length > 0 && (
+                          <div className="space-y-[6px] bg-gray-50 p-2.5 rounded-[10px] border border-gray-100">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase block">Added Slots</label>
+                            <div className="flex flex-wrap gap-[6px]">
+                              {addedSlots.map((slotRange, idx) => (
+                                <div key={idx} className="flex items-center gap-[6px] bg-primary/10 text-primary text-[11px] font-bold px-[10px] py-[3px] rounded-full border border-primary/20">
+                                  <span>{slotRange}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTimeRange(idx)}
+                                    className="text-primary hover:text-rose-500 font-extrabold focus:outline-none cursor-pointer"
+                                    title="Remove this slot"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <button
                           onClick={handleUpdateExpertNextSlot}
                           className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
