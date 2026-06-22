@@ -84,39 +84,6 @@ export function getSlotDates(nextSlotStr: string): { startDate: Date; endDate: D
       let startMeridiem = startMatch.meridiem;
       let endMeridiem = endMatch ? endMatch.meridiem : null;
 
-<<<<<<< HEAD
-    if (endMatch && !endMeridiem && startMeridiem) {
-      endMeridiem = startMeridiem;
-    }
-    if (endMatch && !startMeridiem && endMeridiem) {
-      if (startMatch.hours > endMatch.hours) {
-        startMeridiem = endMeridiem === "pm" ? "am" : "pm";
-      } else {
-        startMeridiem = endMeridiem;
-      }
-    }
-
-    if (!startMeridiem) {
-      startMeridiem = startMatch.hours >= 8 && startMatch.hours < 12 ? "am" : "pm";
-    }
-    if (endMatch && !endMeridiem) {
-      endMeridiem = endMatch.hours >= 8 && endMatch.hours < 12 ? "am" : "pm";
-    }
-
-    const start24 = to24Hour(startMatch.hours, startMatch.minutes, startMeridiem);
-    const end24 = endMatch 
-      ? to24Hour(endMatch.hours, endMatch.minutes, endMeridiem)
-      : { h: (start24.h + 1) % 24, m: start24.m };
-
-    const startDate = new Date(year, month, date, start24.h, start24.m, 0, 0);
-    const endDate = new Date(year, month, date, end24.h, end24.m, 0, 0);
-
-    if (endDate.getTime() < startDate.getTime()) {
-      endDate.setDate(endDate.getDate() + 1);
-    }
-
-    return { startDate, endDate };
-=======
       // Resolve missing meridiems (e.g. "9 to 6 pm" -> start am, end pm)
       if (endMatch && !endMeridiem && startMeridiem) {
         endMeridiem = startMeridiem;
@@ -149,13 +116,9 @@ export function getSlotDates(nextSlotStr: string): { startDate: Date; endDate: D
         endDate.setDate(endDate.getDate() + 1);
       }
 
-      const currentMillis = now.getTime();
-      if (currentMillis >= startDate.getTime() && currentMillis <= endDate.getTime()) {
-        return true;
-      }
+      return { startDate, endDate };
     }
-    return false;
->>>>>>> 290a542da40f7d218db1187492387dd350881aae
+    return null;
   } catch (e) {
     console.error("Error parsing slot dates:", e);
     return null;
