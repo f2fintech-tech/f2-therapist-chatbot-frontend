@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { fetchAdvisorAppointments } from "@/lib/backendAuth";
 import { 
   Bell, 
   Calendar, 
@@ -20,7 +21,7 @@ import {
 interface Reminder {
   id: string;
   title: string;
-  category: "EMI" | "Savings" | "Bill" | "Tax" | "General";
+  category: "EMI" | "Savings" | "Bill" | "Tax" | "General" | "Consultation" | "Preparation" | "FollowUp" | "Admin";
   amount?: number;
   dueDate: string; // YYYY-MM-DD
   priority: "high" | "medium" | "low";
@@ -43,7 +44,11 @@ const CATEGORY_COLORS = {
   Savings: "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400",
   Bill: "bg-cyan-50 border-cyan-100 text-cyan-700 dark:bg-cyan-950/20 dark:border-cyan-900/30 dark:text-cyan-400",
   Tax: "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400",
-  General: "bg-gray-50 border-gray-100 text-gray-700 dark:bg-gray-800/40 dark:border-gray-700/30 dark:text-gray-400"
+  General: "bg-gray-50 border-gray-100 text-gray-700 dark:bg-gray-800/40 dark:border-gray-700/30 dark:text-gray-400",
+  Consultation: "bg-indigo-50 border-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/30 dark:text-indigo-400",
+  Preparation: "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400",
+  FollowUp: "bg-cyan-50 border-cyan-100 text-cyan-700 dark:bg-cyan-950/20 dark:border-cyan-900/30 dark:text-cyan-400",
+  Admin: "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400"
 };
 
 const CATEGORY_ICONS = {
@@ -51,12 +56,52 @@ const CATEGORY_ICONS = {
   Savings: "🐷",
   Bill: "⚡",
   Tax: "📄",
-  General: "🎯"
+  General: "🎯",
+  Consultation: "📅",
+  Preparation: "📝",
+  FollowUp: "🔄",
+  Admin: "📄"
 };
 
 export default function RemindersView({ userId, onToggleSidebar, onToggleInsights, onOpenFinancialWellnessAssistant }: RemindersViewProps) {
   const storageKey = `${STORAGE_KEY_PREFIX}:${userId || "anonymous"}`;
   
+  const checkIsAdvisor = () => {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+        if (parsed?.email) {
+          const email = parsed.email.toLowerCase();
+          const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+          if (defaultEmails.includes(email)) return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  };
+  const isAdvisor = checkIsAdvisor();
+
+  const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
+  useEffect(() => {
+    if (!isAdvisor) return;
+    async function loadAdvisorAppts() {
+      try {
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        const parsed = storedSession ? JSON.parse(storedSession) : null;
+        const advId = parsed?.f2FintechId || parsed?.userId || userId;
+        if (advId) {
+          const appts = await fetchAdvisorAppointments(advId);
+          setAdvisorAppointments(appts || []);
+        }
+      } catch (e) {
+        console.error("Failed to load appointments in RemindersView", e);
+      }
+    }
+    loadAdvisorAppts();
+  }, [userId, isAdvisor]);
+
   // State for reminders
   const [reminders, setReminders] = useState<Reminder[]>([]);
   
@@ -71,7 +116,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   
   // Form fields
   const [formTitle, setFormTitle] = useState("");
-  const [formCategory, setFormCategory] = useState<"EMI" | "Savings" | "Bill" | "Tax" | "General">("General");
+  const [formCategory, setFormCategory] = useState<"EMI" | "Savings" | "Bill" | "Tax" | "General" | "Consultation" | "Preparation" | "FollowUp" | "Admin">("General");
   const [formAmount, setFormAmount] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
   const [formPriority, setFormPriority] = useState<"high" | "medium" | "low">("medium");
@@ -83,8 +128,19 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        setReminders(JSON.parse(raw));
+      let parsed = raw ? JSON.parse(raw) : null;
+      
+      // Re-seed if user is advisor but only client reminders exist
+      if (parsed && isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("default-"))) {
+        parsed = null;
+      }
+      // Re-seed if user is client but only advisor reminders exist
+      if (parsed && !isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("advisor-default-"))) {
+        parsed = null;
+      }
+
+      if (parsed) {
+        setReminders(parsed);
       } else {
         // Pre-populate with beautiful default reminders
         const today = new Date();
@@ -94,7 +150,48 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
           return d.toISOString().split("T")[0];
         };
         
-        const defaults: Reminder[] = [
+        const defaults: Reminder[] = isAdvisor ? [
+          {
+            id: "advisor-default-1",
+            title: "Prepare notes for client consultation",
+            category: "Preparation",
+            dueDate: formatDate(0), // Today
+            priority: "high",
+            frequency: "one-time",
+            notes: "Review client's CIBIL score and financial goals before joining the call.",
+            completed: false
+          },
+          {
+            id: "advisor-default-2",
+            title: "Follow up with client on debt action plan",
+            category: "FollowUp",
+            dueDate: formatDate(3),
+            priority: "medium",
+            frequency: "weekly",
+            notes: "Send the updated debt repayment schedule to client.",
+            completed: false
+          },
+          {
+            id: "advisor-default-3",
+            title: "Attend weekly performance review",
+            category: "Consultation",
+            dueDate: formatDate(5),
+            priority: "high",
+            frequency: "weekly",
+            notes: "Sync with the manager on recent consultation ratings and reviews.",
+            completed: false
+          },
+          {
+            id: "advisor-default-4",
+            title: "Configure next week slots availability",
+            category: "Admin",
+            dueDate: formatDate(10),
+            priority: "low",
+            frequency: "weekly",
+            notes: "Open slots for the next calendar block in the portal.",
+            completed: true
+          }
+        ] : [
           {
             id: "default-1",
             title: "Pay Personal Loan EMI",
@@ -144,7 +241,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
     } catch (e) {
       console.error("Failed to load reminders", e);
     }
-  }, [userId, storageKey]);
+  }, [userId, storageKey, isAdvisor]);
 
   // Save reminders to localStorage
   const saveToStorage = (updatedReminders: Reminder[]) => {
@@ -292,7 +389,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       amount,
       dueDate,
       priority: "medium",
-      frequency: "monthly",
+      frequency: isAdvisor ? "one-time" : "monthly",
       completed: false
     };
     saveToStorage([...reminders, newReminder]);
@@ -341,6 +438,14 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
     return { total, active, completed, overdue, dueToday, nextDueReminder };
   }, [reminders]);
 
+  const nextConsultation = useMemo(() => {
+    if (!isAdvisor || advisorAppointments.length === 0) return null;
+    const upcoming = advisorAppointments
+      .filter(a => !a.completed && !a.cancelled)
+      .sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+    return upcoming.length > 0 ? upcoming[0] : null;
+  }, [isAdvisor, advisorAppointments]);
+
   return (
     <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 dark:bg-slate-900 dark:border-slate-800">
       
@@ -361,7 +466,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               <span className="text-[17px]">🔔</span> Reminders & Alerts
             </div>
             <div className="text-[10px] text-gray-400 sm:text-[11px] dark:text-slate-400 truncate">
-              Set and track recurring payments, savings allocations, and wellness diagnostics.
+              {isAdvisor ? "Set and track consultation tasks, client follow-ups, and advisory preparation schedules." : "Set and track recurring payments, savings allocations, and wellness diagnostics."}
             </div>
           </div>
           
@@ -426,16 +531,28 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
           <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800 col-span-2 xl:col-span-1">
             <div className="w-[36px] h-[36px] bg-indigo-50 text-indigo-600 rounded-[10px] flex items-center justify-center dark:bg-indigo-950/20 dark:text-indigo-400 shrink-0">
-              <DollarSign size={18} />
+              {isAdvisor ? <Calendar size={18} /> : <DollarSign size={18} />}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider truncate">Next Amount Due</div>
-              <div className="text-[14px] font-bold text-gray-800 dark:text-slate-200 leading-tight truncate mt-[2px]">
-                {stats.nextDueReminder?.amount ? `₹${stats.nextDueReminder.amount.toLocaleString("en-IN")}` : "—"}
+              <div className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider truncate">
+                {isAdvisor ? "Next Client Call" : "Next Amount Due"}
               </div>
-              {stats.nextDueReminder && (
-                <div className="text-[8px] text-gray-400 dark:text-slate-500 truncate mt-[1px]">{stats.nextDueReminder.title}</div>
-              )}
+              <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200 leading-tight truncate mt-[2px]">
+                {isAdvisor 
+                  ? (nextConsultation ? `${nextConsultation.date} ${nextConsultation.time}` : "No upcoming call") 
+                  : (stats.nextDueReminder?.amount ? `₹${stats.nextDueReminder.amount.toLocaleString("en-IN")}` : "—")
+                }
+              </div>
+              {isAdvisor 
+                ? (nextConsultation && (
+                  <div className="text-[9px] text-primary truncate mt-[1px]">
+                    Client: {nextConsultation.clientEmail || nextConsultation.userId}
+                  </div>
+                ))
+                : (stats.nextDueReminder && (
+                  <div className="text-[8px] text-gray-400 dark:text-slate-500 truncate mt-[1px]">{stats.nextDueReminder.title}</div>
+                ))
+              }
             </div>
           </div>
         </div>
@@ -470,11 +587,23 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                     className="w-full sm:w-[130px] bg-gray-50 text-gray-700 border border-gray-200 rounded-[10px] px-[10px] py-[7px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:focus:bg-slate-950"
                   >
                     <option value="all">All Categories</option>
-                    <option value="EMI">EMI</option>
-                    <option value="Savings">Savings</option>
-                    <option value="Bill">Bill</option>
-                    <option value="Tax">Tax</option>
-                    <option value="General">General</option>
+                    {isAdvisor ? (
+                      <>
+                        <option value="Preparation">Preparation</option>
+                        <option value="FollowUp">FollowUp</option>
+                        <option value="Consultation">Consultation</option>
+                        <option value="Admin">Admin</option>
+                        <option value="General">General</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="EMI">EMI</option>
+                        <option value="Savings">Savings</option>
+                        <option value="Bill">Bill</option>
+                        <option value="Tax">Tax</option>
+                        <option value="General">General</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -630,37 +759,75 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               </p>
               
               <div className="grid gap-[8px]">
-                <button
-                  onClick={() => handleQuickAdd("Check credit report on CIBIL Checker", "General", undefined, 3)}
-                  className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
-                >
-                  <span>🔍 Check Credit Score</span>
-                  <ArrowRight size={12} />
-                </button>
+                {isAdvisor ? (
+                  <>
+                    <button
+                      onClick={() => handleQuickAdd("Review upcoming client profile and notes", "Preparation", undefined, 0)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>📝 Review Client Profile</span>
+                      <ArrowRight size={12} />
+                    </button>
 
-                <button
-                  onClick={() => handleQuickAdd("Pay credit card monthly balance", "Bill", 4500, 2)}
-                  className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
-                >
-                  <span>💳 Credit Card Balance</span>
-                  <ArrowRight size={12} />
-                </button>
+                    <button
+                      onClick={() => handleQuickAdd("Handle client reschedule request details", "FollowUp", undefined, 2)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>🔄 Reschedule Request</span>
+                      <ArrowRight size={12} />
+                    </button>
 
-                <button
-                  onClick={() => handleQuickAdd("Deposit monthly savings / SIP", "Savings", 2000, 5)}
-                  className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
-                >
-                  <span>🐷 Monthly Mutual Fund SIP</span>
-                  <ArrowRight size={12} />
-                </button>
+                    <button
+                      onClick={() => handleQuickAdd("Weekly consultation sync with manager", "Consultation", undefined, 5)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>📅 Weekly Performance Sync</span>
+                      <ArrowRight size={12} />
+                    </button>
 
-                <button
-                  onClick={() => handleQuickAdd("Submit Income Tax documents", "Tax", undefined, 14)}
-                  className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
-                >
-                  <span>📄 Tax Document Filing</span>
-                  <ArrowRight size={12} />
-                </button>
+                    <button
+                      onClick={() => handleQuickAdd("Verify calendar availability work slots", "Admin", undefined, 7)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>📄 Configure Work Slots</span>
+                      <ArrowRight size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleQuickAdd("Check credit report on CIBIL Checker", "General", undefined, 3)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>🔍 Check Credit Score</span>
+                      <ArrowRight size={12} />
+                    </button>
+
+                    <button
+                      onClick={() => handleQuickAdd("Pay credit card monthly balance", "Bill", 4500, 2)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>💳 Credit Card Balance</span>
+                      <ArrowRight size={12} />
+                    </button>
+
+                    <button
+                      onClick={() => handleQuickAdd("Deposit monthly savings / SIP", "Savings", 2000, 5)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>🐷 Monthly Mutual Fund SIP</span>
+                      <ArrowRight size={12} />
+                    </button>
+
+                    <button
+                      onClick={() => handleQuickAdd("Submit Income Tax documents", "Tax", undefined, 14)}
+                      className="w-full text-left p-[8px_10px] bg-gray-50 hover:bg-primary/5 hover:border-primary/20 border border-transparent rounded-[10px] text-[11.5px] font-medium text-gray-600 hover:text-primary transition-all cursor-pointer flex justify-between items-center dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span>📄 Tax Document Filing</span>
+                      <ArrowRight size={12} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -672,14 +839,19 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                   <span className="text-[20px]">🦉</span>
                 </div>
                 <div className="space-y-[4px]">
-                  <div className="text-[10px] font-semibold text-white/70 tracking-wider uppercase">FinHeal Wisdom</div>
+                  <div className="text-[10px] font-semibold text-white/70 tracking-wider uppercase">
+                    {isAdvisor ? "Advisor Wisdom" : "FinHeal Wisdom"}
+                  </div>
                   <div className="text-[12.5px] font-bold flex items-center gap-[4px]">
-                    Discipline = Freedom <Sparkles size={13} className="text-amber-300" />
+                    {isAdvisor ? "Empathy & Guidance" : "Discipline = Freedom"} <Sparkles size={13} className="text-amber-300" />
                   </div>
                   <p className="text-[11px] text-white/80 leading-relaxed pt-[2px]">
-                    "Paying your debts on time keeps your credit score steady and minimizes money anxiety. Use these reminders to create a calm, organized rhythm for your wallet."
+                    {isAdvisor 
+                      ? '"A great advisory session starts with active listening. Take 5 minutes to review client notes and goals before joining a call to deliver highly personalized support."'
+                      : '"Paying your debts on time keeps your credit score steady and minimizes money anxiety. Use these reminders to create a calm, organized rhythm for your wallet."'
+                    }
                   </p>
-                  {onOpenFinancialWellnessAssistant && (
+                  {!isAdvisor && onOpenFinancialWellnessAssistant && (
                     <button 
                       onClick={onOpenFinancialWellnessAssistant}
                       className="mt-[6px] inline-flex items-center gap-[4px] text-[10.5px] font-semibold bg-white/20 hover:bg-white/35 px-[8px] py-[4px] rounded-[6px] transition-all cursor-pointer"
@@ -756,11 +928,23 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                     onChange={(e) => setFormCategory(e.target.value as any)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-[10px] py-[8px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:bg-slate-950"
                   >
-                    <option value="EMI">🏦 EMI</option>
-                    <option value="Savings">🐷 Savings</option>
-                    <option value="Bill">⚡ Bill</option>
-                    <option value="Tax">📄 Tax</option>
-                    <option value="General">🎯 General</option>
+                    {isAdvisor ? (
+                      <>
+                        <option value="Preparation">📝 Preparation</option>
+                        <option value="FollowUp">🔄 Follow-Up</option>
+                        <option value="Consultation">📅 Consultation</option>
+                        <option value="Admin">📄 Admin</option>
+                        <option value="General">🎯 General</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="EMI">🏦 EMI</option>
+                        <option value="Savings">🐷 Savings</option>
+                        <option value="Bill">⚡ Bill</option>
+                        <option value="Tax">📄 Tax</option>
+                        <option value="General">🎯 General</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

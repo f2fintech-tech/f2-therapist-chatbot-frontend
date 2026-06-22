@@ -1293,11 +1293,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
     try {
       await rescheduleAppointment(apptId, rescheduleDate, rescheduleTime);
+      
+      // Save rescheduled apptId in localStorage
+      const rescheduled = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
+      if (!rescheduled.includes(apptId)) {
+        rescheduled.push(apptId);
+        localStorage.setItem("finheal_rescheduled_appts", JSON.stringify(rescheduled));
+      }
+      
       setReschedulingApptId(null);
       setRescheduleDate("");
       setRescheduleTime("");
       await loadGlobalAppointments();
       alert("Consultation has been rescheduled successfully.");
+      dispatchUpdateEvent("finheal:advisors_update");
     } catch (err) {
       console.error("Error rescheduling appointment:", err);
       alert("Failed to reschedule appointment.");

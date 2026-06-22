@@ -695,6 +695,14 @@ export default function AdvisorPanel({
     const realId = appt?.id || apptId;
     try {
       await rescheduleAppointment(realId, rescheduleDate, rescheduleTime);
+      
+      // Save rescheduled apptId in localStorage
+      const rescheduled = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
+      if (!rescheduled.includes(realId)) {
+        rescheduled.push(realId);
+        localStorage.setItem("finheal_rescheduled_appts", JSON.stringify(rescheduled));
+      }
+      
       await loadAppointments();
       setReschedulingApptId(null);
       setRescheduleDate("");

@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, fetchAdvisorAppointments } from "@/lib/backendAuth";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
@@ -400,6 +400,131 @@ export default function Dashboard({
 
   const [activeTab, setActiveTab] = useState<"overview" | "loans" | "reports" | "advisor">("overview");
 
+  const isUserAdvisor = (email?: string) => {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          )
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const isAdvisor = isUserAdvisor(userProfile?.email);
+
+  const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
+  const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
+  const [advisors, setAdvisors] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isAdvisor) return;
+    let active = true;
+    async function loadAdvisorAppts() {
+      try {
+        setLoadingAdvisorAppts(true);
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        const parsed = storedSession ? JSON.parse(storedSession) : null;
+        const advId = parsed?.f2FintechId || parsed?.userId || userId;
+        
+        if (advId) {
+          const appts = await fetchAdvisorAppointments(advId);
+          if (active) {
+            setAdvisorAppointments(appts || []);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load advisor appointments:", err);
+      } finally {
+        if (active) {
+          setLoadingAdvisorAppts(false);
+        }
+      }
+    }
+    loadAdvisorAppts();
+    const handleAdvisorsUpdate = () => {
+      loadAdvisorAppts();
+    };
+    window.addEventListener("finheal:advisors_update", handleAdvisorsUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("finheal:advisors_update", handleAdvisorsUpdate);
+    };
+  }, [userId, isAdvisor]);
+
+  // Helper to map date string to day of week
+  const getDayOfWeek = (dateStr: string): string => {
+    if (!dateStr) return "";
+    const lower = dateStr.toLowerCase();
+    if (lower.includes("mon")) return "Mon";
+    if (lower.includes("tue")) return "Tue";
+    if (lower.includes("wed")) return "Wed";
+    if (lower.includes("thu")) return "Thu";
+    if (lower.includes("fri")) return "Fri";
+    if (lower.includes("sat")) return "Sat";
+    if (lower.includes("sun")) return "Sun";
+
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        return days[d.getDay()];
+      }
+    } catch (e) {}
+    return "";
+  };
+
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  
+  // Calculate call hours dynamically (each completed appt counts as 45 mins = 0.75 hours)
+  const advisorCallHoursData = daysOfWeek.map(day => {
+    const appts = advisorAppointments.filter(a => {
+      if (!a.completed || a.cancelled) return false;
+      return getDayOfWeek(a.date) === day;
+    });
+    return { day, hours: appts.length * 0.75 };
+  });
+
+  const totalAdvisorCallHours = advisorCallHoursData.reduce((sum, d) => sum + d.hours, 0);
+
+  // Group client ratings into satisfaction bands
+  const ratedAppts = advisorAppointments.filter(a => typeof a.rating === "number" && a.rating > 0);
+  const positiveCount = ratedAppts.filter(a => a.rating >= 4).length;
+  const neutralCount = ratedAppts.filter(a => a.rating === 3).length;
+  const negativeCount = ratedAppts.filter(a => a.rating > 0 && a.rating <= 2).length;
+
+  const advisorSentimentData = [
+    { name: "Positive (4-5 ★)", value: positiveCount, color: "#10b981" },
+    { name: "Neutral (3 ★)", value: neutralCount, color: "#f59e0b" },
+    { name: "Needs Attention (1-2 ★)", value: negativeCount, color: "#ef4444" }
+  ].filter(item => item.value > 0);
+
+  // Extract advisor nextSlot configuration
+  const currentAdvisor = advisors.find(a => {
+    return a.email?.toLowerCase() === userProfile?.email?.toLowerCase() || 
+           a.f2FintechId?.toLowerCase() === userProfile?.email?.split("@")[0]?.toLowerCase();
+  });
+  const activeSlotsList = currentAdvisor?.nextSlot 
+    ? currentAdvisor.nextSlot.split("&").map((s: string) => s.trim()) 
+    : [];
+
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
   const [reportsList, setReportsList] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
@@ -541,7 +666,6 @@ export default function Dashboard({
     { initials: "AN", name: "Anjali Nair", title: "Tax & Credit Expert", rating: 4.8, sessions: 185, available: true, color: "#10b981" },
   ];
 
-  const [advisors, setAdvisors] = useState<any[]>([]);
   useEffect(() => {
     let active = true;
     async function loadAdvisors() {
@@ -605,40 +729,12 @@ export default function Dashboard({
     };
   }, [userId, activeTab]);
 
-  const isUserAdvisor = (email?: string) => {
-    try {
-      const storedSession = localStorage.getItem("finheal-auth-session");
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed?.isAdvisor) return true;
-      }
-    } catch (e) {}
 
-    if (!email) return false;
-    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
-    if (defaultEmails.includes(email.toLowerCase())) return true;
-
-    const stored = localStorage.getItem("finheal_advisors_list");
-    if (stored) {
-      try {
-        const list = JSON.parse(stored);
-        return list.some((a: any) => 
-          a.f2FintechId && (
-            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
-            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
-          )
-        );
-      } catch (e) {}
-    }
-    return false;
-  };
-
-  const isAdvisor = isUserAdvisor(userProfile?.email);
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
     { key: "loans", label: "Loans", icon: "💳" },
-    { key: "reports", label: "Reports", icon: "📈" },
+    ...(!isAdvisor ? [{ key: "reports", label: "Reports", icon: "📈" }] : []),
     ...(!isAdvisor ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
 
@@ -734,179 +830,427 @@ export default function Dashboard({
           ))}
         </div>
       </div>
-
-      {/* ── Tab content (scrollable) ── */}
       <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-
         {/* ══ OVERVIEW TAB ══ */}
         {activeTab === "overview" && (
-          <div className="flex flex-col gap-6">
-
-            {/* KPI row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard icon="💰" label="Net Worth" value={`₹${(netWorth / 100000).toFixed(1)}L`} sub="↑ 5.7% vs last month" color="#10b981" delay={0} />
-              <StatCard icon="📉" label="Total Debt" value={`₹${(totalDebt / 100000).toFixed(1)}L`} sub={`${activeLoansCount} active loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={80} />
-              <StatCard icon="🏦" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of income`} color={BRAND} delay={160} />
-              <StatCard icon="💸" label="Monthly Savings" value={`₹${Math.round(incomeVal * 0.27).toLocaleString()}`} sub="Based on 27% savings rate" color="#f59e0b" delay={240} />
-            </div>
-
-            {/* Chart row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-              {/* Income vs Expense area chart */}
-              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "100ms" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-[13px] font-semibold text-gray-800">Income vs Expenses</div>
-                    <div className="text-[11px] text-gray-400">Last 6 months</div>
-                  </div>
-                  <div className="flex gap-3 text-[10px]">
-                    <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Income</span>
-                    <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ef4444]" />Expenses</span>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={BRAND} stopOpacity={0.15} />
-                        <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="income" name="Income" stroke={BRAND} strokeWidth={2} fill="url(#gradIncome)" dot={false} />
-                    <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#gradExpense)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
+          isAdvisor ? (
+            <div className="flex flex-col gap-6">
+              {/* Advisor KPI row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard icon="🧑‍💼" label="Total Booked" value={String(advisorAppointments.length)} sub="All-time sessions" color={BRAND} delay={0} />
+                <StatCard icon="📅" label="Upcoming Scheduled" value={String(advisorAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Upcoming consultations" color="#10b981" delay={80} />
+                <StatCard icon="🔄" label="Rescheduled" value={String(advisorAppointments.filter(a => {
+                  const rescheduledIds = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
+                  return rescheduledIds.includes(a.id);
+                }).length)} sub="Rescheduled consultations" color="#f59e0b" delay={160} />
+                <StatCard icon="🚫" label="Cancelled" value={String(advisorAppointments.filter(a => a.cancelled).length)} sub="Cancelled sessions" color="#ef4444" delay={240} />
               </div>
 
-              {/* Spend pie */}
-              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5" style={{ animationDelay: "150ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Spending Breakdown</div>
-                <div className="text-[11px] text-gray-400 mb-3">This month · ₹{(incomeVal - Math.round(incomeVal * 0.27)).toLocaleString()}</div>
-                <ResponsiveContainer width="100%" height={140}>
-                  <PieChart>
-                    <Pie data={dynamicSpendPie} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
-                      {dynamicSpendPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex flex-col gap-1.5 mt-2">
-                  {dynamicSpendPie.slice(0, 4).map((item) => (
-                    <div key={item.name} className="flex items-center justify-between text-[10.5px]">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ background: item.color }} />
-                        <span className="text-gray-500">{item.name}</span>
-                      </span>
-                      <span className="font-semibold text-gray-700">₹{item.value.toLocaleString()}</span>
+              {/* Advisor Visualizations & Analytics Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Weekly Call Hours dedicated */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "80ms" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-[13px] font-bold text-gray-800">Productivity: Call Hours Dedicated</div>
+                      <div className="text-[11px] text-gray-400">Hours spent in completed calls per day (45 min / session)</div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+                    {totalAdvisorCallHours > 0 && (
+                      <div className="text-right">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Weekly Hours</span>
+                        <div className="text-[18px] font-bold text-primary">{totalAdvisorCallHours.toFixed(1)}h</div>
+                      </div>
+                    )}
+                  </div>
 
-            {/* Stress level chart row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-              {/* Daily Stress Level line chart */}
-              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
-                    <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px]">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
-                    <span className="text-gray-500">Stress Index (0-100)</span>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={stressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f43f5e" />
-                        <stop offset="100%" stopColor="#6366f1" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Quick Insights or summary card */}
-              <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800 mb-1">Stress Analysis</div>
-                  <div className="text-[11px] text-gray-400 mb-4">Weekly overview</div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-gray-500">Average Stress Level</span>
-                      <span className="font-bold text-gray-800">46 / 100</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-gray-500">Peak Stress Day</span>
-                      <span className="font-bold text-red-500">Wednesday (72)</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-gray-500">Lowest Stress Day</span>
-                      <span className="font-bold text-emerald-500">Sunday (25)</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[10px] p-3 text-[11px] text-[#b91c1c] leading-relaxed mt-4">
-                  <strong>💡 Stress Nudge:</strong> {stressNudgeText}
-                </div>
-              </div>
-            </div>
-
-            {/* Goals overview */}
-            {!isAdvisor && (
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
-                    <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
-                  </div>
-                  <button
-                    data-testid="btn-view-all-goals"
-                    onClick={() => onNavigate("Financial Goals")}
-                    className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
-                  >
-                    View All
-                  </button>
-                </div>
-                <div className="flex flex-col gap-4">
-                  {localGoals.length === 0 ? (
-                    <div className="text-center py-6">
-                      <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+                  {totalAdvisorCallHours === 0 ? (
+                    <div className="text-center py-10 bg-gray-50 border border-dashed rounded-[16px] flex flex-col items-center justify-center h-[200px]">
+                      <p className="text-[28px]">📊</p>
+                      <p className="text-[12px] font-bold text-gray-700 mt-2">No Call Hours Dedicated Yet</p>
+                      <p className="text-[11px] text-gray-400 mt-1 max-w-[280px]">Weekly hours update automatically as you host and complete consultations with clients.</p>
                     </div>
                   ) : (
-                    localGoals.map((g: any, i: number) => {
-                      const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
-                      const color = g.color;
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={advisorCallHoursData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
+                        <Tooltip formatter={(v: any) => [`${v}h`, "Time Spent"]} />
+                        <Bar dataKey="hours" fill={BRAND} radius={[4, 4, 0, 0]} barSize={24} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                {/* Client Sentiment and Availability Slots */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "120ms" }}>
+                  <div>
+                    <div className="text-[13px] font-bold text-gray-800 mb-0.5">Diagnostics & Availability</div>
+                    <div className="text-[11px] text-gray-400 mb-4">Client satisfaction reviews and scheduled slots</div>
+
+                    {/* Client Sentiment */}
+                    <div className="mb-4">
+                      <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-2">
+                        🌟 Client Satisfaction Distribution
+                      </span>
+                      {advisorSentimentData.length === 0 ? (
+                        <div className="text-center py-5 bg-gray-50/50 border border-dashed border-gray-150 rounded-[12px] text-[11px] text-gray-400">
+                          No feedback reviews or ratings recorded yet.
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-4">
+                          <ResponsiveContainer width="40%" height={80}>
+                            <PieChart>
+                              <Pie data={advisorSentimentData} cx="50%" cy="50%" innerRadius={18} outerRadius={30} paddingAngle={2} dataKey="value">
+                                {advisorSentimentData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                              </Pie>
+                              <Tooltip formatter={(v: any) => [`${v} calls`, "Sessions"]} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex-1 space-y-1.5">
+                            {advisorSentimentData.map((item) => (
+                              <div key={item.name} className="flex items-center justify-between text-[10px]">
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: item.color }} />
+                                  <span className="text-gray-500">{item.name}</span>
+                                </span>
+                                <span className="font-bold text-gray-700">{item.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scheduled Availability Slots */}
+                  <div className="border-t border-gray-100 pt-3 mt-2">
+                    <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-2">
+                      🕒 Next Scheduled Slots
+                    </span>
+                    {activeSlotsList.length === 0 ? (
+                      <div className="text-[11px] text-gray-400 italic">
+                        No active slots scheduled. Set slots in the workspace.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin" }}>
+                        {activeSlotsList.map((slot: string, idx: number) => (
+                          <span key={idx} className="text-[9.5px] font-bold bg-[#eef0fd] text-primary px-2.5 py-1 rounded-[8px] border border-[#dde0f8]">
+                            {slot}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Advisor Schedule & History row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Upcoming Schedule */}
+                <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "100ms" }}>
+                  <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                    <h3 className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5">
+                      📅 Upcoming Scheduled Consultations ({advisorAppointments.filter(a => !a.completed && !a.cancelled).length})
+                    </h3>
+                  </div>
+                  
+                  {advisorAppointments.filter(a => !a.completed && !a.cancelled).length === 0 ? (
+                    <div className="text-center py-10 bg-gray-50 border border-dashed rounded-[16px]">
+                      <p className="text-[24px]">🕒</p>
+                      <p className="text-[11px] text-gray-400 mt-[4px]">No upcoming scheduled sessions.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 overflow-y-auto max-h-[350px] pr-1">
+                      {advisorAppointments.filter(a => !a.completed && !a.cancelled).map((appt, idx) => (
+                        <div key={appt.id || idx} className="border border-gray-200 bg-white p-4 rounded-[16px] flex flex-col gap-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div className="text-[12px] font-bold text-gray-900">
+                                Client: <span className="text-primary">{appt.clientEmail || appt.userId}</span>
+                              </div>
+                              {appt.notes && (
+                                <p className="text-[11px] text-gray-500 mt-1 italic">&quot;{appt.notes}&quot;</p>
+                              )}
+                            </div>
+                            <div className="text-right sm:text-right text-[11.5px] font-semibold text-gray-750">
+                              <div className="text-primary font-bold">{appt.date}</div>
+                              <div className="text-gray-500">{appt.time} (IST)</div>
+                            </div>
+                          </div>
+                          {appt.meetUrl && (
+                            <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 mt-1">
+                              <a href={appt.meetUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary hover:underline font-bold truncate max-w-[200px]">
+                                {appt.meetUrl}
+                              </a>
+                              <a href={appt.meetUrl} target="_blank" rel="noopener noreferrer" className="bg-primary hover:bg-opacity-95 text-white text-[10.5px] font-bold px-3 py-1.5 rounded-[8px] transition-all">
+                                Join Call
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Past Consultations History */}
+                <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "150ms" }}>
+                  <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                    <h3 className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5">
+                      📜 Past Consultations History ({advisorAppointments.filter(a => a.completed || a.cancelled).length})
+                    </h3>
+                  </div>
+
+                  {advisorAppointments.filter(a => a.completed || a.cancelled).length === 0 ? (
+                    <div className="text-center py-10 bg-gray-50 border border-dashed rounded-[16px]">
+                      <p className="text-[24px]">📜</p>
+                      <p className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 overflow-y-auto max-h-[350px] pr-1">
+                      {advisorAppointments.filter(a => a.completed || a.cancelled).map((appt, idx) => (
+                        <div key={appt.id || idx} className="border border-gray-150 bg-gray-50/30 p-4 rounded-[16px] flex flex-col gap-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="text-[12px] font-bold text-gray-700">
+                                Client: <span className="text-gray-900 font-semibold">{appt.clientEmail || appt.userId}</span>
+                              </div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${appt.cancelled ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                                  {appt.cancelled ? "Cancelled" : "Completed"}
+                                </span>
+                                {appt.rating && (
+                                  <span className="text-amber-500 text-[11px] font-bold">
+                                    {"★".repeat(appt.rating)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right text-[11px] text-gray-500">
+                              <div className="font-semibold">{appt.date}</div>
+                              <div>{appt.time}</div>
+                            </div>
+                          </div>
+                          {appt.feedback && (
+                            <p className="text-[11px] text-gray-500 italic bg-white p-2 rounded-lg border border-gray-100 mt-1">&quot;{appt.feedback}&quot;</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+
+              {/* KPI row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard icon="💰" label="Net Worth" value={`₹${(netWorth / 100000).toFixed(1)}L`} sub="↑ 5.7% vs last month" color="#10b981" delay={0} />
+                <StatCard icon="📉" label="Total Debt" value={`₹${(totalDebt / 100000).toFixed(1)}L`} sub={`${activeLoansCount} active loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={80} />
+                <StatCard icon="🏦" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of income`} color={BRAND} delay={160} />
+                <StatCard icon="💸" label="Monthly Savings" value={`₹${Math.round(incomeVal * 0.27).toLocaleString()}`} sub="Based on 27% savings rate" color="#f59e0b" delay={240} />
+              </div>
+
+              {/* Chart row */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Income vs Expense area chart */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "100ms" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-[13px] font-semibold text-gray-800">Income vs Expenses</div>
+                      <div className="text-[11px] text-gray-400">Last 6 months</div>
+                    </div>
+                    <div className="flex gap-3 text-[10px]">
+                      <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Income</span>
+                      <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ef4444]" />Expenses</span>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <AreaChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={BRAND} stopOpacity={0.15} />
+                          <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="income" name="Income" stroke={BRAND} strokeWidth={2} fill="url(#gradIncome)" dot={false} />
+                      <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#gradExpense)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Spend pie */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5" style={{ animationDelay: "150ms" }}>
+                  <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Spending Breakdown</div>
+                  <div className="text-[11px] text-gray-400 mb-3">This month · ₹{(incomeVal - Math.round(incomeVal * 0.27)).toLocaleString()}</div>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie data={dynamicSpendPie} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
+                        {dynamicSpendPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-col gap-1.5 mt-2">
+                    {dynamicSpendPie.slice(0, 4).map((item) => (
+                      <div key={item.name} className="flex items-center justify-between text-[10.5px]">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: item.color }} />
+                          <span className="text-gray-500">{item.name}</span>
+                        </span>
+                        <span className="font-semibold text-gray-700">₹{item.value.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stress level chart row */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Daily Stress Level line chart */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
+                      <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
+                      <span className="text-gray-500">Stress Index (0-100)</span>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={stressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f43f5e" />
+                          <stop offset="100%" stopColor="#6366f1" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Quick Insights or summary card */}
+                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
+                  <div>
+                    <div className="text-[13px] font-semibold text-gray-800 mb-1">Stress Analysis</div>
+                    <div className="text-[11px] text-gray-400 mb-4">Weekly overview</div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Average Stress Level</span>
+                        <span className="font-bold text-gray-800">46 / 100</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Peak Stress Day</span>
+                        <span className="font-bold text-red-500">Wednesday (72)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Lowest Stress Day</span>
+                        <span className="font-bold text-emerald-500">Sunday (25)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[10px] p-3 text-[11px] text-[#b91c1c] leading-relaxed mt-4">
+                    <strong>💡 Stress Nudge:</strong> {stressNudgeText}
+                  </div>
+                </div>
+              </div>
+
+              {/* Goals overview */}
+              {!isAdvisor && (
+                <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "300ms" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-[13px] font-semibold text-gray-800">Financial Goals</div>
+                      <div className="text-[11px] text-gray-400">{localGoals.length} active goals</div>
+                    </div>
+                    <button
+                      data-testid="btn-view-all-goals"
+                      onClick={() => onNavigate("Financial Goals")}
+                      className="text-[11px] font-semibold text-primary px-3 py-1.5 rounded-[8px] bg-[#eef0fd] hover:bg-[#dde0f8] transition-colors cursor-pointer"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {localGoals.length === 0 ? (
+                      <div className="text-center py-6">
+                        <p className="text-[12px] text-gray-400">No active goals. Add a new goal in the sidebar to track it here!</p>
+                      </div>
+                    ) : (
+                      localGoals.map((g: any, i: number) => {
+                        const pct = Math.round((g.currentAmount / g.targetAmount) * 100);
+                        const color = g.color;
+                        return (
+                          <div key={g.id} className="flex items-center gap-4">
+                            <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-[12px] font-semibold text-gray-750">{g.name}</span>
+                                <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
+                              </div>
+                              <AnimBar pct={pct} color={color} delay={i * 150} />
+                              <div className="flex justify-between mt-1">
+                                <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
+                                <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent sessions */}
+              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "350ms" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-[13px] font-semibold text-gray-800">Recent Sessions</div>
+                  <button
+                    data-testid="btn-start-chat"
+                    onClick={() => onNavigate("Talk to FinHeal")}
+                    className="text-[11px] font-semibold text-white px-3 py-1.5 rounded-[8px] transition-all hover:-translate-y-px"
+                    style={{ background: BRAND }}
+                  >
+                    + New Chat
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {actualSessions.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-[12px] text-gray-400">No recent sessions. Start a new chat to get financial advice!</p>
+                    </div>
+                  ) : (
+                    actualSessions.slice(0, 5).map((s: any) => {
+                      const dotColor = s.moodColor === "green" ? "#10b981" : s.moodColor === "amber" ? "#f59e0b" : BRAND;
+                      const dateVal = s.updatedAt || s.createdAt;
                       return (
-                        <div key={g.id} className="flex items-center gap-4">
-                          <div className="w-9 h-9 rounded-[8px] bg-[#eef0fd] flex items-center justify-center text-[15px] shrink-0">{g.icon}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-1.5">
-                              <span className="text-[12px] font-semibold text-gray-700">{g.name}</span>
-                              <span className="text-[11px] font-semibold" style={{ color }}>{pct}%</span>
-                            </div>
-                            <AnimBar pct={pct} color={color} delay={i * 150} />
-                            <div className="flex justify-between mt-1">
-                              <span className="text-[10px] text-gray-400">{g.currency}{g.currentAmount.toLocaleString()} saved</span>
-                              <span className="text-[10px] text-gray-400">Target: {g.currency}{g.targetAmount.toLocaleString()}</span>
-                            </div>
+                        <div
+                          key={s.id}
+                          onClick={() => onNavigate("Talk to FinHeal", s.id)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors group"
+                        >
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
+                          <div className="flex-1 text-[12px] text-gray-650 truncate group-hover:text-gray-900 transition-colors">{s.title}</div>
+                          <div className="text-[10px] text-gray-400 shrink-0">
+                            {dateVal ? new Date(dateVal).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : ""}
                           </div>
                         </div>
                       );
@@ -914,48 +1258,8 @@ export default function Dashboard({
                   )}
                 </div>
               </div>
-            )}
-
-            {/* Recent sessions */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "350ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-[13px] font-semibold text-gray-800">Recent Sessions</div>
-                <button
-                  data-testid="btn-start-chat"
-                  onClick={() => onNavigate("Talk to FinHeal")}
-                  className="text-[11px] font-semibold text-white px-3 py-1.5 rounded-[8px] transition-all hover:-translate-y-px"
-                  style={{ background: BRAND }}
-                >
-                  + New Chat
-                </button>
-              </div>
-              <div className="flex flex-col gap-1">
-                {actualSessions.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-[12px] text-gray-400">No recent sessions. Start a new chat to get financial advice!</p>
-                  </div>
-                ) : (
-                  actualSessions.slice(0, 5).map((s: any) => {
-                    const dotColor = s.moodColor === "green" ? "#10b981" : s.moodColor === "amber" ? "#f59e0b" : BRAND;
-                    const dateVal = s.updatedAt || s.createdAt;
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={() => onNavigate("Talk to FinHeal", s.id)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors group"
-                      >
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
-                        <div className="flex-1 text-[12px] text-gray-600 truncate group-hover:text-gray-900 transition-colors">{s.title}</div>
-                        <div className="text-[10px] text-gray-400 shrink-0">
-                          {dateVal ? new Date(dateVal).toLocaleDateString("en-IN", { month: "short", day: "numeric" }) : ""}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
-          </div>
+          )
         )}
 
         {/* ══ LOANS TAB ══ */}
