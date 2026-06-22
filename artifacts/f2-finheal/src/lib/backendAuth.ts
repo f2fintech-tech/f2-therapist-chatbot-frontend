@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "@/lib/backendChat";
 import type { AuthSession } from "@/utils/authSession";
+import { isSlotPassed } from "../utils/availability";
 
 interface AuthResponse {
   user_id: string;
@@ -329,7 +330,7 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     bio: a.bio || "",
     rating: a.rating,
     reviewsCount: a.reviews_count,
-    nextSlot: a.next_slot || "Tomorrow, 10:00 AM",
+    nextSlot: (!a.next_slot || a.next_slot.startsWith("Tomorrow") || isSlotPassed(a.next_slot)) ? "Not available" : a.next_slot,
     category: a.category,
     fee: a.fee,
     originalFee: a.original_fee || undefined,

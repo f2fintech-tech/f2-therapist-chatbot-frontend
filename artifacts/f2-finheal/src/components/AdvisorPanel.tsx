@@ -800,7 +800,6 @@ export default function AdvisorPanel({
                         />
                         <div>
                           <div className="text-[13px] font-bold text-gray-900">{appt.advisorName}</div>
-                          <div className="text-[10px] text-gray-500">{advisor?.designation}</div>
                         </div>
                       </div>
                       
@@ -978,7 +977,6 @@ export default function AdvisorPanel({
                         />
                         <div>
                           <div className="text-[13px] font-bold text-gray-700">{appt.advisorName}</div>
-                          <div className="text-[10px] text-gray-400">{advisor?.designation}</div>
                         </div>
                       </div>
                       
@@ -1083,9 +1081,16 @@ export default function AdvisorPanel({
 
           <div className={isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}>
             <section className="mt-[20px]">
-          <div className="mb-[14px] flex items-center justify-between">
-            <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400">Our Trusted Advisors</h2>
-            <div className="text-[11px] text-gray-400 font-medium">Showing {filteredAdvisors.length} active experts</div>
+          <div className="mb-[14px] flex flex-wrap items-center justify-between gap-[10px]">
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400 hidden sm:block">Our Trusted Advisors</h2>
+            <div className="flex flex-wrap items-center gap-[12px] ml-auto">
+              <div className="flex items-center gap-[10px] text-[10.5px] text-gray-500 font-medium bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> Available</span>
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></span> In Meeting</span>
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></span> Not Available</span>
+              </div>
+              <div className="text-[11px] text-gray-400 font-medium border-l border-gray-200 pl-[12px]">Showing {filteredAdvisors.length} active experts</div>
+            </div>
           </div>
  
           <div className="grid gap-[18px] sm:grid-cols-2 lg:grid-cols-3">
@@ -1102,28 +1107,19 @@ export default function AdvisorPanel({
                 >
                   
                   {/* Visual Availability dot on top right corner */}
-                  <div className="absolute top-[16px] right-[16px]">
+                  <div className="absolute top-[20px] right-[20px]">
                     {effectiveAvail === "available" ? (
-                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9.5px] font-bold animate-fade-in">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        Available
-                      </div>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
+                      </span>
                     ) : effectiveAvail === "in meeting" ? (
-                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9.5px] font-bold animate-fade-in">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                        </span>
-                        In Meeting
-                      </div>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></span>
+                      </span>
                     ) : (
-                      <div className="flex items-center gap-[5px] px-[8px] py-[3.5px] rounded-full bg-rose-50 border border-rose-100 text-rose-700 text-[9.5px] font-bold animate-fade-in">
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                        Not Available
-                      </div>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
                     )}
                   </div>
 
@@ -1136,7 +1132,6 @@ export default function AdvisorPanel({
                     />
                     <div className="flex-1 min-w-0 pr-[85px]">
                       <CardTitle className="text-[15px] font-bold text-gray-900 leading-tight">{advisor.name}</CardTitle>
-                      <div className="text-[11px] font-medium text-gray-500 truncate mt-[2px]">{advisor.designation}</div>
                       <div className="flex items-center gap-[4px] mt-[4px] text-[11px] font-semibold text-amber-500">
                         <span>⭐</span>
                         <span>{advisor.rating}</span>
@@ -1350,9 +1345,11 @@ export default function AdvisorPanel({
                           </div>
                           <button
                             onClick={() => handleOpenBooking(advisor)}
-                            className="bg-primary text-white hover:opacity-90 font-bold py-[9px] px-[16px] rounded-[10px] text-[12px] shadow-[0_8px_20px_rgba(50,68,230,0.14)] transition cursor-pointer"
+                            className="group relative overflow-hidden bg-gradient-to-r from-primary to-[#5b6bf9] text-white font-bold py-[5px] px-[12px] rounded-[6px] text-[10.5px] shadow-[0_2px_8px_rgba(50,68,230,0.15)] hover:shadow-[0_4px_12px_rgba(50,68,230,0.25)] hover:-translate-y-[1px] active:scale-[0.97] transition-all duration-300 cursor-pointer flex items-center"
                           >
-                            Book Call
+                            <span className="relative z-10">Book Call</span>
+                            {/* Subtle shine effect on hover */}
+                            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-[shimmer_1.5s_infinite]"></div>
                           </button>
                         </>
                       )}
@@ -1459,7 +1456,6 @@ export default function AdvisorPanel({
                       />
                       <div className="min-w-0 flex-1">
                         <strong className="text-[13px] text-gray-900 block leading-tight">{selectedAdvisor.name}</strong>
-                        <span className="text-[10.5px] text-gray-500 block mt-[2px]">{selectedAdvisor.designation}</span>
                       </div>
                     </div>
                     
