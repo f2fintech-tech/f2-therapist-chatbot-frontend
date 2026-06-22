@@ -286,22 +286,22 @@ export default function InsightsPanel({
         <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">This Session</div>
         <div className="grid grid-cols-1 gap-[6px] sm:grid-cols-3 lg:grid-cols-3">
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{conversationCount || 0}</div>
+            <div className="font-sans font-bold text-[22px] text-gray-900 leading-[1.1] tracking-tight">{conversationCount || 0}</div>
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Chats</div>
           </div>
           {isAdvisor ? (
             <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-              <div className="font-serif text-[22px] text-indigo-600 leading-[1.1]">{advisorCalls.length}</div>
+              <div className="font-sans font-bold text-[22px] text-indigo-600 leading-[1.1] tracking-tight">{advisorCalls.length}</div>
               <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Calls</div>
             </div>
           ) : (
             <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-              <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{goalsList.length}</div>
+              <div className="font-sans font-bold text-[22px] text-gray-900 leading-[1.1] tracking-tight">{goalsList.length}</div>
               <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Goals</div>
             </div>
           )}
           <div className="bg-gray-50 border-[1.5px] border-gray-100 rounded-[10px] p-[9px_6px] text-center">
-            <div className="font-serif text-[22px] text-gray-900 leading-[1.1]">{getDaysLeftInMonth()}</div>
+            <div className="font-sans font-bold text-[22px] text-gray-900 leading-[1.1] tracking-tight">{getDaysLeftInMonth()}</div>
             <div className="text-[9px] text-gray-400 font-semibold uppercase tracking-[0.6px] mt-[2px]">Days until month end</div>
           </div>
         </div>

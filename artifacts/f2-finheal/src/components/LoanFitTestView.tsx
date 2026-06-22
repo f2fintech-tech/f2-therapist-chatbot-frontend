@@ -189,7 +189,7 @@ function ScoreRing({ score }: { score: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <div className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400">Fit score</div>
-        <div className="font-serif text-[42px] leading-none text-gray-900">{score}</div>
+        <div className="font-sans font-bold text-[42px] leading-none text-gray-900 tracking-tight">{score}</div>
         <div className="mt-[4px] text-[11px] text-gray-500">out of 100</div>
       </div>
     </div>
@@ -456,7 +456,7 @@ export default function LoanFitTestView({
           {loanFitSectionMeta.map((section, index) => (
             <div key={section.sectionId} className="rounded-[16px] border border-gray-200 bg-white p-[14px] shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
               <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{section.title}</div>
-              <div className="mt-[4px] text-[22px] font-serif text-gray-900">{getSectionAnsweredCount(answers, section.sectionId)}</div>
+              <div className="mt-[4px] text-[22px] font-sans font-semibold text-gray-900 tracking-tight">{getSectionAnsweredCount(answers, section.sectionId)}</div>
               <div className="text-[12px] text-gray-500">questions answered</div>
               <div className="mt-[10px] text-[10px] font-semibold uppercase tracking-[0.7px] text-primary">
                 Step {index + 1} of {loanFitSectionMeta.length}

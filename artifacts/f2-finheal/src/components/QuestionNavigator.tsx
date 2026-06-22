@@ -33,7 +33,7 @@ export default function QuestionNavigator({
           {showSummary && (
             <>
               <div className="text-[11px] font-semibold uppercase tracking-[0.9px] text-gray-400">{title}</div>
-              <div className="mt-[6px] font-serif text-[24px] leading-[1.1] text-gray-900">Question {safeActiveIndex + 1} of {safeTotal}</div>
+              <div className="mt-[6px] font-sans font-bold text-[24px] leading-[1.1] text-gray-900 tracking-tight">Question {safeActiveIndex + 1} of {safeTotal}</div>
               <div className="mt-[4px] text-[12px] text-gray-500">{answeredCount} answered · {remainingCount} remaining</div>
             </>
           )}
@@ -42,7 +42,7 @@ export default function QuestionNavigator({
         {showTime && (
           <div className="rounded-[18px] border border-gray-200 bg-gray-50 px-[16px] py-[12px] text-right shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
             <div className="text-[11px] font-semibold uppercase tracking-[0.8px] text-gray-400">TIME LEFT</div>
-            <div className="mt-[2px] font-serif text-[28px] leading-none text-gray-900">{timeLeftLabel}</div>
+            <div className="mt-[2px] font-sans font-bold text-[28px] leading-none text-gray-900 tracking-tight">{timeLeftLabel}</div>
           </div>
         )}
       </div>

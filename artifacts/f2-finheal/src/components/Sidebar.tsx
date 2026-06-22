@@ -339,7 +339,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
         
         <div className="text-[9px] font-semibold text-white/65 tracking-[1.2px] uppercase mb-[6px]">Your Wellness Score</div>
         <div className="flex items-end gap-[6px] mb-[10px]">
-          <div className="font-serif text-[42px] text-white leading-none font-bold">{wellnessData?.score || 0}</div>
+          <div className="font-sans text-[42px] text-white leading-none font-bold tracking-tight">{wellnessData?.score || 0}</div>
           <div className="text-[14px] text-white/55 mb-[5px]">/ 100</div>
         </div>
         <div className="h-[3px] bg-white/20 rounded-[3px]">

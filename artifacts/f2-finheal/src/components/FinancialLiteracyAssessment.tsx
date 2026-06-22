@@ -758,7 +758,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
             {financialLiteracyLevelIds.map((levelId) => (
               <div key={levelId} className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">{getLevelMeta(levelId).name}</div>
-                <div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{levelId}</div>
+                <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{levelId}</div>
               </div>
             ))}
           </section>
@@ -818,15 +818,15 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
           <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
             <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
               <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Score</div>
-              <div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{displayScore}%</div>
+              <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{displayScore}%</div>
             </div>
             <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
               <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Badge</div>
-              <div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{currentResult.badge}</div>
+              <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{currentResult.badge}</div>
             </div>
             <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
               <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Level</div>
-              <div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{currentResult.levelName}</div>
+              <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{currentResult.levelName}</div>
             </div>
           </section>
 
@@ -840,7 +840,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
                 </div>
                 <div className="flex items-center gap-[10px] rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[10px] dark:border-slate-800 dark:bg-slate-900">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Accuracy</div>
-                  <div className="text-[22px] font-serif text-gray-900 dark:text-slate-100">{displayScore}%</div>
+                  <div className="text-[22px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{displayScore}%</div>
                 </div>
               </CardContent>
             </Card>
@@ -913,7 +913,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
               <Card key={item.levelId} className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-950">
                 <CardContent className="px-[16px] py-[16px] sm:px-[18px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">{item.levelName}</div>
-                  <div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{item.latestPercentage}%</div>
+                  <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{item.latestPercentage}%</div>
                   <div className="mt-[4px] text-[12px] text-gray-500 dark:text-slate-400">{item.totalAttempts > 0 ? `Latest attempt, best ${item.bestScore}%` : "Not attempted yet"}</div>
                 </CardContent>
               </Card>
@@ -961,7 +961,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
               </div>
               <div className="flex items-center gap-[10px] rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[10px] dark:border-slate-800 dark:bg-slate-900">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Time left</div>
-                <div className="text-[22px] font-serif text-gray-900 dark:text-slate-100">{getTimerLabel(remainingSeconds)}</div>
+                <div className="text-[22px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{getTimerLabel(remainingSeconds)}</div>
               </div>
             </div>
             <div className="mt-[12px] h-[8px] overflow-hidden rounded-[999px] bg-gray-200 dark:bg-slate-800">
@@ -1059,9 +1059,9 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
           </section>
 
           <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
-            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Answered</div><div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{summary.answered}</div></div>
-            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Remaining</div><div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{summary.remaining}</div></div>
-            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Time left</div><div className="mt-[4px] text-[24px] font-serif text-gray-900 dark:text-slate-100">{getTimerLabel(remainingSeconds)}</div></div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Answered</div><div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{summary.answered}</div></div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Remaining</div><div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{summary.remaining}</div></div>
+            <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900"><div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Time left</div><div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 dark:text-slate-100 tracking-tight">{getTimerLabel(remainingSeconds)}</div></div>
           </section>
 
           <section className="mt-[18px]">

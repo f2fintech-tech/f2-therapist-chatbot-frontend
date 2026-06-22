@@ -196,7 +196,7 @@ function ScoreRing({ score, max = 100, size = 160 }: ScoreRingProps) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-[44px] font-serif font-bold text-gray-900">{score}</div>
+          <div className="text-[44px] font-sans font-bold text-gray-900 tracking-tight">{score}</div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.8px] text-gray-400">Score</div>
         </div>
       </div>
@@ -239,7 +239,7 @@ function MetricPill({ label, value, subtext }: MetricPillProps) {
   return (
     <div className="flex flex-col rounded-[12px] border border-gray-200 bg-gray-50 px-[12px] py-[10px]">
       <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{label}</div>
-      <div className="mt-[4px] text-[18px] font-serif font-bold text-gray-900">{value}</div>
+      <div className="mt-[4px] text-[18px] font-sans font-bold text-gray-900 tracking-tight">{value}</div>
       {subtext && <div className="mt-[2px] text-[11px] text-gray-500">{subtext}</div>}
     </div>
   );
@@ -521,7 +521,7 @@ export default function DebtBalanceReviewView({
               return (
                 <div key={section.id} className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">{section.title}</div>
-                  <div className="mt-[4px] text-[24px] font-serif text-gray-900">
+                  <div className="mt-[4px] text-[24px] font-sans font-semibold text-gray-900 tracking-tight">
                     {answeredInSection}/{totalInSection}
                   </div>
                   <div className="mt-[2px] text-[11px] text-gray-600">{section.description}</div>
@@ -673,7 +673,7 @@ export default function DebtBalanceReviewView({
                         <div className="text-[10px] text-gray-500">{section.description}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[14px] font-serif font-bold text-gray-900">{percentage}%</div>
+                        <div className="text-[14px] font-sans font-bold text-gray-900 tracking-tight">{percentage}%</div>
                       </div>
                     </div>
                     <div className="h-[6px] w-full rounded-full bg-gray-200 overflow-hidden">

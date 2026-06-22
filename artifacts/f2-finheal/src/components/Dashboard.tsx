@@ -100,7 +100,7 @@ function StatCard({ icon, label, value, sub, color, delay = 0 }: any) {
         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right flex-1 min-w-0">{label}</span>
       </div>
       <div>
-        <div className="font-serif text-[28px] font-bold text-gray-900 leading-none">{value}</div>
+        <div className="font-sans text-[28px] font-bold text-gray-900 leading-none tracking-tight">{value}</div>
         {sub && <div className="text-[11px] text-gray-400 mt-1">{sub}</div>}
       </div>
     </div>

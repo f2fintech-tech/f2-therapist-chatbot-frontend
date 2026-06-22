@@ -83,7 +83,7 @@ function ScoreRing({ score, max }: { score: number; max: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <div className="text-[12px] font-semibold text-gray-500">Credit Readiness</div>
-        <div className="mt-1 text-[34px] font-serif text-gray-900">{score}</div>
+        <div className="mt-1 text-[34px] font-sans font-bold text-gray-900 tracking-tight">{score}</div>
         <div className="text-[11px] text-gray-500">of {max}</div>
       </div>
     </div>

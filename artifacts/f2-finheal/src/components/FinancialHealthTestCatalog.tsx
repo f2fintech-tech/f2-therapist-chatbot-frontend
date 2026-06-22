@@ -271,15 +271,15 @@ export default function FinancialHealthTestCatalog({
         <section className="mt-[18px] grid gap-[10px] sm:grid-cols-3">
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Available tests</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">5</div>
+            <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 tracking-tight">5</div>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Average duration</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">8-10 min</div>
+            <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 tracking-tight">8-10 min</div>
           </div>
           <div className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400">Result style</div>
-            <div className="mt-[4px] text-[24px] font-serif text-gray-900">Instant</div>
+            <div className="mt-[4px] text-[24px] font-sans font-bold text-gray-900 tracking-tight">Instant</div>
           </div>
         </section>
 
