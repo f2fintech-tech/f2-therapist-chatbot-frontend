@@ -351,8 +351,11 @@ export default function InsightsPanel({
                           {call.date}
                         </div>
                       </div>
-                      <div className="text-[12px] font-semibold text-gray-800 break-all mb-1">
-                        {call.clientEmail || "No Email"}
+                      <div className="text-[12px] font-semibold text-gray-800 break-all mb-1 flex flex-col">
+                        {call.clientName && <span className="text-gray-900 font-extrabold">{call.clientName}</span>}
+                        <span className={call.clientName ? "text-gray-500 text-[11px] font-medium" : ""}>
+                          {call.clientEmail || "No Email"}
+                        </span>
                       </div>
                       <div className="text-[11px] font-medium text-indigo-600 mb-2">
                         🕒 {call.time}

@@ -22,6 +22,7 @@ interface Appointment {
   time: string;
   notes?: string;
   clientEmail?: string;
+  clientName?: string;
   bookedAt: string;
   completed?: boolean;
   cancelled?: boolean;
@@ -1800,6 +1801,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             )}
                           </div>
                           <div className="text-[12px] text-gray-600">
+                            {appt.clientName && <span><strong>Client name:</strong> {appt.clientName} &nbsp;|&nbsp; </span>}
                             <strong>Client email:</strong> {appt.clientEmail}
                           </div>
                           {appt.meetUrl && (
@@ -2366,7 +2368,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col gap-[10px]">
                               <div className="flex flex-col justify-between sm:flex-row sm:items-center">
                                 <div className="space-y-[4px]">
-                                  <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                                  <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
+                                    {appt.clientName && (
+                                      <>
+                                        Client Name: <span className="text-gray-950 font-extrabold">{appt.clientName}</span>
+                                        <span className="text-gray-300">|</span>
+                                      </>
+                                    )}
                                     Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
                                     <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
                                   </div>
@@ -2548,7 +2556,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             <div key={idx} className="border border-gray-200 bg-gray-50/50 p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center text-left">
                               <div className="space-y-[4px]">
                                 <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
-                                  Client Email: <span className="text-gray-600 font-bold">{appt.clientEmail}</span>
+                                  {appt.clientName && (
+                                    <>
+                                      Client Name: <span className="text-gray-950 font-extrabold">{appt.clientName}</span>
+                                      <span className="text-gray-300">|</span>
+                                    </>
+                                  )}
+                                  Client Email: <span className="text-gray-650 font-bold">{appt.clientEmail}</span>
                                   {appt.cancelled ? (
                                     <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">🚫 Cancelled</span>
                                   ) : appt.completed && appt.rating ? (

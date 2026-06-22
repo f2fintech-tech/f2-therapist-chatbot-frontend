@@ -546,7 +546,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               {isAdvisor 
                 ? (nextConsultation && (
                   <div className="text-[9px] text-primary truncate mt-[1px]">
-                    Client: {nextConsultation.clientEmail || nextConsultation.userId}
+                    Client: {nextConsultation.clientName ? `${nextConsultation.clientName} (${nextConsultation.clientEmail})` : (nextConsultation.clientEmail || nextConsultation.userId)}
                   </div>
                 ))
                 : (stats.nextDueReminder && (

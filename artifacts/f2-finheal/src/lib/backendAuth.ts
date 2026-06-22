@@ -421,6 +421,7 @@ export interface Appointment {
   meetUrl?: string;
   joined?: boolean;
   clientEmail?: string;
+  clientName?: string;
   userId?: string;
 }
 
@@ -457,7 +458,8 @@ function mapBackendAppointmentToFrontend(a: any): Appointment {
     feedback: a.feedback,
     meetUrl: a.meet_url,
     joined: a.joined,
-    clientEmail: a.client_email || a.clientEmail
+    clientEmail: a.client_email || a.clientEmail,
+    clientName: a.client_name || a.clientName
   };
 }
 

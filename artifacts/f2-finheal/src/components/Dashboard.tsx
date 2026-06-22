@@ -93,11 +93,11 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 function StatCard({ icon, label, value, sub, color, delay = 0 }: any) {
   return (
     <div className="dashboard-card animate-fade-up flex flex-col gap-3 p-5" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center justify-between">
-        <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[18px]" style={{ background: `${color}18` }}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[18px] shrink-0" style={{ background: `${color}18` }}>
           {icon}
         </div>
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right flex-1 min-w-0">{label}</span>
       </div>
       <div>
         <div className="font-serif text-[28px] font-bold text-gray-900 leading-none">{value}</div>
@@ -273,11 +273,11 @@ const mapCibilAccountsToLoans = (accounts: CibilAccount[], brandColor: string) =
   const colors = [brandColor, "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
   return accounts.map((acc, index) => {
     const typeLower = (acc.type || "").toLowerCase();
-    
+
     // 1. Determine icon, rate, and default tenure based on loan type
-    let icon = "💼"; 
-    let rate = 12.0; 
-    let defaultTenureYears = 5; 
+    let icon = "💼";
+    let rate = 12.0;
+    let defaultTenureYears = 5;
 
     if (typeLower.includes("home") || typeLower.includes("housing") || typeLower.includes("property")) {
       icon = "🏠";
@@ -290,7 +290,7 @@ const mapCibilAccountsToLoans = (accounts: CibilAccount[], brandColor: string) =
     } else if (typeLower.includes("card") || typeLower.includes("credit card")) {
       icon = "💳";
       rate = 36.0;
-      defaultTenureYears = 1; 
+      defaultTenureYears = 1;
     } else if (typeLower.includes("personal") || typeLower.includes("consumer")) {
       icon = "💳";
       rate = 13.5;
@@ -346,9 +346,9 @@ const mapCibilAccountsToLoans = (accounts: CibilAccount[], brandColor: string) =
     }
 
     const color = colors[index % colors.length];
-    
+
     // Capitalize lender name nicely
-    const displayName = acc.lender 
+    const displayName = acc.lender
       ? acc.lender.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")
       : (acc.type || "Loan");
 
@@ -385,13 +385,13 @@ export default function Dashboard({
         setupDateStr = session?.authenticatedAt || new Date().toISOString();
         localStorage.setItem(storageKey, setupDateStr);
       }
-      
+
       const setupDate = new Date(setupDateStr);
       const formatted = setupDate.toLocaleDateString("en-US", {
         month: "short",
         year: "numeric"
       });
-      
+
       return `Member since ${formatted}`;
     } catch {
       return "Member since Jun 2026";
@@ -407,7 +407,7 @@ export default function Dashboard({
         const parsed = JSON.parse(storedSession);
         if (parsed?.isAdvisor) return true;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (!email) return false;
     const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
@@ -417,13 +417,13 @@ export default function Dashboard({
     if (stored) {
       try {
         const list = JSON.parse(stored);
-        return list.some((a: any) => 
+        return list.some((a: any) =>
           a.f2FintechId && (
-            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.toLowerCase() === a.f2FintechId.toLowerCase() ||
             email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
           )
         );
-      } catch (e) {}
+      } catch (e) { }
     }
     return false;
   };
@@ -443,7 +443,7 @@ export default function Dashboard({
         const storedSession = localStorage.getItem("finheal-auth-session");
         const parsed = storedSession ? JSON.parse(storedSession) : null;
         const advId = parsed?.f2FintechId || parsed?.userId || userId;
-        
+
         if (advId) {
           const appts = await fetchAdvisorAppointments(advId);
           if (active) {
@@ -487,12 +487,12 @@ export default function Dashboard({
         const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         return days[d.getDay()];
       }
-    } catch (e) {}
+    } catch (e) { }
     return "";
   };
 
   const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  
+
   // Calculate call hours dynamically (each completed appt counts as 45 mins = 0.75 hours)
   const advisorCallHoursData = daysOfWeek.map(day => {
     const appts = advisorAppointments.filter(a => {
@@ -518,11 +518,11 @@ export default function Dashboard({
 
   // Extract advisor nextSlot configuration
   const currentAdvisor = advisors.find(a => {
-    return a.email?.toLowerCase() === userProfile?.email?.toLowerCase() || 
-           a.f2FintechId?.toLowerCase() === userProfile?.email?.split("@")[0]?.toLowerCase();
+    return a.email?.toLowerCase() === userProfile?.email?.toLowerCase() ||
+      a.f2FintechId?.toLowerCase() === userProfile?.email?.split("@")[0]?.toLowerCase();
   });
-  const activeSlotsList = currentAdvisor?.nextSlot 
-    ? currentAdvisor.nextSlot.split("&").map((s: string) => s.trim()) 
+  const activeSlotsList = currentAdvisor?.nextSlot
+    ? currentAdvisor.nextSlot.split("&").map((s: string) => s.trim())
     : [];
 
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
@@ -585,7 +585,7 @@ export default function Dashboard({
               if (active) setMonthlyIncome(storedIncome);
             }
           }
-        } catch {}
+        } catch { }
 
         try {
           const report = await getStoredCibilReport(userId);
@@ -599,7 +599,7 @@ export default function Dashboard({
           if (active && profile?.monthly_income) {
             setMonthlyIncome(profile.monthly_income);
           }
-        } catch {}
+        } catch { }
       } finally {
         if (active) setLoadingCibil(false);
       }
@@ -636,7 +636,7 @@ export default function Dashboard({
   const totalDebt = useCountUp(totalDebtVal, 1400);
 
   const activeLoansCount = cibilReport ? activeAccounts.length : 3;
-  
+
   const stressNudgeText = activeLoansCount > 0
     ? "Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety."
     : "Your stress levels are moderate. Keep maintaining a healthy savings buffer to prevent unexpected financial anxiety.";
@@ -678,7 +678,7 @@ export default function Dashboard({
         console.error("Failed to load dashboard advisors:", err);
         const stored = localStorage.getItem("finheal_advisors_list");
         if (stored && active) {
-          try { setAdvisors(JSON.parse(stored)); } catch {}
+          try { setAdvisors(JSON.parse(stored)); } catch { }
         }
       }
     }
@@ -706,7 +706,7 @@ export default function Dashboard({
 
   useEffect(() => {
     if (!userId || activeTab !== "reports") return;
-    
+
     let active = true;
     async function loadReports() {
       setLoadingReports(true);
@@ -818,11 +818,10 @@ export default function Dashboard({
               key={t.key}
               data-testid={`tab-${t.key}`}
               onClick={() => setActiveTab(t.key as any)}
-              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all ${
-                activeTab === t.key
-                  ? "bg-white text-primary"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
+              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all ${activeTab === t.key
+                ? "bg-white text-primary"
+                : "text-white/70 hover:text-white hover:bg-white/10"
+                }`}
             >
               <span>{t.icon}</span>
               {t.label}
@@ -837,13 +836,13 @@ export default function Dashboard({
             <div className="flex flex-col gap-6">
               {/* Advisor KPI row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon="🧑‍💼" label="Total Booked" value={String(advisorAppointments.length)} sub="All-time sessions" color={BRAND} delay={0} />
-                <StatCard icon="📅" label="Upcoming Scheduled" value={String(advisorAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Upcoming consultations" color="#10b981" delay={80} />
-                <StatCard icon="🔄" label="Rescheduled" value={String(advisorAppointments.filter(a => {
+                <StatCard icon="🧑‍💼" label="Total Booked Calls" value={String(advisorAppointments.length)} sub="All-time sessions" color={BRAND} delay={0} />
+                <StatCard icon="📅" label="Upcoming Scheduled Calls" value={String(advisorAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Upcoming consultations" color="#10b981" delay={80} />
+                <StatCard icon="🔄" label="Rescheduled Calls" value={String(advisorAppointments.filter(a => {
                   const rescheduledIds = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
                   return rescheduledIds.includes(a.id);
                 }).length)} sub="Rescheduled consultations" color="#f59e0b" delay={160} />
-                <StatCard icon="🚫" label="Cancelled" value={String(advisorAppointments.filter(a => a.cancelled).length)} sub="Cancelled sessions" color="#ef4444" delay={240} />
+                <StatCard icon="🚫" label="Cancelled Calls" value={String(advisorAppointments.filter(a => a.cancelled).length)} sub="Cancelled sessions" color="#ef4444" delay={240} />
               </div>
 
               {/* Advisor Visualizations & Analytics Row */}
@@ -954,7 +953,7 @@ export default function Dashboard({
                       📅 Upcoming Scheduled Consultations ({advisorAppointments.filter(a => !a.completed && !a.cancelled).length})
                     </h3>
                   </div>
-                  
+
                   {advisorAppointments.filter(a => !a.completed && !a.cancelled).length === 0 ? (
                     <div className="text-center py-10 bg-gray-50 border border-dashed rounded-[16px]">
                       <p className="text-[24px]">🕒</p>
@@ -967,7 +966,7 @@ export default function Dashboard({
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
                               <div className="text-[12px] font-bold text-gray-900">
-                                Client: <span className="text-primary">{appt.clientEmail || appt.userId}</span>
+                                Client: <span className="text-primary">{appt.clientName ? `${appt.clientName} (${appt.clientEmail})` : (appt.clientEmail || appt.userId)}</span>
                               </div>
                               {appt.notes && (
                                 <p className="text-[11px] text-gray-500 mt-1 italic">&quot;{appt.notes}&quot;</p>
@@ -1014,7 +1013,7 @@ export default function Dashboard({
                           <div className="flex justify-between items-start gap-2">
                             <div>
                               <div className="text-[12px] font-bold text-gray-700">
-                                Client: <span className="text-gray-900 font-semibold">{appt.clientEmail || appt.userId}</span>
+                                Client: <span className="text-gray-900 font-semibold">{appt.clientName ? `${appt.clientName} (${appt.clientEmail})` : (appt.clientEmail || appt.userId)}</span>
                               </div>
                               <div className="mt-1 flex items-center gap-2">
                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${appt.cancelled ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
@@ -1033,7 +1032,14 @@ export default function Dashboard({
                             </div>
                           </div>
                           {appt.feedback && (
-                            <p className="text-[11px] text-gray-500 italic bg-white p-2 rounded-lg border border-gray-100 mt-1">&quot;{appt.feedback}&quot;</p>
+                            <div className="mt-2.5">
+                              <span className={`text-[9.5px] font-extrabold uppercase tracking-wider block mb-1 ${appt.cancelled ? 'text-rose-800' : 'text-gray-400'}`}>
+                                {appt.cancelled ? "🚫 Cancellation Reason" : "💬 Client Feedback"}
+                              </span>
+                              <p className={`text-[11px] italic p-2 rounded-lg border leading-relaxed ${appt.cancelled ? 'text-rose-700 bg-rose-50/30 border-rose-100/50' : 'text-gray-500 bg-white border-gray-100'}`}>
+                                &quot;{appt.feedback}&quot;
+                              </p>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -1145,7 +1151,7 @@ export default function Dashboard({
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 {/* Quick Insights or summary card */}
                 <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
                   <div>
@@ -1305,11 +1311,10 @@ export default function Dashboard({
                     <button
                       key={type}
                       onClick={() => setActiveReportSubTab(type)}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                        activeReportSubTab === type
-                          ? "bg-white text-primary shadow-xs"
-                          : "text-gray-500 hover:text-gray-800"
-                      }`}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${activeReportSubTab === type
+                        ? "bg-white text-primary shadow-xs"
+                        : "text-gray-500 hover:text-gray-800"
+                        }`}
                     >
                       {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
                     </button>
@@ -1497,12 +1502,12 @@ export default function Dashboard({
                 const currentScore = cibilReport?.score || 742;
                 const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
                 const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
-                const scoreDesc = cibilReport 
-                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.` 
+                const scoreDesc = cibilReport
+                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.`
                   : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
 
-                const avgGoalProgress = localGoals.length > 0 
-                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100) 
+                const avgGoalProgress = localGoals.length > 0
+                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100)
                   : 0;
 
                 const tiles = [
@@ -1565,7 +1570,7 @@ export default function Dashboard({
                   const sessions = a.reviewsCount !== undefined ? a.reviewsCount : (a.sessions || 15);
                   const dbStatus = a.availability || (a.available ? "available" : "unavailable");
                   const isAvailable = a.nextSlot ? getEffectiveAvailability(dbStatus, a.nextSlot) : dbStatus;
-                  
+
                   const colors = ["#3244e6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899"];
                   const color = a.color || colors[i % colors.length];
 
