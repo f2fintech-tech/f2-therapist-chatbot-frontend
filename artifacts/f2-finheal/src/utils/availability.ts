@@ -14,11 +14,8 @@ function to24Hour(hours: number, minutes: number, meridiem: string | null): { h:
   return { h, m };
 }
 
-/**
- * Parses slot string and checks if current time falls within slot range.
- */
-export function isSlotActive(nextSlotStr: string): boolean {
-  if (!nextSlotStr) return false;
+export function getSlotDates(nextSlotStr: string): { startDate: Date; endDate: Date } | null {
+  if (!nextSlotStr) return null;
 
   try {
     const str = nextSlotStr.toLowerCase().trim();
@@ -28,12 +25,7 @@ export function isSlotActive(nextSlotStr: string): boolean {
     let date = now.getDate();
 
     const monthsShort = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-    const monthsLong = [
-      "january", "february", "march", "april", "may", "june",
-      "july", "august", "september", "october", "november", "december"
-    ];
 
-    // Determine the target date
     if (str.includes("tomorrow")) {
       const tomorrow = new Date(now);
       tomorrow.setDate(now.getDate() + 1);
@@ -43,7 +35,6 @@ export function isSlotActive(nextSlotStr: string): boolean {
     } else if (str.includes("today")) {
       // already initialized to today
     } else {
-      // Try to match standard month day patterns
       const dateMatch = str.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/i);
       const dateMatchReverse = str.match(/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i);
 
@@ -64,13 +55,11 @@ export function isSlotActive(nextSlotStr: string): boolean {
       }
     }
 
-    // Clean dates out to search times
     const timeSearchStr = str
       .replace(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}/gi, "")
       .replace(/\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/gi, "")
       .replace(/today|tomorrow/gi, "");
 
-    // Match times: e.g. "09:00 am", "6 pm", "9", "09:30"
     const rx = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi;
     const timeMatches = [];
     let match;
@@ -83,7 +72,7 @@ export function isSlotActive(nextSlotStr: string): boolean {
     }
 
     if (timeMatches.length === 0) {
-      return false;
+      return null;
     }
 
     const startMatch = timeMatches[0];
@@ -92,7 +81,6 @@ export function isSlotActive(nextSlotStr: string): boolean {
     let startMeridiem = startMatch.meridiem;
     let endMeridiem = endMatch ? endMatch.meridiem : null;
 
-    // Resolve missing meridiems (e.g. "9 to 6 pm" -> start am, end pm)
     if (endMatch && !endMeridiem && startMeridiem) {
       endMeridiem = startMeridiem;
     }
@@ -104,7 +92,6 @@ export function isSlotActive(nextSlotStr: string): boolean {
       }
     }
 
-    // Guess defaults if still missing
     if (!startMeridiem) {
       startMeridiem = startMatch.hours >= 8 && startMatch.hours < 12 ? "am" : "pm";
     }
@@ -115,7 +102,7 @@ export function isSlotActive(nextSlotStr: string): boolean {
     const start24 = to24Hour(startMatch.hours, startMatch.minutes, startMeridiem);
     const end24 = endMatch 
       ? to24Hour(endMatch.hours, endMatch.minutes, endMeridiem)
-      : { h: (start24.h + 1) % 24, m: start24.m }; // default 1hr duration
+      : { h: (start24.h + 1) % 24, m: start24.m };
 
     const startDate = new Date(year, month, date, start24.h, start24.m, 0, 0);
     const endDate = new Date(year, month, date, end24.h, end24.m, 0, 0);
@@ -124,12 +111,26 @@ export function isSlotActive(nextSlotStr: string): boolean {
       endDate.setDate(endDate.getDate() + 1);
     }
 
-    const currentMillis = now.getTime();
-    return currentMillis >= startDate.getTime() && currentMillis <= endDate.getTime();
+    return { startDate, endDate };
   } catch (e) {
-    console.error("Error parsing slot status:", e);
-    return false;
+    console.error("Error parsing slot dates:", e);
+    return null;
   }
+}
+
+export function isSlotActive(nextSlotStr: string): boolean {
+  const dates = getSlotDates(nextSlotStr);
+  if (!dates) return false;
+  const now = new Date().getTime();
+  return now >= dates.startDate.getTime() && now <= dates.endDate.getTime();
+}
+
+export function isSlotPassed(nextSlotStr: string): boolean {
+  if (nextSlotStr === "Not available") return true;
+  const dates = getSlotDates(nextSlotStr);
+  if (!dates) return false;
+  const now = new Date().getTime();
+  return now > dates.endDate.getTime();
 }
 
 /**
