@@ -127,15 +127,9 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
       <AnimBar pct={pct} color={color} />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-50 rounded-[10px] p-3">
-          <div className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Monthly EMI</div>
-          <div className="text-[16px] font-bold text-gray-900">₹{emi.toLocaleString()}</div>
-        </div>
-        <div className="bg-gray-50 rounded-[10px] p-3">
-          <div className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Remaining</div>
-          <div className="text-[16px] font-bold" style={{ color }}>₹{remaining.toLocaleString()}</div>
-        </div>
+      <div className="bg-gray-50 rounded-[10px] p-3">
+        <div className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Remaining</div>
+        <div className="text-[16px] font-bold" style={{ color }}>₹{remaining.toLocaleString()}</div>
       </div>
     </div>
   );
@@ -968,10 +962,9 @@ export default function Dashboard({
         {activeTab === "loans" && (
           <div className="flex flex-col gap-6">
             {/* Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard icon="💰" label="Total Outstanding" value={`₹${(totalDebtVal / 100000).toFixed(1)}L`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
-              <StatCard icon="📅" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of ₹${Math.round(incomeVal / 1000)}K income`} color={BRAND} delay={80} />
-              <StatCard icon="📉" label="Interest This Year" value={`₹${(activeLoansCount > 0 ? (dynamicLoans.reduce((sum, l) => sum + (l.emi * 12 * 0.45), 0) / 100000) : 2.1).toFixed(1)}L`} sub="Paid so far in 2026" color="#f59e0b" delay={160} />
+              <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub="Sync'd from credit report" color="#f59e0b" delay={80} />
             </div>
 
             {/* Loan cards */}
@@ -989,21 +982,6 @@ export default function Dashboard({
               )}
             </div>
 
-            {/* EMI bar chart */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
-              <div className="text-[13px] font-semibold text-gray-800 mb-0.5">EMI Timeline</div>
-              <div className="text-[11px] text-gray-400 mb-4">Monthly obligations over the next 6 months</div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="income" name="Income" fill={`${BRAND}25`} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="EMI + Expenses" fill={BRAND} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </div>
         )}
 

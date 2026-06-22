@@ -420,17 +420,64 @@ export default function AdvisorPanel({
     localStorage.setItem(storageKey, JSON.stringify(newAppts));
   };
 
+  // Helper to parse time string like "09:00 AM" to minutes from midnight
+  const parseTimeToMinutes = (timeStr: string): number => {
+    const parts = timeStr.trim().split(/\s+/);
+    if (parts.length === 0) return 0;
+    const timePart = parts[0];
+    const meridiem = parts[1] || "";
+    let [hoursStr, minutesStr] = timePart.split(":");
+    let hours = parseInt(hoursStr, 10) || 0;
+    const minutes = parseInt(minutesStr, 10) || 0;
+
+    if (meridiem.toUpperCase() === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (meridiem.toUpperCase() === "AM" && hours === 12) {
+      hours = 0;
+    }
+    return hours * 60 + minutes;
+  };
+
   // Get only available time slots (hiding past times for Today)
   const getFilteredTimeSlots = () => {
+    let slots = timeSlots;
+
+    // Filter by selected advisor's nextSlot if the date matches
+    if (selectedAdvisor && selectedAdvisor.nextSlot) {
+      const parts = selectedAdvisor.nextSlot.split(",");
+      if (parts.length >= 2) {
+        const advDateStr = parts[0].trim(); // e.g. "Jun 20 (Sat)"
+        const advTimeStr = parts[1].trim(); // e.g. "09:00 AM - 12:00 PM & 02:00 PM - 04:00 PM"
+        
+        if (selectedDateStr.toLowerCase().includes(advDateStr.toLowerCase())) {
+          const ranges = advTimeStr.split(/\s*&\s*/);
+          slots = slots.filter((slot) => {
+            const slotMin = parseTimeToMinutes(slot);
+            return ranges.some(range => {
+              const [startStr, endStr] = range.split(/\s*-\s*/);
+              if (!startStr || !endStr) return false;
+              const startMin = parseTimeToMinutes(startStr);
+              const endMin = parseTimeToMinutes(endStr);
+              return slotMin >= startMin && slotMin <= endMin;
+            });
+          });
+        } else {
+          // If the selected date does not match the advisor's set slot date,
+          // they have no slots available
+          return [];
+        }
+      }
+    }
+
     if (!dateList.length || selectedDateStr !== dateList[0].fullStr) {
-      return timeSlots; // Not today, all slots available
+      return slots;
     }
 
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
 
-    return timeSlots.filter((slot) => {
+    return slots.filter((slot) => {
       // Parse "HH:MM AM/PM"
       const [timePart, meridiem] = slot.split(" ");
       let [hoursStr, minutesStr] = timePart.split(":");
@@ -1637,7 +1684,11 @@ export default function AdvisorPanel({
                     <div className="grid grid-cols-3 gap-[8px]">
                       {activeTimeSlots.length === 0 ? (
                         <div className="col-span-3 text-center py-[16px] bg-amber-50/70 border border-amber-100/60 rounded-[14px]">
-                          <span className="text-[12px] font-bold text-amber-700">⚠️ No slots remaining today. Please select a future date.</span>
+                          <span className="text-[12px] font-bold text-amber-700">
+                            {selectedAdvisor && selectedAdvisor.nextSlot && !selectedDateStr.toLowerCase().includes(selectedAdvisor.nextSlot.split(",")[0].trim().toLowerCase())
+                              ? `⚠️ Advisor is not available on this date. Please select ${selectedAdvisor.nextSlot.split(",")[0].trim()}.`
+                              : "⚠️ No slots remaining today. Please select a future date."}
+                          </span>
                         </div>
                       ) : (
                         activeTimeSlots.map((slot) => (
