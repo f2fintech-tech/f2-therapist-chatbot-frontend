@@ -123,13 +123,10 @@ export function getSlotDates(nextSlotStr: string): SlotRange[] | null {
         endDate.setDate(endDate.getDate() + 1);
       }
 
-      const currentMillis = now.getTime();
-      if (currentMillis >= startDate.getTime() && currentMillis <= endDate.getTime()) {
-        return true;
-      }
+      ranges.push({ startDate, endDate });
     }
-    return false;
->>>>>>> 290a542da40f7d218db1187492387dd350881aae
+
+    return ranges.length > 0 ? ranges : null;
   } catch (e) {
     console.error("Error parsing slot dates:", e);
     return null;
