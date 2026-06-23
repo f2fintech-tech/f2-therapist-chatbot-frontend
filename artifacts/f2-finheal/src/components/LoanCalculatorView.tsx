@@ -938,13 +938,45 @@ export default function LoanCalculatorView({
     const annualInterest = utilized * (rate / 100);
 
     const monthlyRate = rate / 12 / 100;
+    const ioMonths = interestOnlyTenure * 12;
+
+    let simUtilized = utilized;
+    let totalInterestPaidIO = 0;
+    let baselineTotalInterestIO = 0;
+
+    for (let m = 1; m <= ioMonths; m++) {
+      // Interest calculated on start-of-month utilized balance
+      const interestThisMonth = simUtilized * monthlyRate;
+      totalInterestPaidIO += interestThisMonth;
+      baselineTotalInterestIO += utilized * monthlyRate;
+
+      // Monthly deposit reduces the utilized balance
+      simUtilized = Math.max(0, simUtilized - deposit);
+    }
+    const remainingUtilized = simUtilized;
+
     const amortMonths = repaymentTenure * 12;
     const monthlyEMI = amortMonths === 0 ? 0 : (
+      monthlyRate === 0
+        ? remainingUtilized / amortMonths
+        : (remainingUtilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
+          (Math.pow(1 + monthlyRate, amortMonths) - 1)
+    );
+
+    const baselineMonthlyEMI = amortMonths === 0 ? 0 : (
       monthlyRate === 0
         ? utilized / amortMonths
         : (utilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
           (Math.pow(1 + monthlyRate, amortMonths) - 1)
     );
+
+    const totalInterestAmort = Math.max(0, (monthlyEMI * amortMonths) - remainingUtilized);
+    const baselineTotalInterestAmort = Math.max(0, (baselineMonthlyEMI * amortMonths) - utilized);
+
+    const totalInterestSaved = Math.max(0, Math.round(
+      (baselineTotalInterestIO - totalInterestPaidIO) +
+      (baselineTotalInterestAmort - totalInterestAmort)
+    ));
 
     return {
       limit,
@@ -960,6 +992,9 @@ export default function LoanCalculatorView({
       interestOnlyTenure,
       repaymentTenure,
       monthlyEMI,
+      baselineMonthlyEMI,
+      remainingUtilized,
+      totalInterestSaved,
     };
   }, [flexiLimit, flexiUtilized, flexiRate, flexiDeposit, flexiInterestOnlyTenure, flexiRepaymentTenure]);
 
@@ -1266,8 +1301,10 @@ export default function LoanCalculatorView({
     if (calcType === "emi") {
       if (activeTab === "professional" && profStructure === "flexi") {
         detailsStr = `Calculated a Professional Loan (Doctors) with Flexi OD structure on the EMI Calculator. ` +
-          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years. ` +
-          `Interest-only payment (Years 1-${flexiInterestOnlyTenure}): ${formatCurrency(flexiODCalculations.monthlyInterest)}/mo, Subsequent Monthly EMI (Years ${Number(flexiInterestOnlyTenure) + 1}-${Number(flexiInterestOnlyTenure) + Number(flexiRepaymentTenure)}): ${formatCurrency(flexiODCalculations.monthlyEMI)}/mo.`;
+          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}/mo, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years. ` +
+          `Initial interest-only payment (Years 1-${flexiInterestOnlyTenure}): starts at ${formatCurrency(flexiODCalculations.monthlyInterest)}/mo (decreasing with deposits). ` +
+          `Subsequent Monthly EMI (Years ${Number(flexiInterestOnlyTenure) + 1}-${Number(flexiInterestOnlyTenure) + Number(flexiRepaymentTenure)}): reduced to ${formatCurrency(flexiODCalculations.monthlyEMI)}/mo (was ${formatCurrency(flexiODCalculations.baselineMonthlyEMI)}/mo). ` +
+          `Total interest saved by parking deposits: ${formatCurrency(flexiODCalculations.totalInterestSaved)}. Remaining utilized balance after Phase 1: ${formatCurrency(flexiODCalculations.remainingUtilized)}.`;
       } else if (activeTab === "professional" && profStructure === "dropdown") {
         detailsStr = `Calculated a Professional Loan (Doctors) with Drop Down OD structure on the EMI Calculator. ` +
           `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(dropdownUtilized) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Amortization Tenure: ${Number(dropdownTenure) || 0} Years (Plan: 1+${Number(dropdownTenure)} Y), Reduction Schedule: ${dropdownODCalculations.reductionPct.toFixed(1)}% / Year. ` +
@@ -2959,12 +2996,33 @@ export default function LoanCalculatorView({
                       <div className="flex flex-col gap-1 mt-1 text-gray-800 font-semibold text-[12.5px] w-full">
                         <div className="flex justify-between items-center gap-4">
                           <span className="text-gray-500 text-[11px] font-bold">Years 1–{flexiODCalculations.interestOnlyTenure} (Interest-Only):</span>
-                          <span className="text-[15px] font-black text-primary">{formatCurrency(flexiODCalculations.monthlyInterest)}/mo</span>
+                          <span className="text-[15px] font-black text-primary">
+                            {flexiODCalculations.deposit > 0 ? (
+                              <span>Starts at {formatCurrency(flexiODCalculations.monthlyInterest)}/mo</span>
+                            ) : (
+                              <span>{formatCurrency(flexiODCalculations.monthlyInterest)}/mo</span>
+                            )}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center gap-4 border-t border-gray-100 pt-1 mt-0.5">
                           <span className="text-gray-500 text-[11px] font-bold">Years {flexiODCalculations.interestOnlyTenure + 1}–{flexiODCalculations.interestOnlyTenure + flexiODCalculations.repaymentTenure} (Full EMI):</span>
-                          <span className="text-[15px] font-black text-primary">{formatCurrency(flexiODCalculations.monthlyEMI)}/mo</span>
+                          <span className="text-[15px] font-black text-primary flex flex-col items-end">
+                            {flexiODCalculations.deposit > 0 ? (
+                              <>
+                                <span className="text-emerald-600 font-black">{formatCurrency(flexiODCalculations.monthlyEMI)}/mo</span>
+                                <span className="text-[10px] text-gray-400 font-normal line-through">was {formatCurrency(flexiODCalculations.baselineMonthlyEMI)}/mo</span>
+                              </>
+                            ) : (
+                              <span>{formatCurrency(flexiODCalculations.monthlyEMI)}/mo</span>
+                            )}
+                          </span>
                         </div>
+                        {flexiODCalculations.deposit > 0 && (
+                          <div className="flex justify-between items-center gap-4 border-t border-emerald-100 pt-1.5 mt-1 bg-emerald-50/50 px-2.5 py-1 rounded-[8px]">
+                            <span className="text-emerald-700 text-[10.5px] font-bold uppercase tracking-wide">Total Interest Saved:</span>
+                            <span className="text-[14px] font-black text-emerald-700">{formatCurrency(flexiODCalculations.totalInterestSaved)}</span>
+                          </div>
+                        )}
                       </div>
                     ) : activeTab === "professional" && profStructure === "dropdown" ? (
                       dropdownODCalculations.isFullyUtilized ? (
@@ -3079,11 +3137,31 @@ export default function LoanCalculatorView({
                           <div className="flex flex-col bg-white border border-indigo-100/40 rounded-[12px] p-3 text-center shadow-xs">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Interest (Amortization)</span>
                             <span className="text-[15px] font-black text-indigo-700 mt-1">
-                              {formatCurrency(Math.max(0, (flexiODCalculations.monthlyEMI * flexiODCalculations.repaymentTenure * 12) - flexiODCalculations.utilized))}
+                              {formatCurrency(Math.max(0, (flexiODCalculations.monthlyEMI * flexiODCalculations.repaymentTenure * 12) - flexiODCalculations.remainingUtilized))}
                             </span>
                           </div>
                         </div>
                       </div>
+
+                      {/* Section 3: Expected Deposit Benefit */}
+                      {flexiODCalculations.deposit > 0 && (
+                        <div className="flex flex-col gap-2 border-t border-indigo-100/60 pt-3 text-left">
+                          <span className="text-[11.5px] font-bold text-emerald-800 uppercase tracking-wide flex items-center gap-1">💰 Monthly Deposit Benefit</span>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col bg-emerald-50/60 border border-emerald-100 rounded-[12px] p-3 text-center shadow-xs">
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Total Interest Saved</span>
+                              <span className="text-[16px] font-black text-emerald-700 mt-1">{formatCurrency(flexiODCalculations.totalInterestSaved)}</span>
+                            </div>
+                            <div className="flex flex-col bg-emerald-50/60 border border-emerald-100 rounded-[12px] p-3 text-center shadow-xs">
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Remaining Bal (Year {flexiODCalculations.interestOnlyTenure})</span>
+                              <span className="text-[16px] font-black text-emerald-700 mt-1">{formatCurrency(flexiODCalculations.remainingUtilized)}</span>
+                            </div>
+                          </div>
+                          <div className="text-[11.5px] text-emerald-850 bg-emerald-50/40 border border-emerald-100/50 rounded-[10px] p-3 mt-1 font-medium leading-relaxed">
+                            Parking <strong className="font-bold">{formatCurrency(flexiODCalculations.deposit)}/mo</strong> reduces your outstanding utilized balance from <strong className="font-bold">{formatCurrency(flexiODCalculations.utilized)}</strong> to <strong className="font-bold">{formatCurrency(flexiODCalculations.remainingUtilized)}</strong> before Phase 2 begins. This saves you a total of <strong className="font-extrabold text-emerald-750">{formatCurrency(flexiODCalculations.totalInterestSaved)}</strong> in interest, and lowers your subsequent Monthly EMI from <strong className="font-bold">{formatCurrency(flexiODCalculations.baselineMonthlyEMI)}/mo</strong> to <strong className="font-bold text-emerald-750">{formatCurrency(flexiODCalculations.monthlyEMI)}/mo</strong>!
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : activeTab === "professional" && profStructure === "dropdown" ? (

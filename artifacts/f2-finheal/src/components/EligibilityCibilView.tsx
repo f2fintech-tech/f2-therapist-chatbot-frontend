@@ -364,8 +364,21 @@ export default function EligibilityCibilView({
 
   // Load CIBIL score from local storage / API
   useEffect(() => {
-    // We disable loading the stored CIBIL report on mount/refresh so the checker tab always starts fresh
-    setCibilLoading(false);
+    async function loadStoredReport() {
+      try {
+        setCibilLoading(true);
+        const report = await getStoredCibilReport(userId);
+        if (report) {
+          setStoredCibilReport(report);
+          setCibilReport(report);
+        }
+      } catch (err) {
+        console.log("No stored CIBIL report found on mount:", err);
+      } finally {
+        setCibilLoading(false);
+      }
+    }
+    loadStoredReport();
   }, [userId]);
 
   // Load lenders catalog on mount
@@ -705,8 +718,17 @@ export default function EligibilityCibilView({
     const rateVal = Number(eligRate) || 0;
     const tenureVal = Number(eligTenure) || 0;
 
-    // Standard lending standard: Max 50% Fixed Obligation to Income Ratio (FOIR)
-    const maxFoirPct = 50;
+    // Dynamic acceptable FOIR based on gross monthly income
+    let maxFoirPct = 50;
+    if (incomeVal <= 50000) {
+      maxFoirPct = 50;
+    } else if (incomeVal <= 70000) {
+      maxFoirPct = 60;
+    } else if (incomeVal < 100000) {
+      maxFoirPct = 65;
+    } else {
+      maxFoirPct = 70;
+    }
     const affordableMonthlyObligation = incomeVal * (maxFoirPct / 100);
     const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - emiVal);
 
@@ -736,6 +758,7 @@ export default function EligibilityCibilView({
       riskLevel,
       currentFoir: Math.round(currentFoir),
       baseFoir: Math.round(baseFoir),
+      maxFoirPct,
     };
   }, [eligIncome, eligEmi, eligRate, eligTenure]);
 
@@ -1335,7 +1358,7 @@ export default function EligibilityCibilView({
                     </div>
                     <div className="flex justify-between font-semibold">
                       <span>Target FOIR Cap:</span>
-                      <span>50%</span>
+                      <span>{eligCalculations.maxFoirPct}%</span>
                     </div>
                   </div>
                 </div>

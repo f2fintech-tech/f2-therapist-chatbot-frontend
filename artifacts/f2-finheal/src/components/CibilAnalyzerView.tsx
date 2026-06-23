@@ -122,8 +122,18 @@ export default function CibilAnalyzerView({
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
-      // We disable loading the stored CIBIL report on mount/refresh so the checker tab always starts fresh
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        const reportData = await getStoredCibilReport(userId);
+        if (reportData) {
+          setStoredReport(reportData);
+          setReport(reportData);
+        }
+      } catch (err) {
+        console.log("No stored CIBIL report found on mount:", err);
+      } finally {
+        setIsLoading(false);
+      }
  
       try {
         const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -322,8 +332,19 @@ export default function CibilAnalyzerView({
     const existingEmi = Number(eligEmi) || 0;
     const tenure = Number(eligTenure) || 1;
 
-    // FOIR cap (standard 50% limit)
-    const maxAffordableEmi = Math.max(0, (income * 0.5) - existingEmi);
+    // Dynamic acceptable FOIR based on gross monthly income
+    let maxFoirPct = 50;
+    if (income <= 50000) {
+      maxFoirPct = 50;
+    } else if (income <= 70000) {
+      maxFoirPct = 60;
+    } else if (income < 100000) {
+      maxFoirPct = 65;
+    } else {
+      maxFoirPct = 70;
+    }
+
+    const maxAffordableEmi = Math.max(0, (income * (maxFoirPct / 100)) - existingEmi);
     const foirPct = income > 0 ? ((existingEmi + maxAffordableEmi) / income) * 100 : 0;
 
     // Filter and map lenders
@@ -392,7 +413,8 @@ export default function CibilAnalyzerView({
     return {
       maxAffordableEmi: Math.round(maxAffordableEmi),
       foirPct: Math.round(foirPct),
-      offers: sorted
+      offers: sorted,
+      maxFoirPct
     };
   }, [report, lenders, eligIncome, eligEmi, eligLoanType, eligTenure]);
 
@@ -1324,7 +1346,7 @@ export default function CibilAnalyzerView({
                           style={{ width: `${Math.min(eligibilityOutput.foirPct, 100)}%` }} 
                         />
                       </div>
-                      <span className="text-[10px] text-gray-400 mt-[2px] block">Lenders prefer FOIR ratio below 50%</span>
+                      <span className="text-[10px] text-gray-400 mt-[2px] block">Lenders prefer FOIR ratio below {eligibilityOutput.maxFoirPct}%</span>
                     </div>
                   </div>
 
