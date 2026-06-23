@@ -87,8 +87,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
 
 
-  // Active Admin Tabs: stats, experts, education, tests, appointments, lenders, cibil-enquiries
-  const [activeTab, setActiveTab] = useState<"stats" | "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries">("stats");
+  // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries
+  const [activeTab, setActiveTab] = useState<"experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries">("experts");
 
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
@@ -491,7 +491,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   useEffect(() => {
-    if ((isAdmin && (activeTab === "cibil-enquiries" || activeTab === "stats")) || currentExpertId) {
+    if ((isAdmin && (activeTab === "cibil-enquiries")) || currentExpertId) {
       fetchCibilEnquiries();
     }
   }, [isAdmin, activeTab, currentExpertId]);
@@ -1366,7 +1366,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
             {/* TABS MENU */}
             <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb" }}>
               {[
-                { id: "stats", label: "📊 Analytics stats" },
                 { id: "experts", label: "🧑‍💼 Manage Experts" },
                 { id: "education", label: "📚 Manage Education" },
                 { id: "tests", label: "🧭 Manage Tests" },
@@ -1385,195 +1384,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               ))}
             </div>
 
-            {/* TAB: STATS & ANALYTICS */}
-            {activeTab === "stats" && (
-              <div className="space-y-[20px] animate-fade-in">
 
-                {/* Metrics Cards Grid */}
-                <div className="grid gap-[12px] grid-cols-2 md:grid-cols-3">
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Total Platform Users</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-gray-900">
-                        {statsLoading ? "..." : backendStats?.total_users ?? 0}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Total users on platform: Guest + Registered users</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Registered Members</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-primary">
-                        {statsLoading ? "..." : backendStats?.registered_users ?? 0}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Signed-up user accounts</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Conversion Rate</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-emerald-600">
-                        {statsLoading || !backendStats?.total_users
-                          ? "0%"
-                          : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Guests who became members</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Active Conversations</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-indigo-600">
-                        {statsLoading ? "..." : backendStats?.total_conversations ?? 0}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Total AI chats started</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">User CIBIL Enquiries</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-rose-600">
-                        {cibilLoading ? "..." : cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User").length}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">CIBIL Enquiries made by customers</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Scheduled Calls</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-blue-600">
-                        {allAppointments.filter(a => !a.completed && !a.cancelled).length}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Active booked consultations</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Completed Calls</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-emerald-600">
-                        {allAppointments.filter(a => a.completed).length}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Concluded consultations</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Expert Advisors</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-amber-600">
-                        {advisors.length}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Listed expert professionals</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-gray-200 shadow-xs col-span-2 md:col-span-1">
-                    <CardHeader className="p-[14px] pb-[4px]">
-                      <CardDescription className="text-[13px] font-bold uppercase tracking-wider text-gray-400">Loan Products</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-[14px] pt-0">
-                      <div className="text-[32px] font-serif font-bold text-teal-600">
-                        {lenderList.length}
-                      </div>
-                      <div className="text-[12px] text-gray-500 mt-[2px]">Listed lender offerings</div>
-                    </CardContent>
-                  </Card>
-
-                </div>
-
-                {/* Additional Admin Visual Panel */}
-                <div className="grid gap-[18px] md:grid-cols-2">
-
-                  {/* Platform Wellness Summary Card */}
-                  <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs">
-                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                      🏆 Platform Wellness Average
-                    </h3>
-                    <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-
-                    <div className="flex items-end gap-[10px] mb-[12px]">
-                      <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
-                      <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
-                      <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
-                        Good Health
-                      </span>
-                    </div>
-
-                    <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
-                      <div className="h-full bg-primary" style={{ width: "68%" }} />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
-                      <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                        <div className="text-gray-400 font-medium">Tests Done</div>
-                        <div className="text-gray-800 font-bold mt-[2px]">34 active</div>
-                      </div>
-                      <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                        <div className="text-gray-400 font-medium">Top Category</div>
-                        <div className="text-gray-800 font-bold mt-[2px]">Money IQ</div>
-                      </div>
-                      <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                        <div className="text-gray-400 font-medium">Risk Mix</div>
-                        <div className="text-gray-800 font-bold mt-[2px]">Low (12%)</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Catalog Distribution summary */}
-                  <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-[4px]">
-                        📚 Catalog Content Distribution
-                      </h3>
-                      <p className="text-[12px] text-gray-500 mb-[16px]">Summary breakdown of all dynamic libraries managed by Admin.</p>
-
-                      <div className="space-y-[10px]">
-                        <div className="flex justify-between items-center text-[12px]">
-                          <span className="text-gray-600 font-medium flex items-center gap-[6px]">📄 Educational Articles</span>
-                          <strong className="text-gray-900">{educationContent.filter(c => c.type === "article").length} active</strong>
-                        </div>
-                        <div className="flex justify-between items-center text-[12px]">
-                          <span className="text-gray-600 font-medium flex items-center gap-[6px]">🎥 Educational Videos</span>
-                          <strong className="text-gray-900">{educationContent.filter(c => c.type === "video").length} active</strong>
-                        </div>
-                        <div className="flex justify-between items-center text-[12px]">
-                          <span className="text-gray-600 font-medium flex items-center gap-[6px]">🧭 Financial Health Tests</span>
-                          <strong className="text-gray-900">{testCatalog.length} active</strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-[14px] border-t border-gray-100 flex justify-between text-[11px] text-gray-400">
-                      <span>Last dynamic sync: Just now</span>
-                      <span>Seeded: Yes</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* TAB: MANAGE EXPERTS */}
             {activeTab === "experts" && (

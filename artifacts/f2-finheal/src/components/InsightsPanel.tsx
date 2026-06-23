@@ -22,6 +22,7 @@ interface InsightsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   isAdvisor?: boolean;
+  isAdmin?: boolean;
 }
 
 export default function InsightsPanel({
@@ -37,6 +38,7 @@ export default function InsightsPanel({
   isOpen,
   onClose,
   isAdvisor = false,
+  isAdmin = false,
 }: InsightsPanelProps) {
   const { data: wellness } = useGetWellnessScore(userId);
   const [goalsList, setGoalsList] = useState<Goal[]>([]);
@@ -324,116 +326,117 @@ export default function InsightsPanel({
           <DimRow label="Emotion" val={currentDims?.emotion} color="bg-[#f59e0b]" />
         </div>
       </div>
-
       {/* Active Goals / Scheduled Calls */}
-      <div className="mb-[18px]">
-        {isAdvisor ? (
-          <>
-            <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Scheduled Calls</div>
-            <div>
-              {loadingCalls && advisorCalls.length === 0 ? (
-                <div className="py-[12px] text-center">
-                  <div className="text-[11px] text-gray-400">Loading calls...</div>
-                </div>
-              ) : advisorCalls.length === 0 ? (
-                <div className="py-[12px] text-center">
-                  <div className="text-[11px] text-gray-400">No upcoming calls.</div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {advisorCalls.map(call => (
-                    <div key={call.id} className="p-3 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100/50 rounded-xl transition-all duration-200">
-                      <div className="flex justify-between items-start gap-1 mb-1">
-                        <div className="text-[11px] font-bold text-indigo-700 bg-indigo-100/60 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                          📞 Call
-                        </div>
-                        <div className="text-[10px] text-gray-400 text-right font-medium">
-                          {call.date}
-                        </div>
-                      </div>
-                      <div className="text-[12px] font-semibold text-gray-800 break-all mb-1 flex flex-col">
-                        {call.clientName && <span className="text-gray-900 font-extrabold">{call.clientName}</span>}
-                        <span className={call.clientName ? "text-gray-500 text-[11px] font-medium" : ""}>
-                          {call.clientEmail || "No Email"}
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-medium text-indigo-600 mb-2">
-                        🕒 {call.time}
-                      </div>
-                      {call.notes && (
-                        <div className="text-[10px] text-gray-500 italic bg-white/60 p-1.5 rounded-lg border border-gray-100 mb-2.5 max-h-[50px] overflow-y-auto">
-                          "{call.notes}"
-                        </div>
-                      )}
-                      {call.meetUrl ? (
-                        <a
-                          href={call.meetUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1.5 w-full text-center text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 py-1.5 rounded-lg transition-all shadow-sm hover:shadow-md cursor-pointer"
-                        >
-                          🎥 Join Meeting
-                        </a>
-                      ) : (
-                        <div className="text-[10px] text-center text-gray-400 bg-gray-100/80 py-1 rounded-lg">
-                          No link configured
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
-            <div>
-              {goalsList.length === 0 ? (
-                <div className="py-[12px] text-center">
-                  <div className="text-[11px] text-gray-400">No goals yet.</div>
-                </div>
-              ) : (
-                goalsList.map(goal => {
-                  const progress = (goal.currentAmount / goal.targetAmount) * 100;
-                  const isEditing = editingGoalId === goal.id;
-                  return (
-                    <div key={goal.id} className="py-[9px] border-b border-gray-100 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-[9px] mb-[6px]">
-                        <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{goal.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold text-gray-700 truncate">{goal.name}</div>
-                        </div>
-                        <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] cursor-pointer text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
-                      </div>
-                      <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
-                        <div className="h-full rounded-[3px] transition-all" style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div className="text-[12px] text-green-500">{Math.round(progress)}%</div>
-                        {isEditing ? (
-                          <div className="flex gap-[4px]">
-                            <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="w-[85px] text-[12px] border rounded" autoFocus />
-                            <button onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)} className="text-[10px] bg-primary text-white px-2 py-1 rounded">Update</button>
+      {!isAdmin && (
+        <div className="mb-[18px]">
+          {isAdvisor ? (
+            <>
+              <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Scheduled Calls</div>
+              <div>
+                {loadingCalls && advisorCalls.length === 0 ? (
+                  <div className="py-[12px] text-center">
+                    <div className="text-[11px] text-gray-400">Loading calls...</div>
+                  </div>
+                ) : advisorCalls.length === 0 ? (
+                  <div className="py-[12px] text-center">
+                    <div className="text-[11px] text-gray-400">No upcoming calls.</div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {advisorCalls.map(call => (
+                      <div key={call.id} className="p-3 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100/50 rounded-xl transition-all duration-200">
+                        <div className="flex justify-between items-start gap-1 mb-1">
+                          <div className="text-[11px] font-bold text-indigo-700 bg-indigo-100/60 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            📞 Call
                           </div>
+                          <div className="text-[10px] text-gray-400 text-right font-medium">
+                            {call.date}
+                          </div>
+                        </div>
+                        <div className="text-[12px] font-semibold text-gray-800 break-all mb-1 flex flex-col">
+                          {call.clientName && <span className="text-gray-900 font-extrabold">{call.clientName}</span>}
+                          <span className={call.clientName ? "text-gray-500 text-[11px] font-medium" : ""}>
+                            {call.clientEmail || "No Email"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-medium text-indigo-600 mb-2">
+                          🕒 {call.time}
+                        </div>
+                        {call.notes && (
+                          <div className="text-[10px] text-gray-500 italic bg-white/60 p-1.5 rounded-lg border border-gray-100 mb-2.5 max-h-[50px] overflow-y-auto">
+                            "{call.notes}"
+                          </div>
+                        )}
+                        {call.meetUrl ? (
+                          <a
+                            href={call.meetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 w-full text-center text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 py-1.5 rounded-lg transition-all shadow-sm hover:shadow-md cursor-pointer"
+                          >
+                            🎥 Join Meeting
+                          </a>
                         ) : (
-                          <div className="flex items-center gap-1 cursor-pointer" onClick={() => { setEditingGoalId(goal.id); setEditAmount(goal.currentAmount.toString()); }}>
-                            <span className="text-[12px] font-medium" style={{ color: goal.color }}>{goal.currency}{goal.currentAmount}</span>
-                            <span className="text-[12px]">✏️</span>
+                          <div className="text-[10px] text-center text-gray-400 bg-gray-100/80 py-1 rounded-lg">
+                            No link configured
                           </div>
                         )}
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </>
-        )}
-      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px] mb-[10px]">Active Goals</div>
+              <div>
+                {goalsList.length === 0 ? (
+                  <div className="py-[12px] text-center">
+                    <div className="text-[11px] text-gray-400">No goals yet.</div>
+                  </div>
+                ) : (
+                  goalsList.map(goal => {
+                    const progress = (goal.currentAmount / goal.targetAmount) * 100;
+                    const isEditing = editingGoalId === goal.id;
+                    return (
+                      <div key={goal.id} className="py-[9px] border-b border-gray-100 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-[9px] mb-[6px]">
+                          <div className="w-[28px] h-[28px] rounded-[6px] bg-[#eef0fd] flex items-center justify-center text-[13px] shrink-0">{goal.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-semibold text-gray-700 truncate">{goal.name}</div>
+                          </div>
+                          <button onClick={() => handleDeleteGoal(goal.id)} className="text-[13px] cursor-pointer text-gray-400 hover:text-red-500 transition-colors shrink-0">✕</button>
+                        </div>
+                        <div className="h-[3px] bg-gray-200 rounded-[3px] overflow-hidden mb-[6px]">
+                          <div className="h-full rounded-[3px] transition-all" style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: goal.color || 'var(--color-primary)' }} />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="text-[12px] text-green-500">{Math.round(progress)}%</div>
+                          {isEditing ? (
+                            <div className="flex gap-[4px]">
+                              <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} className="w-[85px] text-[12px] border rounded" autoFocus />
+                              <button onClick={() => handleUpdateProgress(goal.id, parseFloat(editAmount) || 0)} className="text-[10px] bg-primary text-white px-2 py-1 rounded">Update</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 cursor-pointer" onClick={() => { setEditingGoalId(goal.id); setEditAmount(goal.currentAmount.toString()); }}>
+                              <span className="text-[12px] font-medium" style={{ color: goal.color }}>{goal.currency}{goal.currentAmount}</span>
+                              <span className="text-[12px]">✏️</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Wellness Reports */}
-      {!isAdvisor && (
+      {!isAdvisor && !isAdmin && (
         <div className="mb-[18px]">
           <div className="flex items-center justify-between mb-[10px]">
             <div className="text-[12px] font-bold text-gray-400 uppercase tracking-[1px]">Wellness Reports</div>

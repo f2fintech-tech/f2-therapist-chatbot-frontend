@@ -59,8 +59,13 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   }, [userId]);
 
   useEffect(() => {
-    setActiveNav(initialActiveNav);
-  }, [initialActiveNav]);
+    const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+    if (isStaff && initialActiveNav === "Financial Goals") {
+      setActiveNav("Talk to FinHeal");
+    } else {
+      setActiveNav(initialActiveNav);
+    }
+  }, [initialActiveNav, userEmail]);
 
   // Typewriter subtitle for "Financial Wellness AI" — continuous loop (type → pause → delete → pause)
   const fullSubtitle = "Financial Wellness AI";
@@ -249,6 +254,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     return false;
   };
 
+  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+
   const handleOpenAdmin = () => {
     setActiveNav(isUserAdvisor(userEmail) ? "Advisor Workspace" : "Admin Portal");
     onOpenAdmin?.();
@@ -388,7 +395,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
 
       {/* Nav */}
       <div className="flex-1 overflow-y-auto px-[8px] pt-[8px] scrollbar-none xl:min-h-0">
-        {activeNav === "Financial Goals" ? (
+        {activeNav === "Financial Goals" && !isStaff ? (
           // Goal Management View
           <div>
             <button
@@ -570,7 +577,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             </button>
             <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
             <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
-            {!isUserAdvisor(userEmail) && (
+            {!isStaff && (
               <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
             )}
 

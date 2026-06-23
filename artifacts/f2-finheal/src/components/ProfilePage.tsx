@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { UserProfile } from "@/utils/user";
-import { fetchUserProfile, saveUserProfile, changeUserPassword, type BackendUserProfile } from "@/lib/backendAuth";
+import { fetchUserProfile, saveUserProfile, changeUserPassword, updateAdvisorPassword, type BackendUserProfile } from "@/lib/backendAuth";
 import {
   User, Mail, Phone, MapPin, Briefcase, Calendar,
   Target, AlertTriangle, TrendingUp, Wallet, Sparkles,
@@ -141,7 +141,7 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const isGuest = !email;
+  const isGuest = !isAdvisor && !email;
 
   const readFileAsDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -736,7 +736,11 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
 
                             setIsChangingPassword(true);
                             try {
-                              await changeUserPassword(userId, currentPassword, newPassword);
+                              if (isAdvisor) {
+                                await updateAdvisorPassword(userId, currentPassword, newPassword);
+                              } else {
+                                await changeUserPassword(userId, currentPassword, newPassword);
+                              }
                               setPasswordSuccess("Password changed successfully!");
                               setCurrentPassword("");
                               setNewPassword("");

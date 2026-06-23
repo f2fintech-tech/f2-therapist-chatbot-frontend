@@ -236,6 +236,17 @@ export default function FinHealChat() {
     };
   }, [userId]);
 
+  // Redirect staff users away from goals page
+  useEffect(() => {
+    if (authSession) {
+      const email = authSession.email;
+      const isStaff = authSession.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+      if (isStaff && mainView === "goals") {
+        setLocation("/chat", { replace: true });
+      }
+    }
+  }, [authSession, mainView, setLocation]);
+
   const handleLogout = () => {
     clearStoredAuthSession();
     setAuthSession(null);
@@ -659,7 +670,11 @@ export default function FinHealChat() {
                   openFreshChat();
                 }
               } else if (page === "Financial Goals") {
-                setMainView("goals");
+                const email = authSession?.email;
+                const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+                if (!isStaff) {
+                  setMainView("goals");
+                }
               } else if (page === "Financial Health Test") {
                 setMainView("tests");
               } else if (page === "Talk to an Advisor") {
@@ -716,6 +731,7 @@ export default function FinHealChat() {
           isOpen={insightsOpen}
           onClose={closeInsights}
           isAdvisor={isUserAdvisor(authSession?.email)}
+          isAdmin={authSession?.email === "admin@finheal.com" || authSession?.email === "admin@f2finheal.com"}
         />
       </div>
     </>
