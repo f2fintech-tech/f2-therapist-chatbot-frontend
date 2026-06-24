@@ -110,6 +110,125 @@ export default function FinHealChat() {
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
   const chat = useBackendChat(userId);
 
+  // Reminders notifications state
+  const [activeNotification, setActiveNotification] = useState<any | null>(null);
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Helper to parse time string like "09:00 AM" to minutes from midnight
+    const parseTimeToMinutes = (timeStr: string): number => {
+      const parts = timeStr.trim().split(/\s+/);
+      if (parts.length === 0) return 0;
+      const timePart = parts[0];
+      const meridiem = parts[1] || "";
+      let [hoursStr, minutesStr] = timePart.split(":");
+      let hours = parseInt(hoursStr, 10) || 0;
+      const minutes = parseInt(minutesStr, 10) || 0;
+
+      if (meridiem.toUpperCase() === "PM" && hours !== 12) {
+        hours += 12;
+      } else if (meridiem.toUpperCase() === "AM" && hours === 12) {
+        hours = 0;
+      }
+      return hours * 60 + minutes;
+    };
+
+    const checkAlerts = () => {
+      try {
+        const now = new Date();
+        const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const todayDateStr = `${monthsShort[now.getMonth()]} ${now.getDate()} (${daysShort[now.getDay()]})`;
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+        const currentMinutesFromMidnight = currentHours * 60 + currentMinutes;
+
+        // 1. Check Scheduled Calls / Appointments first (higher priority)
+        const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+        const rawAppts = localStorage.getItem(apptsKey);
+        if (rawAppts) {
+          const appts = JSON.parse(rawAppts);
+          if (Array.isArray(appts)) {
+            const dueAppt = appts.find((a: any) => {
+              if (a.completed || a.cancelled || a.joined) return false;
+              
+              const uniqueId = a.id || `appt-${a.advisorId}-${a.date}-${a.time}`;
+              if (notifiedIdsRef.current.has(uniqueId)) return false;
+
+              // Check if date matches today
+              if (a.date === todayDateStr) {
+                const apptMinutes = parseTimeToMinutes(a.time);
+                // Trigger if current time is past or equal to scheduled time
+                return currentMinutesFromMidnight >= apptMinutes;
+              }
+              return false;
+            });
+
+            if (dueAppt) {
+              const uniqueId = dueAppt.id || `appt-${dueAppt.advisorId}-${dueAppt.date}-${dueAppt.time}`;
+              setActiveNotification({
+                ...dueAppt,
+                id: uniqueId,
+                isAppointment: true,
+                category: "Consultation",
+                title: `Call with Advisor ${dueAppt.advisorName || "Expert"}`,
+                notes: dueAppt.notes
+              });
+              notifiedIdsRef.current.add(uniqueId);
+              return; // Show appointment notification first and skip reminders
+            }
+          }
+        }
+
+        // 2. Check Reminders (if no due appointments)
+        const remindersKey = `finheal_reminders:${userId}`;
+        const rawReminders = localStorage.getItem(remindersKey);
+        if (rawReminders) {
+          const reminders = JSON.parse(rawReminders);
+          if (Array.isArray(reminders)) {
+            const currentDateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            
+            const dueReminder = reminders.find((r: any) => {
+              if (r.completed) return false;
+              if (notifiedIdsRef.current.has(r.id)) return false;
+
+              // If date matches today
+              if (r.dueDate === currentDateStr) {
+                if (r.dueTime) {
+                  const [h, m] = r.dueTime.split(':').map(Number);
+                  return (currentHours > h) || (currentHours === h && currentMinutes >= m);
+                } else {
+                  return true;
+                }
+              }
+              
+              // Trigger if overdue
+              if (r.dueDate < currentDateStr) {
+                return true;
+              }
+
+              return false;
+            });
+
+            if (dueReminder) {
+              setActiveNotification(dueReminder);
+              notifiedIdsRef.current.add(dueReminder.id);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error checking alerts for notification:", e);
+      }
+    };
+
+    // Check immediately and periodically
+    checkAlerts();
+    const interval = setInterval(checkAlerts, 10000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
   // Show signup modal automatically when hearts run out
   useEffect(() => {
     if (chat.heartsExhausted && authSession?.isGuest) {
@@ -344,7 +463,8 @@ export default function FinHealChat() {
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("view", view);
+    nextUrl.pathname = `/tests/${view}`;
+    nextUrl.search = "";
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
@@ -426,7 +546,8 @@ export default function FinHealChat() {
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("view", "financial-literacy");
+    nextUrl.pathname = "/tests/financial-literacy";
+    nextUrl.search = "";
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
@@ -481,6 +602,120 @@ export default function FinHealChat() {
         onDismiss={handleQuizDismiss}
         onComplete={handleQuizComplete}
       />
+      {activeNotification && mainView === "chat" && (
+        <>
+          <style>{`
+            @keyframes slideUpNotification {
+              from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .animate-slide-up-notification {
+              animation: slideUpNotification 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="fixed bottom-6 right-6 z-[100] max-w-[360px] w-[calc(100%-32px)] bg-white border border-gray-100 dark:bg-slate-900 dark:border-slate-800 rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.15)] p-4 flex gap-3 animate-slide-up-notification">
+            <div className="text-[24px] shrink-0 mt-0.5">
+              {activeNotification.isAppointment ? "📅" :
+               activeNotification.category === "EMI" ? "🏦" :
+               activeNotification.category === "Savings" ? "🐷" :
+               activeNotification.category === "Bill" ? "⚡" :
+               activeNotification.category === "Tax" ? "📄" : "🔔"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[11px] font-bold text-primary dark:text-indigo-400 uppercase tracking-wide">
+                  {activeNotification.isAppointment ? "Consultation Alert" : "Reminder Alert"}
+                </span>
+                <button
+                  onClick={() => setActiveNotification(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer text-[14px] leading-none"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+              <h4 className="text-[13.5px] font-bold text-gray-800 dark:text-slate-100 mt-1">
+                {activeNotification.title}
+              </h4>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
+                {activeNotification.isAppointment 
+                  ? `Your appointment is starting now (${activeNotification.time})`
+                  : activeNotification.dueTime ? `Scheduled for today at ${activeNotification.dueTime}` : "Due today"}
+                {!activeNotification.isAppointment && activeNotification.amount && ` · Amount: ₹${activeNotification.amount.toLocaleString("en-IN")}`}
+              </p>
+              {activeNotification.notes && (
+                <p className="text-[10px] bg-gray-50 dark:bg-slate-950 p-2 rounded-[8px] mt-2 text-gray-500 dark:text-slate-400 italic leading-snug">
+                  {activeNotification.notes}
+                </p>
+              )}
+              <div className="flex gap-2 mt-3 justify-end">
+                {activeNotification.isAppointment ? (
+                  <button
+                    onClick={() => {
+                      if (activeNotification.meetUrl) {
+                        window.open(activeNotification.meetUrl, "_blank");
+                      }
+                      // Mark as joined in localStorage
+                      try {
+                        const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+                        const raw = localStorage.getItem(apptsKey);
+                        if (raw) {
+                          const appts = JSON.parse(raw);
+                          const updated = appts.map((a: any) => {
+                            const matchId = activeNotification.id === (a.id || `appt-${a.advisorId}-${a.date}-${a.time}`);
+                            return matchId ? { ...a, joined: true } : a;
+                          });
+                          localStorage.setItem(apptsKey, JSON.stringify(updated));
+                          window.dispatchEvent(new Event("storage"));
+                          window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+                        }
+                      } catch (e) {
+                        console.error("Failed to mark appointment joined from notification:", e);
+                      }
+                      setActiveNotification(null);
+                    }}
+                    className="px-3 py-1.5 bg-primary text-white text-[11px] font-semibold rounded-[8px] hover:bg-[#1e2db8] transition-colors cursor-pointer shadow-sm flex items-center gap-1"
+                  >
+                    🚀 Join Call
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      // Mark as completed in localStorage
+                      try {
+                        const storageKey = `finheal_reminders:${userId}`;
+                        const raw = localStorage.getItem(storageKey);
+                        if (raw) {
+                          const reminders = JSON.parse(raw);
+                          const updated = reminders.map((r: any) =>
+                            r.id === activeNotification.id ? { ...r, completed: true } : r
+                          );
+                          localStorage.setItem(storageKey, JSON.stringify(updated));
+                          
+                          // Fire a storage event to keep views updated
+                          window.dispatchEvent(new Event("storage"));
+                        }
+                      } catch (e) {
+                        console.error("Failed to mark reminder completed from notification:", e);
+                      }
+                      setActiveNotification(null);
+                    }}
+                    className="px-3 py-1.5 bg-primary text-white text-[11px] font-semibold rounded-[8px] hover:bg-[#1e2db8] transition-colors cursor-pointer shadow-sm"
+                  >
+                    ✓ Mark Completed
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       {showAuthPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.2)] animate-scale-in">
