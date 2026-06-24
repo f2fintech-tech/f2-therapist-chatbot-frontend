@@ -22,6 +22,9 @@ export interface Advisor {
   discountExpiresAt?: string;
   testComment?: string;
   testRating?: number;
+  department?: string;
+  isAdvisor?: boolean;
+  permissions?: string[];
 }
 
 const DiscountTimer = ({ expiresAt }: { expiresAt: string }) => {
@@ -241,7 +244,7 @@ export default function AdvisorPanel({
 
     advisors.forEach(adv => {
       const exists = baseCategories.some(c => c.id === adv.category);
-      if (!exists && adv.category) {
+      if (!exists && adv.category && adv.category !== "manual") {
         const label = adv.category.charAt(0).toUpperCase() + adv.category.slice(1);
         baseCategories.push({
           id: adv.category,
@@ -793,11 +796,17 @@ export default function AdvisorPanel({
                   <div key={apptKeyId} className="bg-[linear-gradient(135deg,#ffffff_0%,#f9faff_100%)] border border-primary/20 rounded-[18px] p-[16px] shadow-sm flex flex-col justify-between hover:border-primary/40 transition">
                     <div>
                       <div className="flex items-center gap-[10px] mb-[10px]">
-                        <img 
-                          src={advisor?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60"} 
-                          alt={appt.advisorName}
-                          className="w-[40px] h-[40px] rounded-full object-cover border border-primary/10"
-                        />
+                        {advisor?.avatarUrl ? (
+                          <img 
+                            src={advisor.avatarUrl} 
+                            alt={appt.advisorName}
+                            className="w-[40px] h-[40px] rounded-full object-cover border border-primary/10"
+                          />
+                        ) : (
+                          <div className="w-[40px] h-[40px] rounded-full bg-primary/10 border border-primary/10 text-primary flex items-center justify-center font-bold text-[13px] uppercase">
+                            {appt.advisorName ? appt.advisorName.charAt(0) : "U"}
+                          </div>
+                        )}
                         <div>
                           <div className="text-[13px] font-bold text-gray-900">{appt.advisorName}</div>
                         </div>
@@ -970,11 +979,17 @@ export default function AdvisorPanel({
                   <div key={idx} className="bg-gray-50/50 border border-gray-200 rounded-[18px] p-[16px] flex flex-col justify-between hover:bg-gray-50 transition">
                     <div>
                       <div className="flex items-center gap-[10px] mb-[10px]">
-                        <img 
-                          src={advisor?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60"} 
-                          alt={appt.advisorName}
-                          className="w-[40px] h-[40px] rounded-full object-cover grayscale opacity-75 border"
-                        />
+                        {advisor?.avatarUrl ? (
+                          <img 
+                            src={advisor.avatarUrl} 
+                            alt={appt.advisorName}
+                            className="w-[40px] h-[40px] rounded-full object-cover grayscale opacity-75 border"
+                          />
+                        ) : (
+                          <div className="w-[40px] h-[40px] rounded-full bg-gray-100 border text-gray-500 flex items-center justify-center font-bold text-[13px] uppercase">
+                            {appt.advisorName ? appt.advisorName.charAt(0) : "U"}
+                          </div>
+                        )}
                         <div>
                           <div className="text-[13px] font-bold text-gray-700">{appt.advisorName}</div>
                         </div>
@@ -1125,11 +1140,17 @@ export default function AdvisorPanel({
 
                   <CardHeader className="p-[18px] pb-[12px] space-y-0 flex flex-row items-center gap-[14px]">
                     {/* Portrait Avatar */}
-                    <img 
-                      src={advisor.avatarUrl} 
-                      alt={advisor.name}
-                      className="w-[64px] h-[64px] rounded-2xl object-cover shadow-sm border border-gray-100"
-                    />
+                    {advisor.avatarUrl ? (
+                      <img 
+                        src={advisor.avatarUrl} 
+                        alt={advisor.name}
+                        className="w-[64px] h-[64px] rounded-2xl object-cover shadow-sm border border-gray-100"
+                      />
+                    ) : (
+                      <div className="w-[64px] h-[64px] rounded-2xl bg-primary/10 border border-gray-100 text-primary flex items-center justify-center font-bold text-[22px] uppercase">
+                        {advisor.name ? advisor.name.charAt(0) : "U"}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0 pr-[85px]">
                       <CardTitle className="text-[15px] font-bold text-gray-900 leading-tight">{advisor.name}</CardTitle>
                       <div className="flex items-center gap-[4px] mt-[4px] text-[11px] font-semibold text-amber-500">
@@ -1449,11 +1470,17 @@ export default function AdvisorPanel({
                   {/* Order summary banner */}
                   <div className="bg-[#f6f7fe] border border-[#eef0fd] rounded-[16px] p-[14px]">
                     <div className="flex items-center gap-[12px]">
-                      <img 
-                        src={selectedAdvisor.avatarUrl} 
-                        alt={selectedAdvisor.name}
-                        className="w-[44px] h-[44px] rounded-xl object-cover border-2 border-white shadow-sm"
-                      />
+                      {selectedAdvisor.avatarUrl ? (
+                        <img 
+                          src={selectedAdvisor.avatarUrl} 
+                          alt={selectedAdvisor.name}
+                          className="w-[44px] h-[44px] rounded-xl object-cover border-2 border-white shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-[44px] h-[44px] rounded-xl bg-primary/10 border-2 border-white shadow-sm text-primary flex items-center justify-center font-bold text-[16px] uppercase">
+                          {selectedAdvisor.name ? selectedAdvisor.name.charAt(0) : "U"}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <strong className="text-[13px] text-gray-900 block leading-tight">{selectedAdvisor.name}</strong>
                       </div>
@@ -1632,11 +1659,17 @@ export default function AdvisorPanel({
               <>
                 <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
                   <div className="flex items-center gap-[10px]">
-                    <img 
-                      src={selectedAdvisor.avatarUrl} 
-                      alt={selectedAdvisor.name}
-                      className="w-[36px] h-[36px] rounded-full object-cover border"
-                    />
+                    {selectedAdvisor.avatarUrl ? (
+                      <img 
+                        src={selectedAdvisor.avatarUrl} 
+                        alt={selectedAdvisor.name}
+                        className="w-[36px] h-[36px] rounded-full object-cover border"
+                      />
+                    ) : (
+                      <div className="w-[36px] h-[36px] rounded-full bg-primary/10 border text-primary flex items-center justify-center font-bold text-[14px] uppercase">
+                        {selectedAdvisor.name ? selectedAdvisor.name.charAt(0) : "U"}
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-[14px] font-bold text-gray-900">Book 1:1 Consultation</h3>
                       <p className="text-[10.5px] font-semibold text-gray-400 leading-none">{selectedAdvisor.name}</p>
