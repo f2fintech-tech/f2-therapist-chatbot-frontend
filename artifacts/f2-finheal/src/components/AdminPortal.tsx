@@ -751,8 +751,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       loadAdvisors();
       intervalIdAdvisors = setInterval(loadAdvisors, 15000); // Less aggressive polling (every 15s instead of 8s)
     }
-<<<<<<< HEAD
-
     if (shouldLoadEmployees) {
       loadEmployees(true); // Initial load with spinner
       intervalIdEmployees = setInterval(() => loadEmployees(false), 15000); // Silent background updates
@@ -777,9 +775,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       window.removeEventListener("finheal:advisors_update", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };
-=======
-    return;
->>>>>>> 7cec0b099231eefc85593c80d6def979efabab47
   }, [isAdmin, activeTab]);
 
   // Lazy load appointments based on tab or advisor workspace
@@ -796,15 +791,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       intervalId = setInterval(loadGlobalAppointments, 30000); // 30s interval for appointments (low impact)
       window.addEventListener("storage", handleAppointmentsUpdate);
     }
-<<<<<<< HEAD
-
     return () => {
       if (intervalId) clearInterval(intervalId);
       window.removeEventListener("storage", handleAppointmentsUpdate);
     };
-=======
-    return;
->>>>>>> 7cec0b099231eefc85593c80d6def979efabab47
   }, [isAdmin, activeTab, currentExpertId]);
 
   // Sync specific Advisor next slot and self-edit form
