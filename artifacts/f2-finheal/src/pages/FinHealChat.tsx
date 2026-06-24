@@ -463,7 +463,8 @@ export default function FinHealChat() {
   const openTestInNewTab = (view: string) => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("view", view);
+    nextUrl.pathname = `/tests/${view}`;
+    nextUrl.search = "";
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
@@ -545,7 +546,8 @@ export default function FinHealChat() {
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("view", "financial-literacy");
+    nextUrl.pathname = "/tests/financial-literacy";
+    nextUrl.search = "";
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
   };
 
