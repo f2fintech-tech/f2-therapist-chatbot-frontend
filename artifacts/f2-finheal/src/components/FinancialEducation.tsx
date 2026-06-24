@@ -35,12 +35,27 @@ export const CONTENT: ContentItem[] = [
   { id: "v4", type: "video", title: "F2 Fintech - Business Finance", source: "F2 Fintech", duration: "5 min", level: "Intermediate", category: "Business", emoji: "🏢", bgColor: "#3b0764", youtubeId: "cRRmxll1tGE", views: "", date: "Recent", description: "Business finance strategies and funding options explained by F2 Fintech professionals." },
 ];
 
-const SHORTS = [
-  { id: "Rlyw_vt7748", title: "Quick Finance Tip #1" },
-  { id: "2XnoYTeA1bA", title: "Quick Finance Tip #2" },
-  { id: "o8TrS5Hu3tE", title: "Quick Finance Tip #3" },
-  { id: "et_R-v_qwVM", title: "Quick Finance Tip #4" },
+interface ShortItem {
+  id: string;
+  title: string;
+  platform: "youtube" | "instagram";
+  reelUrl?: string;
+  thumbnailUrl?: string;
+}
+
+const SHORTS: ShortItem[] = [
+  { id: "Rlyw_vt7748", title: "Quick Finance Tip #1", platform: "youtube" },
+  { id: "2XnoYTeA1bA", title: "Quick Finance Tip #2", platform: "youtube" },
+  { id: "o8TrS5Hu3tE", title: "Quick Finance Tip #3", platform: "youtube" },
+  { id: "et_R-v_qwVM", title: "Quick Finance Tip #4", platform: "youtube" },
+  { 
+    id: "DZ7TcesyLIV", 
+    title: "Understanding Personal Loans & Credit", 
+    platform: "instagram", 
+    reelUrl: "https://www.instagram.com/reel/DZ7TcesyLIV/?igsh=MW5teHhnYXo5bWl6bw%3D%3D"
+  }
 ];
+
 
 const LEVEL_STYLE: Record<string, { bg: string; color: string }> = {
   Beginner: { bg: "#EAF3DE", color: "#27500A" },
@@ -196,6 +211,8 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     const touchStartY = React.useRef<number>(0);
     const wheelTimeout = React.useRef<any>(null);
     const currentIdx = SHORTS.findIndex(s => s.id === playingShort);
+    const currentShort = currentIdx !== -1 ? SHORTS[currentIdx] : null;
+    const isYoutube = !currentShort || currentShort.platform === "youtube";
 
     const goNext = () => setPlayingShort(SHORTS[currentIdx < SHORTS.length - 1 ? currentIdx + 1 : 0].id);
     const goPrev = () => setPlayingShort(SHORTS[currentIdx > 0 ? currentIdx - 1 : SHORTS.length - 1].id);
@@ -219,7 +236,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
           <span style={{ fontSize: "14px" }}>💡</span>
           <div style={{ fontSize: "13px", fontWeight: 700, color: "white" }}>Financial Tips</div>
           <div style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", borderRadius: "20px", padding: "2px 8px" }}>
-            <span style={{ fontSize: "10px", color: "white", fontWeight: 600 }}>4 Shorts</span>
+            <span style={{ fontSize: "10px", color: "white", fontWeight: 600 }}>{SHORTS.length} Videos</span>
           </div>
         </div>
         <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "0 0 12px 12px", padding: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
@@ -238,24 +255,40 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                 <button onClick={() => setPlayingShort(null)}
                   style={{ position: "absolute", top: "6px", right: "6px", width: "22px", height: "22px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", border: "none", color: "white", cursor: "pointer", fontSize: "10px", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
                 <div style={{ position: "relative", paddingTop: "177%", background: "#000", overflow: "hidden" }}>
-                  <iframe key={playingShort}
-                    src={"https://www.youtube.com/embed/" + playingShort + "?autoplay=1&loop=1&playlist=" + playingShort + "&modestbranding=1&rel=0&controls=0&showinfo=0"}
-                    title="Financial Short"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    style={{ position: "absolute", top: "-8%", left: 0, width: "100%", height: "116%", border: "none" }} />
+                  {isYoutube ? (
+                    <iframe key={playingShort}
+                      src={"https://www.youtube.com/embed/" + playingShort + "?autoplay=1&loop=1&playlist=" + playingShort + "&modestbranding=1&rel=0&controls=0&showinfo=0"}
+                      title="Financial Short"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{ position: "absolute", top: "-8%", left: 0, width: "100%", height: "116%", border: "none" }} />
+                  ) : (
+                    <iframe key={playingShort}
+                      src={"https://www.instagram.com/reel/" + playingShort + "/embed/"}
+                      title="Financial Instagram Reel"
+                      allowFullScreen
+                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                  )}
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "14%", background: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "10%", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
-                  <a href={"https://www.youtube.com/shorts/" + playingShort} target="_blank" rel="noopener noreferrer"
-                    style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,0,0,0.92)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-                    <svg width="14" height="10" viewBox="0 0 24 17" fill="white" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z" />
-                      <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000" />
-                    </svg>
-                    <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>YouTube</span>
-                  </a>
+                  {isYoutube ? (
+                    <a href={"https://www.youtube.com/shorts/" + playingShort} target="_blank" rel="noopener noreferrer"
+                      style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,0,0,0.92)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                      <svg width="14" height="10" viewBox="0 0 24 17" fill="white" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z" />
+                        <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000" />
+                      </svg>
+                      <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>YouTube</span>
+                    </a>
+                  ) : (
+                    <a href={currentShort?.reelUrl || ("https://www.instagram.com/reel/" + playingShort + "/")} target="_blank" rel="noopener noreferrer"
+                      style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4.5px", background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                      <span style={{ fontSize: "11px", color: "white" }}>📸</span>
+                      <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>Instagram</span>
+                    </a>
+                  )}
                 </div>
-                <div style={{ textAlign: "center", padding: "6px 8px", background: "#f9fafb", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {SHORTS[currentIdx].title}</div>
+                <div style={{ textAlign: "center", padding: "6px 8px", background: "#f9fafb", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {currentShort?.title}</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                 <button onClick={goNext}
@@ -269,16 +302,40 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
               <div key={s.id} onClick={() => setPlayingShort(playingShort === s.id ? null : s.id)}
                 style={{ borderRadius: "8px", overflow: "hidden", border: playingShort === s.id ? "2px solid #3344e6" : "1px solid #e5e7eb", cursor: "pointer", background: "white", transition: "all 0.2s" }}>
                 <div style={{ position: "relative" }}>
-                  <img src={"https://img.youtube.com/vi/" + s.id + "/mqdefault.jpg"} alt={s.title}
-                    style={{ width: "100%", height: "72px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
+                  {s.platform === "instagram" ? (
+                    s.thumbnailUrl ? (
+                      <img src={s.thumbnailUrl} alt={s.title}
+                        style={{ width: "100%", height: "72px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
+                    ) : (
+                      <div style={{
+                        width: "100%",
+                        height: "72px",
+                        background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontSize: "9px",
+                        fontWeight: "bold",
+                        position: "relative"
+                      }}>
+                        <span style={{ fontSize: "16px", marginBottom: "2px" }}>📸</span>
+                        <span style={{ letterSpacing: "0.5px" }}>INSTAGRAM REEL</span>
+                      </div>
+                    )
+                  ) : (
+                    <img src={"https://img.youtube.com/vi/" + s.id + "/mqdefault.jpg"} alt={s.title}
+                      style={{ width: "100%", height: "72px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
+                  )}
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: "26px", height: "26px", background: playingShort === s.id ? "rgba(51,68,230,0.9)" : "rgba(255,0,0,0.85)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "26px", height: "26px", background: playingShort === s.id ? "rgba(51,68,230,0.9)" : (s.platform === "instagram" ? "rgba(188,24,136,0.95)" : "rgba(255,0,0,0.85)"), borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {playingShort === s.id
                         ? <div style={{ width: "7px", height: "7px", background: "white", borderRadius: "1px" }} />
                         : <div style={{ width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "9px solid white", marginLeft: "2px" }} />}
                     </div>
                   </div>
-                  <span style={{ position: "absolute", top: "4px", right: "4px", background: playingShort === s.id ? "#3344e6" : "rgba(0,0,0,0.65)", color: "white", fontSize: "7px", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>{playingShort === s.id ? "▶ NOW" : "SHORT"}</span>
+                  <span style={{ position: "absolute", top: "4px", right: "4px", background: playingShort === s.id ? "#3344e6" : (s.platform === "instagram" ? "#c13584" : "rgba(0,0,0,0.65)"), color: "white", fontSize: "7px", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>{playingShort === s.id ? "▶ NOW" : (s.platform === "instagram" ? "REEL" : "SHORT")}</span>
                 </div>
                 <div style={{ padding: "5px 7px" }}>
                   <div style={{ fontSize: "10px", fontWeight: 700, color: playingShort === s.id ? "#3344e6" : "#1e1b4b", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
