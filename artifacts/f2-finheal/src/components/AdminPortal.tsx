@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode } from "@/lib/backendAuth";
@@ -88,7 +89,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
 
   // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries
-  const [activeTab, setActiveTab] = useState<"experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries">("experts");
+  // Dynamic URL Routing for admin tabs (replacing local useState to support URLs like /admin/tests)
+  const [match, params] = useRoute("/admin/:tab");
+  const [_, setLocation] = useLocation();
+  const activeTab = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries"].includes(params.tab))
+    ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries")
+    : "experts";
+
+  const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries") => {
+    setLocation(`/admin/${newTab}`);
+  };
 
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
@@ -276,16 +286,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const currentExpertId = getExpertIdFromEmail(userEmail);
 
-  // Load backend stats
-  useEffect(() => {
-    if (isAdmin) {
-      setStatsLoading(true);
-      fetchAdminStats()
-        .then(stats => setBackendStats(stats))
-        .catch(err => console.error("Error loading stats", err))
-        .finally(() => setStatsLoading(false));
-    }
-  }, [isAdmin]);
+  // Load backend stats (disabled since stats cards are not rendered in the Admin UI)
+  // useEffect(() => {
+  //   if (isAdmin) {
+  //     setStatsLoading(true);
+  //     fetchAdminStats()
+  //       .then(stats => setBackendStats(stats))
+  //       .catch(err => console.error("Error loading stats", err))
+  //       .finally(() => setStatsLoading(false));
+  //   }
+  // }, [isAdmin]);
 
   // Fetch Lenders Catalog from backend JSON database
   const fetchLenders = async () => {
@@ -305,10 +315,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && activeTab === "lenders") {
       fetchLenders();
     }
-  }, [isAdmin]);
+  }, [isAdmin, activeTab]);
 
   // CIBIL Enquiries State and Fetcher
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
@@ -655,13 +665,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
-  // Load local storage states
+  // Load local storage states (static content with zero network cost)
   useEffect(() => {
-    loadAdvisors();
-
-    const intervalId = setInterval(loadAdvisors, 8000);
-
-    // 2. Educational content
+    // 1. Educational content
     const storedContent = localStorage.getItem("finheal_education_content");
     if (storedContent) {
       setEducationContent(JSON.parse(storedContent));
@@ -670,7 +676,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       setEducationContent(CONTENT);
     }
 
-    // 3. Tests List
+    // 2. Tests List
     const storedTests = localStorage.getItem("finheal_health_tests_list");
     if (storedTests) {
       setTestCatalog(JSON.parse(storedTests));
@@ -678,25 +684,54 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
       setTestCatalog(testCards);
     }
-
-    // 4. Appointments across all users
-    loadGlobalAppointments();
-
-    const handleUpdate = () => {
-      const stored = localStorage.getItem("finheal_advisors_list");
-      if (stored) {
-        try { setAdvisors(JSON.parse(stored)); } catch { }
-      }
-      loadGlobalAppointments();
-    };
-    window.addEventListener("finheal:advisors_update", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener("finheal:advisors_update", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
-    };
   }, []);
+
+  // Lazy load and poll advisors only when needed
+  useEffect(() => {
+    const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
+    
+    if (shouldLoadAdvisors) {
+      loadAdvisors();
+      const intervalId = setInterval(loadAdvisors, 15000); // Less aggressive polling (every 15s instead of 8s)
+
+      const handleAdvisorsUpdate = () => {
+        const stored = localStorage.getItem("finheal_advisors_list");
+        if (stored) {
+          try { setAdvisors(JSON.parse(stored)); } catch { }
+        }
+      };
+
+      window.addEventListener("finheal:advisors_update", handleAdvisorsUpdate);
+      window.addEventListener("storage", handleAdvisorsUpdate);
+      
+      return () => {
+        clearInterval(intervalId);
+        window.removeEventListener("finheal:advisors_update", handleAdvisorsUpdate);
+        window.removeEventListener("storage", handleAdvisorsUpdate);
+      };
+    }
+  }, [isAdmin, activeTab]);
+
+  // Lazy load appointments based on tab or advisor workspace
+  useEffect(() => {
+    const shouldLoadAppointments = (!isAdmin && currentExpertId) || (isAdmin && activeTab === "appointments");
+    
+    if (shouldLoadAppointments) {
+      loadGlobalAppointments();
+      const intervalId = setInterval(loadGlobalAppointments, 30000); // 30s interval for appointments (low impact)
+
+      const handleAppointmentsUpdate = () => {
+        loadGlobalAppointments();
+      };
+
+      window.addEventListener("storage", handleAppointmentsUpdate);
+      
+      return () => {
+        clearInterval(intervalId);
+        window.removeEventListener("storage", handleAppointmentsUpdate);
+      };
+    }
+  }, [isAdmin, activeTab, currentExpertId]);
 
   // Sync specific Advisor next slot and self-edit form
   useEffect(() => {

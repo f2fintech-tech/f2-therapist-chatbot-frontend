@@ -73,6 +73,7 @@ function Router() {
       <Route path="/signup" component={FinHealChat} />
       <Route path="/profile" component={FinHealChat} />
       <Route path="/advisor" component={FinHealChat} />
+      <Route path="/admin/:tab" component={FinHealChat} />
       <Route path="/admin" component={FinHealChat} />
       <Route path="/dashboard" component={FinHealChat} />
       <Route path="/education" component={FinHealChat} />
