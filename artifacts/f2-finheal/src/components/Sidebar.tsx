@@ -58,9 +58,25 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     return () => window.removeEventListener("finheal:goals-updated", handleGoalsUpdated);
   }, [userId]);
 
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+
   useEffect(() => {
-    const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
-    if (isStaff && initialActiveNav === "Financial Goals") {
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        setUserPermissions(parsed?.permissions || []);
+      } else {
+        setUserPermissions([]);
+      }
+    } catch (e) {
+      setUserPermissions([]);
+    }
+  }, [userId, userEmail]);
+
+  useEffect(() => {
+    const staff = (typeof isUserAdvisor === 'function' ? isUserAdvisor(userEmail) : false) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+    if (staff && initialActiveNav === "Financial Goals") {
       setActiveNav("Talk to FinHeal");
     } else {
       setActiveNav(initialActiveNav);
@@ -247,7 +263,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
           a.f2FintechId && (
             email.toLowerCase() === a.f2FintechId.toLowerCase() || 
             email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
-          )
+          ) && a.isAdvisor === true
         );
       } catch (e) {}
     }
@@ -255,6 +271,22 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   };
 
   const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+  const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
+
+  const hasPermission = (perm: string) => {
+    if (isSuperAdmin) return true;
+    if (!isStaff) return true;
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed && !("permissions" in parsed)) {
+          return true;
+        }
+      }
+    } catch (e) {}
+    return userPermissions.includes(perm);
+  };
 
   const handleOpenAdmin = () => {
     setActiveNav(isUserAdvisor(userEmail) ? "Advisor Workspace" : "Admin Portal");
@@ -585,7 +617,9 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => { setActiveNav("Financial Education"); onOpenEducation?.(); }} />
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
-            <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
+            {hasPermission("cibil_fetch") && (
+              <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
+            )}
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
             {!isUserAdvisor(userEmail) && (
@@ -600,8 +634,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
             )}
 
-            {/* If Expert */}
-            {isUserAdvisor(userEmail) && (
+            {/* If Expert or Super Admin */}
+            {(isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()))) && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 

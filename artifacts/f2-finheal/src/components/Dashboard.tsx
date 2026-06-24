@@ -510,6 +510,9 @@ export default function Dashboard({
       headers["Authorization"] = `Bearer ${configuredApiKey}`;
       headers["X-API-Key"] = configuredApiKey;
     }
+    if (userId) {
+      headers["X-Requester-ID"] = userId;
+    }
     fetch(`${apiBase}/cibil/enquiries`, { headers })
       .then(res => res.json())
       .then(data => setCibilEnquiries(data))

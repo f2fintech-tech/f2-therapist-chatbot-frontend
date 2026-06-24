@@ -391,7 +391,7 @@ export default function FinHealChat() {
           a.f2FintechId && (
             email.toLowerCase() === a.f2FintechId.toLowerCase() || 
             email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
-          )
+          ) && a.isAdvisor === true
         );
       } catch (e) {}
     }

@@ -7,6 +7,7 @@ export interface AuthSession {
   hearts?: number | null;
   isGuest?: boolean | null;
   isAdvisor?: boolean | null;
+  permissions?: string[];
   authenticatedAt: string;
 }
 

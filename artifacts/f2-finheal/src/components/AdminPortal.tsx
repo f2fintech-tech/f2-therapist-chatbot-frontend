@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
@@ -92,17 +92,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Dynamic URL Routing for admin tabs (replacing local useState to support URLs like /admin/tests)
   const [match, params] = useRoute("/admin/:tab");
   const [_, setLocation] = useLocation();
-  const activeTab = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries"].includes(params.tab))
-    ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries")
+  const activeTab = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
+    ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees")
     : "experts";
 
-  const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries") => {
+  const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") => {
     setLocation(`/admin/${newTab}`);
   };
 
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
+  const [employees, setEmployees] = useState<Advisor[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
@@ -143,6 +146,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [expertModalOpen, setExpertModalOpen] = useState(false);
   const [editingExpert, setEditingExpert] = useState<Advisor | null>(null);
 
+  // Deletion Password Verification Modal States
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isDeletingExpert, setIsDeletingExpert] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const [educationModalOpen, setEducationModalOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<ContentItem | null>(null);
 
@@ -166,7 +176,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     nextSlot: "Tomorrow, 10:00 AM",
     fee: 899,
     testComment: "",
-    testRating: 5
+    testRating: 5,
+    department: "Founder's Office",
+    isAdvisor: false,
+    permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
   });
 
   // Education form state
@@ -488,6 +501,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         headers["Authorization"] = `Bearer ${configuredApiKey}`;
         headers["X-API-Key"] = configuredApiKey;
       }
+      if (userId) {
+        headers["X-Requester-ID"] = userId;
+      }
       const res = await fetch(`${apiBase}/cibil/enquiries`, { headers });
       if (res.ok) {
         const data = await res.json();
@@ -650,8 +666,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const loadAdvisors = async () => {
     try {
       const list = await fetchAdvisors();
-      setAdvisors(list);
-      localStorage.setItem("finheal_advisors_list", JSON.stringify(list));
+      const sortedList = [...list].sort((a, b) => {
+        const idA = (a.f2FintechId || a.id || "").toLowerCase();
+        const idB = (b.f2FintechId || b.id || "").toLowerCase();
+        return idA.localeCompare(idB);
+      });
+      setAdvisors(sortedList);
+      localStorage.setItem("finheal_advisors_list", JSON.stringify(sortedList));
       dispatchUpdateEvent("finheal:advisors_update");
     } catch (err) {
       console.error("Error loading advisors from backend:", err);
@@ -662,6 +683,38 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         localStorage.setItem("finheal_advisors_list", JSON.stringify([]));
         setAdvisors([]);
       }
+    }
+  };
+
+  const loadEmployees = async (showLoading: boolean = false) => {
+    try {
+      if (showLoading) {
+        setEmployeesLoading(true);
+      }
+      const list = await fetchAdvisors(undefined, true);
+      const sortedList = [...list].sort((a, b) => {
+        const idA = (a.f2FintechId || a.id || "").toLowerCase();
+        const idB = (b.f2FintechId || b.id || "").toLowerCase();
+        return idA.localeCompare(idB);
+      });
+      setEmployees(sortedList);
+    } catch (err) {
+      console.error("Error loading employees from backend:", err);
+    } finally {
+      if (showLoading) {
+        setEmployeesLoading(false);
+      }
+    }
+  };
+
+  const handleToggleAdvisorRole = async (f2FintechId: string, currentIsAdvisor: boolean) => {
+    try {
+      await updateAdvisorRole(f2FintechId, !currentIsAdvisor);
+      await loadAdvisors();
+      await loadEmployees();
+    } catch (err) {
+      console.error("Error toggling role:", err);
+      alert("Failed to update employee role.");
     }
   };
 
@@ -686,51 +739,64 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   }, []);
 
-  // Lazy load and poll advisors only when needed
+  // Lazy load and poll advisors/employees only when needed
   useEffect(() => {
     const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
+    const shouldLoadEmployees = activeTab === "employees";
     
+    let intervalIdAdvisors: any = null;
+    let intervalIdEmployees: any = null;
+
     if (shouldLoadAdvisors) {
       loadAdvisors();
-      const intervalId = setInterval(loadAdvisors, 15000); // Less aggressive polling (every 15s instead of 8s)
-
-      const handleAdvisorsUpdate = () => {
-        const stored = localStorage.getItem("finheal_advisors_list");
-        if (stored) {
-          try { setAdvisors(JSON.parse(stored)); } catch { }
-        }
-      };
-
-      window.addEventListener("finheal:advisors_update", handleAdvisorsUpdate);
-      window.addEventListener("storage", handleAdvisorsUpdate);
-      
-      return () => {
-        clearInterval(intervalId);
-        window.removeEventListener("finheal:advisors_update", handleAdvisorsUpdate);
-        window.removeEventListener("storage", handleAdvisorsUpdate);
-      };
+      intervalIdAdvisors = setInterval(loadAdvisors, 15000); // Less aggressive polling (every 15s instead of 8s)
     }
+
+    if (shouldLoadEmployees) {
+      loadEmployees(true); // Initial load with spinner
+      intervalIdEmployees = setInterval(() => loadEmployees(false), 15000); // Silent background updates
+    }
+
+    const handleUpdate = () => {
+      const stored = localStorage.getItem("finheal_advisors_list");
+      if (stored) {
+        try { setAdvisors(JSON.parse(stored)); } catch { }
+      }
+      if (shouldLoadEmployees) {
+        loadEmployees(false);
+      }
+    };
+
+    window.addEventListener("finheal:advisors_update", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    
+    return () => {
+      if (intervalIdAdvisors) clearInterval(intervalIdAdvisors);
+      if (intervalIdEmployees) clearInterval(intervalIdEmployees);
+      window.removeEventListener("finheal:advisors_update", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, [isAdmin, activeTab]);
 
   // Lazy load appointments based on tab or advisor workspace
   useEffect(() => {
     const shouldLoadAppointments = (!isAdmin && currentExpertId) || (isAdmin && activeTab === "appointments");
+    let intervalId: any = null;
+
+    const handleAppointmentsUpdate = () => {
+      loadGlobalAppointments();
+    };
     
     if (shouldLoadAppointments) {
       loadGlobalAppointments();
-      const intervalId = setInterval(loadGlobalAppointments, 30000); // 30s interval for appointments (low impact)
-
-      const handleAppointmentsUpdate = () => {
-        loadGlobalAppointments();
-      };
-
+      intervalId = setInterval(loadGlobalAppointments, 30000); // 30s interval for appointments (low impact)
       window.addEventListener("storage", handleAppointmentsUpdate);
-      
-      return () => {
-        clearInterval(intervalId);
-        window.removeEventListener("storage", handleAppointmentsUpdate);
-      };
     }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("storage", handleAppointmentsUpdate);
+    };
   }, [isAdmin, activeTab, currentExpertId]);
 
   // Sync specific Advisor next slot and self-edit form
@@ -850,7 +916,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       f2FintechId: "",
       name: "",
       designation: "",
-      avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+      avatarUrl: "",
       availability: "available",
       expertise: "",
       strength: "",
@@ -862,7 +928,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       nextSlot: "Tomorrow, 10:00 AM",
       fee: 899,
       testComment: "",
-      testRating: 5
+      testRating: 5,
+      department: "Founder's Office",
+      isAdvisor: false,
+      permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -876,17 +945,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       designation: adv.designation,
       avatarUrl: adv.avatarUrl,
       availability: adv.availability,
-      expertise: adv.expertise.join(", "),
-      strength: adv.strength,
-      bio: adv.bio,
+      expertise: adv.expertise ? (Array.isArray(adv.expertise) ? adv.expertise.join(", ") : adv.expertise) : "",
+      strength: adv.strength || "",
+      bio: adv.bio || "",
       category: isCustomCategory ? "manual" : adv.category,
-      customCategory: isCustomCategory ? adv.category : "",
+      customCategory: (isCustomCategory && adv.category !== "manual") ? adv.category : "",
       rating: adv.rating,
       reviewsCount: adv.reviewsCount,
-      nextSlot: adv.nextSlot,
+      nextSlot: adv.nextSlot || "",
       fee: adv.fee || 899,
       testComment: "",
-      testRating: 5
+      testRating: 5,
+      department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
+      isAdvisor: adv.isAdvisor ?? false,
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -900,12 +972,18 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       alert("Name and designation are required!");
       return;
     }
-
-    const resolvedCategory = expertForm.category === "manual" ? expertForm.customCategory.trim() : expertForm.category;
-    if (!resolvedCategory) {
-      alert("Category is required!");
+    if (
+      expertForm.isAdvisor && 
+      expertForm.category === "manual" && 
+      (!expertForm.customCategory.trim() || expertForm.customCategory.toLowerCase().trim() === "manual")
+    ) {
+      alert("Please write a valid custom category name (cannot be empty or 'manual').");
       return;
     }
+
+    const resolvedCategory = expertForm.isAdvisor
+      ? (expertForm.category === "manual" ? expertForm.customCategory.trim() : expertForm.category)
+      : "General";
 
     const rawExpertise = expertForm.expertise.split(",").map((e: string) => e.trim()).filter(Boolean);
     const resolvedExpertise = rawExpertise.length > 0
@@ -919,18 +997,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       f2FintechId: f2FintechIdClean,
       name: expertForm.name.trim(),
       designation: expertForm.designation.trim(),
-      avatarUrl: expertForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+      avatarUrl: expertForm.avatarUrl.trim(),
       availability: expertForm.availability,
       expertise: resolvedExpertise,
       strength: expertForm.strength.trim() || "Financial planning",
       bio: expertForm.bio.trim() || "Certified Financial Advisor",
-      category: resolvedCategory,
+      category: resolvedCategory || "General",
       rating: expertForm.rating,
       reviewsCount: expertForm.reviewsCount,
       nextSlot: expertForm.nextSlot.trim() || "Tomorrow, 10:00 AM",
       fee: Number(expertForm.fee) || 899,
       testComment: expertForm.testComment?.trim() || "",
-      testRating: expertForm.testRating || 5
+      testRating: expertForm.testRating || 5,
+      department: (expertForm.department && expertForm.department.trim() !== "General") ? expertForm.department.trim() : "Founder's Office",
+      isAdvisor: expertForm.isAdvisor,
+      permissions: expertForm.permissions
     };
 
     if (savingExpert) return;
@@ -938,6 +1019,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     try {
       await saveAdvisor(item);
       await loadAdvisors();
+      await loadEmployees();
       setExpertModalOpen(false);
     } catch (err) {
       console.error("Error saving advisor to backend:", err);
@@ -947,15 +1029,40 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
-  const handleDeleteExpert = async (id: string) => {
-    if (confirm("Are you sure you want to retire this expert's profile?")) {
-      try {
-        await deleteAdvisor(id);
+  const handleDeleteExpert = (id: string) => {
+    setDeleteTargetId(id);
+    setAdminPassword("");
+    setDeleteError(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteExpert = async () => {
+    if (!adminPassword) {
+      setDeleteError("Password is required.");
+      return;
+    }
+    
+    setIsDeletingExpert(true);
+    setDeleteError(null);
+    try {
+      // Verify Admin Password via signInUser check
+      await signInUser(userEmail, adminPassword);
+      
+      // If verification succeeds, execute deletion
+      if (deleteTargetId) {
+        await deleteAdvisor(deleteTargetId);
         await loadAdvisors();
-      } catch (err) {
-        console.error("Error deleting advisor:", err);
-        alert("Failed to delete expert from database.");
+        await loadEmployees();
       }
+      setDeleteConfirmOpen(false);
+      setDeleteTargetId(null);
+      setAdminPassword("");
+      alert("Employee deleted successfully.");
+    } catch (err) {
+      console.error("Verification or deletion failed:", err);
+      setDeleteError("Invalid Admin password. Access denied.");
+    } finally {
+      setIsDeletingExpert(false);
     }
   };
 
@@ -1205,7 +1312,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       ...activeExpert,
       name: selfEditForm.name.trim(),
       designation: selfEditForm.designation.trim(),
-      avatarUrl: selfEditForm.avatarUrl.trim() || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+      avatarUrl: selfEditForm.avatarUrl.trim(),
       expertise: resolvedExpertise,
       strength: selfEditForm.strength.trim() || "Financial planning",
       bio: selfEditForm.bio.trim() || "Certified Financial Advisor",
@@ -1349,12 +1456,49 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
+  const handleJoinMeeting = async (apptId?: string) => {
+    if (!apptId) return;
+    try {
+      await joinAppointment(apptId);
+      await loadGlobalAppointments();
+    } catch (err) {
+      console.error("Error joining meeting:", err);
+    }
+  };
+
+  const handleRescheduleClick = (appt: any) => {
+    setReschedulingApptId(appt.id || null);
+    setRescheduleDate("");
+    setRescheduleTime("");
+    setCancellingApptId(null);
+  };
+
+  const handleStatusClick = (appt: any) => {
+    setCancellingApptId(appt.id || null);
+    setCancelReason("");
+    setReschedulingApptId(null);
+  };
+
   const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
   const activeExpertAppointments = allAppointments.filter(a => a.advisorId === currentExpertId);
   const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
   // ==================== RENDERING WORKSPACE ====================
+  if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
+    return (
+      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
+        <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
+          <div className="text-[32px] text-center mb-[12px]">🔒</div>
+          <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Access Denied</h3>
+          <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+            You must be an approved active client-facing advisor to access this workspace. Please contact the Super Admin to promote your role.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
 
@@ -1406,7 +1550,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 { id: "tests", label: "🧭 Manage Tests" },
                 { id: "appointments", label: "📅 Scheduled Calls" },
                 { id: "lenders", label: "🏦 Lenders Catalog" },
-                { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" }
+                { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
+                { id: "employees", label: "👥 Employees Directory" }
               ].map(t => (
                 <button
                   key={t.id}
@@ -1450,14 +1595,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       {advisors.map((adv) => (
                         <tr key={adv.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] flex items-center gap-[10px]">
-                            <img src={adv.avatarUrl} alt={adv.name} className="w-[32px] h-[32px] rounded-full object-cover border" />
+                            {adv.avatarUrl ? (
+                              <img src={adv.avatarUrl} alt={adv.name} className="w-[32px] h-[32px] rounded-full object-cover border" />
+                            ) : (
+                              <div className="w-[32px] h-[32px] rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[11px] uppercase">
+                                {adv.name ? adv.name.charAt(0) : "U"}
+                              </div>
+                            )}
                             <div>
                               <strong className="text-gray-900">{adv.name}</strong>
                               <div className="text-[10px] text-amber-500">⭐ {adv.rating} ({adv.reviewsCount} reviews)</div>
                             </div>
                           </td>
                           <td className="p-[12px] text-gray-600 font-medium">{adv.designation}</td>
-                          <td className="p-[12px] uppercase font-bold text-[10.5px] text-gray-400">{adv.category}</td>
+                          <td className="p-[12px] uppercase font-bold text-[10.5px] text-gray-400">{adv.category === "manual" ? "General" : adv.category}</td>
                           <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                           <td className="p-[12px]">
                             {(() => {
@@ -1990,6 +2141,143 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 </div>
               </div>
             )}
+
+            {/* TAB: EMPLOYEES DIRECTORY */}
+            {activeTab === "employees" && (
+              <div className="space-y-[16px] animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">
+                      Employees Directory ({employees.filter(emp => {
+                        const search = employeeSearch.toLowerCase().trim();
+                        if (!search) return true;
+                        return (
+                          (emp.name || "").toLowerCase().includes(search) ||
+                          (emp.designation || "").toLowerCase().includes(search) ||
+                          (emp.department || "").toLowerCase().includes(search) ||
+                          (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
+                        );
+                      }).length})
+                    </h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">
+                      Manage company employee records and toggle active client-facing advisors.
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={employeeSearch}
+                      onChange={e => setEmployeeSearch(e.target.value)}
+                      placeholder="Search employees by name, ID, dept..."
+                      className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
+                    />
+                    <button
+                      onClick={handleOpenAddExpert}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
+                    >
+                      + Add Employee
+                    </button>
+                  </div>
+                </div>
+
+                {employeesLoading ? (
+                  <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
+                ) : employees.length === 0 ? (
+                  <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
+                    No employee profiles created yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
+                    {employees.filter(emp => {
+                      const search = employeeSearch.toLowerCase().trim();
+                      if (!search) return true;
+                      return (
+                        (emp.name || "").toLowerCase().includes(search) ||
+                        (emp.designation || "").toLowerCase().includes(search) ||
+                        (emp.department || "").toLowerCase().includes(search) ||
+                        (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
+                      );
+                    }).map((emp) => {
+                      const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
+                      const isAvailable = getEffectiveAvailability(emp.availability, emp.nextSlot) === "available";
+                      
+                      return (
+                        <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                          <div className={`absolute top-0 left-0 w-full h-[3px] transition-colors duration-300 ${emp.isAdvisor ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                          
+                          <div className="flex items-start gap-[12px] mt-1">
+                            <div className="relative shrink-0">
+                              {emp.avatarUrl ? (
+                                <img
+                                  src={emp.avatarUrl}
+                                  alt={emp.name}
+                                  className="w-[48px] h-[48px] rounded-xl object-cover border"
+                                />
+                              ) : (
+                                <div className="w-[48px] h-[48px] rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[18px] uppercase">
+                                  {emp.name ? emp.name.charAt(0) : "U"}
+                                </div>
+                              )}
+                              <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${isAvailable ? 'bg-emerald-500' : 'bg-gray-400'}`} title={isAvailable ? 'Available' : 'Unavailable'}></span>
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-gray-900 truncate leading-snug">{emp.name}</h4>
+                              <div className="text-[10px] text-gray-400 truncate mt-[1px]">{emp.designation}</div>
+                              <div className="text-[9.5px] font-bold text-primary/80 uppercase mt-[4px] tracking-wider">{emp.department || "General"}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[4px] text-[11px] text-gray-600">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Employee ID</span>
+                              <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Email</span>
+                              <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
+                            </div>
+                            {emp.isAdvisor && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Rating</span>
+                                <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
+                            <button
+                              onClick={() => handleToggleAdvisorRole(emp.f2FintechId || emp.id, emp.isAdvisor || false)}
+                              className={`flex items-center gap-[6px] px-[10px] py-[4px] rounded-[8px] text-[10px] font-bold border transition ${emp.isAdvisor 
+                                ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
+                                : 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10'}`}
+                            >
+                              {emp.isAdvisor ? "Remove Advisor" : "Make Advisor"}
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenEditExpert(emp)}
+                                className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExpert(emp.f2FintechId || emp.id)}
+                                className="text-rose-500 hover:underline text-[11px] font-bold cursor-pointer transition"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           /* ========================================================================= */
@@ -2001,11 +2289,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 {/* Advisor Workspace Welcome Banner */}
                 <div className="border border-primary/20 bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] flex flex-col sm:flex-row gap-[18px] items-center">
                   <div className="relative group shrink-0">
-                    <img
-                      src={activeExpert.avatarUrl}
-                      alt={activeExpert.name}
-                      className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white"
-                    />
+                    {activeExpert.avatarUrl ? (
+                      <img
+                        src={activeExpert.avatarUrl}
+                        alt={activeExpert.name}
+                        className="w-[84px] h-[84px] rounded-2xl object-cover shadow-md border-2 border-white"
+                      />
+                    ) : (
+                      <div className="w-[84px] h-[84px] rounded-2xl bg-primary/10 border-2 border-white shadow-md text-primary flex items-center justify-center font-bold text-[32px] uppercase">
+                        {activeExpert.name ? activeExpert.name.charAt(0) : "U"}
+                      </div>
+                    )}
                     <label
                       htmlFor="avatar-upload-input"
                       className="absolute -bottom-1 -right-1 bg-primary text-white h-[28px] w-[28px] rounded-full flex items-center justify-center cursor-pointer border-2 border-white shadow-md hover:scale-105 transition-all"
@@ -2043,84 +2337,86 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   {/* Left Column: Next Slot Editor & Profile Editor */}
                   <div className="md:col-span-1 space-y-[20px] h-fit">
                     {/* Card 1: Slot Editor */}
-                    <Card className="border-gray-200 shadow-xs">
-                      <CardHeader className="p-[16px] pb-[4px]">
-                        <CardTitle className="text-[14px] font-bold">Update Next Slot</CardTitle>
-                        <CardDescription className="text-[11px] text-gray-400">Set the next available booking slot users will see on your card.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-[16px] space-y-[12px]">
-                        <div className="space-y-[10px]">
-                          <div>
-                            <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Date</label>
-                            <input
-                              type="date"
-                              value={slotDate}
-                              onChange={(e) => setSlotDate(e.target.value)}
-                              className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-[10px]">
+                    {activeExpert?.permissions?.includes("scheduled_calls") && (
+                      <Card className="border-gray-200 shadow-xs">
+                        <CardHeader className="p-[16px] pb-[4px]">
+                          <CardTitle className="text-[14px] font-bold">Update Next Slot</CardTitle>
+                          <CardDescription className="text-[11px] text-gray-400">Set the next available booking slot users will see on your card.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-[16px] space-y-[12px]">
+                          <div className="space-y-[10px]">
                             <div>
-                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">From Time</label>
-                              <select
-                                value={slotFromTime}
-                                onChange={(e) => setSlotFromTime(e.target.value)}
-                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
-                              >
-                                {timeSlots.map((time) => (
-                                  <option key={time} value={time}>{time}</option>
-                                ))}
-                              </select>
+                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Date</label>
+                              <input
+                                type="date"
+                                value={slotDate}
+                                onChange={(e) => setSlotDate(e.target.value)}
+                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
+                              />
                             </div>
-                            <div>
-                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">To Time</label>
-                              <select
-                                value={slotToTime}
-                                onChange={(e) => setSlotToTime(e.target.value)}
-                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
-                              >
-                                {timeSlots.map((time) => (
-                                  <option key={time} value={time}>{time}</option>
-                                ))}
-                              </select>
+                            <div className="grid grid-cols-2 gap-[10px]">
+                              <div>
+                                <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">From Time</label>
+                                <select
+                                  value={slotFromTime}
+                                  onChange={(e) => setSlotFromTime(e.target.value)}
+                                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                                >
+                                  {timeSlots.map((time) => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">To Time</label>
+                                <select
+                                  value={slotToTime}
+                                  onChange={(e) => setSlotToTime(e.target.value)}
+                                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                                >
+                                  {timeSlots.map((time) => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={handleAddTimeRange}
+                              className="w-full border border-primary text-primary hover:bg-primary/5 font-semibold py-[8px] rounded-[10px] text-[11.5px] transition cursor-pointer"
+                            >
+                              + Add Time Range
+                            </button>
                           </div>
+                          {addedSlots.length > 0 && (
+                            <div className="space-y-[6px] bg-gray-50 p-2.5 rounded-[10px] border border-gray-100">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase block">Added Slots</label>
+                              <div className="flex flex-wrap gap-[6px]">
+                                {addedSlots.map((slotRange, idx) => (
+                                  <div key={idx} className="flex items-center gap-[6px] bg-primary/10 text-primary text-[11px] font-bold px-[10px] py-[3px] rounded-full border border-primary/20">
+                                    <span>{slotRange}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveTimeRange(idx)}
+                                      className="text-primary hover:text-rose-500 font-extrabold focus:outline-none cursor-pointer"
+                                      title="Remove this slot"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           <button
-                            type="button"
-                            onClick={handleAddTimeRange}
-                            className="w-full border border-primary text-primary hover:bg-primary/5 font-semibold py-[8px] rounded-[10px] text-[11.5px] transition cursor-pointer"
+                            onClick={handleUpdateExpertNextSlot}
+                            className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
                           >
-                            + Add Time Range
+                            Save Next Slot
                           </button>
-                        </div>
-                        {addedSlots.length > 0 && (
-                          <div className="space-y-[6px] bg-gray-50 p-2.5 rounded-[10px] border border-gray-100">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase block">Added Slots</label>
-                            <div className="flex flex-wrap gap-[6px]">
-                              {addedSlots.map((slotRange, idx) => (
-                                <div key={idx} className="flex items-center gap-[6px] bg-primary/10 text-primary text-[11px] font-bold px-[10px] py-[3px] rounded-full border border-primary/20">
-                                  <span>{slotRange}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveTimeRange(idx)}
-                                    className="text-primary hover:text-rose-500 font-extrabold focus:outline-none cursor-pointer"
-                                    title="Remove this slot"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <button
-                          onClick={handleUpdateExpertNextSlot}
-                          className="w-full bg-primary hover:opacity-90 text-white font-bold py-[9px] rounded-[10px] text-[12px] transition cursor-pointer shadow-md shadow-primary/10"
-                        >
-                          Save Next Slot
-                        </button>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    )}
 
                     {/* Card 2: Self Profile Editor */}
                     <Card className="border-gray-200 shadow-xs">
@@ -2196,23 +2492,397 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </div>
 
                   {/* Right Column: Booked consultations list */}
-                  <div className="md:col-span-2 space-y-[18px]">
-                    {/* Section 1: Upcoming Scheduled Consultations */}
-                    <div className="space-y-[10px]">
-                      <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📅 Upcoming Scheduled Consultations ({expertUpcomingAppointments.length})
-                      </h3>
+                  {activeExpert?.permissions?.includes("scheduled_calls") ? (
+                    <div className="md:col-span-2 space-y-[18px]">
+                      {/* Section 1: Upcoming Scheduled Consultations */}
+                      <div className="space-y-[10px]">
+                        <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                          📅 Upcoming Scheduled Consultations ({expertUpcomingAppointments.length})
+                        </h3>
 
-                      {expertUpcomingAppointments.length === 0 ? (
-                        <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
-                          <div className="text-[24px]">🕒</div>
-                          <div className="text-[11px] text-gray-400 mt-[4px]">No upcoming scheduled sessions.</div>
+                        {expertUpcomingAppointments.length === 0 ? (
+                          <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
+                            <div className="text-[24px]">🕒</div>
+                            <div className="text-[11px] text-gray-400 mt-[4px]">No upcoming scheduled sessions.</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-[10px]">
+                            {expertUpcomingAppointments.map((appt, idx) => (
+                              <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col gap-[10px]">
+                                <div className="flex flex-col justify-between sm:flex-row sm:items-center">
+                                  <div className="space-y-[4px]">
+                                    <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
+                                      {appt.clientName && (
+                                        <>
+                                          Client Name: <span className="text-gray-950 font-extrabold">{appt.clientName}</span>
+                                          <span className="text-gray-300">|</span>
+                                        </>
+                                      )}
+                                      Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
+                                      <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
+                                    </div>
+                                    {appt.meetUrl && (
+                                      <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
+                                        <span>🌐 <strong>Room Link:</strong></span>
+                                        <a
+                                          href={appt.meetUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-primary hover:underline font-bold"
+                                        >
+                                          {appt.meetUrl}
+                                        </a>
+                                      </div>
+                                    )}
+                                    {appt.notes && (
+                                      <div className="text-[11px] text-gray-500 mt-[4px] bg-gray-50 p-[8px] rounded-[8px]">
+                                        📝 <strong>Notes:</strong> {appt.notes}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0">
+                                    <div className="text-[13px] font-bold text-gray-900">{appt.date}</div>
+                                    <div className="text-[12px] font-semibold text-gray-400 mt-[2px]">{appt.time} (IST)</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-[8px] pt-[8px] border-t border-gray-100/60 justify-end">
+                                  {appt.meetUrl && (
+                                    <a
+                                      href={appt.meetUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => handleJoinMeeting(appt.id)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-[6px] px-[12px] rounded-[8px] text-[11px] transition shadow-xs flex items-center gap-[4px] cursor-pointer"
+                                    >
+                                      <span>🎥</span> {appt.joined ? "Re-join Meeting" : "Join Consultation"}
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() => handleRescheduleClick(appt)}
+                                    className="bg-primary hover:bg-opacity-95 text-white font-bold py-[6px] px-[12px] rounded-[8px] text-[11px] transition shadow-xs cursor-pointer"
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    onClick={() => handleStatusClick(appt)}
+                                    className="border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-[6px] px-[12px] rounded-[8px] text-[11px] transition cursor-pointer"
+                                  >
+                                    Update Status
+                                  </button>
+                                </div>
+
+                                {cancellingApptId === appt.id && (
+                                  <div className="mt-[4px] p-[12px] bg-rose-50/50 border border-rose-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                    <label className="text-[10px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
+                                    <textarea
+                                      value={cancelReason}
+                                      onChange={(e) => setCancelReason(e.target.value)}
+                                      placeholder="Please write why you are cancelling the call (required to cancel)..."
+                                      rows={2}
+                                      className="w-full px-[10px] py-[8px] border border-rose-200 rounded-[8px] text-[12px] focus:outline-none focus:border-rose-400 bg-white"
+                                    />
+                                    <div className="flex gap-[8px] justify-end">
+                                      <button
+                                        onClick={() => {
+                                          setCancellingApptId(null);
+                                          setCancelReason("");
+                                        }}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                      >
+                                        Back
+                                      </button>
+                                      <button
+                                        onClick={() => appt.id && handleCancelAppointment(appt.id)}
+                                        disabled={!cancelReason.trim()}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                      >
+                                        Confirm Cancellation
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {reschedulingApptId === appt.id && (
+                                  <div className="mt-[4px] p-[12px] bg-blue-50/50 border border-blue-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                    <label className="text-[10px] font-bold text-blue-800 uppercase block">Reschedule — Select New Date & Time</label>
+                                    <div className="flex gap-[6px] overflow-x-auto pb-[4px] scrollbar-none">
+                                      {generateRescheduleDateList().map((dt, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => { setRescheduleDate(dt.fullStr); setRescheduleTime(""); }}
+                                          className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${rescheduleDate === dt.fullStr
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
+                                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                          <span className={`text-[9px] font-medium leading-none ${rescheduleDate === dt.fullStr ? "text-white/80" : "text-gray-400"}`}>{dt.dayName}</span>
+                                          <span className="text-[14px] font-bold mt-[3px] leading-none">{dt.dayNum}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {rescheduleDate && (
+                                      <div className="grid grid-cols-4 gap-[6px]">
+                                        {timeSlots.map((slot) => (
+                                          <button
+                                            key={slot}
+                                            type="button"
+                                            onClick={() => setRescheduleTime(slot)}
+                                            className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${rescheduleTime === slot
+                                              ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
+                                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                              }`}
+                                          >
+                                            {slot}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div className="flex gap-[8px] justify-end">
+                                      <button
+                                        onClick={() => {
+                                          setReschedulingApptId(null);
+                                          setRescheduleDate("");
+                                          setRescheduleTime("");
+                                        }}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                      >
+                                        Back
+                                      </button>
+                                      <button
+                                        onClick={() => appt.id && handleRescheduleAppointment(appt.id)}
+                                        disabled={!rescheduleDate || !rescheduleTime}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-blue-600 rounded-[8px] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                      >
+                                        Confirm Reschedule
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2: Past Consultations History */}
+                      <div className="space-y-[10px]">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                            📜 Past Consultations History ({expertPastAppointments.length})
+                          </h3>
                         </div>
-                      ) : (
-                        <div className="space-y-[10px]">
-                          {expertUpcomingAppointments.map((appt, idx) => (
-                            <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col gap-[10px]">
-                              <div className="flex flex-col justify-between sm:flex-row sm:items-center">
+
+                        {expertPastAppointments.length === 0 ? (
+                          <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
+                            <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
+                          </div>
+                                                ) : (
+                          <div className="space-y-[8px]">
+                            {expertPastAppointments.map((appt, idx) => (
+                              <div key={idx} className="border border-gray-150 bg-gray-50/40 hover:bg-gray-50/80 transition-colors p-[16px] rounded-[16px] flex flex-col gap-[10px]">
+                                <div className="flex flex-col justify-between sm:flex-row sm:items-center text-left">
+                                  <div className="space-y-[4px]">
+                                    <div className="text-[12px] font-bold text-gray-800 flex items-center gap-[6px] flex-wrap">
+                                      {appt.clientName && (
+                                        <>
+                                          Client: <span className="text-gray-900 font-extrabold">{appt.clientName}</span>
+                                          <span className="text-gray-300">|</span>
+                                        </>
+                                      )}
+                                      Email: <span className="text-primary/90 font-bold">{appt.clientEmail}</span>
+                                      {appt.cancelled ? (
+                                        <span className="text-[8.5px] font-extrabold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">Cancelled</span>
+                                      ) : appt.completed && appt.rating ? (
+                                        <span className="text-[8.5px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
+                                      ) : (
+                                        <span className="text-[8.5px] font-extrabold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed</span>
+                                      )}
+                                    </div>
+                                    {appt.meetUrl && (
+                                      <div className="text-[11px] text-gray-400 mt-[2px]">
+                                        🌐 Room Link: <span className="font-semibold text-gray-500">{appt.meetUrl}</span>
+                                      </div>
+                                    )}
+                                    {appt.completed && appt.rating && (
+                                      <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
+                                        <div className="flex items-center gap-[4px]">
+                                          <span>{"★".repeat(appt.rating || 0)}</span>
+                                          <span className="text-gray-500">({appt.rating}/5 stars)</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {appt.cancelled && appt.feedback && (
+                                      <div className="text-[11px] italic text-rose-700 bg-rose-50/40 border border-rose-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                        <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
+                                        <span>&quot;{appt.feedback}&quot;</span>
+                                      </div>
+                                    )}
+                                    {!appt.cancelled && appt.completed && appt.feedback && (
+                                      <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                        <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
+                                        <span>&quot;{appt.feedback}&quot;</span>
+                                      </div>
+                                    )}
+                                    {!appt.completed && !appt.cancelled && (
+                                      <div className="text-[10.5px] text-amber-600 font-bold mt-[4px] flex items-center gap-[4px]">
+                                        <span>🕒</span> Awaiting client completion and rating
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 text-gray-400">
+                                    <div className="text-[13px] font-bold">{appt.date}</div>
+                                    <div className="text-[12px] font-semibold mt-[2px]">{appt.time} (IST)</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-[8px] pt-[8px] border-t border-gray-100/60 justify-end">
+                                  {!appt.cancelled && (
+                                    <>
+                                      <button
+                                        onClick={() => alert("We have sent the Google Calendar invite link to you and your client.")}
+                                        className="bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition cursor-pointer"
+                                      >
+                                        Accept session
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setCancellingApptId(appt.id || null);
+                                          setCancelReason("");
+                                          setReschedulingApptId(null);
+                                        }}
+                                        className="border border-rose-200 hover:bg-rose-50 text-rose-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
+                                      >
+                                        Cancel Call
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setReschedulingApptId(appt.id || null);
+                                          setRescheduleDate("");
+                                          setRescheduleTime("");
+                                          setCancellingApptId(null);
+                                        }}
+                                        className="border border-blue-200 hover:bg-blue-50 text-blue-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
+                                      >
+                                        Reschedule
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+
+                                {cancellingApptId === appt.id && (
+                                  <div className="mt-[4px] p-[12px] bg-rose-50/50 border border-rose-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                    <label className="text-[10px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
+                                    <textarea
+                                      value={cancelReason}
+                                      onChange={(e) => setCancelReason(e.target.value)}
+                                      placeholder="Please write why you are cancelling the call (required to cancel)..."
+                                      rows={2}
+                                      className="w-full px-[10px] py-[8px] border border-rose-200 rounded-[8px] text-[12px] focus:outline-none focus:border-rose-400 bg-white"
+                                    />
+                                    <div className="flex gap-[8px] justify-end">
+                                      <button
+                                        onClick={() => {
+                                          setCancellingApptId(null);
+                                          setCancelReason("");
+                                        }}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                      >
+                                        Back
+                                      </button>
+                                      <button
+                                        onClick={() => appt.id && handleCancelAppointment(appt.id)}
+                                        disabled={!cancelReason.trim()}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                      >
+                                        Confirm Cancellation
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {reschedulingApptId === appt.id && (
+                                  <div className="mt-[4px] p-[12px] bg-blue-50/50 border border-blue-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
+                                    <label className="text-[10px] font-bold text-blue-800 uppercase block">Reschedule — Select New Date & Time</label>
+                                    <div className="flex gap-[6px] overflow-x-auto pb-[4px] scrollbar-none">
+                                      {generateRescheduleDateList().map((dt, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => { setRescheduleDate(dt.fullStr); setRescheduleTime(""); }}
+                                          className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${rescheduleDate === dt.fullStr
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
+                                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                          <span className={`text-[9px] font-medium leading-none ${rescheduleDate === dt.fullStr ? "text-white/80" : "text-gray-400"}`}>{dt.dayName}</span>
+                                          <span className="text-[14px] font-bold mt-[3px] leading-none">{dt.dayNum}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {rescheduleDate && (
+                                      <div className="grid grid-cols-4 gap-[6px]">
+                                        {timeSlots.map((slot) => (
+                                          <button
+                                            key={slot}
+                                            type="button"
+                                            onClick={() => setRescheduleTime(slot)}
+                                            className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${rescheduleTime === slot
+                                              ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
+                                              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                                              }`}
+                                          >
+                                            {slot}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div className="flex gap-[8px] justify-end">
+                                      <button
+                                        onClick={() => {
+                                          setReschedulingApptId(null);
+                                          setRescheduleDate("");
+                                          setRescheduleTime("");
+                                        }}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
+                                      >
+                                        Back
+                                      </button>
+                                      <button
+                                        onClick={() => appt.id && handleRescheduleAppointment(appt.id)}
+                                        disabled={!rescheduleDate || !rescheduleTime}
+                                        className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-blue-600 rounded-[8px] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                                      >
+                                        Confirm Reschedule
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="md:col-span-2 space-y-[18px]">
+                      {/* Section 2: Past Consultations History */}
+                      <div className="space-y-[10px] pt-[8px]">
+                        <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
+                          📜 Past Consultations History ({expertPastAppointments.length})
+                        </h3>
+
+                        {expertPastAppointments.length === 0 ? (
+                          <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
+                            <div className="text-[24px]">📜</div>
+                            <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-[10px]">
+                            {expertPastAppointments.map((appt, idx) => (
+                              <div key={idx} className="border border-gray-200 bg-gray-50/50 p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center text-left">
                                 <div className="space-y-[4px]">
                                   <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
                                     {appt.clientName && (
@@ -2221,245 +2891,60 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                         <span className="text-gray-300">|</span>
                                       </>
                                     )}
-                                    Client Email: <span className="text-primary font-bold">{appt.clientEmail}</span>
-                                    <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Scheduled</span>
+                                    Client Email: <span className="text-gray-650 font-bold">{appt.clientEmail}</span>
+                                    {appt.cancelled ? (
+                                      <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">🚫 Cancelled</span>
+                                    ) : appt.completed && appt.rating ? (
+                                      <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
+                                    ) : (
+                                      <span className="text-[9px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed</span>
+                                    )}
                                   </div>
                                   {appt.meetUrl && (
-                                    <div className="text-[11.5px] text-gray-600 mt-[4px] flex items-center gap-[6px]">
-                                      <span>🌐 <strong>Room Link:</strong></span>
-                                      <a
-                                        href={appt.meetUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-primary hover:underline font-bold"
-                                      >
-                                        {appt.meetUrl}
-                                      </a>
+                                    <div className="text-[11px] text-gray-400 mt-[2px]">
+                                      🌐 Room Link: <span className="font-semibold text-gray-500">{appt.meetUrl}</span>
                                     </div>
                                   )}
-                                  {appt.notes && (
-                                    <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
-                                      <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
-                                      <span>&quot;{appt.notes}&quot;</span>
+                                  {appt.completed && appt.rating && (
+                                    <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
+                                      <div className="flex items-center gap-[4px]">
+                                        <span>{"★".repeat(appt.rating || 0)}</span>
+                                        <span className="text-gray-500">({appt.rating}/5 stars)</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {appt.cancelled && appt.feedback && (
+                                    <div className="text-[11px] italic text-rose-700 bg-rose-50/40 border border-rose-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                      <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
+                                      <span>&quot;{appt.feedback}&quot;</span>
+                                    </div>
+                                  )}
+                                  {!appt.cancelled && appt.completed && appt.feedback && (
+                                    <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
+                                      <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
+                                      <span>&quot;{appt.feedback}&quot;</span>
+                                    </div>
+                                  )}
+                                  {!appt.completed && !appt.cancelled && (
+                                    <div className="text-[10.5px] text-amber-600 font-bold mt-[4px] flex items-center gap-[4px]">
+                                      <span>🕒</span> Awaiting client completion and rating
                                     </div>
                                   )}
                                 </div>
 
-                                <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-50 sm:border-t-0 sm:mt-0 sm:pt-0">
-                                  <div className="text-[13px] font-bold text-primary">{appt.date}</div>
-                                  <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
-                                  <div className="mt-[8px] flex items-center justify-end gap-[8px]">
-                                    {appt.meetUrl ? (
-                                      <a
-                                        href={appt.meetUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-block bg-primary hover:opacity-90 text-white text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer text-center"
-                                      >
-                                        Join Call Room
-                                      </a>
-                                    ) : (
-                                      <button
-                                        onClick={() => alert("We've sent the Google Calendar invite link to you and your client. Press OK to copy link.")}
-                                        className="bg-[#ecfdf5] hover:bg-[#d1fae5] text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-[6px] border border-emerald-100 transition"
-                                      >
-                                        Accept session
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        setCancellingApptId(appt.id || null);
-                                        setCancelReason("");
-                                        setReschedulingApptId(null);
-                                      }}
-                                      className="border border-rose-200 hover:bg-rose-50 text-rose-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
-                                    >
-                                      Cancel Call
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setReschedulingApptId(appt.id || null);
-                                        setRescheduleDate("");
-                                        setRescheduleTime("");
-                                        setCancellingApptId(null);
-                                      }}
-                                      className="border border-blue-200 hover:bg-blue-50 text-blue-600 text-[11px] font-bold px-[12px] py-[6px] rounded-[8px] transition cursor-pointer"
-                                    >
-                                      Reschedule
-                                    </button>
-                                  </div>
+                                <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 text-gray-400">
+                                  <div className="text-[13px] font-bold">{appt.date}</div>
+                                  <div className="text-[12px] font-semibold mt-[2px]">{appt.time} (IST)</div>
                                 </div>
                               </div>
-
-                              {cancellingApptId === appt.id && (
-                                <div className="mt-[4px] p-[12px] bg-rose-50/50 border border-rose-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
-                                  <label className="text-[10px] font-bold text-rose-800 uppercase block">Reason for Cancellation *</label>
-                                  <textarea
-                                    value={cancelReason}
-                                    onChange={(e) => setCancelReason(e.target.value)}
-                                    placeholder="Please write why you are cancelling the call (required to cancel)..."
-                                    rows={2}
-                                    className="w-full px-[10px] py-[8px] border border-rose-200 rounded-[8px] text-[12px] focus:outline-none focus:border-rose-400 bg-white"
-                                  />
-                                  <div className="flex gap-[8px] justify-end">
-                                    <button
-                                      onClick={() => {
-                                        setCancellingApptId(null);
-                                        setCancelReason("");
-                                      }}
-                                      className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
-                                    >
-                                      Back
-                                    </button>
-                                    <button
-                                      onClick={() => appt.id && handleCancelAppointment(appt.id)}
-                                      disabled={!cancelReason.trim()}
-                                      className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-rose-600 rounded-[8px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
-                                    >
-                                      Confirm Cancellation
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Reschedule inline form */}
-                              {reschedulingApptId === appt.id && (
-                                <div className="mt-[4px] p-[12px] bg-blue-50/50 border border-blue-100 rounded-[12px] space-y-[8px] text-left animate-fade-in">
-                                  <label className="text-[10px] font-bold text-blue-800 uppercase block">Reschedule — Select New Date & Time</label>
-                                  <div className="flex gap-[6px] overflow-x-auto pb-[4px] scrollbar-none">
-                                    {generateRescheduleDateList().map((dt, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => { setRescheduleDate(dt.fullStr); setRescheduleTime(""); }}
-                                        className={`flex flex-col items-center justify-center min-w-[54px] h-[56px] rounded-[10px] border transition cursor-pointer ${rescheduleDate === dt.fullStr
-                                          ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200/40"
-                                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                                          }`}
-                                      >
-                                        <span className={`text-[9px] font-medium leading-none ${rescheduleDate === dt.fullStr ? "text-white/80" : "text-gray-400"}`}>{dt.dayName}</span>
-                                        <span className="text-[14px] font-bold mt-[3px] leading-none">{dt.dayNum}</span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                  {rescheduleDate && (
-                                    <div className="grid grid-cols-4 gap-[6px]">
-                                      {timeSlots.map((slot) => (
-                                        <button
-                                          key={slot}
-                                          type="button"
-                                          onClick={() => setRescheduleTime(slot)}
-                                          className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${rescheduleTime === slot
-                                            ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                            }`}
-                                        >
-                                          {slot}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <div className="flex gap-[8px] justify-end">
-                                    <button
-                                      onClick={() => {
-                                        setReschedulingApptId(null);
-                                        setRescheduleDate("");
-                                        setRescheduleTime("");
-                                      }}
-                                      className="px-[12px] py-[6px] text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-[8px] hover:bg-gray-50 transition cursor-pointer"
-                                    >
-                                      Back
-                                    </button>
-                                    <button
-                                      onClick={() => appt.id && handleRescheduleAppointment(appt.id)}
-                                      disabled={!rescheduleDate || !rescheduleTime}
-                                      className="px-[12px] py-[6px] text-[11px] font-bold text-white bg-blue-600 rounded-[8px] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
-                                    >
-                                      Confirm Reschedule
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Section 2: Past Consultations History */}
-                    <div className="space-y-[10px] pt-[8px]">
-                      <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📜 Past Consultations History ({expertPastAppointments.length})
-                      </h3>
-
-                      {expertPastAppointments.length === 0 ? (
-                        <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
-                          <div className="text-[24px]">📜</div>
-                          <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
-                        </div>
-                      ) : (
-                        <div className="space-y-[10px]">
-                          {expertPastAppointments.map((appt, idx) => (
-                            <div key={idx} className="border border-gray-200 bg-gray-50/50 p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center text-left">
-                              <div className="space-y-[4px]">
-                                <div className="text-[13px] font-bold text-gray-900 flex items-center gap-[6px] flex-wrap">
-                                  {appt.clientName && (
-                                    <>
-                                      Client Name: <span className="text-gray-950 font-extrabold">{appt.clientName}</span>
-                                      <span className="text-gray-300">|</span>
-                                    </>
-                                  )}
-                                  Client Email: <span className="text-gray-650 font-bold">{appt.clientEmail}</span>
-                                  {appt.cancelled ? (
-                                    <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">🚫 Cancelled</span>
-                                  ) : appt.completed && appt.rating ? (
-                                    <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed & Rated</span>
-                                  ) : (
-                                    <span className="text-[9px] font-bold bg-[#ecfdf5] text-emerald-800 border border-emerald-200 px-[6px] py-[1.5px] rounded-full uppercase">✓ Completed</span>
-                                  )}
-                                </div>
-                                {appt.meetUrl && (
-                                  <div className="text-[11px] text-gray-400 mt-[2px]">
-                                    🌐 Room Link: <span className="font-semibold text-gray-500">{appt.meetUrl}</span>
-                                  </div>
-                                )}
-                                {appt.completed && appt.rating && (
-                                  <div className="flex flex-col gap-[3px] text-[11px] font-semibold text-amber-600 bg-amber-50/20 border border-amber-100/30 px-[10px] py-[6px] rounded-[10px] w-fit mt-[4px]">
-                                    <div className="flex items-center gap-[4px]">
-                                      <span>{"★".repeat(appt.rating || 0)}</span>
-                                      <span className="text-gray-500">({appt.rating}/5 stars)</span>
-                                    </div>
-                                  </div>
-                                )}
-                                {appt.cancelled && appt.feedback && (
-                                  <div className="text-[11px] italic text-rose-700 bg-rose-50/40 border border-rose-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
-                                    <span className="text-[9.5px] font-extrabold text-rose-800 uppercase tracking-wider block">🚫 Cancellation Reason</span>
-                                    <span>&quot;{appt.feedback}&quot;</span>
-                                  </div>
-                                )}
-                                {!appt.cancelled && appt.completed && appt.feedback && (
-                                  <div className="text-[11px] italic text-gray-700 bg-emerald-50/40 border border-emerald-100/60 p-[10px] rounded-[12px] max-w-[440px] mt-[6px] flex flex-col gap-[3px] text-left">
-                                    <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase tracking-wider block">💬 Client Feedback Review</span>
-                                    <span>&quot;{appt.feedback}&quot;</span>
-                                  </div>
-                                )}
-                                {!appt.completed && !appt.cancelled && (
-                                  <div className="text-[10.5px] text-amber-600 font-bold mt-[4px] flex items-center gap-[4px]">
-                                    <span>🕒</span> Awaiting client completion and rating
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 text-gray-400">
-                                <div className="text-[13px] font-bold">{appt.date}</div>
-                                <div className="text-[12px] font-semibold mt-[2px]">{appt.time} (IST)</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  )
+                }
+              </div>
 
                 {/* Section 3: Referral Engine */}
                 <div className="border border-[#e0e7ff] bg-gradient-to-r from-[#f8faff] to-[#f3f6ff] rounded-[20px] p-[20px] shadow-sm animate-fade-in mt-[20px]">
@@ -2537,196 +3022,198 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 </div>
 
                 {/* Section: CIBIL Enquiries */}
-                <div className="border border-gray-200 rounded-[20px] p-[20px] bg-white shadow-sm space-y-[16px] text-left animate-fade-in mt-[20px]">
-                  <div className="border-b border-gray-100 pb-3 space-y-3">
-                    {/* Row 1: Title & Pagination */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                          📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
-                        </h3>
-                        <p className="text-[10px] text-gray-400 mt-[2px]">
-                          {filterDate
-                            ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                            : "Showing all credit score fetches across the platform."}
-                        </p>
-                      </div>
-
-                      {/* Compact Pagination Controls */}
-                      {filteredEnquiries.length > 0 && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            disabled={safeCibilPage === 1}
-                            onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
-                            className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
-                            title="Previous Page"
-                          >
-                            ←
-                          </button>
-                          <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
-                            {safeCibilPage} / {totalPages}
-                          </span>
-                          <button
-                            disabled={safeCibilPage === totalPages}
-                            onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
-                            className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
-                            title="Next Page"
-                          >
-                            →
-                          </button>
+                {activeExpert?.permissions?.includes("cibil_view") && (
+                  <div className="border border-gray-200 rounded-[20px] p-[20px] bg-white shadow-sm space-y-[16px] text-left animate-fade-in mt-[20px]">
+                    <div className="border-b border-gray-100 pb-3 space-y-3">
+                      {/* Row 1: Title & Pagination */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
+                            📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                          </h3>
+                          <p className="text-[10px] text-gray-400 mt-[2px]">
+                            {filterDate
+                              ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
+                              : "Showing all credit score fetches across the platform."}
+                          </p>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Row 2: Filters & Export */}
-                    <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                        <input
-                          type="date"
-                          value={filterDate}
-                          onChange={(e) => setFilterDate(e.target.value)}
-                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                        />
-                        {(filterDate || filterRole !== "all") && (
-                          <button
-                            onClick={() => { setFilterDate(""); setFilterRole("all"); }}
-                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                          >
-                            Reset Filters
-                          </button>
-                        )}
+                        {/* Compact Pagination Controls */}
                         {filteredEnquiries.length > 0 && (
-                          <button
-                            onClick={handleExportCSV}
-                            className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                            title="Export leads to Excel/CSV sheet"
-                          >
-                            📥 Export Leads
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              disabled={safeCibilPage === 1}
+                              onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                              title="Previous Page"
+                            >
+                              ←
+                            </button>
+                            <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                              {safeCibilPage} / {totalPages}
+                            </span>
+                            <button
+                              disabled={safeCibilPage === totalPages}
+                              onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                              title="Next Page"
+                            >
+                              →
+                            </button>
+                          </div>
                         )}
                       </div>
+
+                      {/* Row 2: Filters & Export */}
+                      <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                          <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                          {(filterDate || filterRole !== "all") && (
+                            <button
+                              onClick={() => { setFilterDate(""); setFilterRole("all"); }}
+                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
+                          {filteredEnquiries.length > 0 && (
+                            <button
+                              onClick={handleExportCSV}
+                              className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                              title="Export leads to Excel/CSV sheet"
+                            >
+                              📥 Export Leads
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
+                      <table className="w-full text-left text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                            <th className="p-[12px]">User Identity</th>
+                            <th className="p-[12px]">Bureau</th>
+                            <th className="p-[12px]">PAN Card</th>
+                            <th className="p-[12px]">Credit Score</th>
+                            <th className="p-[12px]">Date & Time</th>
+                            <th className="p-[12px] text-right">PDF Report</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cibilLoading ? (
+                            <tr>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
+                            </tr>
+                          ) : filteredEnquiries.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">
+                                {filterDate
+                                  ? "No CIBIL inquiries found for this particular day."
+                                  : "No CIBIL inquiries found on the platform."}
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedEnquiries.map((enq) => {
+                              let scoreColorClass = "text-red-500";
+                              let bandText = "Poor";
+                              if (enq.score >= 750) {
+                                scoreColorClass = "text-emerald-600";
+                                bandText = "Excellent";
+                              } else if (enq.score >= 700) {
+                                scoreColorClass = "text-green-500";
+                                bandText = "Good";
+                              } else if (enq.score >= 630) {
+                                scoreColorClass = "text-amber-500";
+                                bandText = "Fair";
+                              }
+
+                              const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+
+                              return (
+                                <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                  <td className="p-[12px] max-w-[220px] break-words">
+                                    <strong className="text-gray-900 block">{enq.name}</strong>
+                                    {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
+                                    {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
+                                    <div className="mt-[4px]">
+                                      <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
+                                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                                        : role === "Senior Leadership"
+                                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                                          : role === "Manager"
+                                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                                            : "bg-emerald-50 text-emerald-700 border-emerald-250"
+                                        }`}>
+                                        {role === "User" ? "User (Lead)" : role}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="p-[12px]">
+                                    <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${enq.bureau.toLowerCase() === "experian"
+                                      ? "bg-purple-100 text-purple-700 border border-purple-200"
+                                      : "bg-blue-100 text-blue-700 border border-blue-200"
+                                      }`}>
+                                      {enq.bureau}
+                                    </span>
+                                  </td>
+                                  <td className="p-[12px] font-mono font-semibold text-gray-700 uppercase">
+                                    {enq.pan || "-"}
+                                  </td>
+                                  <td className="p-[12px]">
+                                    <span className={`text-[15px] font-extrabold ${scoreColorClass}`}>
+                                      {enq.score}
+                                    </span>
+                                    <span className="text-[10px] text-gray-450 block font-medium">
+                                      {bandText}
+                                    </span>
+                                  </td>
+                                  <td className="p-[12px] text-gray-500">
+                                    {new Date(enq.fetched_at && !enq.fetched_at.endsWith("Z") && !enq.fetched_at.includes("+") ? `${enq.fetched_at}Z` : enq.fetched_at).toLocaleString("en-IN", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      hour12: true,
+                                    })}
+                                  </td>
+                                  <td className="p-[12px] text-right">
+                                    {enq.pdf_url ? (
+                                      <a
+                                        href={enq.pdf_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline font-bold text-[11px] block"
+                                      >
+                                        View Report ↗
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400 block">-</span>
+                                    )}
+                                    <button
+                                      onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                      className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                    >
+                                      Generate CAM 📊
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-
-                  <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-[12px] border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
-                          <th className="p-[12px]">User Identity</th>
-                          <th className="p-[12px]">Bureau</th>
-                          <th className="p-[12px]">PAN Card</th>
-                          <th className="p-[12px]">Credit Score</th>
-                          <th className="p-[12px]">Date & Time</th>
-                          <th className="p-[12px] text-right">PDF Report</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cibilLoading ? (
-                          <tr>
-                            <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
-                          </tr>
-                        ) : filteredEnquiries.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="text-center p-6 text-gray-400">
-                              {filterDate
-                                ? "No CIBIL inquiries found for this particular day."
-                                : "No CIBIL inquiries found on the platform."}
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedEnquiries.map((enq) => {
-                            let scoreColorClass = "text-red-500";
-                            let bandText = "Poor";
-                            if (enq.score >= 750) {
-                              scoreColorClass = "text-emerald-600";
-                              bandText = "Excellent";
-                            } else if (enq.score >= 700) {
-                              scoreColorClass = "text-green-500";
-                              bandText = "Good";
-                            } else if (enq.score >= 630) {
-                              scoreColorClass = "text-amber-500";
-                              bandText = "Fair";
-                            }
-
-                            const role = classifyEnquiryRole(enq.email, enq.name, advisors);
-
-                            return (
-                              <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
-                                <td className="p-[12px] max-w-[220px] break-words">
-                                  <strong className="text-gray-900 block">{enq.name}</strong>
-                                  {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
-                                  {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
-                                  <div className="mt-[4px]">
-                                    <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
-                                      ? "bg-rose-50 text-rose-700 border-rose-200"
-                                      : role === "Senior Leadership"
-                                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                                        : role === "Manager"
-                                          ? "bg-blue-50 text-blue-700 border-blue-200"
-                                          : "bg-emerald-50 text-emerald-700 border-emerald-250"
-                                      }`}>
-                                      {role === "User" ? "User (Lead)" : role}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="p-[12px]">
-                                  <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${enq.bureau.toLowerCase() === "experian"
-                                    ? "bg-purple-100 text-purple-700 border border-purple-200"
-                                    : "bg-blue-100 text-blue-700 border border-blue-200"
-                                    }`}>
-                                    {enq.bureau}
-                                  </span>
-                                </td>
-                                <td className="p-[12px] font-mono font-semibold text-gray-700 uppercase">
-                                  {enq.pan || "-"}
-                                </td>
-                                <td className="p-[12px]">
-                                  <span className={`text-[15px] font-extrabold ${scoreColorClass}`}>
-                                    {enq.score}
-                                  </span>
-                                  <span className="text-[10px] text-gray-450 block font-medium">
-                                    {bandText}
-                                  </span>
-                                </td>
-                                <td className="p-[12px] text-gray-500">
-                                  {new Date(enq.fetched_at && !enq.fetched_at.endsWith("Z") && !enq.fetched_at.includes("+") ? `${enq.fetched_at}Z` : enq.fetched_at).toLocaleString("en-IN", {
-                                    day: "2-digit",
-                                    month: "short",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    hour12: true,
-                                  })}
-                                </td>
-                                <td className="p-[12px] text-right">
-                                  {enq.pdf_url ? (
-                                    <a
-                                      href={enq.pdf_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline font-bold text-[11px] block"
-                                    >
-                                      View Report ↗
-                                    </a>
-                                  ) : (
-                                    <span className="text-gray-400 block">-</span>
-                                  )}
-                                  <button
-                                    onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
-                                    className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
-                                  >
-                                    Generate CAM 📊
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                )}
               </>
             ) : (
               <div className="text-center py-[48px]">
@@ -2788,6 +3275,20 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Department</label>
+                  <select
+                    value={expertForm.department}
+                    onChange={(e) => setExpertForm({ ...expertForm, department: e.target.value })}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                  >
+                    <option value="Founder's Office">Founder's Office</option>
+                    <option value="Product">Product</option>
+                    <option value="Credit & Operations">Credit & Operations</option>
+                    <option value="Marketing & Sales">Marketing & Sales</option>
+                    <option value="Human Resource">Human Resource</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -2800,6 +3301,63 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                 />
               </div>
+
+              {/* Is Advisor Checkbox */}
+              <div className="py-2 flex items-center gap-[8px]">
+                <input
+                  type="checkbox"
+                  id="is-advisor-checkbox"
+                  checked={expertForm.isAdvisor}
+                  onChange={(e) => setExpertForm({ ...expertForm, isAdvisor: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-350 text-primary focus:ring-primary cursor-pointer"
+                />
+                <label htmlFor="is-advisor-checkbox" className="text-[12px] font-bold text-gray-700 cursor-pointer select-none">
+                  Is Active Client-Facing Advisor (Offers consultations)
+                </label>
+              </div>
+
+              {/* Permissions Checklist */}
+              <div className="border border-indigo-100 bg-[#f7f8ff] p-[16px] rounded-[16px] space-y-[8px]">
+                <label className="text-[12px] font-bold text-indigo-800 uppercase tracking-[0.5px] block">
+                  Permissions / Feature Access
+                </label>
+                <div className="grid grid-cols-2 gap-[10px]">
+                  {[
+                    { key: "cibil_fetch", label: "Credit Report Fetching" },
+                    { key: "cibil_view", label: "View Credit Records" },
+                    { key: "scheduled_calls", label: "Manage Call Calendars" },
+                    { key: "lenders_edit", label: "Edit Lenders Catalog" },
+                    { key: "education_edit", label: "Edit Education Content" },
+                  ].map((perm) => {
+                    const isChecked = expertForm.permissions?.includes(perm.key);
+                    return (
+                      <div key={perm.key} className="flex items-center gap-[6px] py-[2px]">
+                        <input
+                          type="checkbox"
+                          id={`perm-checkbox-${perm.key}`}
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const nextPerms = e.target.checked
+                              ? [...(expertForm.permissions || []), perm.key]
+                              : (expertForm.permissions || []).filter((k) => k !== perm.key);
+                            setExpertForm({ ...expertForm, permissions: nextPerms });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                        />
+                        <label
+                          htmlFor={`perm-checkbox-${perm.key}`}
+                          className="text-[11.5px] font-medium text-gray-700 cursor-pointer select-none"
+                        >
+                          {perm.label}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {expertForm.isAdvisor && (
+                <>
 
               <div className="grid grid-cols-2 gap-[10px]">
                 <div>
@@ -2971,6 +3529,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
                 />
               </div>
+              </>
+              )}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
@@ -2983,6 +3543,76 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
               >
                 {savingExpert ? "Saving..." : "Save Expert"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ==================== DELETE PASSWORD VERIFICATION MODAL ================== */}
+      {/* ========================================================================= */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
+          <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-rose-50/50">
+              <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
+                ⚠️ Verify Admin Password
+              </h3>
+              <button 
+                onClick={() => setDeleteConfirmOpen(false)} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[14px]">
+              <p className="text-[12px] leading-relaxed text-gray-600">
+                You are about to permanently delete this employee record. 
+                This action cannot be undone. To authorize, please enter your Admin password:
+              </p>
+              
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                  Admin Password
+                </label>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-rose-500 bg-white"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleConfirmDeleteExpert();
+                    }
+                  }}
+                />
+              </div>
+
+              {deleteError && (
+                <div className="p-[10px] bg-rose-50 border border-rose-100 rounded-[10px] text-[11.5px] text-rose-700 font-medium">
+                  {deleteError}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button 
+                onClick={() => setDeleteConfirmOpen(false)} 
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteExpert}
+                disabled={isDeletingExpert || !adminPassword}
+                className="flex-1 py-[11px] bg-rose-600 text-white font-bold rounded-[12px] text-[12px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {isDeletingExpert ? "Verifying..." : "Delete Profile"}
               </button>
             </div>
           </div>

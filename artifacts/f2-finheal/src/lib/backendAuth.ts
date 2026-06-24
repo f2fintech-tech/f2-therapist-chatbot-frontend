@@ -9,6 +9,7 @@ interface AuthResponse {
   name?: string;
   hearts?: number;
   is_guest?: boolean;
+  permissions?: string[];
 }
 
 export interface BackendUserProfile {
@@ -173,6 +174,7 @@ export async function signUpAdvisor(payload: AdvisorSignupPayload): Promise<Auth
     hearts: result.hearts ?? null,
     isGuest: false,
     isAdvisor: true,
+    permissions: result.permissions || [],
     authenticatedAt: new Date().toISOString(),
   };
 }
@@ -191,6 +193,7 @@ export async function signInAdvisor(payload: AdvisorLoginPayload): Promise<AuthS
     hearts: result.hearts ?? null,
     isGuest: false,
     isAdvisor: true,
+    permissions: result.permissions || [],
     authenticatedAt: new Date().toISOString(),
   };
 }
@@ -294,6 +297,9 @@ export interface BackendAdvisor {
   discount_expires_at?: string | null;
   test_comment?: string | null;
   test_rating?: number | null;
+  department?: string | null;
+  is_advisor?: boolean;
+  permissions?: string[] | null;
 }
 
 export interface Advisor {
@@ -315,6 +321,9 @@ export interface Advisor {
   discountExpiresAt?: string;
   testComment?: string;
   testRating?: number;
+  department?: string;
+  isAdvisor?: boolean;
+  permissions?: string[];
 }
 
 export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
@@ -323,7 +332,7 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     f2FintechId: a.f2_fintech_id,
     name: a.name,
     designation: a.designation,
-    avatarUrl: a.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=60",
+    avatarUrl: a.avatar_url || "",
     availability: a.availability,
     expertise: a.expertise || [],
     strength: a.strength || "",
@@ -336,7 +345,10 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     originalFee: a.original_fee || undefined,
     discountExpiresAt: a.discount_expires_at || undefined,
     testComment: a.test_comment || undefined,
-    testRating: a.test_rating || undefined
+    testRating: a.test_rating || undefined,
+    department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
+    isAdvisor: a.is_advisor ?? false,
+    permissions: a.permissions || []
   };
 }
 
@@ -356,12 +368,18 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     category: a.category,
     fee: a.fee || 899,
     test_comment: a.testComment,
-    test_rating: a.testRating
+    test_rating: a.testRating,
+    department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
+    is_advisor: a.isAdvisor ?? false,
+    permissions: a.permissions || []
   };
 }
 
-export async function fetchAdvisors(userId?: string): Promise<any[]> {
-  const url = userId ? `advisors?user_id=${encodeURIComponent(userId)}` : "advisors";
+export async function fetchAdvisors(userId?: string, allEmployees: boolean = false): Promise<any[]> {
+  const queryParams = [];
+  if (userId) queryParams.push(`user_id=${encodeURIComponent(userId)}`);
+  if (allEmployees) queryParams.push(`all_employees=true`);
+  const url = queryParams.length > 0 ? `advisors?${queryParams.join("&")}` : "advisors";
   const list = await authRequest<BackendAdvisor[]>(url, { method: "GET" });
   return list.map(mapBackendAdvisorToFrontend);
 }
@@ -395,6 +413,13 @@ export async function updateAdvisorNextSlot(f2FintechId: string, nextSlot: strin
     body: JSON.stringify({ next_slot: nextSlot }),
   });
   return mapBackendAdvisorToFrontend(result);
+}
+
+export async function updateAdvisorRole(f2FintechId: string, isAdvisor: boolean): Promise<any> {
+  return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/role`, {
+    method: "PUT",
+    body: JSON.stringify({ is_advisor: isAdvisor }),
+  });
 }
 
 export async function saveUserGoals(userId: string, goals: any[]): Promise<any> {
