@@ -710,6 +710,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         window.removeEventListener("storage", handleAdvisorsUpdate);
       };
     }
+    return;
   }, [isAdmin, activeTab]);
 
   // Lazy load appointments based on tab or advisor workspace
@@ -731,6 +732,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         window.removeEventListener("storage", handleAppointmentsUpdate);
       };
     }
+    return;
   }, [isAdmin, activeTab, currentExpertId]);
 
   // Sync specific Advisor next slot and self-edit form

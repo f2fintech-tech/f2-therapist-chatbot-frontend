@@ -29,6 +29,8 @@ interface Reminder {
   frequency: "one-time" | "weekly" | "monthly" | "yearly";
   notes?: string;
   completed: boolean;
+  isAppointment?: boolean;
+  meetUrl?: string;
 }
 
 interface RemindersViewProps {
@@ -105,6 +107,88 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
   // State for reminders
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  
+  // State for client appointments
+  const [clientAppointments, setClientAppointments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAdvisor) return;
+    const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    const loadAppts = () => {
+      try {
+        const stored = localStorage.getItem(apptsKey);
+        if (stored) {
+          setClientAppointments(JSON.parse(stored));
+        } else {
+          setClientAppointments([]);
+        }
+      } catch (e) {
+        console.error("Failed to load client appointments in RemindersView", e);
+      }
+    };
+    loadAppts();
+    window.addEventListener("storage", loadAppts);
+    window.addEventListener("finheal:advisors_update" as any, loadAppts);
+    return () => {
+      window.removeEventListener("storage", loadAppts);
+      window.removeEventListener("finheal:advisors_update" as any, loadAppts);
+    };
+  }, [userId, isAdvisor]);
+
+  const combinedReminders = useMemo(() => {
+    const list = [...reminders];
+    
+    if (!isAdvisor) {
+      clientAppointments.forEach(appt => {
+        const parseApptDateToISO = (dateStr: string): string => {
+          if (!dateStr) return "";
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+          
+          try {
+            const parts = dateStr.trim().split(/\s+/);
+            if (parts.length >= 2) {
+              const monthName = parts[0];
+              const dayNum = parseInt(parts[1], 10);
+              
+              const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+              const monthIdx = monthsShort.indexOf(monthName);
+              if (monthIdx !== -1 && !isNaN(dayNum)) {
+                const year = new Date().getFullYear();
+                return `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              }
+            }
+          } catch (e) {}
+          return dateStr;
+        };
+
+        const isoDate = parseApptDateToISO(appt.date);
+        
+        list.push({
+          id: appt.id || `appt-${appt.advisorId}-${appt.date}-${appt.time}`,
+          title: `Consultation with Advisor ${appt.advisorName}`,
+          category: "Consultation",
+          dueDate: isoDate,
+          dueTime: appt.time,
+          priority: "high",
+          frequency: "one-time",
+          notes: appt.notes || `Google Meet link: ${appt.meetUrl || "Pending"}`,
+          completed: appt.completed || false,
+          isAppointment: true,
+          meetUrl: appt.meetUrl
+        } as any);
+      });
+    }
+    
+    return list;
+  }, [reminders, clientAppointments, isAdvisor]);
+
+  const upcomingCalls = useMemo(() => {
+    if (isAdvisor) {
+      return advisorAppointments.filter(a => !a.completed && !a.cancelled);
+    } else {
+      return clientAppointments.filter(a => !a.completed && !a.cancelled);
+    }
+  }, [isAdvisor, advisorAppointments, clientAppointments]);
   
   // State for UI filters & search
   const [searchQuery, setSearchQuery] = useState("");
@@ -286,6 +370,19 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
   // Toggle completed status
   const handleToggleComplete = (id: string) => {
+    const appt = clientAppointments.find(a => (a.id || `appt-${a.advisorId}-${a.date}-${a.time}`) === id);
+    if (appt) {
+      const updated = clientAppointments.map(a => {
+        const matchId = (a.id || `appt-${a.advisorId}-${a.date}-${a.time}`) === id;
+        return matchId ? { ...a, completed: !a.completed } : a;
+      });
+      setClientAppointments(updated);
+      localStorage.setItem(`finheal_advisor_appointments:${userId || "anonymous"}`, JSON.stringify(updated));
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+      return;
+    }
+
     const updated = reminders.map(r => r.id === id ? { ...r, completed: !r.completed } : r);
     saveToStorage(updated);
   };
@@ -412,7 +509,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
   // Memoized lists & counts
   const filteredReminders = useMemo(() => {
-    return reminders.filter(r => {
+    return combinedReminders.filter(r => {
       const matchesSearch = r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (r.notes && r.notes.toLowerCase().includes(searchQuery.toLowerCase()));
       
@@ -432,26 +529,27 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       // Then sort by due date ascending
       return a.dueDate.localeCompare(b.dueDate);
     });
-  }, [reminders, searchQuery, statusFilter, categoryFilter]);
+  }, [combinedReminders, searchQuery, statusFilter, categoryFilter]);
 
   const stats = useMemo(() => {
-    const total = reminders.length;
-    const completed = reminders.filter(r => r.completed).length;
+    const total = combinedReminders.length;
+    const completed = combinedReminders.filter(r => r.completed).length;
     const active = total - completed;
     
     // Count overdue
     const todayStr = new Date().toISOString().split("T")[0];
-    const overdue = reminders.filter(r => !r.completed && r.dueDate < todayStr).length;
+    const overdue = combinedReminders.filter(r => !r.completed && r.dueDate < todayStr).length;
     
     // Count due today
-    const dueToday = reminders.filter(r => !r.completed && r.dueDate === todayStr).length;
+    const dueToday = combinedReminders.filter(r => !r.completed && r.dueDate === todayStr).length;
     
-    // Calculate next due amount
-    const activeReminders = reminders.filter(r => !r.completed).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    const nextDueReminder = activeReminders.length > 0 ? activeReminders[0] : null;
+    // Calculate total due amount for active reminders
+    const activeRemindersWithAmount = combinedReminders.filter(r => !r.completed && r.amount !== undefined);
+    const totalDueAmount = activeRemindersWithAmount.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const dueCount = activeRemindersWithAmount.length;
 
-    return { total, active, completed, overdue, dueToday, nextDueReminder };
-  }, [reminders]);
+    return { total, active, completed, overdue, dueToday, totalDueAmount, dueCount };
+  }, [combinedReminders]);
 
   const nextConsultation = useMemo(() => {
     if (!isAdvisor || advisorAppointments.length === 0) return null;
@@ -507,7 +605,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       <div className="flex-1 overflow-y-auto px-[16px] py-[16px] space-y-[18px] sm:px-[20px] sm:py-[20px]">
         
         {/* KPI Stats cards */}
-        <div className="grid grid-cols-2 gap-[10px] xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-[10px] md:grid-cols-3 xl:grid-cols-5">
           <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800">
             <div className="w-[36px] h-[36px] bg-blue-50 text-blue-600 rounded-[10px] flex items-center justify-center dark:bg-blue-950/20 dark:text-blue-400 shrink-0">
               <Bell size={18} />
@@ -543,18 +641,19 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               <div className={`text-[20px] font-bold leading-none mt-[2px] ${stats.dueToday > 0 ? "text-amber-600" : "text-gray-800 dark:text-slate-200"}`}>{stats.dueToday}</div>
             </div>
           </div>
-          <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800 col-span-2 xl:col-span-1">
+
+          <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800">
             <div className="w-[36px] h-[36px] bg-indigo-50 text-indigo-600 rounded-[10px] flex items-center justify-center dark:bg-indigo-950/20 dark:text-indigo-400 shrink-0">
               {isAdvisor ? <Calendar size={18} /> : <IndianRupee size={18} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider truncate">
-                {isAdvisor ? "Next Client Call" : "Next Amount Due"}
+                {isAdvisor ? "Next Client Call" : "Total Amount Due"}
               </div>
               <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200 leading-tight truncate mt-[2px]">
                 {isAdvisor 
                   ? (nextConsultation ? `${nextConsultation.date} ${nextConsultation.time}` : "No upcoming call") 
-                  : (stats.nextDueReminder?.amount ? `₹${stats.nextDueReminder.amount.toLocaleString("en-IN")}` : "—")
+                  : (stats.totalDueAmount > 0 ? `₹${stats.totalDueAmount.toLocaleString("en-IN")}` : "—")
                 }
               </div>
               {isAdvisor 
@@ -563,10 +662,28 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                     Client: {nextConsultation.clientName ? `${nextConsultation.clientName} (${nextConsultation.clientEmail})` : (nextConsultation.clientEmail || nextConsultation.userId)}
                   </div>
                 ))
-                : (stats.nextDueReminder && (
-                  <div className="text-[8px] text-gray-400 dark:text-slate-500 truncate mt-[1px]">{stats.nextDueReminder.title}</div>
-                ))
+                : (
+                  <div className="text-[8px] text-gray-400 dark:text-slate-500 truncate mt-[1px]">
+                    {stats.dueCount > 0 ? `Across ${stats.dueCount} active reminder${stats.dueCount > 1 ? "s" : ""}` : "No pending payments"}
+                  </div>
+                )
               }
+            </div>
+          </div>
+
+          {/* 5th Card: Scheduled Calls */}
+          <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800">
+            <div className="w-[36px] h-[36px] bg-[#eef0fd] text-primary rounded-[10px] flex items-center justify-center dark:bg-indigo-950/20 dark:text-indigo-400 shrink-0">
+              <Calendar size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider truncate">Scheduled Calls</div>
+              <div className="text-[20px] font-bold text-gray-800 dark:text-slate-200 leading-none mt-[2px]">{upcomingCalls.length}</div>
+              {upcomingCalls.length > 0 && (
+                <div className="text-[9px] text-primary truncate mt-[1.5px] font-medium">
+                  {upcomingCalls[0].time} ({upcomingCalls[0].date.split(" ")[0]})
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -744,13 +861,26 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
                       {/* Actions */}
                       <div className="flex gap-[4px] shrink-0 self-center">
-                        <button
-                          onClick={() => handleDeleteReminder(rem.id)}
-                          className="h-[28px] w-[28px] hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-[6px] flex items-center justify-center transition-all cursor-pointer dark:hover:bg-rose-950/20"
-                          title="Delete reminder"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {rem.isAppointment ? (
+                          rem.meetUrl && !rem.completed && (
+                            <a
+                              href={rem.meetUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-bold bg-primary text-white px-2.5 py-1.5 rounded-[8px] hover:bg-[#1e2db8] transition-colors shrink-0 whitespace-nowrap cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                              🚀 Join Call
+                            </a>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteReminder(rem.id)}
+                            className="h-[28px] w-[28px] hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-[6px] flex items-center justify-center transition-all cursor-pointer dark:hover:bg-rose-950/20"
+                            title="Delete reminder"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
