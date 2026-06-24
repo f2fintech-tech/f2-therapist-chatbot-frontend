@@ -904,13 +904,22 @@ export default function Dashboard({
         </div>
 
         {/* Tabs */}
-        <div className="flex px-8 pb-0 gap-1 mt-1 relative z-10">
+        <div className="flex px-4 sm:px-8 pb-0 gap-1 mt-1 relative z-10 overflow-x-auto no-scrollbar max-w-full">
+          <style>{`
+            .no-scrollbar::-webkit-scrollbar {
+              display: none;
+            }
+            .no-scrollbar {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+          `}</style>
           {tabs.map((t) => (
             <button
               key={t.key}
               data-testid={`tab-${t.key}`}
               onClick={() => setActiveTab(t.key as any)}
-              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all ${activeTab === t.key
+              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all shrink-0 whitespace-nowrap ${activeTab === t.key
                 ? "bg-white text-primary"
                 : "text-white/70 hover:text-white hover:bg-white/10"
                 }`}

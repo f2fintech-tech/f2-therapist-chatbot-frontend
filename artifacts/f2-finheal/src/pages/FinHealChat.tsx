@@ -110,6 +110,66 @@ export default function FinHealChat() {
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
   const chat = useBackendChat(userId);
 
+  // Reminders notifications state
+  const [activeNotification, setActiveNotification] = useState<any | null>(null);
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const checkReminders = () => {
+      try {
+        const storageKey = `finheal_reminders:${userId}`;
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return;
+        const reminders = JSON.parse(raw);
+        if (!Array.isArray(reminders)) return;
+
+        const now = new Date();
+        const currentDateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+
+        // Find any uncompleted reminder that is due today/overdue at or before current time
+        const dueReminder = reminders.find((r: any) => {
+          if (r.completed) return false;
+          if (notifiedIdsRef.current.has(r.id)) return false;
+
+          // If date matches today
+          if (r.dueDate === currentDateStr) {
+            if (r.dueTime) {
+              const [h, m] = r.dueTime.split(':').map(Number);
+              // Trigger if current time is past or equal to scheduled time
+              return (currentHours > h) || (currentHours === h && currentMinutes >= m);
+            } else {
+              // Trigger immediately on the day if no time is specified
+              return true;
+            }
+          }
+          
+          // Trigger if overdue
+          if (r.dueDate < currentDateStr) {
+            return true;
+          }
+
+          return false;
+        });
+
+        if (dueReminder) {
+          setActiveNotification(dueReminder);
+          notifiedIdsRef.current.add(dueReminder.id);
+        }
+      } catch (e) {
+        console.error("Error checking reminders for notification:", e);
+      }
+    };
+
+    // Check immediately and periodically
+    checkReminders();
+    const interval = setInterval(checkReminders, 10000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
   // Show signup modal automatically when hearts run out
   useEffect(() => {
     if (chat.heartsExhausted && authSession?.isGuest) {
@@ -481,6 +541,86 @@ export default function FinHealChat() {
         onDismiss={handleQuizDismiss}
         onComplete={handleQuizComplete}
       />
+      {activeNotification && mainView === "chat" && (
+        <>
+          <style>{`
+            @keyframes slideUpNotification {
+              from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .animate-slide-up-notification {
+              animation: slideUpNotification 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="fixed bottom-6 right-6 z-[100] max-w-[360px] w-[calc(100%-32px)] bg-white border border-gray-100 dark:bg-slate-900 dark:border-slate-800 rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.15)] p-4 flex gap-3 animate-slide-up-notification">
+            <div className="text-[24px] shrink-0 mt-0.5">
+              {activeNotification.category === "EMI" ? "🏦" :
+               activeNotification.category === "Savings" ? "🐷" :
+               activeNotification.category === "Bill" ? "⚡" :
+               activeNotification.category === "Tax" ? "📄" : "🔔"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[11px] font-bold text-primary dark:text-indigo-400 uppercase tracking-wide">
+                  Reminder Alert
+                </span>
+                <button
+                  onClick={() => setActiveNotification(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer text-[14px] leading-none"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+              <h4 className="text-[13.5px] font-bold text-gray-800 dark:text-slate-100 mt-1">
+                {activeNotification.title}
+              </h4>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
+                {activeNotification.dueTime ? `Scheduled for today at ${activeNotification.dueTime}` : "Due today"}
+                {activeNotification.amount && ` · Amount: ₹${activeNotification.amount.toLocaleString("en-IN")}`}
+              </p>
+              {activeNotification.notes && (
+                <p className="text-[10px] bg-gray-50 dark:bg-slate-950 p-2 rounded-[8px] mt-2 text-gray-500 dark:text-slate-400 italic leading-snug">
+                  {activeNotification.notes}
+                </p>
+              )}
+              <div className="flex gap-2 mt-3 justify-end">
+                <button
+                  onClick={() => {
+                    // Mark as completed in localStorage
+                    try {
+                      const storageKey = `finheal_reminders:${userId}`;
+                      const raw = localStorage.getItem(storageKey);
+                      if (raw) {
+                        const reminders = JSON.parse(raw);
+                        const updated = reminders.map((r: any) =>
+                          r.id === activeNotification.id ? { ...r, completed: true } : r
+                        );
+                        localStorage.setItem(storageKey, JSON.stringify(updated));
+                        
+                        // Fire a storage event to keep views updated
+                        window.dispatchEvent(new Event("storage"));
+                      }
+                    } catch (e) {
+                      console.error("Failed to mark reminder completed from notification:", e);
+                    }
+                    setActiveNotification(null);
+                  }}
+                  className="px-3 py-1.5 bg-primary text-white text-[11px] font-semibold rounded-[8px] hover:bg-[#1e2db8] transition-colors cursor-pointer shadow-sm"
+                >
+                  ✓ Mark Completed
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       {showAuthPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.2)] animate-scale-in">

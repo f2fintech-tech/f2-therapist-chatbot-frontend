@@ -3,7 +3,7 @@ import { fetchAdvisorAppointments } from "@/lib/backendAuth";
 import { 
   Bell, 
   Calendar, 
-  DollarSign, 
+  IndianRupee, 
   CheckCircle, 
   Clock, 
   Trash2, 
@@ -24,6 +24,7 @@ interface Reminder {
   category: "EMI" | "Savings" | "Bill" | "Tax" | "General" | "Consultation" | "Preparation" | "FollowUp" | "Admin";
   amount?: number;
   dueDate: string; // YYYY-MM-DD
+  dueTime?: string; // HH:MM
   priority: "high" | "medium" | "low";
   frequency: "one-time" | "weekly" | "monthly" | "yearly";
   notes?: string;
@@ -119,6 +120,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   const [formCategory, setFormCategory] = useState<"EMI" | "Savings" | "Bill" | "Tax" | "General" | "Consultation" | "Preparation" | "FollowUp" | "Admin">("General");
   const [formAmount, setFormAmount] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
+  const [formDueTime, setFormDueTime] = useState("");
   const [formPriority, setFormPriority] = useState<"high" | "medium" | "low">("medium");
   const [formFrequency, setFormFrequency] = useState<"one-time" | "weekly" | "monthly" | "yearly">("one-time");
   const [formNotes, setFormNotes] = useState("");
@@ -126,121 +128,130 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
   // Load reminders on mount / userId change
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      let parsed = raw ? JSON.parse(raw) : null;
-      
-      // Re-seed if user is advisor but only client reminders exist
-      if (parsed && isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("default-"))) {
-        parsed = null;
-      }
-      // Re-seed if user is client but only advisor reminders exist
-      if (parsed && !isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("advisor-default-"))) {
-        parsed = null;
-      }
-
-      if (parsed) {
-        setReminders(parsed);
-      } else {
-        // Pre-populate with beautiful default reminders
-        const today = new Date();
-        const formatDate = (daysOffset: number) => {
-          const d = new Date();
-          d.setDate(today.getDate() + daysOffset);
-          return d.toISOString().split("T")[0];
-        };
+    const loadReminders = () => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        let parsed = raw ? JSON.parse(raw) : null;
         
-        const defaults: Reminder[] = isAdvisor ? [
-          {
-            id: "advisor-default-1",
-            title: "Prepare notes for client consultation",
-            category: "Preparation",
-            dueDate: formatDate(0), // Today
-            priority: "high",
-            frequency: "one-time",
-            notes: "Review client's CIBIL score and financial goals before joining the call.",
-            completed: false
-          },
-          {
-            id: "advisor-default-2",
-            title: "Follow up with client on debt action plan",
-            category: "FollowUp",
-            dueDate: formatDate(3),
-            priority: "medium",
-            frequency: "weekly",
-            notes: "Send the updated debt repayment schedule to client.",
-            completed: false
-          },
-          {
-            id: "advisor-default-3",
-            title: "Attend weekly performance review",
-            category: "Consultation",
-            dueDate: formatDate(5),
-            priority: "high",
-            frequency: "weekly",
-            notes: "Sync with the manager on recent consultation ratings and reviews.",
-            completed: false
-          },
-          {
-            id: "advisor-default-4",
-            title: "Configure next week slots availability",
-            category: "Admin",
-            dueDate: formatDate(10),
-            priority: "low",
-            frequency: "weekly",
-            notes: "Open slots for the next calendar block in the portal.",
-            completed: true
-          }
-        ] : [
-          {
-            id: "default-1",
-            title: "Pay Personal Loan EMI",
-            category: "EMI",
-            amount: 15400,
-            dueDate: formatDate(0), // Today
-            priority: "high",
-            frequency: "monthly",
-            notes: "EMI auto-debit from primary savings account. Check balance.",
-            completed: false
-          },
-          {
-            id: "default-2",
-            title: "Check credit score update on CIBIL Checker",
-            category: "General",
-            dueDate: formatDate(3),
-            priority: "medium",
-            frequency: "monthly",
-            notes: "Keep score above 750 to guarantee best lending rates.",
-            completed: false
-          },
-          {
-            id: "default-3",
-            title: "Deposit monthly mutual fund SIP",
-            category: "Savings",
-            amount: 5000,
-            dueDate: formatDate(5),
-            priority: "high",
-            frequency: "monthly",
-            notes: "Investing regularly creates long-term financial security.",
-            completed: false
-          },
-          {
-            id: "default-4",
-            title: "Review monthly therapy budget allocation",
-            category: "General",
-            dueDate: formatDate(10),
-            priority: "low",
-            frequency: "monthly",
-            notes: "Balanced budget ensures emotional and economic ease.",
-            completed: true
-          }
-        ];
-        setReminders(defaults);
-        localStorage.setItem(storageKey, JSON.stringify(defaults));
+        // Re-seed if user is advisor but only client reminders exist
+        if (parsed && isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("default-"))) {
+          parsed = null;
+        }
+        // Re-seed if user is client but only advisor reminders exist
+        if (parsed && !isAdvisor && parsed.some((r: any) => r.id && r.id.startsWith("advisor-default-"))) {
+          parsed = null;
+        }
+
+        if (parsed) {
+          setReminders(parsed);
+        } else {
+          // Pre-populate with beautiful default reminders
+          const today = new Date();
+          const formatDate = (daysOffset: number) => {
+            const d = new Date();
+            d.setDate(today.getDate() + daysOffset);
+            return d.toISOString().split("T")[0];
+          };
+          
+          const defaults: Reminder[] = isAdvisor ? [
+            {
+              id: "advisor-default-1",
+              title: "Prepare notes for client consultation",
+              category: "Preparation",
+              dueDate: formatDate(0), // Today
+              priority: "high",
+              frequency: "one-time",
+              notes: "Review client's CIBIL score and financial goals before joining the call.",
+              completed: false
+            },
+            {
+              id: "advisor-default-2",
+              title: "Follow up with client on debt action plan",
+              category: "FollowUp",
+              dueDate: formatDate(3),
+              priority: "medium",
+              frequency: "weekly",
+              notes: "Send the updated debt repayment schedule to client.",
+              completed: false
+            },
+            {
+              id: "advisor-default-3",
+              title: "Attend weekly performance review",
+              category: "Consultation",
+              dueDate: formatDate(5),
+              priority: "high",
+              frequency: "weekly",
+              notes: "Sync with the manager on recent consultation ratings and reviews.",
+              completed: false
+            },
+            {
+              id: "advisor-default-4",
+              title: "Configure next week slots availability",
+              category: "Admin",
+              dueDate: formatDate(10),
+              priority: "low",
+              frequency: "weekly",
+              notes: "Open slots for the next calendar block in the portal.",
+              completed: true
+            }
+          ] : [
+            {
+              id: "default-1",
+              title: "Pay Personal Loan EMI",
+              category: "EMI",
+              amount: 15400,
+              dueDate: formatDate(0), // Today
+              priority: "high",
+              frequency: "monthly",
+              notes: "EMI auto-debit from primary savings account. Check balance.",
+              completed: false
+            },
+            {
+              id: "default-2",
+              title: "Check credit score update on CIBIL Checker",
+              category: "General",
+              dueDate: formatDate(3),
+              priority: "medium",
+              frequency: "monthly",
+              notes: "Keep score above 750 to guarantee best lending rates.",
+              completed: false
+            },
+            {
+              id: "default-3",
+              title: "Deposit monthly mutual fund SIP",
+              category: "Savings",
+              amount: 5000,
+              dueDate: formatDate(5),
+              priority: "high",
+              frequency: "monthly",
+              notes: "Investing regularly creates long-term financial security.",
+              completed: false
+            },
+            {
+              id: "default-4",
+              title: "Review monthly therapy budget allocation",
+              category: "General",
+              dueDate: formatDate(10),
+              priority: "low",
+              frequency: "monthly",
+              notes: "Balanced budget ensures emotional and economic ease.",
+              completed: true
+            }
+          ];
+          setReminders(defaults);
+          localStorage.setItem(storageKey, JSON.stringify(defaults));
+        }
+      } catch (e) {
+        console.error("Failed to load reminders", e);
       }
-    } catch (e) {
-      console.error("Failed to load reminders", e);
-    }
+    };
+
+    loadReminders();
+    
+    window.addEventListener("storage", loadReminders);
+    return () => {
+      window.removeEventListener("storage", loadReminders);
+    };
   }, [userId, storageKey, isAdvisor]);
 
   // Save reminders to localStorage
@@ -295,6 +306,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
     setFormCategory("General");
     setFormAmount("");
     setFormDueDate(new Date().toISOString().split("T")[0]);
+    setFormDueTime("");
     setFormPriority("medium");
     setFormFrequency("one-time");
     setFormNotes("");
@@ -309,6 +321,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
     setFormCategory(reminder.category);
     setFormAmount(reminder.amount?.toString() || "");
     setFormDueDate(reminder.dueDate);
+    setFormDueTime(reminder.dueTime || "");
     setFormPriority(reminder.priority);
     setFormFrequency(reminder.frequency);
     setFormNotes(reminder.notes || "");
@@ -351,6 +364,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               category: formCategory,
               amount: numericAmount,
               dueDate: formDueDate,
+              dueTime: formDueTime.trim() || undefined,
               priority: formPriority,
               frequency: formFrequency,
               notes: formNotes.trim() || undefined
@@ -366,6 +380,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
         category: formCategory,
         amount: numericAmount,
         dueDate: formDueDate,
+        dueTime: formDueTime.trim() || undefined,
         priority: formPriority,
         frequency: formFrequency,
         notes: formNotes.trim() || undefined,
@@ -528,10 +543,9 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
               <div className={`text-[20px] font-bold leading-none mt-[2px] ${stats.dueToday > 0 ? "text-amber-600" : "text-gray-800 dark:text-slate-200"}`}>{stats.dueToday}</div>
             </div>
           </div>
-
           <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800 col-span-2 xl:col-span-1">
             <div className="w-[36px] h-[36px] bg-indigo-50 text-indigo-600 rounded-[10px] flex items-center justify-center dark:bg-indigo-950/20 dark:text-indigo-400 shrink-0">
-              {isAdvisor ? <Calendar size={18} /> : <DollarSign size={18} />}
+              {isAdvisor ? <Calendar size={18} /> : <IndianRupee size={18} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider truncate">
@@ -702,7 +716,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                             dateInfo.status === "tomorrow" ? "text-amber-600" :
                             "text-gray-500 dark:text-slate-400"
                           }`}>
-                            <Calendar size={11} /> {dateInfo.text}
+                            <Calendar size={11} /> {dateInfo.text} {rem.dueTime && `at ${rem.dueTime}`}
                           </span>
 
                           {/* Amount */}
@@ -918,8 +932,8 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                 />
               </div>
 
-              {/* Grid: Category and Due Date */}
-              <div className="grid grid-cols-2 gap-[10px]">
+              {/* Grid: Category, Due Date, and Due Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-[10px]">
                 {/* Category */}
                 <div>
                   <label className="text-[11px] font-semibold text-gray-700 dark:text-slate-300 block mb-[4px]">Category</label>
@@ -930,9 +944,9 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                   >
                     {isAdvisor ? (
                       <>
-                        <option value="Preparation">📝 Preparation</option>
+                        <option value="Preparation">📝 Prep</option>
                         <option value="FollowUp">🔄 Follow-Up</option>
-                        <option value="Consultation">📅 Consultation</option>
+                        <option value="Consultation">📅 Call</option>
                         <option value="Admin">📄 Admin</option>
                         <option value="General">🎯 General</option>
                       </>
@@ -957,6 +971,17 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                     onChange={(e) => setFormDueDate(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-[10px] py-[8px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:bg-slate-950"
                     required
+                  />
+                </div>
+
+                {/* Due Time */}
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-700 dark:text-slate-300 block mb-[4px]">Due Time</label>
+                  <input
+                    type="time"
+                    value={formDueTime}
+                    onChange={(e) => setFormDueTime(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-[10px] py-[8px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:bg-slate-950"
                   />
                 </div>
               </div>

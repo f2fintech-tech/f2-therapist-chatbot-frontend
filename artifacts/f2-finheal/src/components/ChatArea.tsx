@@ -524,41 +524,48 @@ export default function ChatArea({
       </div>
         <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
         {prefillMessage?.card && (<div style={{ background: "#eef0fd", border: "1.5px solid #d4d8fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "8px", maxWidth: "800px", margin: "0 auto 8px", display: "flex", alignItems: "flex-start", gap: "10px" }}><span style={{ fontSize: "18px" }}>📎</span><div style={{ flex: 1 }}><div style={{ fontSize: "11px", fontWeight: 700, color: "#3344e6", marginBottom: "2px" }}>ATTACHED CONTENT</div><div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>{prefillMessage.card}</div></div><button onClick={() => onClearPrefill?.()} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "16px", lineHeight: 1, padding: "0 0 0 8px", flexShrink: 0 }}>✕</button></div>)}
-        <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-col items-stretch p-[10px] gap-[8px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:flex-row sm:items-end sm:p-[10px_10px_10px_18px]">
+        <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-row items-end p-[6px_8px_6px_10px] gap-[6px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:p-[8px_10px_8px_14px] sm:gap-[10px]">
+          
+          {/* Left section: Attach file button */}
+          <div className="flex items-center justify-center shrink-0 mb-[2px] sm:mb-[3px]">
+            <div className="relative group">
+              <label
+                className={`w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${isLoading || isSendingMessage ? "pointer-events-none opacity-40" : ""}`}
+                aria-label="Attach file"
+                title="Attach file"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-8.48 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" />
+                </svg>
+                <input
+                  type="file"
+                  accept="*/*"
+                  onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
+                  className="hidden"
+                />
+              </label>
 
+              <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150 z-10">
+                <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">Attach file</div>
+                <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
+              </div>
+            </div>
+          </div>
+
+          {/* Middle section: Text input */}
           <textarea
             ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Type your message..."
-            className="flex-1 bg-transparent border-none outline-none text-gray-900 text-[16px] resize-none min-h-[22px] max-h-[100px] leading-[1.55] py-[6px] placeholder:text-gray-400"
+            className="flex-1 bg-transparent border-none outline-none text-gray-900 text-[16px] resize-none min-h-[36px] max-h-[100px] leading-[1.4] py-[8px] placeholder:text-gray-400"
             rows={1}
             style={{ height: "auto" }}
           />
-          <div className="flex flex-wrap gap-[5px] items-center justify-center pb-[1px] sm:flex-nowrap">
-              <div className="relative group">
-                <label
-                  className={`w-[32px] h-[32px] rounded-full text-gray-400 text-[15px] flex items-center justify-center transition-all hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${isLoading || isSendingMessage ? "pointer-events-none opacity-40" : ""}`}
-                  aria-label="Attach file"
-                  title="Attach file"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-8.48 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" />
-                  </svg>
-                  <input
-                    type="file"
-                    accept="*/*"
-                    onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
-                    className="hidden"
-                  />
-                </label>
 
-                <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
-                  <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">Attach file</div>
-                  <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
-                </div>
-              </div>
+          {/* Right section: Action buttons (Microphone, Send/Stop) */}
+          <div className="flex items-center gap-[4px] shrink-0 mb-[2px] sm:mb-[3px] sm:gap-[6px]">
             <div className="relative group">
               <button
                 type="button"
@@ -582,11 +589,12 @@ export default function ChatArea({
                 )}
               </button>
 
-              <div className="cursor-pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150">
+              <div className="pointer-events-none absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition duration-150 z-10">
                 <div className="bg-white text-[12px] text-gray-700 px-3 py-1 rounded-[8px] shadow-md">{isRecording ? 'Stop recording' : 'Record audio'}</div>
                 <div className="absolute left-1/2 transform -translate-x-1/2 top-full w-2 h-2 bg-white rotate-45 shadow-md" />
               </div>
             </div>
+
             {isSendingMessage ? (
               <button
                 type="button"
