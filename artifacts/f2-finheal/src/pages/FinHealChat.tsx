@@ -75,7 +75,7 @@ export default function FinHealChat() {
   const mainView = useMemo(() => {
     if (location === "/profile") return "profile";
     if (location === "/advisor") return "advisor";
-    if (location === "/admin") return "admin";
+    if (location === "/admin" || location.startsWith("/admin/")) return "admin";
     if (location === "/dashboard") return "dashboard";
     if (location === "/education") return "education";
     if (location === "/loan-calculator") return "loan-calculator";
