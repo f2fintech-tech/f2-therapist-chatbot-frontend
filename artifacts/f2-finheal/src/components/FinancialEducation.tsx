@@ -267,7 +267,14 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                       src={"https://www.instagram.com/reel/" + playingShort + "/embed/"}
                       title="Financial Instagram Reel"
                       allowFullScreen
-                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} />
+                      style={{ 
+                        position: "absolute", 
+                        top: "-16%", 
+                        left: "-2%", 
+                        width: "104%", 
+                        height: "134%", 
+                        border: "none" 
+                      }} />
                   )}
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "14%", background: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "10%", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
