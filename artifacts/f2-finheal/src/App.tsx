@@ -83,7 +83,7 @@ function Router() {
       <Route path="/goals" component={FinHealChat} />
       <Route path="/tests/:id" component={FinHealChat} />
       <Route path="/tests" component={FinHealChat} />
-      <Route component={FinHealChat} />
+      <Route component={NotFound} />
     </Switch>
   );
 }
