@@ -274,7 +274,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                         width: "100%", 
                         height: "100%", 
                         border: "none",
-                        transform: "scale(1.38)",
+                        transform: "scale(1.5) translateY(3%)",
                         transformOrigin: "center center"
                       }} />
                   )}
