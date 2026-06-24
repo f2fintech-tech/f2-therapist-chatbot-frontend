@@ -617,6 +617,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     <FinancialTipsColumn />
                   ) : (
                     <>
+                      {categoryFilter === "All" && <FinancialTipsColumn />}
                       <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
                       {filteredVideos.map((v, idx) => <VideoCard key={v.id} item={v} delay={Math.min(idx * 0.05, 0.3)} />)}
                     </>
