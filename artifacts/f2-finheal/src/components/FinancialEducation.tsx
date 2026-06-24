@@ -52,7 +52,7 @@ const SHORTS: ShortItem[] = [
     id: "DZ7TcesyLIV", 
     title: "Understanding Personal Loans & Credit", 
     platform: "instagram", 
-    reelUrl: "https://www.instagram.com/reel/DZ7TcesyLIV/?igsh=MW5teHhnYXo5bWl6bw%3D%3D"
+    reelUrl: "https://www.instagram.com/reel/DZ7TcesyLIV/?igsh=c3pncjRjanpzYWd6"
   }
 ];
 
