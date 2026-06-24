@@ -269,11 +269,13 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                       allowFullScreen
                       style={{ 
                         position: "absolute", 
-                        top: "-16%", 
-                        left: "-2%", 
-                        width: "104%", 
-                        height: "134%", 
-                        border: "none" 
+                        top: 0, 
+                        left: 0, 
+                        width: "100%", 
+                        height: "100%", 
+                        border: "none",
+                        transform: "scale(1.38)",
+                        transformOrigin: "center center"
                       }} />
                   )}
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "14%", background: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", zIndex: 5 }} />
