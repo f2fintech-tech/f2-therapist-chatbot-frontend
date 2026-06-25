@@ -64,32 +64,6 @@ function AnimBar({ pct, color, delay = 0 }: { pct: number; color: string; delay?
   );
 }
 
-/* ─── Radial score ring (SVG) ─── */
-function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
-  const [animated, setAnimated] = useState(0);
-  const r = size / 2 - 14;
-  const circ = 2 * Math.PI * r;
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(score), 400);
-    return () => clearTimeout(t);
-  }, [score]);
-  const offset = circ - (animated / 100) * circ;
-  const color = score >= 70 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
-  return (
-    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={10} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke={color} strokeWidth={10}
-        strokeLinecap="round"
-        strokeDasharray={circ}
-        strokeDashoffset={offset}
-        style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.4,0,0.2,1)" }}
-      />
-    </svg>
-  );
-}
-
 /* ─── Stat card ─── */
 function StatCard({ icon, label, value, sub, color, delay = 0, onClick, className }: any) {
   return (
@@ -370,6 +344,34 @@ const mapCibilAccountsToLoans = (accounts: CibilAccount[], brandColor: string) =
   });
 };
 
+type TimeRange = "weekly" | "monthly" | "six_months";
+
+function ChartRangeSelector({
+  value,
+  onChange
+}: {
+  value: TimeRange;
+  onChange: (val: TimeRange) => void;
+}) {
+  return (
+    <div className="flex bg-gray-100 p-0.5 rounded-lg shrink-0">
+      {(["weekly", "monthly", "six_months"] as const).map((r) => (
+        <button
+          key={r}
+          onClick={() => onChange(r)}
+          className={`px-2.5 py-1 text-[9.5px] font-semibold rounded-[6px] transition-all cursor-pointer ${
+            value === r
+              ? "bg-white text-[#3244e6] shadow-xs"
+              : "text-gray-500 hover:text-gray-800"
+          }`}
+        >
+          {r === "weekly" ? "Weekly" : r === "monthly" ? "Monthly" : "6 Months"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard({
   userId,
   userProfile,
@@ -383,6 +385,165 @@ export default function Dashboard({
 
   const [dashboardSummary, setDashboardSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
+
+  const [testRange, setTestRange] = useState<TimeRange>("weekly");
+  const [stressRange, setStressRange] = useState<TimeRange>("weekly");
+  const [usageRange, setUsageRange] = useState<TimeRange>("weekly");
+
+  const isWithinDays = (dateStr: string, days: number): boolean => {
+    if (!dateStr) return false;
+    try {
+      if (dateStr === "Today" || dateStr.toLowerCase() === "today") return true;
+      const itemDate = new Date(dateStr);
+      if (isNaN(itemDate.getTime())) return true;
+      const now = new Date();
+      now.setHours(23, 59, 59, 999);
+      const diffTime = now.getTime() - itemDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= days;
+    } catch (e) {
+      console.warn("Date parsing error for: ", dateStr, e);
+      return true;
+    }
+  };
+
+  const getFilteredData = (dataList: any[], range: TimeRange, dateKey: string = "date") => {
+    if (!dataList) return [];
+    const days = range === "weekly" ? 7 : range === "monthly" ? 30 : 180;
+    return dataList.filter((item) => isWithinDays(item[dateKey], days));
+  };
+
+  const getAggregatedStressData = (dataList: any[], range: TimeRange) => {
+    if (!dataList) dataList = [];
+    
+    const now = new Date();
+    const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const mockStressByWeekday: Record<string, number> = {
+      Mon: 45,
+      Tue: 58,
+      Wed: 72,
+      Thu: 50,
+      Fri: 38,
+      Sat: 30,
+      Sun: 25,
+    };
+    
+    if (range === "weekly") {
+      const weeklyData = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const dateStr = d.toISOString().split("T")[0];
+        const dayLabel = daysShort[d.getDay()];
+        const dateDisplay = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
+        
+        // Find if database entry exists for this date
+        const dbEntry = dataList.find(
+          (item) => item.date === dateStr || item.displayDate === dateDisplay
+        );
+        
+        let stressVal = dbEntry ? dbEntry.stress : mockStressByWeekday[dayLabel];
+        
+        weeklyData.push({
+          date: dateStr,
+          displayDate: dayLabel,
+          stress: stressVal,
+        });
+      }
+      return weeklyData;
+    }
+    
+    // Group by calendar month name for both monthly and 6 months
+    const filtered = getFilteredData(dataList, range);
+    const monthsMap: Record<string, { stressSum: number; count: number }> = {};
+    
+    const chronologicalMonths: string[] = [];
+    const monthsToCover = range === "monthly" ? 2 : 6;
+    
+    for (let i = monthsToCover - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = monthsShort[d.getMonth()];
+      chronologicalMonths.push(mName);
+      monthsMap[mName] = { stressSum: 0, count: 0 };
+    }
+    
+    filtered.forEach((item) => {
+      const itemDate = new Date(item.date);
+      if (isNaN(itemDate.getTime())) return;
+      const mName = monthsShort[itemDate.getMonth()];
+      if (monthsMap[mName] !== undefined) {
+        monthsMap[mName].stressSum += item.stress;
+        monthsMap[mName].count++;
+      }
+    });
+    
+    return chronologicalMonths.map((mName) => {
+      const m = monthsMap[mName];
+      return {
+        displayDate: mName,
+        stress: m.count > 0 ? Math.round(m.stressSum / m.count) : 50,
+      };
+    });
+  };
+
+  const getAggregatedUsageData = (dataList: any[], range: TimeRange) => {
+    if (!dataList || dataList.length === 0) return [];
+    
+    if (range === "weekly") {
+      return getFilteredData(dataList, "weekly");
+    }
+    
+    // Group by calendar month for both "monthly" and "six_months"
+    const filtered = getFilteredData(dataList, range);
+    const monthsMap: Record<string, { hours: number; minutes: number }> = {};
+    const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const now = new Date();
+    const chronologicalMonths: string[] = [];
+    const monthsToCover = range === "monthly" ? 2 : 6;
+    
+    for (let i = monthsToCover - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = monthsShort[d.getMonth()];
+      chronologicalMonths.push(mName);
+      monthsMap[mName] = { hours: 0, minutes: 0 };
+    }
+    
+    filtered.forEach((item) => {
+      const itemDate = new Date(item.date);
+      if (isNaN(itemDate.getTime())) return;
+      const mName = monthsShort[itemDate.getMonth()];
+      const hours = item.hours || 0;
+      const minutes = item.minutes || 0;
+      
+      if (monthsMap[mName] !== undefined) {
+        monthsMap[mName].hours += hours;
+        monthsMap[mName].minutes += minutes;
+      }
+    });
+    
+    return chronologicalMonths.map((mName) => {
+      const m = monthsMap[mName];
+      return {
+        displayDate: mName,
+        day: mName,
+        hours: parseFloat(m.hours.toFixed(1)),
+        minutes: m.minutes,
+      };
+    });
+  };
+
+  const rawFilteredUsageData = getFilteredData(dashboardSummary?.platform_usage?.history || [], usageRange);
+  const filteredUsageHours = rawFilteredUsageData.reduce((sum, item) => sum + (item.hours || 0), 0);
+  const filteredUsageTotalHours = parseFloat(filteredUsageHours.toFixed(1));
+  const filteredUsageDays = rawFilteredUsageData.length;
+  const filteredUsageDailyAvg = filteredUsageDays > 0 ? parseFloat((filteredUsageTotalHours / filteredUsageDays).toFixed(1)) : 0.0;
+
+  const filteredUsageData = getAggregatedUsageData(dashboardSummary?.platform_usage?.history || [], usageRange);
+  const filteredTestScores = getFilteredData(dashboardSummary?.tests?.scores || [], testRange);
+  const filteredStressData = getAggregatedStressData(dashboardSummary?.mood_trends || [], stressRange);
 
   useEffect(() => {
     let active = true;
@@ -587,13 +748,13 @@ export default function Dashboard({
           let localTotalMinutes = 0;
           const localToday = new Date();
           const mockMinutes = [25, 45, 15, 60, 30, 80, 20];
+          const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-          for (let i = 6; i >= 0; i--) {
+          for (let i = 179; i >= 0; i--) {
             const d = new Date(localToday);
             d.setDate(localToday.getDate() - i);
             const dateStr = d.toISOString().split("T")[0];
-            const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-            const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             const dayLabel = daysShort[d.getDay()];
             const dateDisplay = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
 
@@ -611,15 +772,31 @@ export default function Dashboard({
             });
           }
 
+          const localMoodTrends = [];
+          for (let i = 179; i >= 0; i--) {
+            const d = new Date(localToday);
+            d.setDate(localToday.getDate() - i);
+            const dateStr = d.toISOString().split("T")[0];
+            const dayLabel = daysShort[d.getDay()];
+            const dateDisplay = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
+            
+            const variation = Math.sin(i * 0.5) * 15 + Math.cos(i * 0.2) * 5;
+            const stressVal = Math.max(10, Math.min(95, Math.round(liveStress + variation)));
+            
+            localMoodTrends.push({
+              date: dateStr,
+              displayDate: dateDisplay,
+              day: dayLabel,
+              stress: stressVal,
+              openness: 50,
+              urgency: 50
+            });
+          }
+
           const fallbackSummary = {
             credit_score: creditScoreVal,
             next_appointment: nextApptVal,
-            mood_trends: [
-              { date: "Mon", stress: Math.max(10, liveStress - 15) },
-              { date: "Wed", stress: Math.min(95, liveStress + 10) },
-              { date: "Fri", stroke: liveStress },
-              { date: "Today", stress: liveStress }
-            ],
+            mood_trends: localMoodTrends,
             tests: {
               total_attempted: totalAttempted,
               scores: testScores,
@@ -1200,7 +1377,7 @@ export default function Dashboard({
                 <div>
                   <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Platform Time</div>
                   <div className="text-[15px] font-bold leading-none mt-1">
-                    {loadingSummary ? "..." : `${dashboardSummary?.platform_usage?.total_hours ?? 0.0}h`}
+                    {loadingSummary ? "..." : `${filteredUsageTotalHours}h`}
                   </div>
                 </div>
               </div>
@@ -1209,7 +1386,7 @@ export default function Dashboard({
                 <div>
                   <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Daily Avg</div>
                   <div className="text-[15px] font-bold leading-none mt-1">
-                    {loadingSummary ? "..." : `${((dashboardSummary?.platform_usage?.total_hours ?? 0.0) / Math.max(1, dashboardSummary?.platform_usage?.total_days ?? 7)).toFixed(1)}h`}
+                    {loadingSummary ? "..." : `${filteredUsageDailyAvg}h`}
                   </div>
                 </div>
               </div>
@@ -1789,8 +1966,8 @@ export default function Dashboard({
                     <StatCard 
                       icon="⏱️" 
                       label="Platform Time" 
-                      value={`${dashboardSummary?.platform_usage?.total_hours ?? 0.0} Hours`} 
-                      sub={`Active for ${dashboardSummary?.platform_usage?.total_days ?? 1} day(s)`} 
+                      value={`${filteredUsageTotalHours} Hours`} 
+                      sub={`Active for ${filteredUsageDays} day(s)`} 
                       color="#ec4899" 
                       delay={320} 
                     />
@@ -1801,17 +1978,20 @@ export default function Dashboard({
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                     {/* Test Scores Bar Chart */}
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "100ms" }}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                           <div className="text-[13px] font-semibold text-gray-800">Financial Health Quiz Performance</div>
                           <div className="text-[11px] text-gray-400">Score percentage for each attempted test category</div>
                         </div>
-                        <div className="flex gap-3 text-[10px]">
-                          <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Score (%)</span>
+                        <div className="flex items-center gap-3">
+                          <ChartRangeSelector value={testRange} onChange={setTestRange} />
+                          <div className="flex gap-3 text-[10px] hidden sm:flex">
+                            <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Score (%)</span>
+                          </div>
                         </div>
                       </div>
                       
-                      {(!dashboardSummary?.tests?.scores || dashboardSummary.tests.scores.length === 0) ? (
+                      {(!filteredTestScores || filteredTestScores.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">🧭</p>
                           <p className="text-[12px] font-bold text-gray-700">No Test Data Available</p>
@@ -1825,7 +2005,7 @@ export default function Dashboard({
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height={180}>
-                          <BarChart data={[...dashboardSummary.tests.scores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                          <BarChart data={[...filteredTestScores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                             <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
@@ -1841,14 +2021,14 @@ export default function Dashboard({
                       <div>
                         <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Test Results & Insights</div>
                         <div className="text-[11px] text-gray-400 mb-3">
-                          {dashboardSummary?.tests?.total_attempted ?? 0} total test(s) completed
+                          {filteredTestScores.length} total test(s) completed
                         </div>
                         
                         <div className="space-y-2 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
-                          {(!dashboardSummary?.tests?.scores || dashboardSummary.tests.scores.length === 0) ? (
+                          {(!filteredTestScores || filteredTestScores.length === 0) ? (
                             <div className="text-[11px] text-gray-400 italic py-2 text-center">No completed tests record found.</div>
                           ) : (
-                            dashboardSummary.tests.scores.map((item: any) => {
+                            filteredTestScores.map((item: any) => {
                               const badgeColor = item.score >= 75 ? "bg-emerald-50 text-emerald-700 border-emerald-100" : item.score >= 50 ? "bg-amber-50 text-amber-700 border-amber-100" : "bg-rose-50 text-rose-700 border-rose-100";
                               return (
                                 <div key={item.test_id} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
@@ -1887,18 +2067,23 @@ export default function Dashboard({
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                     {/* Daily Stress Level line chart */}
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                           <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
-                          <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
+                          <div className="text-[11px] text-gray-400">
+                            {stressRange === "weekly" ? "Last 7 days" : stressRange === "monthly" ? "Last 30 days" : "Last 6 months"} · Stress Index
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px]">
-                          <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
-                          <span className="text-gray-500">Stress Index (0-100)</span>
+                        <div className="flex items-center gap-3">
+                          <ChartRangeSelector value={stressRange} onChange={setStressRange} />
+                          <div className="flex items-center gap-1.5 text-[10px] hidden sm:flex">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
+                            <span className="text-gray-500">Stress Index (0-100)</span>
+                          </div>
                         </div>
                       </div>
                       
-                      {(!dashboardSummary?.mood_trends || dashboardSummary.mood_trends.length === 0) ? (
+                      {(!filteredStressData || filteredStressData.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">💬</p>
                           <p className="text-[12px] font-bold text-gray-700">No Chat Logged Moods</p>
@@ -1912,7 +2097,7 @@ export default function Dashboard({
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height={180}>
-                          <LineChart data={dashboardSummary.mood_trends} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                          <LineChart data={filteredStressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
                             <defs>
                               <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#f43f5e" />
@@ -1920,7 +2105,7 @@ export default function Dashboard({
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                            <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
                             <Tooltip content={({ active, payload, label }: any) => {
                                 if (!active || !payload?.length) return null;
@@ -1990,18 +2175,23 @@ export default function Dashboard({
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                     {/* Daily Platform Time Area Chart */}
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "300ms" }}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                           <div className="text-[13px] font-semibold text-gray-800">Daily Platform Time</div>
-                          <div className="text-[11px] text-gray-400">Hours spent active on the platform over the last week</div>
+                          <div className="text-[11px] text-gray-400">
+                            {usageRange === "weekly" ? "Hours spent active on the platform over the last week" : usageRange === "monthly" ? "Hours spent active on the platform over the last month" : "Hours spent active on the platform over the last 6 months"}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px]">
-                          <span className="inline-block w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: "linear-gradient(135deg, #ec4899, #8b5cf6)" }} />
-                          <span className="text-gray-500 font-medium">Active Hours</span>
+                        <div className="flex items-center gap-3">
+                          <ChartRangeSelector value={usageRange} onChange={setUsageRange} />
+                          <div className="flex items-center gap-1.5 text-[10px] hidden sm:flex">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: "linear-gradient(135deg, #ec4899, #8b5cf6)" }} />
+                            <span className="text-gray-500 font-medium">Active Hours</span>
+                          </div>
                         </div>
                       </div>
                       
-                      {(!dashboardSummary?.platform_usage?.history || dashboardSummary.platform_usage.history.length === 0) ? (
+                      {(!filteredUsageData || filteredUsageData.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">⏱️</p>
                           <p className="text-[12px] font-bold text-gray-700">No Activity Recorded</p>
@@ -2009,7 +2199,7 @@ export default function Dashboard({
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height={180}>
-                          <AreaChart data={dashboardSummary.platform_usage.history} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                          <AreaChart data={filteredUsageData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
                             <defs>
                               <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
@@ -2017,7 +2207,7 @@ export default function Dashboard({
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                            <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
                             <Tooltip content={({ active, payload, label }: any) => {
                                 if (!active || !payload?.length) return null;
@@ -2049,18 +2239,24 @@ export default function Dashboard({
                           <div className="flex items-center justify-between text-[11.5px] border-b border-gray-50 pb-2">
                             <span className="text-gray-500 font-medium">Daily Average Time</span>
                             <span className="font-bold text-gray-700">
-                              {loadingSummary ? "..." : `${((dashboardSummary?.platform_usage?.total_hours ?? 0.0) / Math.max(1, dashboardSummary?.platform_usage?.total_days ?? 7)).toFixed(1)} hrs/day`}
+                              {loadingSummary ? "..." : `${filteredUsageDailyAvg} hrs/day`}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[11.5px] border-b border-gray-50 pb-2">
-                            <span className="text-gray-500 font-medium">Weekly Total Time</span>
+                            <span className="text-gray-500 font-medium">
+                              {usageRange === "weekly" ? "Weekly Total Time" : usageRange === "monthly" ? "Monthly Total Time" : "6-Month Total Time"}
+                            </span>
                             <span className="font-bold text-gray-700">
-                              {loadingSummary ? "..." : `${dashboardSummary?.platform_usage?.total_hours ?? 0.0} hrs`}
+                              {loadingSummary ? "..." : `${filteredUsageTotalHours} hrs`}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[11.5px] pb-1">
-                            <span className="text-gray-500 font-medium">Weekly Target Goal</span>
-                            <span className="font-bold text-emerald-600">3.5 hrs (Met)</span>
+                            <span className="text-gray-500 font-medium">
+                              {usageRange === "weekly" ? "Weekly Target Goal" : usageRange === "monthly" ? "Monthly Target Goal" : "6-Month Target Goal"}
+                            </span>
+                            <span className="font-bold text-emerald-600">
+                              {usageRange === "weekly" ? "3.5 hrs" : usageRange === "monthly" ? "15.0 hrs" : "90.0 hrs"} ({filteredUsageTotalHours >= (usageRange === "weekly" ? 3.5 : usageRange === "monthly" ? 15.0 : 90.0) ? "Met" : "In Progress"})
+                            </span>
                           </div>
                         </div>
                       </div>
