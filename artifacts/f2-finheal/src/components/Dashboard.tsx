@@ -421,8 +421,50 @@ export default function Dashboard({
             };
           });
 
+          // Fetch live wellness snapshot directly from database via the /wellness/{userId} endpoint (bypass API key if optional)
+          const dbWellness = await authRequest<any>(`wellness/${encodeURIComponent(userId)}`, { method: "GET" }).catch(() => null);
+
+          // Scan local storage for tests and merge them if not already retrieved by fetchTestResults
+          const localTests = [
+            { key: `finheal_loan_fit_test:${userId}`, type: "loan_fit" },
+            { key: `finheal_debt_balance_review:${userId}`, type: "debt_balance" },
+            { key: `finheal_credit_readiness:${userId}`, type: "credit_readiness" },
+            { key: `finheal_emergency_fund_check:${userId}`, type: "emergency_fund" },
+            { key: `finheal_financial_literacy_test:${userId}`, type: "financial_literacy" },
+          ];
+
+          const seenTypes = new Set(testScores.map((t: any) => t.test_id));
+          for (const t of localTests) {
+            if (seenTypes.has(t.type)) continue;
+            try {
+              const raw = localStorage.getItem(t.key);
+              if (!raw) continue;
+              const parsed = JSON.parse(raw);
+              if (!parsed?.completed || !parsed?.result) continue;
+              const meta = testMeta[t.type];
+              if (!meta) continue;
+              const score = parsed.result?.percentageScore != null
+                ? Math.round(parsed.result.percentageScore)
+                : parsed.result?.rawScore != null
+                ? Math.round(parsed.result.rawScore)
+                : parsed.result?.score != null
+                ? Math.round(parsed.result.score)
+                : 50;
+              
+              testScores.push({
+                test_id: t.type,
+                title: meta.title,
+                score: score,
+                date: parsed.updatedAt ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+              });
+              seenTypes.add(t.type);
+            } catch (e) {
+              console.warn("Failed to parse local test result in fallback dashboard aggregation:", e);
+            }
+          }
+
           // Compute nudges locally
-          let totalAttempted = testScores.length;
+          let totalAttempted = Math.max(testScores.length, wellness?.session_count ?? 0);
           let testNudge = "You haven't taken any financial health tests yet! Find out your Money IQ score now to avoid costly financial mistakes.";
           let recommendedTestId = "financial-literacy";
 
@@ -530,16 +572,17 @@ export default function Dashboard({
             } catch {}
           }
 
-          // Fallback mood trends using default stress levels
-          const wellnessScore = wellness?.score ?? 50;
+          // Fallback mood trends using database live stress if available
+          const wellnessScore = wellness?.score ?? dbWellness?.wellnessScore ?? 50;
+          const liveStress = dbWellness?.liveMoodState?.stress ?? dbWellness?.trendState?.stress_trend ?? wellnessScore;
           const fallbackSummary = {
             credit_score: creditScoreVal,
             next_appointment: nextApptVal,
             mood_trends: [
-              { date: "Mon", stress: Math.max(10, wellnessScore - 15) },
-              { date: "Wed", stress: Math.min(95, wellnessScore + 10) },
-              { date: "Fri", stress: wellnessScore },
-              { date: "Today", stress: wellnessScore }
+              { date: "Mon", stress: Math.max(10, liveStress - 15) },
+              { date: "Wed", stress: Math.min(95, liveStress + 10) },
+              { date: "Fri", stress: liveStress },
+              { date: "Today", stress: liveStress }
             ],
             tests: {
               total_attempted: totalAttempted,
