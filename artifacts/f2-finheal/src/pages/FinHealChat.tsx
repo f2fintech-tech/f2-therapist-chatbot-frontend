@@ -16,7 +16,7 @@ import type { MoodDimensions } from "@/lib/backendChat";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
-import { fetchHearts, fetchUserProfile } from "@/lib/backendAuth";
+import { fetchHearts, fetchUserProfile, authRequest } from "@/lib/backendAuth";
 import { syncGoalsFromBackend } from "@/utils/localGoals";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
@@ -109,6 +109,43 @@ export default function FinHealChat() {
   const userId = authSession?.userId || "";
   const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
   const chat = useBackendChat(userId);
+
+  // Platform Usage Time Tracker
+  useEffect(() => {
+    if (!userId) return;
+
+    let activeSeconds = 0;
+    const interval = setInterval(() => {
+      if (document.hasFocus()) {
+        activeSeconds += 10;
+        if (activeSeconds >= 60) {
+          activeSeconds = 0;
+          const dateKey = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+          const storageKey = `finheal_platform_usage_${userId}`;
+          let usageData: Record<string, number> = {};
+          try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) usageData = JSON.parse(raw);
+          } catch (e) {
+            console.warn("Failed to parse local platform usage data:", e);
+          }
+          const currentMins = usageData[dateKey] || 0;
+          usageData[dateKey] = currentMins + 1;
+          localStorage.setItem(storageKey, JSON.stringify(usageData));
+
+          authRequest<any>(`profile/track/usage/${encodeURIComponent(userId)}`, {
+            method: "POST",
+            body: JSON.stringify({ date: dateKey, minutes: 1 })
+          }).catch((err) => {
+            console.warn("Failed to sync platform usage to backend:", err);
+          });
+        }
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [userId]);
+
 
   // Reminders notifications state
   const [activeNotification, setActiveNotification] = useState<any | null>(null);
