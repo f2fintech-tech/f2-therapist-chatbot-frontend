@@ -1603,17 +1603,16 @@ export default function Dashboard({
 
                   {/* Stress level chart row - Chat Telemetry Mood trends & Education */}
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                    {/* Mood Trends Multi-Line Chart */}
+                    {/* Daily Stress Level line chart */}
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <div className="text-[13px] font-semibold text-gray-800">AI Chat Telemetry Mood Trends</div>
-                          <div className="text-[11px] text-gray-400">Stress, Solution Openness, and Urgency metrics logged from recent chat turns</div>
+                          <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
+                          <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
                         </div>
-                        <div className="flex gap-2.5 text-[9.5px]">
-                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#f43f5e]" />Stress</span>
-                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#10b981]" />Openness</span>
-                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#8b5cf6]" />Urgency</span>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
+                          <span className="text-gray-500">Stress Index (0-100)</span>
                         </div>
                       </div>
                       
@@ -1632,29 +1631,29 @@ export default function Dashboard({
                       ) : (
                         <ResponsiveContainer width="100%" height={180}>
                           <LineChart data={dashboardSummary.mood_trends} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#f43f5e" />
+                                <stop offset="100%" stopColor="#6366f1" />
+                              </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                            <Tooltip 
-                              content={({ active, payload, label }: any) => {
+                            <Tooltip content={({ active, payload, label }: any) => {
                                 if (!active || !payload?.length) return null;
                                 return (
                                   <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
                                     <div className="font-semibold text-gray-700 mb-1">{label}</div>
-                                    {payload.map((p: any) => (
-                                      <div key={p.name} className="flex items-center gap-2 mt-0.5">
-                                        <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                                        <span className="text-gray-500">{p.name}:</span>
-                                        <span className="font-semibold text-gray-800">{p.value}%</span>
-                                      </div>
-                                    ))}
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                                      <span className="text-gray-500">Stress:</span>
+                                      <span className="font-semibold text-gray-800">{payload[0].value}%</span>
+                                    </div>
                                   </div>
                                 );
-                              }} 
-                            />
-                            <Line type="monotone" dataKey="stress" name="Stress Index" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
-                            <Line type="monotone" dataKey="openness" name="Openness" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
-                            <Line type="monotone" dataKey="urgency" name="Urgency" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3 }} />
+                              }} />
+                            <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
                           </LineChart>
                         </ResponsiveContainer>
                       )}
