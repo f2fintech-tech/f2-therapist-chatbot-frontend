@@ -598,6 +598,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
           <>
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
             
+            <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
             <button
               type="button"
               onClick={handleOpenTalkToFinHeal}
@@ -609,7 +610,6 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <span>Talk to FinHeal</span>
             </button>
             <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
-            <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
             {!isStaff && (
               <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
             )}
@@ -645,60 +645,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
         )}
       </div>
 
-      <DropdownMenu>
-        <div className="p-[12px] border-t border-gray-100 flex items-center gap-[10px] hover:bg-gray-50 transition-colors group">
-          <button
-            type="button"
-            className="w-[32px] h-[32px] rounded-full bg-gradient-to-br from-primary to-[#4a5cf0] flex items-center justify-center text-[12px] font-bold text-white shrink-0 overflow-hidden"
-            aria-label="Open account menu"
-          >
-            {userProfile.avatarUrl ? (
-              <img src={userProfile.avatarUrl} alt={userProfile.displayName} className="h-full w-full object-cover" />
-            ) : (
-              userProfile.initials
-            )}
-          </button>
-          <button
-            type="button"
-            className="text-left flex-1"
-            onClick={onOpenProfile}
-            aria-label="Open profile page"
-          >
-            <div className="text-[13px] font-semibold text-gray-800">{userProfile.displayName}</div>
-          </button>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="ml-auto text-[15px] text-gray-300 transition-transform duration-300 group-hover:rotate-60 hover:text-gray-500"
-              aria-label="Open settings menu"
-            >
-              ⚙️
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" sideOffset={10} className="w-[180px] rounded-[14px] border border-gray-200 bg-white p-[6px] shadow-[0_20px_50px_rgba(15,23,42,0.14)]">
-            <DropdownMenuItem
-              className="cursor-pointer rounded-[10px] px-[12px] py-[10px] text-[13px] font-medium text-gray-700 outline-none transition-colors hover:bg-[#f6f7fe] hover:text-primary focus:bg-[#f6f7fe]"
-              onSelect={(event) => {
-                event.preventDefault();
-                onOpenProfile();
-              }}
-            >
-              Profile
-            </DropdownMenuItem>
-            {onLogout && (
-              <DropdownMenuItem
-                className="cursor-pointer rounded-[10px] px-[12px] py-[10px] text-[13px] font-medium text-gray-700 outline-none transition-colors hover:bg-[#fef2f2] hover:text-[#dc2626] focus:bg-[#fef2f2]"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  onLogout();
-                }}
-              >
-                Sign Out
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </div>
-      </DropdownMenu>
+
       {/* Confirm delete dialog for goals */}
       <ConfirmDeleteDialog
         isOpen={isDeleteDialogOpen}

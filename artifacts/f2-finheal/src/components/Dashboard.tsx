@@ -1375,7 +1375,7 @@ export default function Dashboard({
               <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[14px] px-4 py-2.5 text-white flex items-center gap-3 shadow-xs">
                 <span className="text-[20px] select-none">⏱️</span>
                 <div>
-                  <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Platform Time</div>
+                  <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Active Hours</div>
                   <div className="text-[15px] font-bold leading-none mt-1">
                     {loadingSummary ? "..." : `${filteredUsageTotalHours}h`}
                   </div>
@@ -1962,10 +1962,10 @@ export default function Dashboard({
                       onClick={() => onNavigate("Financial Education")}
                     />
 
-                    {/* Platform Usage Card */}
+                    {/* Active Hours Card */}
                     <StatCard 
                       icon="⏱️" 
-                      label="Platform Time" 
+                      label="Active Hours" 
                       value={`${filteredUsageTotalHours} Hours`} 
                       sub={`Active for ${filteredUsageDays} day(s)`} 
                       color="#ec4899" 
@@ -2171,15 +2171,15 @@ export default function Dashboard({
                     </div>
                   </div>
 
-                  {/* Platform Time Chart row */}
+                  {/* Active Hours Chart row */}
                   <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                    {/* Daily Platform Time Area Chart */}
+                    {/* Daily Active Hours Area Chart */}
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "300ms" }}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
-                          <div className="text-[13px] font-semibold text-gray-800">Daily Platform Time</div>
+                          <div className="text-[13px] font-semibold text-gray-800">Daily Active Hours</div>
                           <div className="text-[11px] text-gray-400">
-                            {usageRange === "weekly" ? "Hours spent active on the platform over the last week" : usageRange === "monthly" ? "Hours spent active on the platform over the last month" : "Hours spent active on the platform over the last 6 months"}
+                            {usageRange === "weekly" ? "Hours active on the platform over the last week" : usageRange === "monthly" ? "Hours active on the platform over the last month" : "Hours active on the platform over the last 6 months"}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">

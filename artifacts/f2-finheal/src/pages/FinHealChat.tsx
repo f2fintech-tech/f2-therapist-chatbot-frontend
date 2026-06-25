@@ -107,7 +107,7 @@ export default function FinHealChat() {
   const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
-  const userProfile = authSession ? createUserProfile(userId, authSession.displayName, authSession.avatarUrl) : null;
+  const userProfile = authSession ? { ...createUserProfile(userId, authSession.displayName, authSession.avatarUrl), email: authSession.email } : null;
   const chat = useBackendChat(userId);
 
   // Platform Usage Time Tracker
@@ -834,6 +834,7 @@ export default function FinHealChat() {
               setAuthSession(null);
             }}
             onOpenEligibilityCibil={openEligibilityCibil}
+            onOpenProfile={openProfilePage}
           />
         ) : mainView === "tests" ? (
           <FinancialHealthTestCatalog

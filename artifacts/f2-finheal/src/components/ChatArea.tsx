@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import StreamingMessage from "./StreamingMessage";
 
@@ -29,6 +37,7 @@ interface ChatAreaProps {
   prefillMessage?: { text: string; card: string };
   onClearPrefill?: () => void;
   onOpenEligibilityCibil?: () => void;
+  onOpenProfile?: () => void;
 }
 
 
@@ -56,12 +65,29 @@ export default function ChatArea({
   prefillMessage,
   onClearPrefill,
   onOpenEligibilityCibil,
+  onOpenProfile,
 }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [showAd, setShowAd] = useState(true);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("theme") || "light";
+    }
+    return "light";
+  });
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const handleStartEdit = (messageId: string, currentContent: string) => {
     setEditingMessageId(messageId);
@@ -270,40 +296,40 @@ export default function ChatArea({
           }
         }
       `}</style>
-      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
-        <div className="flex items-start gap-[10px] sm:items-center">
+      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white dark:bg-slate-950 dark:border-slate-800 rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
+        <div className="flex items-start gap-[10px] sm:items-center w-full">
           {!isSidebarOpen && (
             <button
               onClick={onToggleSidebar}
-              className="auth-screen-nav-toggle fixed left-[12px] top-[12px] hidden h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 z-50 shadow-sm"
+              className="auth-screen-nav-toggle fixed left-[12px] top-[12px] hidden h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 items-center justify-center text-[18px] transition-all hover:bg-gray-200 dark:hover:bg-slate-700 shrink-0 z-50 shadow-sm"
               aria-label="Toggle sidebar"
             >
               ☰
             </button>
           )}
           <div className="flex-1 min-w-3 lg:pl-5">
-            <div className="text-[18px] font-bold text-gray-900 pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
-            <div className="text-[10px] text-gray-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
+            <div className="text-[18px] font-bold text-gray-900 dark:text-slate-100 pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
+            <div className="text-[10px] text-gray-400 dark:text-slate-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
               <span
-                className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
+                className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] dark:shadow-[0_0_0_2px_rgba(16,185,129,0.1)] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
               />
               FinHeal AI · {latestConversation} · {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
             </div>
 
             {typeof remainingHearts === "number" && (
-              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 bg-white/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] lg:w-[calc(100%-32px)] lg:mx-auto">
+              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] lg:w-[calc(100%-32px)] lg:mx-auto">
                 <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div className="text-[13px] font-semibold text-slate-900">Hearts remaining</div>
-                    <div className="mt-[6px] text-[12px] text-slate-500">Each chat uses 10 hearts. Sign up for more access.</div>
+                    <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">Hearts remaining</div>
+                    <div className="mt-[6px] text-[12px] text-slate-500 dark:text-slate-400">Each chat uses 10 hearts. Sign up for more access.</div>
                   </div>
-                  <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
+                  <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 dark:bg-slate-805 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 dark:text-slate-100 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
                     <span className="heart-pump" aria-hidden="true">❤️</span>
                     <span>{remainingHearts} / 50</span>
                   </div>
                 </div>
 
-                <div className="mt-[12px] h-[14px] overflow-hidden rounded-full bg-slate-200 shadow-inner">
+                <div className="mt-[12px] h-[14px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 shadow-inner">
                   <div
                     className={`h-full rounded-full bg-gradient-to-r from-primary via-cyan-500 to-emerald-500 transition-all duration-500 ease-out ${
                       remainingHearts <= 10 ? "shadow-[0_0_0_8px_rgba(254,226,226,0.16)]" : ""
@@ -312,18 +338,18 @@ export default function ChatArea({
                   />
                 </div>
 
-                <div className="mt-[10px] flex items-center justify-between text-[11px] text-slate-500">
+                <div className="mt-[10px] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                   <span>
                     {remainingHearts <= 0 ? (
                       <button
                         onClick={onSignupPrompt}
-                        className="font-semibold text-primary underline hover:text-[#1e2db8]"
+                        className="font-semibold text-primary dark:text-indigo-400 underline hover:text-[#1e2db8] dark:hover:text-indigo-300"
                       >
                         Hearts exhausted — click here to sign up and continue chatting free
                       </button>
                     ) : "Progress toward sign up — every chat reduces your hearts."}
                   </span>
-                  <span className="font-semibold text-slate-700">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
                 </div>
               </div>
             )}
@@ -331,7 +357,7 @@ export default function ChatArea({
           {showAd && (
             <div 
               onClick={onOpenEligibilityCibil}
-              className="hidden sm:flex items-center gap-[8px] h-[30px] px-[12px] rounded-full border border-cyan-500/20 bg-cyan-50/10 backdrop-blur-md text-[11px] font-semibold cursor-pointer transition-all duration-300 hover:border-cyan-500/40 hover:bg-cyan-50/20 ad-header-glow mr-[100px] sm:mr-[120px] lg:mr-[140px] shrink-0 text-left relative"
+              className="hidden sm:flex items-center gap-[8px] h-[30px] px-[12px] rounded-full border border-cyan-500/20 dark:border-cyan-500/30 bg-cyan-50/10 backdrop-blur-md text-[11px] font-semibold cursor-pointer transition-all duration-300 hover:border-cyan-500/40 dark:hover:border-cyan-500/50 hover:bg-cyan-50/20 ad-header-glow shrink-0 text-left relative"
             >
               <style>{`
                 @keyframes neonGlow {
@@ -355,43 +381,142 @@ export default function ChatArea({
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
               </span>
               
-              <span className="text-slate-600 tracking-wide font-sans font-medium hover:text-slate-900 transition-colors">
+              <span className="text-slate-600 dark:text-slate-300 tracking-wide font-sans font-medium hover:text-slate-900 dark:hover:text-white transition-colors">
                 Check CIBIL & Loan Eligibility
               </span>
                           
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowAd(false); }} 
-                className="text-slate-400 hover:text-slate-600 font-sans text-[11px] p-0.5 ml-1 transition cursor-pointer select-none leading-none focus:outline-none"
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 font-sans text-[11px] p-0.5 ml-1 transition cursor-pointer select-none leading-none focus:outline-none"
                 aria-label="Dismiss"
               >
                 ✕
               </button>
             </div>
           )}
-        </div>
-        {onLogout && (
-          <div className="flex w-full flex-wrap gap-[6px] justify-end">
-            <button onClick={onLogout} className="h-[30px] px-[12px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary sm:text-[11.5px] cursor-pointer">
-              🚪 Sign out
-            </button>
-          </div>
-        )}
-      </div>
 
-      {!isInsightsOpen && (
-        <div className="fixed right-[12px] top-[12px] flex items-center gap-[6px] z-50">
-          <button onClick={handleClearDraft} className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 bg-white text-gray-600 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] hover:bg-[#f6f7fe] hover:text-primary cursor-pointer shadow-sm" title="Clear draft text">
-            🗑 Clear
-          </button>
-          <button
-            onClick={onToggleInsights}
-            className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 shrink-0 shadow-sm 2xl:hidden"
-            aria-label="Toggle insights panel"
-          >
-            ☰
-          </button>
+          {/* Action controls container */}
+          <div className="ml-auto flex items-center gap-3 shrink-0">
+            {/* Clear Button */}
+            <button
+              onClick={handleClearDraft}
+              className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] dark:hover:border-slate-700 hover:bg-[#f6f7fe] dark:hover:bg-slate-800 hover:text-primary dark:hover:text-indigo-400 cursor-pointer shadow-sm"
+              title="Clear draft text"
+            >
+              🗑 Clear
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white cursor-pointer transition-all shadow-sm"
+              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+            >
+              {theme === "light" ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-slate-700">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-amber-500">
+                  <circle cx="12" cy="12" r="4"/>
+                  <path d="M12 2v2"/>
+                  <path d="M12 20v2"/>
+                  <path d="M4.93 4.93l1.41 1.41"/>
+                  <path d="M17.66 17.66l1.41 1.41"/>
+                  <path d="M2 12h2"/>
+                  <path d="M20 12h2"/>
+                  <path d="M6.34 17.66l-1.41 1.41"/>
+                  <path d="M19.07 4.93l-1.41 1.41"/>
+                </svg>
+              )}
+            </button>
+
+            {/* Profile Dropdown Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="relative flex items-center justify-center w-8 h-8 rounded-full cursor-pointer focus:outline-none hover:ring-2 hover:ring-primary/20 transition-all select-none">
+                  {userProfile.avatarUrl ? (
+                    <img
+                      src={userProfile.avatarUrl}
+                      alt={userProfile.displayName}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+                      {userProfile.initials}
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex items-center gap-3 px-1 py-1.5">
+                    <div className="relative flex w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm items-center justify-center shrink-0">
+                      {userProfile.avatarUrl ? (
+                        <img
+                          src={userProfile.avatarUrl}
+                          alt={userProfile.displayName}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span>{userProfile.initials}</span>
+                      )}
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
+                        {userProfile.displayName}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                        {userProfile.email?.toLowerCase().endsWith("@f2fintech.com") ? "Employee" : "Standard"}
+                      </span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={onOpenProfile}
+                  className="cursor-pointer text-gray-700 dark:text-slate-200 focus:bg-gray-50 dark:focus:bg-slate-800 focus:text-gray-900 dark:focus:text-slate-100 flex items-center gap-2 px-3 py-2 rounded-md transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>My Profile</span>
+                </DropdownMenuItem>
+                {onLogout && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={onLogout}
+                      className="cursor-pointer text-rose-600 dark:text-rose-400 focus:bg-rose-50 dark:focus:bg-rose-950/30 focus:text-rose-700 dark:focus:text-rose-300 flex items-center gap-2 px-3 py-2 rounded-md transition-colors font-medium"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-rose-500">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Insights Panel Toggle Button */}
+            {!isInsightsOpen && (
+              <button
+                onClick={onToggleInsights}
+                className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 dark:hover:bg-slate-700 shrink-0 shadow-sm 2xl:hidden"
+                aria-label="Toggle insights panel"
+              >
+                ☰
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       {error && (
         <div className="mx-[16px] mt-[14px] rounded-[14px] border border-[#fecaca] bg-[#fef2f2] px-[14px] py-[10px] text-[12px] text-[#b91c1c] sm:mx-[20px]">
