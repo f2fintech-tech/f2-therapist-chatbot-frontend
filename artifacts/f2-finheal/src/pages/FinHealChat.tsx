@@ -835,6 +835,7 @@ export default function FinHealChat() {
             }}
             onOpenEligibilityCibil={openEligibilityCibil}
             onOpenProfile={openProfilePage}
+            onLogout={handleLogout}
           />
         ) : mainView === "tests" ? (
           <FinancialHealthTestCatalog

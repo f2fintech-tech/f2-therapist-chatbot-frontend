@@ -73,22 +73,6 @@ export default function ChatArea({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
 
-  const [theme, setTheme] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("theme") || "light";
-    }
-    return "light";
-  });
-
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
   const handleStartEdit = (messageId: string, currentContent: string) => {
     setEditingMessageId(messageId);
     setEditingValue(currentContent);
@@ -406,31 +390,6 @@ export default function ChatArea({
               🗑 Clear
             </button>
 
-            {/* Theme Toggle Button */}
-            <button
-              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800/60 hover:text-gray-900 dark:hover:text-white cursor-pointer transition-all shadow-sm"
-              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-            >
-              {theme === "light" ? (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-slate-700">
-                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-amber-500">
-                  <circle cx="12" cy="12" r="4"/>
-                  <path d="M12 2v2"/>
-                  <path d="M12 20v2"/>
-                  <path d="M4.93 4.93l1.41 1.41"/>
-                  <path d="M17.66 17.66l1.41 1.41"/>
-                  <path d="M2 12h2"/>
-                  <path d="M20 12h2"/>
-                  <path d="M6.34 17.66l-1.41 1.41"/>
-                  <path d="M19.07 4.93l-1.41 1.41"/>
-                </svg>
-              )}
-            </button>
-
             {/* Profile Dropdown Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -497,7 +456,7 @@ export default function ChatArea({
                         <polyline points="16 17 21 12 16 7" />
                         <line x1="21" y1="12" x2="9" y2="12" />
                       </svg>
-                      <span>Logout</span>
+                      <span>Sign out</span>
                     </DropdownMenuItem>
                   </>
                 )}
