@@ -4,9 +4,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "pnpm --filter @workspace/f2-finheal dev",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build": "pnpm run typecheck && pnpm --filter @workspace/f2-finheal run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter @workspace/f2-finheal --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "dependencies": {
