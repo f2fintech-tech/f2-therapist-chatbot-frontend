@@ -634,8 +634,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
             )}
 
-            {/* If Expert or Super Admin */}
-            {(isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()))) && (
+            {/* If Expert/Advisor */}
+            {isUserAdvisor(userEmail) && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 
