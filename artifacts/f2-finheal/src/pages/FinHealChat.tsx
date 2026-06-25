@@ -490,6 +490,7 @@ export default function FinHealChat() {
   }, []);
 
   const isUserAdvisor = (email?: string) => {
+    if (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) return false;
     if (authSession?.isAdvisor) return true;
     try {
       const storedSession = localStorage.getItem("finheal-auth-session");

@@ -91,9 +91,13 @@ function ScoreRing({ score, size = 140 }: { score: number; size?: number }) {
 }
 
 /* ─── Stat card ─── */
-function StatCard({ icon, label, value, sub, color, delay = 0 }: any) {
+function StatCard({ icon, label, value, sub, color, delay = 0, onClick, className }: any) {
   return (
-    <div className="dashboard-card animate-fade-up flex flex-col gap-3 p-5" style={{ animationDelay: `${delay}ms` }}>
+    <div 
+      className={`dashboard-card animate-fade-up flex flex-col gap-3 p-5 ${onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-px transition-all duration-200' : ''} ${className || ''}`} 
+      style={{ animationDelay: `${delay}ms` }}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[18px] shrink-0" style={{ background: `${color}18` }}>
           {icon}
@@ -377,6 +381,43 @@ export default function Dashboard({
 }: DashboardProps) {
   const { data: wellness } = useGetWellnessScore(userId);
 
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState<boolean>(true);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSummary() {
+      if (!userId) return;
+      try {
+        setLoadingSummary(true);
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const res = await fetch(`${apiBase}/dashboard/summary?user_id=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (active) {
+            setDashboardSummary(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard summary:", err);
+      } finally {
+        if (active) {
+          setLoadingSummary(false);
+        }
+      }
+    }
+    loadSummary();
+
+    const handleWellnessUpdate = () => {
+      loadSummary();
+    };
+    window.addEventListener("finheal:wellness_update", handleWellnessUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("finheal:wellness_update", handleWellnessUpdate);
+    };
+  }, [userId]);
+
   const getMemberSinceText = () => {
     try {
       const storageKey = `finheal_setup_date_${userId}`;
@@ -402,6 +443,7 @@ export default function Dashboard({
   const [activeTab, setActiveTab] = useState<"overview" | "loans" | "reports" | "advisor">("overview");
 
   const isUserAdvisor = (email?: string) => {
+    if (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) return false;
     try {
       const storedSession = localStorage.getItem("finheal-auth-session");
       if (storedSession) {
@@ -1419,133 +1461,251 @@ export default function Dashboard({
             </div>
           ) : (
             <div className="flex flex-col gap-6">
-
-              {/* KPI row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon="💰" label="Net Worth" value={`₹${(netWorth / 100000).toFixed(1)}L`} sub="↑ 5.7% vs last month" color="#10b981" delay={0} />
-                <StatCard icon="📉" label="Total Debt" value={`₹${(totalDebt / 100000).toFixed(1)}L`} sub={`${activeLoansCount} active loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={80} />
-                <StatCard icon="🏦" label="Monthly EMI" value={`₹${totalEmiVal.toLocaleString()}`} sub={`${emiPct}% of income`} color={BRAND} delay={160} />
-                <StatCard icon="💸" label="Monthly Savings" value={`₹${Math.round(incomeVal * 0.27).toLocaleString()}`} sub="Based on 27% savings rate" color="#f59e0b" delay={240} />
-              </div>
-
-              {/* Chart row */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Income vs Expense area chart */}
-                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "100ms" }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-[13px] font-semibold text-gray-800">Income vs Expenses</div>
-                      <div className="text-[11px] text-gray-400">Last 6 months</div>
-                    </div>
-                    <div className="flex gap-3 text-[10px]">
-                      <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Income</span>
-                      <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#ef4444]" />Expenses</span>
-                    </div>
-                  </div>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <AreaChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={BRAND} stopOpacity={0.15} />
-                          <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="income" name="Income" stroke={BRAND} strokeWidth={2} fill="url(#gradIncome)" dot={false} />
-                      <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#gradExpense)" dot={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+              {loadingSummary ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 animate-pulse">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3" />
+                  <p className="text-[12px] text-gray-500 font-semibold">Generating your dashboard telemetry...</p>
                 </div>
+              ) : (
+                <>
+                  {/* KPI row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Credit Health Card */}
+                    <StatCard 
+                      icon="🛡️" 
+                      label="Credit Health" 
+                      value={dashboardSummary?.credit_score?.score ? String(dashboardSummary.credit_score.score) : "No Score"} 
+                      sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"} 
+                      color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"} 
+                      delay={0} 
+                      onClick={() => onNavigate("Eligibility & CIBIL Checker")}
+                    />
+                    
+                    {/* Advisor Call Card */}
+                    <StatCard 
+                      icon="📅" 
+                      label="Advisor Call" 
+                      value={dashboardSummary?.next_appointment ? dashboardSummary.next_appointment.advisor_name : "No Bookings"} 
+                      sub={dashboardSummary?.next_appointment ? `${dashboardSummary.next_appointment.date} · ${dashboardSummary.next_appointment.time}` : "Schedule a call now →"} 
+                      color={dashboardSummary?.next_appointment ? "#10b981" : "#f59e0b"} 
+                      delay={80} 
+                      onClick={dashboardSummary?.next_appointment ? () => { if (dashboardSummary.next_appointment.meet_url) window.open(dashboardSummary.next_appointment.meet_url, "_blank"); } : () => onNavigate("Talk to an Advisor")}
+                    />
+                    
+                    {/* Financial Health Tests Card */}
+                    <StatCard 
+                      icon="🧭" 
+                      label="Tests Attempted" 
+                      value={String(dashboardSummary?.tests?.total_attempted ?? 0)} 
+                      sub={dashboardSummary?.tests?.scores?.[0] ? `Last: ${dashboardSummary.tests.scores[0].title} (${dashboardSummary.tests.scores[0].score}%)` : "Take a financial quiz →"} 
+                      color={BRAND} 
+                      delay={160} 
+                      onClick={() => onNavigate("Financial Health Test")}
+                    />
+                    
+                    {/* Educational Resources Card */}
+                    <StatCard 
+                      icon="📚" 
+                      label="Content Consumed" 
+                      value={String((dashboardSummary?.education?.articles_read_count ?? 0) + (dashboardSummary?.education?.videos_watched_count ?? 0))} 
+                      sub={`${dashboardSummary?.education?.articles_read_count ?? 0} articles · ${dashboardSummary?.education?.videos_watched_count ?? 0} videos`} 
+                      color="#8b5cf6" 
+                      delay={240} 
+                      onClick={() => onNavigate("Financial Education")}
+                    />
+                  </div>
 
-                {/* Spend pie */}
-                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5" style={{ animationDelay: "150ms" }}>
-                  <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Spending Breakdown</div>
-                  <div className="text-[11px] text-gray-400 mb-3">This month · ₹{(incomeVal - Math.round(incomeVal * 0.27)).toLocaleString()}</div>
-                  <ResponsiveContainer width="100%" height={140}>
-                    <PieChart>
-                      <Pie data={dynamicSpendPie} cx="50%" cy="50%" innerRadius={38} outerRadius={62} paddingAngle={3} dataKey="value">
-                        {dynamicSpendPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="flex flex-col gap-1.5 mt-2">
-                    {dynamicSpendPie.slice(0, 4).map((item) => (
-                      <div key={item.name} className="flex items-center justify-between text-[10.5px]">
-                        <span className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: item.color }} />
-                          <span className="text-gray-500">{item.name}</span>
-                        </span>
-                        <span className="font-semibold text-gray-700">₹{item.value.toLocaleString()}</span>
+                  {/* Chart row - Financial Health Tests */}
+                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    {/* Test Scores Bar Chart */}
+                    <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "100ms" }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="text-[13px] font-semibold text-gray-800">Financial Health Quiz Performance</div>
+                          <div className="text-[11px] text-gray-400">Score percentage for each attempted test category</div>
+                        </div>
+                        <div className="flex gap-3 text-[10px]">
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3244e6]" />Score (%)</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                      
+                      {(!dashboardSummary?.tests?.scores || dashboardSummary.tests.scores.length === 0) ? (
+                        <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
+                          <p className="text-[24px] mb-2">🧭</p>
+                          <p className="text-[12px] font-bold text-gray-700">No Test Data Available</p>
+                          <p className="text-[11px] text-gray-400 max-w-[280px] mt-1">Take your first Financial Health Test to view your score breakdown and personal benchmarks here.</p>
+                          <button
+                            onClick={() => onNavigate("Financial Health Test")}
+                            className="mt-3 px-3 py-1.5 text-[11px] font-semibold text-white bg-primary rounded-lg transition-all active:scale-95 cursor-pointer"
+                          >
+                            Start Test Now
+                          </button>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={180}>
+                          <BarChart data={[...dashboardSummary.tests.scores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                            <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                            <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
+                            <Bar dataKey="score" fill={BRAND} radius={[4, 4, 0, 0]} barSize={32} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
 
-              {/* Stress level chart row */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Daily Stress Level line chart */}
-                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <div className="text-[13px] font-semibold text-gray-800">Daily Stress Level</div>
-                      <div className="text-[11px] text-gray-400">Last 7 days · Stress Index</div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px]">
-                      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: "linear-gradient(135deg, #f43f5e, #6366f1)" }} />
-                      <span className="text-gray-500">Stress Index (0-100)</span>
+                    {/* Test Suggestions Card */}
+                    <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "150ms" }}>
+                      <div>
+                        <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Test Results & Insights</div>
+                        <div className="text-[11px] text-gray-400 mb-3">
+                          {dashboardSummary?.tests?.total_attempted ?? 0} total test(s) completed
+                        </div>
+                        
+                        <div className="space-y-2 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
+                          {(!dashboardSummary?.tests?.scores || dashboardSummary.tests.scores.length === 0) ? (
+                            <div className="text-[11px] text-gray-400 italic py-2 text-center">No completed tests record found.</div>
+                          ) : (
+                            dashboardSummary.tests.scores.map((item: any) => {
+                              const badgeColor = item.score >= 75 ? "bg-emerald-50 text-emerald-700 border-emerald-100" : item.score >= 50 ? "bg-amber-50 text-amber-700 border-amber-100" : "bg-rose-50 text-rose-700 border-rose-100";
+                              return (
+                                <div key={item.test_id} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
+                                  <div className="min-w-0 flex-1 pr-2">
+                                    <div className="font-semibold text-gray-700 truncate">{item.title}</div>
+                                    <div className="text-[9px] text-gray-455">{item.date}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeColor}`}>
+                                    {item.score}%
+                                  </span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <div className="bg-[#fef3c7] border border-[#fde68a] rounded-[10px] p-3 text-[10.5px] text-[#92400e] leading-relaxed">
+                          <strong>💡 Test Nudge:</strong> {dashboardSummary?.tests?.nudge_message}
+                        </div>
+                        
+                        {dashboardSummary?.tests?.recommended_test_id && (
+                          <button
+                            onClick={() => onNavigate("Financial Health Test")}
+                            className="w-full mt-3 py-2 rounded-[10px] text-[11px] font-semibold text-white bg-primary hover:opacity-95 transition-all active:scale-95 text-center cursor-pointer"
+                          >
+                            Attempt Recommended Quiz →
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <LineChart data={stressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f43f5e" />
-                          <stop offset="100%" stopColor="#6366f1" />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
 
-                {/* Quick Insights or summary card */}
-                <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
-                  <div>
-                    <div className="text-[13px] font-semibold text-gray-800 mb-1">Stress Analysis</div>
-                    <div className="text-[11px] text-gray-400 mb-4">Weekly overview</div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-gray-500">Average Stress Level</span>
-                        <span className="font-bold text-gray-800">46 / 100</span>
+                  {/* Stress level chart row - Chat Telemetry Mood trends & Education */}
+                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    {/* Mood Trends Multi-Line Chart */}
+                    <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-3 p-5" style={{ animationDelay: "200ms" }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="text-[13px] font-semibold text-gray-800">AI Chat Telemetry Mood Trends</div>
+                          <div className="text-[11px] text-gray-400">Stress, Solution Openness, and Urgency metrics logged from recent chat turns</div>
+                        </div>
+                        <div className="flex gap-2.5 text-[9.5px]">
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#f43f5e]" />Stress</span>
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#10b981]" />Openness</span>
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[#8b5cf6]" />Urgency</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-gray-500">Peak Stress Day</span>
-                        <span className="font-bold text-red-500">Wednesday (72)</span>
+                      
+                      {(!dashboardSummary?.mood_trends || dashboardSummary.mood_trends.length === 0) ? (
+                        <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
+                          <p className="text-[24px] mb-2">💬</p>
+                          <p className="text-[12px] font-bold text-gray-700">No Chat Logged Moods</p>
+                          <p className="text-[11px] text-gray-400 max-w-[280px] mt-1">Start chatting with FinHeal, your AI Therapist, to generate live emotional and wellness insights.</p>
+                          <button
+                            onClick={() => onNavigate("Talk to FinHeal")}
+                            className="mt-3 px-3 py-1.5 text-[11px] font-semibold text-white bg-primary rounded-lg transition-all active:scale-95 cursor-pointer"
+                          >
+                            Start Chatting
+                          </button>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={180}>
+                          <LineChart data={dashboardSummary.mood_trends} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                            <Tooltip 
+                              content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                    <div className="font-semibold text-gray-700 mb-1">{label}</div>
+                                    {payload.map((p: any) => (
+                                      <div key={p.name} className="flex items-center gap-2 mt-0.5">
+                                        <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+                                        <span className="text-gray-500">{p.name}:</span>
+                                        <span className="font-semibold text-gray-800">{p.value}%</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }} 
+                            />
+                            <Line type="monotone" dataKey="stress" name="Stress Index" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
+                            <Line type="monotone" dataKey="openness" name="Openness" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+                            <Line type="monotone" dataKey="urgency" name="Urgency" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+
+                    {/* Educational Consumption Suggestions Card */}
+                    <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
+                      <div>
+                        <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Educational Insights</div>
+                        <div className="text-[11px] text-gray-400 mb-4">Consumption by topic category</div>
+                        
+                        <div className="space-y-3">
+                          {["Loans", "Credit", "Business"].map((cat) => {
+                            const count = dashboardSummary?.education?.category_breakdown?.[cat] ?? 0;
+                            // Calculate simple progress width representation
+                            const maxVal = Math.max(1, ...Object.values(dashboardSummary?.education?.category_breakdown ?? {}).map((v: any) => typeof v === 'number' ? v : 0));
+                            const pct = Math.round((count / maxVal) * 100);
+                            const colorsMap: Record<string, string> = { Loans: BRAND, Credit: "#10b981", Business: "#f59e0b" };
+                            return (
+                              <div key={cat}>
+                                <div className="flex justify-between text-[11px] mb-1">
+                                  <span className="text-gray-500 font-medium">{cat} Articles & Videos</span>
+                                  <span className="font-bold text-gray-700">{count} consumed</span>
+                                </div>
+                                <div className="h-[5px] bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: colorsMap[cat] }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-gray-500">Lowest Stress Day</span>
-                        <span className="font-bold text-emerald-500">Sunday (25)</span>
+                      
+                      <div className="mt-4 border-t border-gray-50 pt-3">
+                        <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-[10px] p-3 text-[10.5px] text-[#1e40af] leading-relaxed">
+                          <strong>📚 Suggestion:</strong> {dashboardSummary?.education?.nudge_message}
+                        </div>
+                        
+                        {dashboardSummary?.education?.recommended_content_id && (
+                          <button
+                            onClick={() => onNavigate("Financial Education")}
+                            className="w-full mt-3 py-2 rounded-[10px] text-[11px] font-semibold text-white bg-primary hover:opacity-95 transition-all active:scale-95 text-center cursor-pointer"
+                          >
+                            View Recommended Guide →
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <div className="bg-[#fef2f2] border border-[#fecaca] rounded-[10px] p-3 text-[11px] text-[#b91c1c] leading-relaxed mt-4">
-                    <strong>💡 Stress Nudge:</strong> {stressNudgeText}
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
 
               {/* Goals overview */}
               {!isStaff && (
