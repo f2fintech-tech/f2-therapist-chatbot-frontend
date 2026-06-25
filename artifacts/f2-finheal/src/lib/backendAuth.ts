@@ -220,6 +220,9 @@ export async function saveTestResult(payload: TestResultPayload): Promise<void> 
     method: "POST",
     body: JSON.stringify(payload),
   });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+  }
 }
 
 export async function fetchTestResults(userId: string): Promise<{

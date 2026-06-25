@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest } from "@/lib/backendAuth";
 import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -390,13 +390,11 @@ export default function Dashboard({
       if (!userId) return;
       try {
         setLoadingSummary(true);
-        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-        const res = await fetch(`${apiBase}/dashboard/summary?user_id=${userId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (active) {
-            setDashboardSummary(data);
-          }
+        const data = await authRequest<any>(`dashboard/summary?user_id=${encodeURIComponent(userId)}`, {
+          method: "GET"
+        });
+        if (active) {
+          setDashboardSummary(data);
         }
       } catch (err) {
         console.error("Failed to load dashboard summary:", err);
