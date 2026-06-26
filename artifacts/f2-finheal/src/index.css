@@ -410,7 +410,8 @@ main > div.sticky > div:first-child {
 .financial-literacy-view ~ .global-profile-dropdown,
 .test-catalog-view ~ .global-profile-dropdown,
 .chat-view ~ .global-profile-dropdown,
-.debt-balance-view ~ .global-profile-dropdown {
+.debt-balance-view ~ .global-profile-dropdown,
+.admin-view ~ .global-profile-dropdown {
   top: 11px;
 }
 
