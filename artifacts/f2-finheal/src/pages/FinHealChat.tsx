@@ -817,7 +817,7 @@ export default function FinHealChat() {
         />
         <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           {mainView === "chat" || mainView === "goals" ? (
-          <ChatArea
+            <ChatArea
             conversationId={chat.conversationId}
             conversationCount={chat.conversationCount}
             error={chat.error}

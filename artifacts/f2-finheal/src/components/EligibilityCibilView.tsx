@@ -912,7 +912,7 @@ export default function EligibilityCibilView({
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200">
+    <div className="eligibility-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200">
       
       {/* Header */}
       <header className="flex flex-col gap-[14px] border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0 sm:flex-row sm:items-center sm:justify-between">

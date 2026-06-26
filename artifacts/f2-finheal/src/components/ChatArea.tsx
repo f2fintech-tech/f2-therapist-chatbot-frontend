@@ -383,8 +383,6 @@ export default function ChatArea({
               🗑 Clear
             </button>
 
-
-
             {/* Insights Panel Toggle Button */}
             {!isInsightsOpen && (
               <button
