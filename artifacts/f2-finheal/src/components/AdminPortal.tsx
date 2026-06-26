@@ -1487,7 +1487,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // ==================== RENDERING WORKSPACE ====================
   if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
     return (
-      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
+      <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
         <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
           <div className="text-[32px] text-center mb-[12px]">🔒</div>
           <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Access Denied</h3>
@@ -1500,7 +1500,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   }
 
   return (
-    <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
+    <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
 
       {/* HEADER SECTION */}
       <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
