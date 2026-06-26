@@ -274,7 +274,7 @@ export default function ChatArea({
           display: none;
         }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1023px) {
           .auth-screen-nav-toggle {
             display: flex !important;
           }

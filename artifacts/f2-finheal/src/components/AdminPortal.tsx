@@ -8,6 +8,7 @@ import { getEffectiveAvailability } from "@/utils/availability";
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
 import { type LenderProduct } from "./LoanCalculatorView";
+import CibilAnalyzerView from "./CibilAnalyzerView";
 interface AdminPortalProps {
   userId: string;
   userEmail: string;
@@ -340,6 +341,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterRole, setFilterRole] = useState<string>("all");
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
+  const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
 
   // Reset page when filterDate or filterRole changes
   useEffect(() => {
@@ -1541,7 +1543,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
           <div className="space-y-[24px]">
 
             {/* TABS MENU */}
-            <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb" }}>
+            <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", overflowX: "auto", maxWidth: "100%", scrollbarWidth: "none" }} className="no-scrollbar">
+              <style>{`
+                .no-scrollbar::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
               {[
                 { id: "experts", label: "🧑‍💼 Manage Experts" },
                 { id: "education", label: "📚 Manage Education" },
@@ -1577,8 +1584,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </button>
                 </div>
 
-                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                  <table className="w-full text-left text-[12px] border-collapse">
+                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                  <table className="w-full min-w-[800px] text-left text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-[12px]">Expert info</th>
@@ -1655,8 +1662,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </button>
                 </div>
 
-                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                  <table className="w-full text-left text-[12px] border-collapse">
+                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                  <table className="w-full min-w-[800px] text-left text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-[12px]">Title</th>
@@ -1724,8 +1731,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </button>
                 </div>
 
-                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                  <table className="w-full text-left text-[12px] border-collapse">
+                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                  <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-[12px]">Test Title</th>
@@ -1867,8 +1874,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </button>
                 </div>
 
-                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                  <table className="w-full text-left text-[12px] border-collapse">
+                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                  <table className="w-full min-w-[900px] text-left text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-[12px]">Lender / Product</th>
@@ -2020,8 +2027,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                  <table className="w-full text-left text-[12px] border-collapse">
+                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                  <table className="w-full min-w-[800px] text-left text-[12px] border-collapse">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                         <th className="p-[12px]">User Identity</th>
@@ -2111,14 +2118,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                 })}
                               </td>
                               <td className="p-[12px] text-right">
-                                {enq.pdf_url ? (
+                                {enq.report_data ? (
+                                  <button
+                                    onClick={() => setViewingCibilReport(enq.report_data)}
+                                    className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
+                                  >
+                                    View Report ↗
+                                  </button>
+                                ) : enq.pdf_url ? (
                                   <a
                                     href={enq.pdf_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary hover:underline font-bold text-[11px] block"
                                   >
-                                    View Report ↗
+                                    View PDF ↗
                                   </a>
                                 ) : (
                                   <span className="text-gray-400 block">-</span>
@@ -2964,8 +2978,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </button>
                   </div>
 
-                  <div className="border border-white/50 rounded-[16px] overflow-hidden bg-white/60 shadow-inner">
-                    <table className="w-full text-left text-[12px] border-collapse">
+                  <div className="border border-white/50 rounded-[16px] overflow-x-auto bg-white/60 shadow-inner">
+                    <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
                       <thead>
                         <tr className="bg-indigo-50/50 border-b border-indigo-100 text-indigo-800/70 font-bold">
                           <th className="p-[12px]">Referral Code</th>
@@ -3093,8 +3107,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       </div>
                     </div>
 
-                    <div className="border border-gray-200 rounded-[16px] overflow-hidden bg-white shadow-xs">
-                      <table className="w-full text-left text-[12px] border-collapse">
+                    <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full min-w-[800px] text-left text-[12px] border-collapse">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
                             <th className="p-[12px]">User Identity</th>
@@ -3184,14 +3198,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                                     })}
                                   </td>
                                   <td className="p-[12px] text-right">
-                                    {enq.pdf_url ? (
+                                    {enq.report_data ? (
+                                      <button
+                                        onClick={() => setViewingCibilReport(enq.report_data)}
+                                        className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
+                                      >
+                                        View Report ↗
+                                      </button>
+                                    ) : enq.pdf_url ? (
                                       <a
                                         href={enq.pdf_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-primary hover:underline font-bold text-[11px] block"
                                       >
-                                        View Report ↗
+                                        View PDF ↗
                                       </a>
                                     ) : (
                                       <span className="text-gray-400 block">-</span>
@@ -4105,6 +4126,38 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
               <button onClick={handleSaveLender} className="px-[16px] py-[8px] bg-primary text-white hover:opacity-90 rounded-[10px] text-[12px] font-bold cursor-pointer animate-pulse-ring">
                 Save Product
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingCibilReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4 animate-fade-in cibil-modal-backdrop">
+          <div className="bg-white rounded-[24px] max-w-[1100px] w-full shadow-2xl border border-gray-100 overflow-hidden flex flex-col h-[90vh] max-h-[850px] animate-scale-up cibil-modal-content">
+            <div className="flex items-center justify-between border-b border-gray-100 px-[25px] py-[18px] bg-[#f9faff] shrink-0 cibil-print-hide">
+              <div>
+                <h3 className="text-[15px] font-bold text-gray-900">
+                  Credit Score Report: <span className="text-primary">{viewingCibilReport.name}</span>
+                </h3>
+                <p className="text-[11px] text-gray-400 mt-[2px] font-medium">
+                  PAN: <span className="font-mono text-gray-650 font-bold uppercase">{viewingCibilReport.pan}</span> | Mobile: <span className="text-gray-650 font-bold">{viewingCibilReport.phone}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setViewingCibilReport(null)} 
+                className="text-[22px] text-gray-400 hover:text-gray-600 cursor-pointer border-none bg-transparent transition font-bold leading-none p-1"
+                title="Close Report"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
+              <CibilAnalyzerView 
+                userId={userId || "admin"} 
+                overrideReport={viewingCibilReport} 
+                onToggleSidebar={() => {}} 
+                onToggleInsights={() => {}} 
+              />
             </div>
           </div>
         </div>
