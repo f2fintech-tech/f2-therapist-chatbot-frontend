@@ -233,3 +233,150 @@
   }
 }
 
+/* Print styles for CIBIL Analyzer Dashboard */
+@media print {
+  /* Reset height/overflow limitations for all scrollable parent elements */
+  html, body, #root, #root *, main, article, section {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Make sure we preserve the absolute and relative positions for layout charts, dials, etc. */
+  .absolute {
+    position: absolute !important;
+  }
+  .relative {
+    position: relative !important;
+  }
+  
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Make sure the modal backdrop parent wrapper is visible and acts as a static block */
+  .cibil-modal-backdrop,
+  .cibil-modal-backdrop * {
+    visibility: visible !important;
+  }
+  
+  .cibil-modal-backdrop {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Make the modal content dialog wrapper full width and non-restricted in height */
+  .cibil-modal-content {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Allow the scroll wrapper to expand fully so browser handles pages naturally */
+  .cibil-modal-scroll {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .cibil-print-section,
+  .cibil-print-section * {
+    visibility: visible !important;
+  }
+  
+  .cibil-print-section {
+    display: block !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  .cibil-print-scrollable {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .cibil-print-hide,
+  .cibil-print-hide * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Ensure colors and background-colors print exactly as defined */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Styling to hide specific elements when compiling a client-side PDF document */
+.cibil-pdf-downloading .cibil-print-hide {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Reset height/overflow limitations during pdf download so canvas renders full content */
+.cibil-pdf-downloading.cibil-print-section {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+}
+
+.cibil-pdf-downloading .cibil-print-scrollable {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+}
+
+/* Show user name in header only inside the downloaded PDF */
+.cibil-pdf-only-name {
+  display: none !important;
+}
+.cibil-pdf-downloading .cibil-pdf-only-name {
+  display: inline-block !important;
+}
+

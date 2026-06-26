@@ -334,6 +334,24 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const handleOpenEducation = () => {
+    setActiveNav("Financial Education");
+    onOpenEducation?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenProfile = () => {
+    setActiveNav("Settings");
+    onOpenProfile();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
 
   const moods = [
     { emoji: "😰", title: "Very Stressed", hoverText: "Stressed" },
@@ -353,7 +371,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
         />
       )}
       {/* Mobile Drawer */}
-      <aside className={`fixed left-0 top-0 bottom-0 w-[268px] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed left-0 top-0 bottom-0 w-[clamp(260px,85vw,268px)] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       <button
         type="button"
         onClick={handleOpenTalkToFinHeal}
@@ -615,7 +633,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             )}
 
             <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
-            <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={() => { setActiveNav("Financial Education"); onOpenEducation?.(); }} />
+            <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={handleOpenEducation} />
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
             {hasPermission("cibil_fetch") && (
@@ -640,7 +658,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 
-            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={onOpenProfile} />
+            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={handleOpenProfile} />
           </>
         )}
       </div>
