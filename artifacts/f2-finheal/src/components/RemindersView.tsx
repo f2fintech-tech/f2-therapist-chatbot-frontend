@@ -560,7 +560,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   }, [isAdvisor, advisorAppointments]);
 
   return (
-    <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 dark:bg-slate-900 dark:border-slate-800">
+    <main className="reminders-view relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100 dark:bg-slate-900 dark:border-slate-800">
       
       {/* View Header */}
       <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-950/95 shrink-0">

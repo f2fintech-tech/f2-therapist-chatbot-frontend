@@ -261,7 +261,7 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
     : "rounded-full px-5 bg-primary text-white shadow-[0_8px_24px_rgba(50,68,230,0.18)]";
 
   return (
-    <main className="relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-tr from-slate-50 via-indigo-50/20 to-slate-50 rounded-[20px] shadow-md border border-gray-200 animate-fade-up delay-100">
+    <main className="profile-view relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-tr from-slate-50 via-indigo-50/20 to-slate-50 rounded-[20px] shadow-md border border-gray-200 animate-fade-up delay-100">
       {/* Header Banner */}
       <div className="relative flex flex-col gap-[10px] border-b border-gray-150 px-[16px] py-[16px] shrink-0 bg-white rounded-t-[20px] sm:px-[24px] sm:py-[20px] overflow-hidden">
         {/* Colorful top ambient glow */}
