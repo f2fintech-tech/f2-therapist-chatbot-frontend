@@ -411,7 +411,8 @@ main > div.sticky > div:first-child {
 .test-catalog-view ~ .global-profile-dropdown,
 .chat-view ~ .global-profile-dropdown,
 .debt-balance-view ~ .global-profile-dropdown,
-.admin-view ~ .global-profile-dropdown {
+.admin-view ~ .global-profile-dropdown,
+.advisor-view ~ .global-profile-dropdown {
   top: 11px;
 }
 

@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
 import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
 import EmergencyFundCheckView from "@/components/EmergencyFundCheckView";
@@ -807,7 +815,8 @@ export default function FinHealChat() {
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
         />
-        {mainView === "chat" || mainView === "goals" ? (
+        <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          {mainView === "chat" || mainView === "goals" ? (
           <ChatArea
             conversationId={chat.conversationId}
             conversationCount={chat.conversationCount}
@@ -993,6 +1002,80 @@ export default function FinHealChat() {
             onOpenFinancialWellnessAssistant={openChatView}
           />
         )}
+
+        {/* Global Pinned Profile Dropdown */}
+        {userProfile && (
+          <div className="global-profile-dropdown absolute right-[12px] z-50">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="global-profile-avatar relative flex items-center justify-center w-10 h-10 rounded-full cursor-pointer focus:outline-none transition-all duration-300 hover:scale-105 hover:rotate-3 select-none bg-gradient-to-tr from-primary via-indigo-600 to-violet-500 text-white shadow-md border-2 border-white/90 dark:border-slate-800">
+                  {userProfile.avatarUrl ? (
+                    <img
+                      src={userProfile.avatarUrl}
+                      alt={userProfile.displayName}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="font-extrabold text-[14px] tracking-wide drop-shadow-sm select-none">
+                      {userProfile.initials}
+                    </span>
+                  )}
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full shadow-sm" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex items-center gap-3 px-1 py-1.5">
+                    <div className="relative flex w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm items-center justify-center shrink-0">
+                      {userProfile.avatarUrl ? (
+                        <img
+                          src={userProfile.avatarUrl}
+                          alt={userProfile.displayName}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span>{userProfile.initials}</span>
+                      )}
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
+                        {userProfile.displayName}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                        {userProfile.email?.toLowerCase().endsWith("@f2fintech.com") ? "Employee" : "Standard"}
+                      </span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={openProfilePage}
+                  className="cursor-pointer text-gray-700 dark:text-slate-200 focus:bg-gray-50 dark:focus:bg-slate-800 focus:text-gray-900 dark:focus:text-slate-100 flex items-center gap-2 px-3 py-2 rounded-md transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>My Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="cursor-pointer text-rose-600 dark:text-rose-400 focus:bg-rose-50 dark:focus:bg-rose-950/30 focus:text-rose-700 dark:focus:text-rose-300 flex items-center gap-2 px-3 py-2 rounded-md transition-colors font-medium"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-rose-500">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+        </div>
         <InsightsPanel
           conversationId={chat.conversationId}
           conversations={chat.conversations}
