@@ -27,6 +27,9 @@ import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "./Eligib
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import html2canvas from "html2canvas-pro";
+import { jsPDF } from "jspdf";
+
  
 interface CibilAnalyzerViewProps {
   userId: string;
@@ -35,6 +38,7 @@ interface CibilAnalyzerViewProps {
   onToggleInsights: () => void;
   onApplyNow?: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
+  overrideReport?: CibilReport | null;
 }
 
 interface LenderProduct {
@@ -60,7 +64,8 @@ export default function CibilAnalyzerView({
   onToggleSidebar,
   onToggleInsights,
   onApplyNow,
-  onTalkToAdvisor
+  onTalkToAdvisor,
+  overrideReport = null
 }: CibilAnalyzerViewProps) {
   const { toast } = useToast();
 
@@ -70,6 +75,7 @@ export default function CibilAnalyzerView({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
 
   // Form inputs
   const [formName, setFormName] = useState<string>("");
@@ -122,6 +128,26 @@ export default function CibilAnalyzerView({
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
+      if (overrideReport) {
+        setStoredReport(overrideReport);
+        setReport(overrideReport);
+        setIsLoading(false);
+        
+        try {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+          const res = await fetch(`${apiBase}/lenders`);
+          if (res.ok) {
+            const data = await res.json();
+            setLenders(data);
+          }
+        } catch (err) {
+          console.error("Failed to load lenders catalog:", err);
+        } finally {
+          setIsLoadingLenders(false);
+        }
+        return;
+      }
+
       try {
         setIsLoading(true);
         const reportData = await getStoredCibilReport(userId);
@@ -149,7 +175,7 @@ export default function CibilAnalyzerView({
       }
     }
     init();
-  }, [userId]);
+  }, [userId, overrideReport]);
 
   // Cap eligibility EMI at gross income
   useEffect(() => {
@@ -271,6 +297,83 @@ export default function CibilAnalyzerView({
       });
     } finally {
       setIsGeneratingCAM(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!report) return;
+    setIsGeneratingPDF(true);
+    try {
+      const element = document.querySelector(".cibil-print-section") as HTMLElement;
+      if (!element) {
+        throw new Error("Report element not found in DOM");
+      }
+      
+      // Temporarily mark the container to apply print-hiding styles during pdf render
+      element.classList.add("cibil-pdf-downloading");
+      
+      // Wait for layout reflow to expand scroll height and hide print-hidden elements
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Generate canvas using html2canvas-pro (which supports oklch)
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff"
+      });
+      
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      
+      // A4 dimensions: 210mm x 297mm
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const margin = 10;
+      const contentWidth = pdfWidth - (margin * 2); // 190mm
+      const contentHeight = pdfHeight - (margin * 2); // 277mm
+      
+      // Calculate how the canvas height maps to PDF height
+      const imgWidth = contentWidth;
+      const imgHeight = (canvas.height * contentWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = margin;
+      
+      // Page 1
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+      heightLeft -= contentHeight;
+      
+      // Additional pages
+      while (heightLeft > 0) {
+        position = (heightLeft - imgHeight) + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+        heightLeft -= contentHeight;
+      }
+      
+      pdf.save(`CIBIL_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
+      
+      toast({
+        title: "PDF Saved!",
+        description: "Your platform credit analysis report has been saved successfully.",
+        variant: "default"
+      });
+    } catch (err: any) {
+      console.error("PDF generation failed:", err);
+      toast({
+        title: "Download Failed",
+        description: err.message || "Failed to compile PDF report.",
+        variant: "destructive"
+      });
+    } finally {
+      // Ensure we cleanup the printing class
+      const element = document.querySelector(".cibil-print-section");
+      if (element) {
+        element.classList.remove("cibil-pdf-downloading");
+      }
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -517,7 +620,7 @@ export default function CibilAnalyzerView({
   }
 
   return (
-    <div className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200">
+    <div className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
       
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0">
@@ -533,41 +636,35 @@ export default function CibilAnalyzerView({
             <CreditCard className="w-[20px] h-[20px]" />
           </div>
           <div>
-            <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">CIBIL Bureau Analyzer</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">CIBIL Bureau Analyzer</h1>
+              {report && (
+                <span className="text-[11px] bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full inline-block cibil-pdf-only-name">
+                  {report.name}
+                </span>
+              )}
+            </div>
             <p className="text-[11px] font-medium text-gray-400 uppercase tracking-[0.5px]">Official Credit Diagnostic Toolkit</p>
           </div>
         </div>
         
-        {/* Connection status badge */}
-        <div className="flex items-center gap-[12px] shrink-0">
-          {report && (
-            <div className="flex items-center gap-[10px]">
-              {report.pdf_url && (
-                <a
-                  href={report.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer"
-                >
-                  <FileText className="w-[14px] h-[14px] text-emerald-600" />
-                  <span>Download PDF Report</span>
-                </a>
-              )}
-              <button
-                onClick={handleGenerateCAM}
-                disabled={isGeneratingCAM}
-                className="flex items-center gap-[6px] bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-[12px] py-[6px] rounded-[20px] text-[12px] font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FileText className="w-[14px] h-[14px] text-indigo-600" />
-                <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Download Analysis Button */}
+        {report && (
+          <div className="shrink-0 cibil-print-hide">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
+              className="flex items-center gap-[6px] bg-primary hover:bg-opacity-95 text-white px-[16px] py-[8px] rounded-[12px] text-[12px] font-bold shadow-sm transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] border-none bg-none disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <FileText className="w-[14px] h-[14px]" />
+              <span>{isGeneratingPDF ? "Downloading..." : "Download Analysis"}</span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-[20px] min-h-0">        {!report ? (
+      <div className="flex-1 overflow-y-auto p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
           // State A: Form to retrieve CIBIL Report
           <div className="mx-auto max-w-[520px] my-[24px]">
             <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">
@@ -879,7 +976,7 @@ export default function CibilAnalyzerView({
                     href={report.pdf_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full"
+                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                   >
                     <FileText className="w-[14px] h-[14px]" />
                     <span>Download PDF Report</span>
@@ -889,7 +986,7 @@ export default function CibilAnalyzerView({
                 <button
                   onClick={handleGenerateCAM}
                   disabled={isGeneratingCAM}
-                  className="mt-[8px] flex items-center justify-center gap-[6px] bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-[8px] flex items-center justify-center gap-[6px] bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                 >
                   <FileText className="w-[14px] h-[14px]" />
                   <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
@@ -935,7 +1032,7 @@ export default function CibilAnalyzerView({
             </div>
 
             {/* Credit Toolkit Navigation Tabs */}
-            <div className="border-b border-gray-200">
+            <div className="border-b border-gray-200 cibil-print-hide">
               <nav className="flex space-x-[8px] overflow-x-auto pb-[2px]">
                 <TabButton active={activeTab === "report"} onClick={() => setActiveTab("report")} icon={<FileText className="w-[14px] h-[14px]" />} label="Credit Report" />
                 <TabButton active={activeTab === "emi"} onClick={() => setActiveTab("emi")} icon={<Calculator className="w-[14px] h-[14px]" />} label="EMI Calculator" />
@@ -1007,7 +1104,7 @@ export default function CibilAnalyzerView({
                             href={report.pdf_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-[10px] py-[4px] rounded-[8px] font-bold flex items-center gap-[4px] hover:bg-primary/20 transition-all cursor-pointer shrink-0"
+                            className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-[10px] py-[4px] rounded-[8px] font-bold flex items-center gap-[4px] hover:bg-primary/20 transition-all cursor-pointer shrink-0 cibil-print-hide"
                           >
                             <FileText className="w-[12px] h-[12px]" />
                             <span>PDF Report</span>
@@ -1016,7 +1113,7 @@ export default function CibilAnalyzerView({
                       </div>
 
                       {/* Category chips / filter row */}
-                      <div className="flex flex-wrap gap-[8px] mb-[16px]">
+                      <div className="flex flex-wrap gap-[8px] mb-[16px] cibil-print-hide">
                         <button
                           onClick={() => setActiveAccountFilter(null)}
                           className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${

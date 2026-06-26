@@ -264,7 +264,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         zIndex: 1 
       }}>
         <style>{`
-          @media (max-width: 1100px) {
+          @media (max-width: 1023px) {
             .auth-screen-shell {
               position: fixed !important;
               inset: 0 !important;

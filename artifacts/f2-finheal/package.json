@@ -76,6 +76,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "html2canvas-pro": "^2.2.0",
+    "jspdf": "^4.2.1",
     "react-confetti": "^6.4.0"
   }
 }

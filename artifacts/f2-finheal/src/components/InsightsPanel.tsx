@@ -662,7 +662,7 @@ export default function InsightsPanel({
       {isOpen && <div className="fixed inset-0 bg-black/40 z-30 2xl:hidden" onClick={onClose} />}
 
       {/* Sidebar - Mobile */}
-      <aside className={`fixed right-0 top-0 bottom-0 w-[280px] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <aside className={`fixed right-0 top-0 bottom-0 w-[clamp(260px,85vw,280px)] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <button onClick={onClose} className="absolute top-3 right-3 h-6 w-6 rounded-md flex items-center justify-center text-red-400 z-50">✕</button>
         {panelContent}
       </aside>
