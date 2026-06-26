@@ -1300,7 +1300,7 @@ export default function Dashboard({
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 relative">
+    <div className="dashboard-view flex-1 flex flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 relative">
 
       {/* Fixed Sidebar Toggle Button (shows on screen < lg, overlays open sidebar) */}
       {onToggleSidebar && !isSidebarOpen && (
@@ -1317,7 +1317,7 @@ export default function Dashboard({
       {onToggleInsights && !isInsightsOpen && (
         <button
           onClick={onToggleInsights}
-          className="fixed right-[12px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden z-50 shadow-sm"
+          className="fixed right-[64px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden z-50 shadow-sm"
           aria-label="Toggle Insights"
         >
           ☰
@@ -1331,7 +1331,7 @@ export default function Dashboard({
         <div className="absolute -bottom-10 left-1/3 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute top-4 right-1/4 w-20 h-20 rounded-full bg-white/8 pointer-events-none" />
 
-        <div className="relative pl-[64px] pr-6 py-6 sm:pl-[76px] sm:pr-8 sm:py-7 lg:px-8 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+        <div className="relative pl-[64px] pr-[64px] py-6 sm:pl-[76px] sm:pr-[64px] sm:py-7 lg:px-8 lg:pr-[64px] flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           {/* Profile Details Group */}
           <div className="flex items-center gap-4 sm:gap-6 w-full xl:w-auto">
 
@@ -2365,6 +2365,31 @@ export default function Dashboard({
         {/* ══ LOANS TAB ══ */}
         {activeTab === "loans" && (
           <div className="flex flex-col gap-6">
+            {cibilReport && (
+              <div className="bg-blue-50/50 dark:bg-slate-900/40 border border-blue-100 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mb-2 animate-fade-up">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 dark:bg-slate-800 dark:text-blue-400 flex items-center justify-center text-lg shrink-0">
+                    👤
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-[13px] font-bold text-gray-800 dark:text-slate-200">
+                      Report Subject: {cibilReport.name || "N/A"}
+                    </h4>
+                    <p className="text-[11px] text-gray-550 dark:text-slate-400 mt-0.5">
+                      PAN: {cibilReport.pan || "N/A"} · Phone: {cibilReport.phone || "N/A"}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right shrink-0 flex flex-col items-start sm:items-end gap-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#ecfdf5] text-[#10b981] dark:bg-emerald-950/30 dark:text-emerald-400 border border-[#d1fae5] dark:border-emerald-900/30 shadow-xs">
+                    Score: {cibilReport.score || "N/A"} ({cibilReport.band || "Good"})
+                  </span>
+                  <div className="text-[9px] text-gray-400 dark:text-slate-500">
+                    Synced on {cibilReport.fetched_at ? new Date(cibilReport.fetched_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "N/A"}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard icon="💰" label="Total Outstanding" value={`₹${(totalDebtVal / 100000).toFixed(1)}L`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
@@ -2597,7 +2622,7 @@ export default function Dashboard({
                 const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
                 const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
                 const scoreDesc = cibilReport
-                  ? `Your score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan}.`
+                  ? `Report Subject: ${cibilReport.name || "N/A"}. Score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan || "N/A"}.`
                   : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
 
                 const avgGoalProgress = localGoals.length > 0
