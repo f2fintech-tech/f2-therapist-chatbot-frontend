@@ -380,3 +380,63 @@
   display: inline-block !important;
 }
 
+/* Pad all page view headers on the right to accommodate the global pinned profile avatar */
+main > div.border-b:not(.sticky),
+main > header.border-b,
+div.flex-col > header.border-b,
+main > div.sticky > div:first-child {
+  padding-right: 64px !important;
+}
+
+/* Position and center the global profile dropdown avatar vertically in a straight line */
+.global-profile-dropdown {
+  top: 10px; /* Standard vertical alignment for w-10 h-10 avatar in standard headers */
+}
+
+/* Center in taller headers (height: ~72px, avatar: 40px) */
+.eligibility-view ~ .global-profile-dropdown,
+.cibil-view ~ .global-profile-dropdown,
+.profile-view ~ .global-profile-dropdown,
+.loan-calculator-view ~ .global-profile-dropdown,
+.education-view ~ .global-profile-dropdown {
+  top: 16px;
+}
+
+/* Center in mid-size/standard headers (height: ~62px, avatar: 40px) */
+.reminders-view ~ .global-profile-dropdown,
+.emergency-fund-view ~ .global-profile-dropdown,
+.credit-readiness-view ~ .global-profile-dropdown,
+.loan-fit-view ~ .global-profile-dropdown,
+.financial-literacy-view ~ .global-profile-dropdown,
+.test-catalog-view ~ .global-profile-dropdown,
+.chat-view ~ .global-profile-dropdown,
+.debt-balance-view ~ .global-profile-dropdown {
+  top: 11px;
+}
+
+/* Center vertically in the Dashboard view's hero profile banner (aligns with the glassmorphic cards) */
+@media (min-width: 640px) {
+  .dashboard-view ~ .global-profile-dropdown {
+    top: 40px;
+  }
+}
+@media (max-width: 639px) {
+  .dashboard-view ~ .global-profile-dropdown {
+    top: 32px;
+  }
+}
+
+/* Premium styling and shadow glows for profile avatar trigger */
+.global-profile-avatar {
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.global-profile-avatar:hover {
+  box-shadow: 
+    0 0 0 4px rgba(99, 102, 241, 0.15), 
+    0 8px 20px rgba(99, 102, 241, 0.35), 
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 1);
+}
+
