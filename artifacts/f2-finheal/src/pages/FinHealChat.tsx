@@ -963,6 +963,10 @@ export default function FinHealChat() {
                 setMainView("tests");
               } else if (page === "Talk to an Advisor") {
                 setMainView("advisor");
+              } else if (page === "Financial Education") {
+                setMainView("education");
+              } else if (page === "Eligibility & CIBIL Checker") {
+                setMainView("eligibility-cibil");
               }
             }}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}

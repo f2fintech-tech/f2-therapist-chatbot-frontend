@@ -343,14 +343,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
-  const handleOpenProfile = () => {
-    setActiveNav("Settings");
-    onOpenProfile();
 
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
-      onClose();
-    }
-  };
 
 
   const moods = [
@@ -627,6 +620,9 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               </div>
               <span>Talk to FinHeal</span>
             </button>
+            {!isUserAdvisor(userEmail) && (
+              <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
+            )}
             <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
             {!isStaff && (
               <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
@@ -641,12 +637,6 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             )}
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
-            {!isUserAdvisor(userEmail) && (
-              <>
-                <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Support</div>
-                <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
-              </>
-            )}
             
             {/* If Admin */}
             {(userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com") && (
@@ -658,7 +648,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 
-            <NavBtn icon="⚙️" label="Settings" active={activeNav === "Settings"} onClick={handleOpenProfile} />
+
           </>
         )}
       </div>
