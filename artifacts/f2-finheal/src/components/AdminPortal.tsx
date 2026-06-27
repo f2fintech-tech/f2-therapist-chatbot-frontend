@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
-import { getEffectiveAvailability } from "@/utils/availability";
+
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
 import { type LenderProduct } from "./LoanCalculatorView";
@@ -153,6 +153,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Deactivation reason modal states
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<any>(null);
+  const [deactivateReason, setDeactivateReason] = useState("");
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   const [educationModalOpen, setEducationModalOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<ContentItem | null>(null);
@@ -1366,6 +1372,46 @@ ${sheetDataXml}
     }
   };
 
+  const handleToggleActive = async (adv: any) => {
+    const nextStatus = adv.isActive !== false ? false : true;
+    if (nextStatus) {
+      // Activating: clear deactivation reason automatically
+      try {
+        await updateAdvisorActiveStatus(adv.f2FintechId || adv.id, true);
+        alert(`Advisor ${adv.name} has been activated successfully.`);
+        await loadAdvisors();
+        await loadEmployees();
+      } catch (err) {
+        console.error("Failed to activate advisor:", err);
+        alert("Error activating advisor.");
+      }
+    } else {
+      // Deactivating: prompt for reason
+      setDeactivateTarget(adv);
+      setDeactivateReason("");
+      setDeactivateConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setIsDeactivating(true);
+    try {
+      await updateAdvisorActiveStatus(deactivateTarget.f2FintechId || deactivateTarget.id, false, deactivateReason);
+      alert(`Advisor ${deactivateTarget.name} has been deactivated.`);
+      setDeactivateConfirmOpen(false);
+      setDeactivateTarget(null);
+      setDeactivateReason("");
+      await loadAdvisors();
+      await loadEmployees();
+    } catch (err) {
+      console.error("Failed to deactivate advisor:", err);
+      alert("Error deactivating advisor.");
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
   // ==================== Education CRUD Actions ====================
   const handleOpenAddEdu = () => {
     setEditingContent(null);
@@ -1893,6 +1939,7 @@ ${sheetDataXml}
                         <th className="p-[12px]">Category</th>
                         <th className="p-[12px]">Hourly Fee</th>
                         <th className="p-[12px]">Availability</th>
+                        <th className="p-[12px]">Status</th>
                         <th className="p-[12px] text-right">Actions</th>
                       </tr>
                     </thead>
@@ -1917,7 +1964,7 @@ ${sheetDataXml}
                           <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                           <td className="p-[12px]">
                             {(() => {
-                              const effectiveAvail = getEffectiveAvailability(adv.availability, adv.nextSlot);
+                              const effectiveAvail = adv.availability;
                               return effectiveAvail === "available" ? (
                                 <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
                               ) : effectiveAvail === "in meeting" ? (
@@ -1927,7 +1974,27 @@ ${sheetDataXml}
                               );
                             })()}
                           </td>
+                          <td className="p-[12px]">
+                            {adv.isActive !== false ? (
+                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Active</span>
+                            ) : (
+                              <div className="flex flex-col gap-[2px]">
+                                <span className="bg-amber-50 text-amber-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-amber-100 w-max">Deactivated</span>
+                                {adv.deactivationReason && (
+                                  <span className="text-[9.5px] text-amber-600 font-medium italic truncate max-w-[150px] block" title={adv.deactivationReason}>
+                                    Reason: {adv.deactivationReason}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-[12px] text-right space-x-[6px]">
+                            <button
+                              onClick={() => handleToggleActive(adv)}
+                              className={`${adv.isActive !== false ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700'} hover:underline font-bold cursor-pointer`}
+                            >
+                              {adv.isActive !== false ? "Deactivate" : "Activate"}
+                            </button>
                             <button
                               onClick={() => handleOpenEditExpert(adv)}
                               className="text-primary hover:underline font-bold cursor-pointer"
@@ -2534,7 +2601,7 @@ ${sheetDataXml}
                       );
                     }).map((emp) => {
                       const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
-                      const isAvailable = getEffectiveAvailability(emp.availability, emp.nextSlot) === "available";
+                      const isAvailable = emp.availability === "available";
                       
                       return (
                         <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
@@ -2573,10 +2640,26 @@ ${sheetDataXml}
                               <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
                             </div>
                             {emp.isAdvisor && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Rating</span>
-                                <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                              </div>
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400">Rating</span>
+                                  <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400">Status</span>
+                                  <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                                  </span>
+                                </div>
+                                {emp.isActive === false && emp.deactivationReason && (
+                                   <div className="flex justify-between text-[10px]">
+                                     <span className="text-gray-400">Reason</span>
+                                     <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                                       {emp.deactivationReason}
+                                     </span>
+                                   </div>
+                                 )}
+                              </>
                             )}
                           </div>
 
@@ -2591,6 +2674,14 @@ ${sheetDataXml}
                             </button>
 
                             <div className="flex items-center gap-2">
+                              {emp.isAdvisor && (
+                                <button
+                                  onClick={() => handleToggleActive(emp)}
+                                  className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                                >
+                                  {emp.isActive !== false ? "Deactivate" : "Activate"}
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleOpenEditExpert(emp)}
                                 className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
@@ -3978,6 +4069,62 @@ ${sheetDataXml}
                 {isDeletingExpert ? "Verifying..." : "Delete Profile"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DEACTIVATE ADVISOR REASON MODAL ==================== */}
+      {deactivateConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
+          <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
+              <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
+                🚫 Deactivate Advisor Profile
+              </h3>
+              <button 
+                onClick={() => setDeactivateConfirmOpen(false)} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[14px]">
+              <p className="text-[12px] leading-relaxed text-gray-600">
+                Please enter the reason for temporarily deactivating <strong>{deactivateTarget?.name}</strong>:
+              </p>
+              
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                  Deactivation Reason
+                </label>
+                <textarea
+                  value={deactivateReason}
+                  onChange={(e) => setDeactivateReason(e.target.value)}
+                  placeholder="e.g. Leave of absence, health reasons, temporary assignment"
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-amber-500 bg-white min-h-[80px]"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button 
+                onClick={() => setDeactivateConfirmOpen(false)} 
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeactivate}
+                disabled={isDeactivating || !deactivateReason.trim()}
+                className="flex-1 py-[11px] bg-amber-600 text-white font-bold rounded-[12px] text-[12px] hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {isDeactivating ? "Updating..." : "Deactivate Profile"}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

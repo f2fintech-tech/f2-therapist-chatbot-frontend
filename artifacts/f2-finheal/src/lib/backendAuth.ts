@@ -302,6 +302,8 @@ export interface BackendAdvisor {
   test_rating?: number | null;
   department?: string | null;
   is_advisor?: boolean;
+  is_active?: boolean;
+  deactivation_reason?: string | null;
   permissions?: string[] | null;
 }
 
@@ -326,6 +328,8 @@ export interface Advisor {
   testRating?: number;
   department?: string;
   isAdvisor?: boolean;
+  isActive?: boolean;
+  deactivationReason?: string;
   permissions?: string[];
 }
 
@@ -351,6 +355,8 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     testRating: a.test_rating || undefined,
     department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
     isAdvisor: a.is_advisor ?? false,
+    isActive: a.is_active ?? true,
+    deactivationReason: a.deactivation_reason || undefined,
     permissions: a.permissions || []
   };
 }
@@ -374,6 +380,8 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     test_rating: a.testRating,
     department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
     is_advisor: a.isAdvisor ?? false,
+    is_active: a.isActive ?? true,
+    deactivation_reason: a.deactivationReason || undefined,
     permissions: a.permissions || []
   };
 }
@@ -422,6 +430,16 @@ export async function updateAdvisorRole(f2FintechId: string, isAdvisor: boolean)
   return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/role`, {
     method: "PUT",
     body: JSON.stringify({ is_advisor: isAdvisor }),
+  });
+}
+
+export async function updateAdvisorActiveStatus(f2FintechId: string, isActive: boolean, deactivationReason?: string): Promise<any> {
+  return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/active-status`, {
+    method: "PUT",
+    body: JSON.stringify({ 
+      is_active: isActive,
+      deactivation_reason: deactivationReason 
+    }),
   });
 }
 
