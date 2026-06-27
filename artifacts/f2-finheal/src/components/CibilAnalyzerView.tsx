@@ -917,19 +917,8 @@ export default function CibilAnalyzerView({
                           Next update: {nextDate}
                         </span>
                       );
-                    } else {
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReport(null);
-                          }}
-                          className="text-[11px] text-primary hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
-                        >
-                          Refresh Report {exempt && "(Admin)"}
-                        </button>
-                      );
                     }
+                    return null;
                   })()}
                 </div>
                 
