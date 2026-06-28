@@ -1458,7 +1458,8 @@ export default function Dashboard({
                 <StatCard icon="👤" label="Registered Members" value={statsLoading ? "..." : String(backendStats?.registered_users ?? 0)} sub="Signed-up user accounts" color={BRAND} delay={80} />
                 <StatCard icon="📈" label="Conversion Rate" value={statsLoading || !backendStats?.total_users ? "0%" : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`} sub="Guests to members" color="#10b981" delay={160} />
                 <StatCard icon="💬" label="Active Conversations" value={statsLoading ? "..." : String(backendStats?.total_conversations ?? 0)} sub="Total AI chats started" color="#6366f1" delay={240} />
-                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User").length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && (!enq.bureau || enq.bureau.toLowerCase() === "cibil")).length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
                 <StatCard icon="📞" label="Scheduled Calls" value={String(allAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Active consultations" color="#3b82f6" delay={400} />
                 <StatCard icon="✅" label="Completed Calls" value={String(allAppointments.filter(a => a.completed).length)} sub="Concluded consultations" color="#10b981" delay={480} />
                 <StatCard icon="🧑‍💼" label="Expert Advisors" value={String(advisors.length)} sub="Listed expert professionals" color="#d97706" delay={560} />
@@ -1469,11 +1470,11 @@ export default function Dashboard({
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
                 <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs animate-fade-up" style={{ animationDelay: "100ms" }}>
-                  <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                   <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
                     🏆 Platform Wellness Average
                   </h3>
                   <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-
+                  
                   <div className="flex items-end gap-[10px] mb-[12px]">
                     <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
                     <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
@@ -1502,15 +1503,20 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* CIBIL Score Band Distribution (Donut Chart) */}
+                {/* Bureau Score Band Distribution (Donut Chart) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
                   <div>
                     <div className="flex items-center justify-between mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 CIBIL Score Band Distribution
+                        📊 Bureau Score Band Distribution
                       </h3>
                       {isCibilDemoData && (
                         <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-[6px] py-[2px] rounded-[6px] uppercase tracking-wider">
+                          Demo Data
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base (CIBIL & Experian).</p>r">
                           Demo Data
                         </span>
                       )}
