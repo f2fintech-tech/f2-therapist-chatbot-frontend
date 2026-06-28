@@ -338,16 +338,25 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
+  const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
 
-  // Reset page when filterDate, filterRole, or filterLoanType changes
+  const todayStr = (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
+  // Reset page when filterDate, filterEndDate, filterRole, or filterLoanType changes
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterRole, filterLoanType]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType]);
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
     // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
@@ -365,8 +374,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (!isFetchedByMe) return false;
     }
 
-    // 1. Filter by Date
-    if (filterDate) {
+    // 1. Filter by Date (Start & End Date range)
+    if (filterDate || filterEndDate) {
       if (!enq.fetched_at) return false;
       const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
       const localDate = new Date(utcStr);
@@ -374,7 +383,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       const month = String(localDate.getMonth() + 1).padStart(2, '0');
       const day = String(localDate.getDate()).padStart(2, '0');
       const localDateStr = `${year}-${month}-${day}`;
-      if (localDateStr !== filterDate) return false;
+      
+      if (filterDate && filterEndDate) {
+        if (localDateStr < filterDate || localDateStr > filterEndDate) return false;
+      } else if (filterDate) {
+        if (localDateStr !== filterDate) return false;
+      } else if (filterEndDate) {
+        if (localDateStr > filterEndDate) return false;
+      }
     }
 
     // 2. Filter by Role
@@ -412,6 +428,22 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
     return true;
   });
+
+  const getDateFilterDescription = () => {
+    if (filterDate && filterEndDate) {
+      if (filterDate === filterEndDate) {
+        return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+      return `Showing records fetched between ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterDate) {
+      return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterEndDate) {
+      return `Showing records fetched up to ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    return "Showing all credit score fetches across the platform.";
+  };
 
   const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
   const safeCibilPage = Math.min(cibilPage, totalPages);
@@ -571,29 +603,54 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       return !isNaN(scoreVal) && scoreVal >= 700;
     });
 
-    // Determine max active accounts count to prepare dynamic columns
-    let maxLoans = 0;
-    filteredEnquiries.forEach(enq => {
-      const activeAccounts = (enq.accounts || []).filter(
-        (acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1
-      );
-      if (activeAccounts.length > maxLoans) {
-        maxLoans = activeAccounts.length;
-      }
+    const loanTypesConfig = [
+      { key: "home_loan", label: "Home Loan" },
+      { key: "personal_loan", label: "Personal Loan" },
+      { key: "professional_loan", label: "Professional Loan" },
+      { key: "car_loan", label: "Car Loan" },
+      { key: "credit_card", label: "Credit Card" },
+      { key: "education_loan", label: "Education Loan" },
+      { key: "business_loan", label: "Business Loan" },
+      { key: "gold_loan", label: "Gold Loan" },
+      { key: "other_loans", label: "Other Loan" }
+    ];
+
+    const maxLoanCounts: Record<string, number> = {};
+    loanTypesConfig.forEach(cfg => {
+      let maxCount = 0;
+      filteredEnquiries.forEach(enq => {
+        const val = enq[cfg.key];
+        if (val) {
+          const count = val.split("; ").filter(Boolean).length;
+          if (count > maxCount) {
+            maxCount = count;
+          }
+        }
+      });
+      maxLoanCounts[cfg.key] = maxCount;
     });
 
-    const generateWorksheetXml = (data: any[], maxLns: number) => {
-      const totalCols = 7 + maxLns;
+    const generateWorksheetXml = (data: any[]) => {
+      const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
+      const loanCols: { key: string; label: string; count: number }[] = [];
+      
+      loanTypesConfig.forEach(cfg => {
+        const count = maxLoanCounts[cfg.key] || 0;
+        if (count > 0) {
+          loanCols.push({ key: cfg.key, label: cfg.label, count });
+          for (let i = 0; i < count; i++) {
+            headers.push(count > 1 ? `${cfg.label} ${i + 1}` : cfg.label);
+          }
+        }
+      });
+
+      const totalCols = headers.length;
       const lastColLetter = getColumnLetter(totalCols);
 
       let sheetDataXml = "";
       
       // Header row
       sheetDataXml += `    <row r="1" spans="1:${totalCols}">\n`;
-      const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
-      for (let i = 0; i < maxLns; i++) {
-        headers.push(`Loan ${i + 1}`);
-      }
       headers.forEach((h, idx) => {
         const r = `${getColumnLetter(idx + 1)}1`;
         sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
@@ -604,10 +661,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       data.forEach((enq, rowIdx) => {
         const rowIndex = rowIdx + 2;
         sheetDataXml += `    <row r="${rowIndex}" spans="1:${totalCols}">\n`;
-
-        const activeAccountsList = (enq.accounts || []).filter(
-          (acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1
-        );
 
         const dateFormatted = enq.fetched_at
           ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
@@ -623,17 +676,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
           dateFormatted
         ];
 
-        for (let i = 0; i < maxLns; i++) {
-          if (i < activeAccountsList.length) {
-            const acc = activeAccountsList[i];
-            const lender = acc.lender || "Unknown Lender";
-            const type = acc.type || "Loan";
-            const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
-            fields.push(`${lender} (${type}) - Bal: Rs.${bal}`);
-          } else {
-            fields.push("-");
+        loanCols.forEach(col => {
+          const val = enq[col.key] || "";
+          const loansList = val.split("; ").filter(Boolean);
+          for (let i = 0; i < col.count; i++) {
+            if (i < loansList.length) {
+              fields.push(loansList[i]);
+            } else {
+              fields.push("-");
+            }
           }
-        }
+        });
 
         fields.forEach((val, colIdx) => {
           const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
@@ -656,8 +709,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       colsXml += `    <col min="5" max="5" width="26" customWidth="1"/>\n`; // Email
       colsXml += `    <col min="6" max="6" width="12" customWidth="1"/>\n`; // Bureau
       colsXml += `    <col min="7" max="7" width="20" customWidth="1"/>\n`; // Date Fetched
-      if (maxLns > 0) {
-        colsXml += `    <col min="8" max="${totalCols}" width="35" customWidth="1"/>\n`; // Loans
+      if (totalCols > 7) {
+        colsXml += `    <col min="8" max="${totalCols}" width="35" customWidth="1"/>\n`; // Dynamic Loans
       }
       colsXml += "  </cols>\n";
 
@@ -733,8 +786,8 @@ ${sheetDataXml}
   </cellXfs>
 </styleSheet>`;
 
-    const sheet1Xml = generateWorksheetXml(under700, maxLoans);
-    const sheet2Xml = generateWorksheetXml(above700, maxLoans);
+    const sheet1Xml = generateWorksheetXml(under700);
+    const sheet2Xml = generateWorksheetXml(above700);
 
     const files = [
       { name: "[Content_Types].xml", content: contentTypesXml },
@@ -806,7 +859,7 @@ ${sheetDataXml}
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      const res = await fetch(`${apiBase}/cibil/enquiries`, { headers });
+      const res = await fetch(`${apiBase}/cibil/leads`, { headers });
       if (res.ok) {
         const data = await res.json();
         setCibilEnquiries(data);
@@ -2248,9 +2301,7 @@ ${sheetDataXml}
                         CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                       </h3>
                       <p className="text-[10px] text-gray-400 mt-[2px]">
-                        {filterDate
-                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                          : "Showing all credit score fetches across the platform."}
+                        {getDateFilterDescription()}
                       </p>
                     </div>
 
@@ -2320,17 +2371,26 @@ ${sheetDataXml}
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
                       <input
                         type="date"
                         value={filterDate}
                         onChange={(e) => setFilterDate(e.target.value)}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
-                      {(filterDate || filterRole !== "all" || filterLoanType !== "all") && (
+                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                      <input
+                        type="date"
+                        value={filterEndDate}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                      />
+                      {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
                         <button
-                          onClick={() => { setFilterDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                          onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
                           className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
                         >
                           Reset Filters
@@ -3366,9 +3426,7 @@ ${sheetDataXml}
                             📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                           </h3>
                           <p className="text-[10px] text-gray-400 mt-[2px]">
-                            {filterDate
-                              ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                              : "Showing all credit score fetches across the platform."}
+                            {getDateFilterDescription()}
                           </p>
                         </div>
 
@@ -3422,22 +3480,31 @@ ${sheetDataXml}
                           </select>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                          <input
-                            type="date"
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                          />
-                          {(filterDate || filterRole !== "all" || filterLoanType !== "all") && (
-                            <button
-                              onClick={() => { setFilterDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
-                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                            >
-                              Reset Filters
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                            <input
+                              type="date"
+                              value={filterDate}
+                              onChange={(e) => setFilterDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                            <input
+                              type="date"
+                              value={filterEndDate}
+                              onChange={(e) => setFilterEndDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                              <button
+                                onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                                className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                              >
+                                Reset Filters
+                              </button>
+                            )}
                           {filteredEnquiries.length > 0 && (
                             <button
                               onClick={handleExportExcel}
