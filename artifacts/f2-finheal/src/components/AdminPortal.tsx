@@ -341,6 +341,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
+  
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
@@ -357,6 +358,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   useEffect(() => {
     setCibilPage(1);
   }, [filterDate, filterEndDate, filterRole, filterLoanType]);
+
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
     // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
@@ -2335,14 +2337,14 @@ ${sheetDataXml}
                   <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
+                      <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
                       <select
                         value={filterRole}
                         onChange={(e) => setFilterRole(e.target.value)}
                         className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
                       >
                         <option value="all">All Enquirers</option>
-                        <option value="User">Regular Users (Leads)</option>
+                        <option value="User">Users (Leads)</option>
                         <option value="Admin">Admins</option>
                         <option value="Manager">Managers</option>
                         <option value="Senior Leadership">Senior Leadership</option>
@@ -2371,7 +2373,7 @@ ${sheetDataXml}
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">From:</span>
                       <input
                         type="date"
@@ -2380,6 +2382,9 @@ ${sheetDataXml}
                         max={todayStr}
                         className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">To:</span>
                       <input
                         type="date"
@@ -2388,24 +2393,26 @@ ${sheetDataXml}
                         max={todayStr}
                         className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
-                      {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
-                        <button
-                          onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
-                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                        >
-                          Reset Filters
-                        </button>
-                      )}
-                      {filteredEnquiries.length > 0 && (
-                        <button
-                          onClick={handleExportExcel}
-                          className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                          title="Export leads to Excel workbook (.xlsx)"
-                        >
-                          📥 Export Leads (Excel)
-                        </button>
-                      )}
                     </div>
+
+                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                      <button
+                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                      >
+                        Reset Filters
+                      </button>
+                    )}
+
+                    {filteredEnquiries.length > 0 && (
+                      <button
+                        onClick={handleExportExcel}
+                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                        title="Export leads to Excel workbook (.xlsx)"
+                      >
+                        📥 Export Leads
+                      </button>
+                    )}
                   </div>
                 </div>
 
