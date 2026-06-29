@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, generateOnDemandReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults } from "@/lib/backendAuth";
 import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -1077,7 +1077,11 @@ export default function Dashboard({
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
   const [reportsList, setReportsList] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
-  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
+  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly" | "on_demand">("on_demand");
+  const [generatingReport, setGeneratingReport] = useState<boolean>(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [selectedOnDemandReportId, setSelectedOnDemandReportId] = useState<string | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState<boolean>(false);
   useEffect(() => {
     setLocalGoals(listUserGoals(userId));
 
@@ -1263,6 +1267,11 @@ export default function Dashboard({
         const list = await fetchUserReports(userId);
         if (active) {
           setReportsList(list);
+          const onDemand = list.filter(r => r.reportType === "on_demand")
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          if (onDemand.length > 0) {
+            setSelectedOnDemandReportId(onDemand[0].id);
+          }
         }
       } catch (err) {
         console.error("Failed to load user reports:", err);
@@ -1534,7 +1543,8 @@ export default function Dashboard({
                 <StatCard icon="👤" label="Registered Members" value={statsLoading ? "..." : String(backendStats?.registered_users ?? 0)} sub="Signed-up user accounts" color={BRAND} delay={80} />
                 <StatCard icon="📈" label="Conversion Rate" value={statsLoading || !backendStats?.total_users ? "0%" : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`} sub="Guests to members" color="#10b981" delay={160} />
                 <StatCard icon="💬" label="Active Conversations" value={statsLoading ? "..." : String(backendStats?.total_conversations ?? 0)} sub="Total AI chats started" color="#6366f1" delay={240} />
-                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User").length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && (!enq.bureau || enq.bureau.toLowerCase() === "cibil")).length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
                 <StatCard icon="📞" label="Scheduled Calls" value={String(allAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Active consultations" color="#3b82f6" delay={400} />
                 <StatCard icon="✅" label="Completed Calls" value={String(allAppointments.filter(a => a.completed).length)} sub="Concluded consultations" color="#10b981" delay={480} />
                 <StatCard icon="🧑‍💼" label="Expert Advisors" value={String(advisors.length)} sub="Listed expert professionals" color="#d97706" delay={560} />
@@ -1545,11 +1555,11 @@ export default function Dashboard({
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
                 <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs animate-fade-up" style={{ animationDelay: "100ms" }}>
-                  <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                   <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
                     🏆 Platform Wellness Average
                   </h3>
                   <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-
+                  
                   <div className="flex items-end gap-[10px] mb-[12px]">
                     <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
                     <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
@@ -1578,12 +1588,12 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* CIBIL Score Band Distribution (Donut Chart) */}
+                {/* Bureau Score Band Distribution (Donut Chart) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
                   <div>
                     <div className="flex items-center justify-between mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 CIBIL Score Band Distribution
+                        📊 Bureau Score Band Distribution
                       </h3>
                       {isCibilDemoData && (
                         <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-[6px] py-[2px] rounded-[6px] uppercase tracking-wider">
@@ -1591,7 +1601,8 @@ export default function Dashboard({
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base.</p>
+                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base (CIBIL & Experian).</p>
+                  </div>
 
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                       {/* Donut Chart */}
@@ -1650,7 +1661,6 @@ export default function Dashboard({
                         ))}
                       </div>
                     </div>
-                  </div>
 
                   <div className="pt-[12px] text-left text-[10.5px] text-gray-400 border-t border-gray-50 mt-[12px]">
                     {isCibilDemoData
@@ -2707,30 +2717,187 @@ export default function Dashboard({
                   <h3 className="text-[14px] font-bold text-gray-800">💡 Personalized Wellness & Therapy Reports</h3>
                   <p className="text-[11px] text-gray-400">Generated automatically from your chat logs and activities</p>
                 </div>
-                <div className="flex bg-gray-100 rounded-lg p-0.5 shrink-0">
-                  {(["daily", "fortnightly", "monthly"] as const).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setActiveReportSubTab(type)}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${activeReportSubTab === type
-                        ? "bg-white text-primary shadow-xs"
-                        : "text-gray-500 hover:text-gray-800"
-                        }`}
-                    >
-                      {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3">
+                  {/* On-Demand History Selector */}
+                  {activeReportSubTab === "on_demand" && (() => {
+                    const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    if (onDemandReports.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold text-gray-450 uppercase">History:</span>
+                        <select
+                          value={selectedOnDemandReportId || ""}
+                          onChange={(e) => setSelectedOnDemandReportId(e.target.value)}
+                          className="bg-white border border-gray-200 hover:border-gray-300 rounded-lg py-1 px-2 text-[10px] font-bold text-gray-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        >
+                          {onDemandReports.map((r) => {
+                            const dateStr = new Date(r.createdAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric"
+                            });
+                            return (
+                              <option key={r.id} value={r.id}>
+                                Report ({dateStr})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  })()}
+
+
                 </div>
               </div>
+
+              {/* Generate Report Action Box */}
+              {activeReportSubTab === "on_demand" && (() => {
+                const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const lastOnDemand = onDemandReports[0];
+                let isCooldown = false;
+                let nextAvailableDate: Date | null = null;
+                if (lastOnDemand) {
+                  const createdTime = new Date(lastOnDemand.createdAt).getTime();
+                  const cooldownTime = createdTime + 7 * 24 * 60 * 60 * 1000;
+                  const now = Date.now();
+                  if (now < cooldownTime) {
+                    isCooldown = true;
+                    nextAvailableDate = new Date(cooldownTime);
+                  }
+                }
+
+                const handleGenerate = async () => {
+                  setGeneratingReport(true);
+                  setGenError(null);
+                  try {
+                    const newReport = await generateOnDemandReport(userId);
+                    setReportsList(prev => [newReport, ...prev]);
+                    setSelectedOnDemandReportId(newReport.id);
+                  } catch (err: any) {
+                    console.error("Report generation failed:", err);
+                    let message = "An unexpected error occurred.";
+                    if (err.message) {
+                      try {
+                        const parsedErr = JSON.parse(err.message);
+                        const detail = parsedErr.detail;
+                        if (detail) {
+                          if (typeof detail === "object") {
+                            if (detail.code === "NO_ACTIVITY") {
+                              message = "No new activity found since your last report / registration date. Try chatting with the therapist or taking a quiz first!";
+                            } else if (detail.code === "COOLDOWN_ACTIVE") {
+                              message = "You can only generate a report once every 7 days.";
+                            } else if (detail.message) {
+                              if (detail.message.includes("RESOURCE_EXHAUSTED") || detail.message.includes("429")) {
+                                message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                              } else {
+                                message = detail.message;
+                              }
+                            } else {
+                              message = JSON.stringify(detail);
+                            }
+                          } else if (typeof detail === "string") {
+                            if (detail.includes("RESOURCE_EXHAUSTED") || detail.includes("429")) {
+                              message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                            } else {
+                              message = detail;
+                            }
+                          }
+                        } else if (parsedErr.message) {
+                          message = parsedErr.message;
+                        } else {
+                          message = err.message;
+                        }
+                      } catch (parseEx) {
+                        if (err.message.includes("RESOURCE_EXHAUSTED") || err.message.includes("429")) {
+                          message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                        } else {
+                          message = err.message;
+                        }
+                      }
+                    }
+                    setGenError(message);
+                  } finally {
+                    setGeneratingReport(false);
+                  }
+                };
+
+                return (
+                  <div className="bg-gradient-to-r from-primary/5 via-indigo-50/50 to-emerald-50/50 border border-primary/10 rounded-2xl p-5 mb-5 text-left animate-fade-up">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="max-w-xl">
+                        <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5">
+                          ✨ On-Demand Wellness & Therapy Reports
+                        </h4>
+                        <p className="text-[11px] text-gray-505 mt-1 leading-relaxed">
+                          💡 Reports can be generated once every 7 days to analyze your credit syncs, therapy chats, and quiz activities. You can download existing reports as a PDF at any time.
+                        </p>
+                        {genError && (
+                          <div className="mt-2.5 bg-rose-50 border border-rose-100 text-rose-700 text-[10.5px] px-3 py-2 rounded-xl flex items-start gap-1.5 font-medium">
+                            <span>⚠️</span>
+                            <span>{genError}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex flex-col items-stretch md:items-end gap-2">
+                        {isCooldown ? (
+                          <div className="text-right">
+                            <button
+                              disabled
+                              className="w-full md:w-auto bg-gray-100 text-gray-400 font-bold text-[11px] px-5 py-2.5 rounded-xl cursor-not-allowed border border-gray-200/50"
+                            >
+                              🔒 Cooldown Active
+                            </button>
+                            <span className="text-[9.5px] font-bold text-rose-500 block mt-1">
+                              Next report on {nextAvailableDate?.toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric"
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleGenerate}
+                            disabled={generatingReport}
+                            className={`w-full md:w-auto text-[11px] font-bold px-5 py-2.5 rounded-xl text-white shadow-md transition-all cursor-pointer ${
+                              generatingReport
+                                ? "bg-primary/50 cursor-wait"
+                                : "bg-primary hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]"
+                            }`}
+                          >
+                            {generatingReport ? "🔮 Generating..." : "⚙️ Generate Fresh Report"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {loadingReports && reportsList.length === 0 ? (
                 <div className="text-center py-10">
                   <div className="text-[12px] text-gray-400 animate-pulse">Loading wellness reports...</div>
                 </div>
               ) : (() => {
-                const activeReport = reportsList.find((r) => r.reportType === activeReportSubTab);
+                const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const activeReport = activeReportSubTab === "on_demand"
+                  ? (onDemandReports.find(r => r.id === selectedOnDemandReportId) || onDemandReports[0])
+                  : reportsList.find((r) => r.reportType === activeReportSubTab);
+
                 if (!activeReport) {
-                  return (
+                  return activeReportSubTab === "on_demand" ? (
+                    <div className="text-center py-12 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                      <div className="text-[36px] mb-2.5">🔮</div>
+                      <h4 className="text-[13px] font-bold text-gray-700">No On-Demand Report Generated</h4>
+                      <p className="text-[11px] text-gray-400 max-w-[340px] mx-auto mt-1 leading-relaxed">
+                        Generate your first Personalized Therapist Report using the button above. The report will analyze your activity logs since your registration!
+                      </p>
+                    </div>
+                  ) : (
                     <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                       <div className="text-[32px] mb-2">🎯</div>
                       <h4 className="text-[13px] font-bold text-gray-700">No {activeReportSubTab === "daily" ? "Daily" : activeReportSubTab === "fortnightly" ? "15-Day" : "30-Day"} Report Yet</h4>
@@ -2744,88 +2911,157 @@ export default function Dashboard({
                 // Render active report content
                 return (
                   <div className="space-y-5">
-                    {/* Compassionate Therapy Analysis */}
-                    <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
-                      <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
-                        Therapist Analysis
-                      </span>
-                      <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
-                        &quot;{activeReport.summary}&quot;
-                      </p>
+                    {/* Header Action Row */}
+                    <div className="flex justify-between items-center bg-gray-50/60 p-3 rounded-2xl border border-gray-100/50 text-left">
+                      <div className="text-[11px] text-gray-500 font-semibold">
+                        🗓️ Report Period: <span className="text-gray-800 font-bold">{new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> to <span className="text-gray-800 font-bold">{new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                      
+                      <button
+                        onClick={async () => {
+                          setDownloadingPDF(true);
+                          try {
+                            const html2canvas = (await import("html2canvas-pro")).default;
+                            const { jsPDF } = await import("jspdf");
+                            
+                            const docEl = document.getElementById("therapy-report-document-body");
+                            if (!docEl) return;
+                            
+                            const canvas = await html2canvas(docEl, {
+                              scale: 2,
+                              useCORS: true,
+                              allowTaint: true,
+                              backgroundColor: "#ffffff"
+                            });
+                            
+                            const imgData = canvas.toDataURL("image/png");
+                            const pdf = new jsPDF("p", "mm", "a4");
+                            const imgWidth = 210;
+                            const pageHeight = 297;
+                            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                            let heightLeft = imgHeight;
+                            let position = 0;
+                            
+                            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                            heightLeft -= pageHeight;
+                            
+                            while (heightLeft >= 0) {
+                              position = heightLeft - imgHeight;
+                              pdf.addPage();
+                              pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                              heightLeft -= pageHeight;
+                            }
+                            
+                            pdf.save(`FinHeal_Therapy_Report_${new Date(activeReport.startDate).toLocaleDateString().replace(/\//g, "-")}.pdf`);
+                          } catch (err) {
+                            console.error("PDF export failed:", err);
+                            alert("Failed to export PDF.");
+                          } finally {
+                            setDownloadingPDF(false);
+                          }
+                        }}
+                        disabled={downloadingPDF}
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer ${downloadingPDF ? "opacity-50 cursor-wait" : ""}`}
+                      >
+                        {downloadingPDF ? "⏳ Exporting..." : "📥 Download PDF"}
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Activity Summary Log */}
-                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          Period Activity Log
-                        </span>
-                        <div className="space-y-2">
-                          {[
-                            { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
-                            { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
-                            { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
-                            { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
-                            { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
-                          ].map((item) => (
-                            <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
-                              <span className="text-gray-500 font-medium flex items-center gap-1.5">
-                                <span>{item.icon}</span> {item.label}
-                              </span>
-                              <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                                {item.count}
-                              </span>
-                            </div>
-                          ))}
+                    {/* PDF Export Wrapper */}
+                    <div id="therapy-report-document-body" className="p-5 bg-white border border-gray-100 rounded-2xl space-y-5 text-left">
+                      <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
+                        <div>
+                          <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
+                          <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
+                        </div>
+                        <div className="text-[9px] text-gray-400 font-bold">
+                          Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         </div>
                       </div>
 
-                      {/* Mood Trend Analysis */}
-                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          Avg Stress & Telemetry Trend
+                      {/* Compassionate Therapy Analysis */}
+                      <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                        <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                          Therapist Analysis
                         </span>
-                        <div className="space-y-2.5">
-                          {[
-                            { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
-                            { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
-                            { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
-                            { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
-                            { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
-                          ].map((dim) => {
-                            const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
-                            return (
-                              <div key={dim.label} className="flex items-center gap-2">
-                                <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
-                                <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
-                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
-                                </div>
-                                <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                        <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                          &quot;{activeReport.summary}&quot;
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Activity Summary Log */}
+                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            Period Activity Log
+                          </span>
+                          <div className="space-y-2">
+                            {[
+                              { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
+                              { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
+                              { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
+                              { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
+                              { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
+                            ].map((item) => (
+                              <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
+                                <span className="text-gray-500 font-medium flex items-center gap-1.5">
+                                  <span>{item.icon}</span> {item.label}
+                                </span>
+                                <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
+                                  {item.count}
+                                </span>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Key Recommendations & Takeaways */}
-                    {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
-                      <div className="border-t border-gray-100 pt-4">
-                        <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          📋 Recommended Therapist Action Steps
-                        </span>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {activeReport.keyTakeaways.map((takeaway, idx) => (
-                            <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
-                              <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
-                                {takeaway}
-                              </span>
-                            </div>
-                          ))}
+                        {/* Mood Trend Analysis */}
+                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            Avg Stress & Telemetry Trend
+                          </span>
+                          <div className="space-y-2.5">
+                            {[
+                              { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                              { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                              { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                              { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                              { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                            ].map((dim) => {
+                              const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                              return (
+                                <div key={dim.label} className="flex items-center gap-2">
+                                  <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                  <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      {/* Key Recommendations & Takeaways */}
+                      {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                        <div className="border-t border-gray-100 pt-4">
+                          <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            📋 Recommended Therapist Action Steps
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {activeReport.keyTakeaways.map((takeaway, idx) => (
+                              <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                                <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                  {takeaway}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
