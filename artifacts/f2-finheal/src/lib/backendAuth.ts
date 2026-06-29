@@ -302,6 +302,8 @@ export interface BackendAdvisor {
   test_rating?: number | null;
   department?: string | null;
   is_advisor?: boolean;
+  is_active?: boolean;
+  deactivation_reason?: string | null;
   permissions?: string[] | null;
 }
 
@@ -326,6 +328,8 @@ export interface Advisor {
   testRating?: number;
   department?: string;
   isAdvisor?: boolean;
+  isActive?: boolean;
+  deactivationReason?: string;
   permissions?: string[];
 }
 
@@ -351,6 +355,8 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     testRating: a.test_rating || undefined,
     department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
     isAdvisor: a.is_advisor ?? false,
+    isActive: a.is_active ?? true,
+    deactivationReason: a.deactivation_reason || undefined,
     permissions: a.permissions || []
   };
 }
@@ -374,6 +380,8 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     test_rating: a.testRating,
     department: (a.department && a.department !== "General") ? a.department : "Founder's Office",
     is_advisor: a.isAdvisor ?? false,
+    is_active: a.isActive ?? true,
+    deactivation_reason: a.deactivationReason || undefined,
     permissions: a.permissions || []
   };
 }
@@ -422,6 +430,16 @@ export async function updateAdvisorRole(f2FintechId: string, isAdvisor: boolean)
   return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/role`, {
     method: "PUT",
     body: JSON.stringify({ is_advisor: isAdvisor }),
+  });
+}
+
+export async function updateAdvisorActiveStatus(f2FintechId: string, isActive: boolean, deactivationReason?: string): Promise<any> {
+  return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/active-status`, {
+    method: "PUT",
+    body: JSON.stringify({ 
+      is_active: isActive,
+      deactivation_reason: deactivationReason 
+    }),
   });
 }
 
@@ -631,7 +649,7 @@ export function isAdvisorSlotActive(availability: string): boolean {
 export interface UserReport {
   id: string;
   userId: string;
-  reportType: "daily" | "fortnightly" | "monthly";
+  reportType: "daily" | "fortnightly" | "monthly" | "on_demand";
   startDate: string;
   endDate: string;
   summary: string;
@@ -713,3 +731,26 @@ export async function listReferrals(advisorId: string): Promise<ReferralCode[]> 
     method: "GET"
   });
 }
+
+export async function generateOnDemandReport(userId: string): Promise<UserReport> {
+  const result = await authRequest<any>(`chat/reports/${encodeURIComponent(userId)}/generate`, {
+    method: "POST"
+  });
+  if (!result || result.status !== "success" || !result.report) {
+    throw new Error(result?.message || "Failed to generate on-demand report.");
+  }
+  const r = result.report;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  };
+}
+

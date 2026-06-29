@@ -1783,20 +1783,8 @@ export default function EligibilityCibilView({
                               Next update: {nextDate}
                             </span>
                           );
-                        } else {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCibilReport(null);
-                                setCibilError(null);
-                              }}
-                              className="text-[10px] text-primary hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
-                            >
-                              Refresh Report {exempt && "(Admin)"}
-                            </button>
-                          );
                         }
+                        return null;
                       })()}
                     </div>
                     

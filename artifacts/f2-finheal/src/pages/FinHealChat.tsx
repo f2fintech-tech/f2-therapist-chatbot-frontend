@@ -86,7 +86,7 @@ export default function FinHealChat() {
     if (location === "/admin" || location.startsWith("/admin/")) return "admin";
     if (location === "/dashboard") return "dashboard";
     if (location === "/education") return "education";
-    if (location === "/loan-calculator") return "loan-calculator";
+    if (location === "/loan-calculator" || location.startsWith("/loan-calculator/")) return "loan-calculator";
     if (location === "/cibil-analyzer") return "cibil-analyzer";
     if (location === "/eligibility-cibil") return "eligibility-cibil";
     if (location === "/tests") return "tests";
@@ -963,6 +963,10 @@ export default function FinHealChat() {
                 setMainView("tests");
               } else if (page === "Talk to an Advisor") {
                 setMainView("advisor");
+              } else if (page === "Financial Education") {
+                setMainView("education");
+              } else if (page === "Eligibility & CIBIL Checker") {
+                setMainView("eligibility-cibil");
               }
             }}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}

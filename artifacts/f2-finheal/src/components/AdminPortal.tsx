@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
-import { getEffectiveAvailability } from "@/utils/availability";
+
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
 import { type LenderProduct } from "./LoanCalculatorView";
@@ -153,6 +153,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Deactivation reason modal states
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<any>(null);
+  const [deactivateReason, setDeactivateReason] = useState("");
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
   const [educationModalOpen, setEducationModalOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<ContentItem | null>(null);
@@ -338,15 +344,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
+  const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterLoanType, setFilterLoanType] = useState<string>("all");
+  
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
 
-  // Reset page when filterDate or filterRole changes
+  const todayStr = (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
+  // Reset page when filterDate, filterEndDate, filterRole, or filterLoanType changes
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterRole]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType]);
+
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
     // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
@@ -364,8 +382,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (!isFetchedByMe) return false;
     }
 
-    // 1. Filter by Date
-    if (filterDate) {
+    // 1. Filter by Date (Start & End Date range)
+    if (filterDate || filterEndDate) {
       if (!enq.fetched_at) return false;
       const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
       const localDate = new Date(utcStr);
@@ -373,7 +391,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       const month = String(localDate.getMonth() + 1).padStart(2, '0');
       const day = String(localDate.getDate()).padStart(2, '0');
       const localDateStr = `${year}-${month}-${day}`;
-      if (localDateStr !== filterDate) return false;
+      
+      if (filterDate && filterEndDate) {
+        if (localDateStr < filterDate || localDateStr > filterEndDate) return false;
+      } else if (filterDate) {
+        if (localDateStr !== filterDate) return false;
+      } else if (filterEndDate) {
+        if (localDateStr > filterEndDate) return false;
+      }
     }
 
     // 2. Filter by Role
@@ -382,8 +407,51 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (role !== filterRole) return false;
     }
 
+    // 3. Filter by Loan Type
+    if (filterLoanType !== "all") {
+      const activeAccounts = (enq.accounts || []).filter(
+        (acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1
+      );
+      const hasMatchingLoan = activeAccounts.some((acc: any) => {
+        const typeClean = (acc.type || "").toLowerCase();
+        if (filterLoanType === "home") return typeClean.includes("home") || typeClean.includes("housing");
+        if (filterLoanType === "personal") return typeClean.includes("personal");
+        if (filterLoanType === "professional") return typeClean.includes("professional");
+        if (filterLoanType === "creditcard") return typeClean.includes("card") || typeClean.includes("cc");
+        if (filterLoanType === "auto") return typeClean.includes("auto") || typeClean.includes("car") || typeClean.includes("vehicle") || typeClean.includes("wheeler");
+        if (filterLoanType === "business") return typeClean.includes("business");
+        if (filterLoanType === "gold") return typeClean.includes("gold");
+        if (filterLoanType === "education") return typeClean.includes("education") || typeClean.includes("student");
+        if (filterLoanType === "property") return typeClean.includes("property") || typeClean.includes("lap");
+        if (filterLoanType === "other") {
+          const isMatchedByAnyKnown = ["home", "housing", "personal", "professional", "card", "cc", "auto", "car", "vehicle", "wheeler", "business", "gold", "education", "student", "property", "lap"].some(
+            keyword => typeClean.includes(keyword)
+          );
+          return !isMatchedByAnyKnown;
+        }
+        return false;
+      });
+      if (!hasMatchingLoan) return false;
+    }
+
     return true;
   });
+
+  const getDateFilterDescription = () => {
+    if (filterDate && filterEndDate) {
+      if (filterDate === filterEndDate) {
+        return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+      return `Showing records fetched between ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterDate) {
+      return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterEndDate) {
+      return `Showing records fetched up to ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    return "Showing all credit score fetches across the platform.";
+  };
 
   const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
   const safeCibilPage = Math.min(cibilPage, totalPages);
@@ -392,67 +460,360 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     safeCibilPage * cibilPageSize
   );
 
-  const handleExportCSV = () => {
+  const escapeXml = (unsafe: string) => {
+    if (!unsafe) return "";
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
+  const getColumnLetter = (colIndex: number) => {
+    let temp = colIndex;
+    let letter = "";
+    while (temp > 0) {
+      let modulo = (temp - 1) % 26;
+      letter = String.fromCharCode(65 + modulo) + letter;
+      temp = Math.floor((temp - modulo) / 26);
+    }
+    return letter;
+  };
+
+  const handleExportExcel = () => {
     if (filteredEnquiries.length === 0) return;
 
-    // Header row
-    const headers = ["Name", "Phone", "Email", "CIBIL Score", "Bureau", "Existing Open Accounts", "Date Fetched"];
+    // 1. Helper function for CRC32 calculation
+    const makeCRCTable = () => {
+      let c;
+      const crcTable = [];
+      for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+          c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        crcTable[n] = c;
+      }
+      return crcTable;
+    };
 
-    // Map rows
-    const rows = filteredEnquiries.map(enq => {
-      // 1. Get only active (open) accounts
-      const activeAccountsList = (enq.accounts || []).filter((acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1);
+    const crcTable = makeCRCTable();
 
-      // 2. Format active accounts list
-      const formattedAccounts = activeAccountsList.length > 0
-        ? activeAccountsList.map((acc: any) => {
-          const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
-          return `${acc.lender} (${acc.type}) - Bal: Rs.${bal}`;
-        }).join("; ")
-        : "No open accounts";
+    const calculateCrc32 = (bytes: Uint8Array) => {
+      let crc = 0 ^ (-1);
+      for (let i = 0; i < bytes.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xFF];
+      }
+      return (crc ^ (-1)) >>> 0;
+    };
 
-      // 3. Date formatting
-      const dateFormatted = enq.fetched_at
-        ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
-        : "-";
+    // 2. Helper function to create an uncompressed ZIP file
+    const createZipBlob = (files: { name: string; content: string }[]) => {
+      const encoder = new TextEncoder();
+      const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
+      let currentOffset = 0;
+      const parts: BlobPart[] = [];
 
-      return [
-        enq.name || "Guest",
-        enq.phone || "-",
-        enq.email || "-",
-        enq.score || "-",
-        enq.bureau || "CIBIL",
-        formattedAccounts,
-        dateFormatted
-      ];
+      files.forEach((file) => {
+        const nameBytes = encoder.encode(file.name);
+        const contentBytes = encoder.encode(file.content);
+        const crc = calculateCrc32(contentBytes);
+
+        const header = new Uint8Array(30 + nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x04034b50, true); // Local file header signature
+        view.setUint16(4, 10, true);         // Version needed to extract
+        view.setUint16(6, 0, true);          // General purpose bit flag
+        view.setUint16(8, 0, true);          // Compression method (0 = Store)
+        view.setUint32(10, 0, true);         // Last mod time / date (not set)
+        view.setUint32(14, crc, true);       // CRC-32
+        view.setUint32(18, contentBytes.length, true); // Compressed size
+        view.setUint32(22, contentBytes.length, true); // Uncompressed size
+        view.setUint16(26, nameBytes.length, true);    // File name length
+        view.setUint16(28, 0, true);         // Extra field length
+
+        header.set(nameBytes, 30);
+
+        zipData.push({
+          nameBytes,
+          contentBytes,
+          crc,
+          offset: currentOffset
+        });
+
+        parts.push(header);
+        parts.push(contentBytes);
+
+        currentOffset += header.length + contentBytes.length;
+      });
+
+      const centralDirectoryOffset = currentOffset;
+      let centralDirectorySize = 0;
+
+      zipData.forEach((file) => {
+        const header = new Uint8Array(46 + file.nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x02014b50, true); // Central file header signature
+        view.setUint16(4, 20, true);         // Version made by
+        view.setUint16(6, 10, true);         // Version needed to extract
+        view.setUint16(8, 0, true);          // General purpose bit flag
+        view.setUint16(10, 0, true);         // Compression method (Store)
+        view.setUint32(12, 0, true);         // Last mod time / date
+        view.setUint32(16, file.crc, true);  // CRC-32
+        view.setUint32(20, file.contentBytes.length, true); // Compressed size
+        view.setUint32(24, file.contentBytes.length, true); // Uncompressed size
+        view.setUint16(28, file.nameBytes.length, true);    // File name length
+        view.setUint16(30, 0, true);         // Extra field length
+        view.setUint16(32, 0, true);         // File comment length
+        view.setUint16(34, 0, true);         // Disk number start
+        view.setUint16(36, 0, true);         // Internal file attributes
+        view.setUint32(38, 0, true);         // External file attributes
+        view.setUint32(42, file.offset, true); // Local header offset
+
+        header.set(file.nameBytes, 46);
+        parts.push(header);
+
+        centralDirectorySize += header.length;
+        currentOffset += header.length;
+      });
+
+      const eocd = new Uint8Array(22);
+      const view = new DataView(eocd.buffer);
+
+      view.setUint32(0, 0x06054b50, true); // End of central dir signature
+      view.setUint16(4, 0, true);          // Number of this disk
+      view.setUint16(6, 0, true);          // Disk where central dir starts
+      view.setUint16(8, files.length, true); // Directory records on this disk
+      view.setUint16(10, files.length, true); // Total directory records
+      view.setUint32(12, centralDirectorySize, true); // Size of central dir
+      view.setUint32(16, centralDirectoryOffset, true); // Offset of central dir
+      view.setUint16(20, 0, true);         // Comment length
+
+      parts.push(eocd);
+
+      return new Blob(parts, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    };
+
+    // 3. Split data
+    const under700 = filteredEnquiries.filter(enq => {
+      const scoreVal = Number(enq.score);
+      return isNaN(scoreVal) || scoreVal < 700;
+    });
+    const above700 = filteredEnquiries.filter(enq => {
+      const scoreVal = Number(enq.score);
+      return !isNaN(scoreVal) && scoreVal >= 700;
     });
 
-    // Convert to CSV string, escaping quotes
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row =>
-        row.map(val => {
-          const strVal = String(val);
-          // Escape double quotes by doubling them
-          const escaped = strVal.replace(/"/g, '""');
-          // If it contains commas, quotes, or newlines, wrap in quotes
-          if (escaped.includes(",") || escaped.includes('"') || escaped.includes("\n") || escaped.includes(";")) {
-            return `"${escaped}"`;
-          }
-          return escaped;
-        }).join(",")
-      )
-    ].join("\n");
+    const loanTypesConfig = [
+      { key: "home_loan", label: "Home Loan" },
+      { key: "personal_loan", label: "Personal Loan" },
+      { key: "professional_loan", label: "Professional Loan" },
+      { key: "car_loan", label: "Car Loan" },
+      { key: "credit_card", label: "Credit Card" },
+      { key: "education_loan", label: "Education Loan" },
+      { key: "business_loan", label: "Business Loan" },
+      { key: "gold_loan", label: "Gold Loan" },
+      { key: "other_loans", label: "Other Loan" }
+    ];
 
-    // Create Blob and trigger download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const maxLoanCounts: Record<string, number> = {};
+    loanTypesConfig.forEach(cfg => {
+      let maxCount = 0;
+      filteredEnquiries.forEach(enq => {
+        const val = enq[cfg.key];
+        if (val) {
+          const count = val.split("; ").filter(Boolean).length;
+          if (count > maxCount) {
+            maxCount = count;
+          }
+        }
+      });
+      maxLoanCounts[cfg.key] = maxCount;
+    });
+
+    const generateWorksheetXml = (data: any[]) => {
+      const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
+      const loanCols: { key: string; label: string; count: number }[] = [];
+      
+      loanTypesConfig.forEach(cfg => {
+        const count = maxLoanCounts[cfg.key] || 0;
+        if (count > 0) {
+          loanCols.push({ key: cfg.key, label: cfg.label, count });
+          for (let i = 0; i < count; i++) {
+            headers.push(count > 1 ? `${cfg.label} ${i + 1}` : cfg.label);
+          }
+        }
+      });
+
+      const totalCols = headers.length;
+      const lastColLetter = getColumnLetter(totalCols);
+
+      let sheetDataXml = "";
+      
+      // Header row
+      sheetDataXml += `    <row r="1" spans="1:${totalCols}">\n`;
+      headers.forEach((h, idx) => {
+        const r = `${getColumnLetter(idx + 1)}1`;
+        sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
+      });
+      sheetDataXml += `    </row>\n`;
+
+      // Data rows
+      data.forEach((enq, rowIdx) => {
+        const rowIndex = rowIdx + 2;
+        sheetDataXml += `    <row r="${rowIndex}" spans="1:${totalCols}">\n`;
+
+        const dateFormatted = enq.fetched_at
+          ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
+          : "-";
+
+        const fields = [
+          enq.name || "Guest",
+          enq.phone || "-",
+          enq.pan || "-",
+          enq.score !== undefined && enq.score !== null ? String(enq.score) : "-",
+          enq.email || "-",
+          enq.bureau || "CIBIL",
+          dateFormatted
+        ];
+
+        loanCols.forEach(col => {
+          const val = enq[col.key] || "";
+          const loansList = val.split("; ").filter(Boolean);
+          for (let i = 0; i < col.count; i++) {
+            if (i < loansList.length) {
+              fields.push(loansList[i]);
+            } else {
+              fields.push("-");
+            }
+          }
+        });
+
+        fields.forEach((val, colIdx) => {
+          const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
+          const isNumber = colIdx === 3 && !isNaN(Number(val)) && val !== "-";
+          if (isNumber) {
+            sheetDataXml += `      <c r="${r}" s="2" t="n"><v>${val}</v></c>\n`;
+          } else {
+            sheetDataXml += `      <c r="${r}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>\n`;
+          }
+        });
+
+        sheetDataXml += `    </row>\n`;
+      });
+
+      let colsXml = "  <cols>\n";
+      colsXml += `    <col min="1" max="1" width="22" customWidth="1"/>\n`; // Name
+      colsXml += `    <col min="2" max="2" width="16" customWidth="1"/>\n`; // Phone
+      colsXml += `    <col min="3" max="3" width="16" customWidth="1"/>\n`; // PAN
+      colsXml += `    <col min="4" max="4" width="14" customWidth="1"/>\n`; // CIBIL Score
+      colsXml += `    <col min="5" max="5" width="26" customWidth="1"/>\n`; // Email
+      colsXml += `    <col min="6" max="6" width="12" customWidth="1"/>\n`; // Bureau
+      colsXml += `    <col min="7" max="7" width="20" customWidth="1"/>\n`; // Date Fetched
+      if (totalCols > 7) {
+        colsXml += `    <col min="8" max="${totalCols}" width="35" customWidth="1"/>\n`; // Dynamic Loans
+      }
+      colsXml += "  </cols>\n";
+
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:${lastColLetter}${data.length + 1}"/>
+${colsXml}
+  <sheetData>
+${sheetDataXml}
+  </sheetData>
+</worksheet>`;
+    };
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+    const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Leads CIBIL under 700" sheetId="1" r:id="rId1"/>
+    <sheet name="Leads CIBIL 700 and above" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/></font>
+    <font><b/><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FFFFFFFF"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border/>
+    <border>
+      <left style="thin"><color rgb="FFD1D5DB"/></left>
+      <right style="thin"><color rgb="FFD1D5DB"/></right>
+      <top style="thin"><color rgb="FFD1D5DB"/></top>
+      <bottom style="thin"><color rgb="FFD1D5DB"/></bottom>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="3">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+  </cellXfs>
+</styleSheet>`;
+
+    const sheet1Xml = generateWorksheetXml(under700);
+    const sheet2Xml = generateWorksheetXml(above700);
+
+    const files = [
+      { name: "[Content_Types].xml", content: contentTypesXml },
+      { name: "_rels/.rels", content: relsXml },
+      { name: "xl/workbook.xml", content: workbookXml },
+      { name: "xl/_rels/workbook.xml.rels", content: workbookRelsXml },
+      { name: "xl/styles.xml", content: stylesXml },
+      { name: "xl/worksheets/sheet1.xml", content: sheet1Xml },
+      { name: "xl/worksheets/sheet2.xml", content: sheet2Xml }
+    ];
+
+    const blob = createZipBlob(files);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split('T')[0];
 
-    const roleName = filterRole === "all" ? "All" : filterRole === "User" ? "Leads" : filterRole;
-    const dateStr = filterDate ? `_${filterDate}` : "";
     link.setAttribute("href", url);
-    link.setAttribute("download", `FinHeal_CIBIL_${roleName}_Enquiries${dateStr}.csv`);
+    link.setAttribute("download", `leads_${dateStr}.xlsx`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -506,7 +867,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      const res = await fetch(`${apiBase}/cibil/enquiries`, { headers });
+      const res = await fetch(`${apiBase}/cibil/leads`, { headers });
       if (res.ok) {
         const data = await res.json();
         setCibilEnquiries(data);
@@ -1066,6 +1427,46 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     }
   };
 
+  const handleToggleActive = async (adv: any) => {
+    const nextStatus = adv.isActive !== false ? false : true;
+    if (nextStatus) {
+      // Activating: clear deactivation reason automatically
+      try {
+        await updateAdvisorActiveStatus(adv.f2FintechId || adv.id, true);
+        alert(`Advisor ${adv.name} has been activated successfully.`);
+        await loadAdvisors();
+        await loadEmployees();
+      } catch (err) {
+        console.error("Failed to activate advisor:", err);
+        alert("Error activating advisor.");
+      }
+    } else {
+      // Deactivating: prompt for reason
+      setDeactivateTarget(adv);
+      setDeactivateReason("");
+      setDeactivateConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setIsDeactivating(true);
+    try {
+      await updateAdvisorActiveStatus(deactivateTarget.f2FintechId || deactivateTarget.id, false, deactivateReason);
+      alert(`Advisor ${deactivateTarget.name} has been deactivated.`);
+      setDeactivateConfirmOpen(false);
+      setDeactivateTarget(null);
+      setDeactivateReason("");
+      await loadAdvisors();
+      await loadEmployees();
+    } catch (err) {
+      console.error("Failed to deactivate advisor:", err);
+      alert("Error deactivating advisor.");
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
   // ==================== Education CRUD Actions ====================
   const handleOpenAddEdu = () => {
     setEditingContent(null);
@@ -1593,6 +1994,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         <th className="p-[12px]">Category</th>
                         <th className="p-[12px]">Hourly Fee</th>
                         <th className="p-[12px]">Availability</th>
+                        <th className="p-[12px]">Status</th>
                         <th className="p-[12px] text-right">Actions</th>
                       </tr>
                     </thead>
@@ -1617,7 +2019,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                           <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                           <td className="p-[12px]">
                             {(() => {
-                              const effectiveAvail = getEffectiveAvailability(adv.availability, adv.nextSlot);
+                              const effectiveAvail = adv.availability;
                               return effectiveAvail === "available" ? (
                                 <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
                               ) : effectiveAvail === "in meeting" ? (
@@ -1627,7 +2029,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               );
                             })()}
                           </td>
+                          <td className="p-[12px]">
+                            {adv.isActive !== false ? (
+                              <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Active</span>
+                            ) : (
+                              <div className="flex flex-col gap-[2px]">
+                                <span className="bg-amber-50 text-amber-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-amber-100 w-max">Deactivated</span>
+                                {adv.deactivationReason && (
+                                  <span className="text-[9.5px] text-amber-600 font-medium italic truncate max-w-[150px] block" title={adv.deactivationReason}>
+                                    Reason: {adv.deactivationReason}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="p-[12px] text-right space-x-[6px]">
+                            <button
+                              onClick={() => handleToggleActive(adv)}
+                              className={`${adv.isActive !== false ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700'} hover:underline font-bold cursor-pointer`}
+                            >
+                              {adv.isActive !== false ? "Deactivate" : "Activate"}
+                            </button>
                             <button
                               onClick={() => handleOpenEditExpert(adv)}
                               className="text-primary hover:underline font-bold cursor-pointer"
@@ -1948,9 +2370,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                       </h3>
                       <p className="text-[10px] text-gray-400 mt-[2px]">
-                        {filterDate
-                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                          : "Showing all credit score fetches across the platform."}
+                        {getDateFilterDescription()}
                       </p>
                     </div>
 
@@ -1984,46 +2404,82 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
+                      <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
                       <select
                         value={filterRole}
                         onChange={(e) => setFilterRole(e.target.value)}
                         className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
                       >
                         <option value="all">All Enquirers</option>
-                        <option value="User">Regular Users (Leads)</option>
+                        <option value="User">Users (Leads)</option>
                         <option value="Admin">Admins</option>
                         <option value="Manager">Managers</option>
                         <option value="Senior Leadership">Senior Leadership</option>
                       </select>
                     </div>
 
+                    {/* Active Loan Type Filter Selector */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                      <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                      <select
+                        value={filterLoanType}
+                        onChange={(e) => setFilterLoanType(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Loan Types</option>
+                        <option value="home">Home Loan</option>
+                        <option value="personal">Personal Loan</option>
+                        <option value="professional">Professional Loan</option>
+                        <option value="creditcard">Credit Card</option>
+                        <option value="auto">Auto / Vehicle Loan</option>
+                        <option value="business">Business Loan</option>
+                        <option value="gold">Gold Loan</option>
+                        <option value="education">Education Loan</option>
+                        <option value="property">Loan Against Property (LAP)</option>
+                        <option value="other">Other Loans</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
                       <input
                         type="date"
                         value={filterDate}
                         onChange={(e) => setFilterDate(e.target.value)}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
-                      {(filterDate || filterRole !== "all") && (
-                        <button
-                          onClick={() => { setFilterDate(""); setFilterRole("all"); }}
-                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
-                        >
-                          Reset Filters
-                        </button>
-                      )}
-                      {filteredEnquiries.length > 0 && (
-                        <button
-                          onClick={handleExportCSV}
-                          className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                          title="Export leads to Excel/CSV sheet"
-                        >
-                          📥 Export Leads
-                        </button>
-                      )}
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                      <input
+                        type="date"
+                        value={filterEndDate}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                      <button
+                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                      >
+                        Reset Filters
+                      </button>
+                    )}
+
+                    {filteredEnquiries.length > 0 && (
+                      <button
+                        onClick={handleExportExcel}
+                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                        title="Export leads to Excel workbook (.xlsx)"
+                      >
+                        📥 Export Leads
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2212,7 +2668,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                       );
                     }).map((emp) => {
                       const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
-                      const isAvailable = getEffectiveAvailability(emp.availability, emp.nextSlot) === "available";
+                      const isAvailable = emp.availability === "available";
                       
                       return (
                         <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
@@ -2251,10 +2707,26 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
                             </div>
                             {emp.isAdvisor && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Rating</span>
-                                <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                              </div>
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400">Rating</span>
+                                  <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400">Status</span>
+                                  <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                                  </span>
+                                </div>
+                                {emp.isActive === false && emp.deactivationReason && (
+                                   <div className="flex justify-between text-[10px]">
+                                     <span className="text-gray-400">Reason</span>
+                                     <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                                       {emp.deactivationReason}
+                                     </span>
+                                   </div>
+                                 )}
+                              </>
                             )}
                           </div>
 
@@ -2269,6 +2741,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             </button>
 
                             <div className="flex items-center gap-2">
+                              {emp.isAdvisor && (
+                                <button
+                                  onClick={() => handleToggleActive(emp)}
+                                  className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                                >
+                                  {emp.isActive !== false ? "Deactivate" : "Activate"}
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleOpenEditExpert(emp)}
                                 className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
@@ -3044,9 +3524,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                           </h3>
                           <p className="text-[10px] text-gray-400 mt-[2px]">
-                            {filterDate
-                              ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                              : "Showing all credit score fetches across the platform."}
+                            {getDateFilterDescription()}
                           </p>
                         </div>
 
@@ -3078,29 +3556,60 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                       {/* Row 2: Filters & Export */}
                       <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                        {/* Active Loan Type Filter Selector */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                          <input
-                            type="date"
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                          />
-                          {(filterDate || filterRole !== "all") && (
-                            <button
-                              onClick={() => { setFilterDate(""); setFilterRole("all"); }}
-                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                            >
-                              Reset Filters
-                            </button>
-                          )}
+                          <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                          <select
+                            value={filterLoanType}
+                            onChange={(e) => setFilterLoanType(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Loan Types</option>
+                            <option value="home">Home Loan</option>
+                            <option value="personal">Personal Loan</option>
+                            <option value="professional">Professional Loan</option>
+                            <option value="creditcard">Credit Card</option>
+                            <option value="auto">Auto / Vehicle Loan</option>
+                            <option value="business">Business Loan</option>
+                            <option value="gold">Gold Loan</option>
+                            <option value="education">Education Loan</option>
+                            <option value="property">Loan Against Property (LAP)</option>
+                            <option value="other">Other Loans</option>
+                          </select>
+                        </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                            <input
+                              type="date"
+                              value={filterDate}
+                              onChange={(e) => setFilterDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                            <input
+                              type="date"
+                              value={filterEndDate}
+                              onChange={(e) => setFilterEndDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                              <button
+                                onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                                className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                              >
+                                Reset Filters
+                              </button>
+                            )}
                           {filteredEnquiries.length > 0 && (
                             <button
-                              onClick={handleExportCSV}
+                              onClick={handleExportExcel}
                               className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                              title="Export leads to Excel/CSV sheet"
+                              title="Export leads to Excel workbook (.xlsx)"
                             >
-                              📥 Export Leads
+                              📥 Export Leads (Excel)
                             </button>
                           )}
                         </div>
@@ -3634,6 +4143,62 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 {isDeletingExpert ? "Verifying..." : "Delete Profile"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DEACTIVATE ADVISOR REASON MODAL ==================== */}
+      {deactivateConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
+          <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
+              <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
+                🚫 Deactivate Advisor Profile
+              </h3>
+              <button 
+                onClick={() => setDeactivateConfirmOpen(false)} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[14px]">
+              <p className="text-[12px] leading-relaxed text-gray-600">
+                Please enter the reason for temporarily deactivating <strong>{deactivateTarget?.name}</strong>:
+              </p>
+              
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                  Deactivation Reason
+                </label>
+                <textarea
+                  value={deactivateReason}
+                  onChange={(e) => setDeactivateReason(e.target.value)}
+                  placeholder="e.g. Leave of absence, health reasons, temporary assignment"
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-amber-500 bg-white min-h-[80px]"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button 
+                onClick={() => setDeactivateConfirmOpen(false)} 
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeactivate}
+                disabled={isDeactivating || !deactivateReason.trim()}
+                className="flex-1 py-[11px] bg-amber-600 text-white font-bold rounded-[12px] text-[12px] hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {isDeactivating ? "Updating..." : "Deactivate Profile"}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

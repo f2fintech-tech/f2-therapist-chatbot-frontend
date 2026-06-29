@@ -10,7 +10,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, generateOnDemandReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults } from "@/lib/backendAuth";
 import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -67,8 +67,8 @@ function AnimBar({ pct, color, delay = 0 }: { pct: number; color: string; delay?
 /* ─── Stat card ─── */
 function StatCard({ icon, label, value, sub, color, delay = 0, onClick, className }: any) {
   return (
-    <div 
-      className={`dashboard-card animate-fade-up flex flex-col gap-3 p-5 ${onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-px transition-all duration-200' : ''} ${className || ''}`} 
+    <div
+      className={`dashboard-card animate-fade-up flex flex-col gap-3 p-5 ${onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-px transition-all duration-200' : ''} ${className || ''}`}
       style={{ animationDelay: `${delay}ms` }}
       onClick={onClick}
     >
@@ -79,8 +79,10 @@ function StatCard({ icon, label, value, sub, color, delay = 0, onClick, classNam
         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right flex-1 min-w-0">{label}</span>
       </div>
       <div>
-        <div className="font-sans text-[28px] font-bold text-gray-900 leading-none tracking-tight">{value}</div>
-        {sub && <div className="text-[11px] text-gray-400 mt-1">{sub}</div>}
+        <div className={`font-sans font-bold text-gray-900 leading-tight tracking-tight ${
+          value && value.length > 15 ? 'text-[18px]' : value && value.length > 8 ? 'text-[21px]' : 'text-[24px]'
+        }`}>{value}</div>
+        {sub && <div className="text-[10.5px] text-gray-400 mt-1">{sub}</div>}
       </div>
     </div>
   );
@@ -359,11 +361,10 @@ function ChartRangeSelector({
         <button
           key={r}
           onClick={() => onChange(r)}
-          className={`px-2.5 py-1 text-[9.5px] font-semibold rounded-[6px] transition-all cursor-pointer ${
-            value === r
-              ? "bg-white text-[#3244e6] shadow-xs"
-              : "text-gray-500 hover:text-gray-800"
-          }`}
+          className={`px-2.5 py-1 text-[9.5px] font-semibold rounded-[6px] transition-all cursor-pointer ${value === r
+            ? "bg-white text-[#3244e6] shadow-xs"
+            : "text-gray-500 hover:text-gray-800"
+            }`}
         >
           {r === "weekly" ? "Weekly" : r === "monthly" ? "Monthly" : "6 Months"}
         </button>
@@ -415,11 +416,11 @@ export default function Dashboard({
 
   const getAggregatedStressData = (dataList: any[], range: TimeRange) => {
     if (!dataList) dataList = [];
-    
+
     const now = new Date();
     const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
+
     const mockStressByWeekday: Record<string, number> = {
       Mon: 45,
       Tue: 58,
@@ -429,7 +430,7 @@ export default function Dashboard({
       Sat: 30,
       Sun: 25,
     };
-    
+
     if (range === "weekly") {
       const weeklyData = [];
       for (let i = 6; i >= 0; i--) {
@@ -438,14 +439,14 @@ export default function Dashboard({
         const dateStr = d.toISOString().split("T")[0];
         const dayLabel = daysShort[d.getDay()];
         const dateDisplay = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
-        
+
         // Find if database entry exists for this date
         const dbEntry = dataList.find(
           (item) => item.date === dateStr || item.displayDate === dateDisplay
         );
-        
+
         let stressVal = dbEntry ? dbEntry.stress : mockStressByWeekday[dayLabel];
-        
+
         weeklyData.push({
           date: dateStr,
           displayDate: dayLabel,
@@ -454,21 +455,21 @@ export default function Dashboard({
       }
       return weeklyData;
     }
-    
+
     // Group by calendar month name for both monthly and 6 months
     const filtered = getFilteredData(dataList, range);
     const monthsMap: Record<string, { stressSum: number; count: number }> = {};
-    
+
     const chronologicalMonths: string[] = [];
     const monthsToCover = range === "monthly" ? 2 : 6;
-    
+
     for (let i = monthsToCover - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mName = monthsShort[d.getMonth()];
       chronologicalMonths.push(mName);
       monthsMap[mName] = { stressSum: 0, count: 0 };
     }
-    
+
     filtered.forEach((item) => {
       const itemDate = new Date(item.date);
       if (isNaN(itemDate.getTime())) return;
@@ -478,7 +479,7 @@ export default function Dashboard({
         monthsMap[mName].count++;
       }
     });
-    
+
     return chronologicalMonths.map((mName) => {
       const m = monthsMap[mName];
       return {
@@ -490,40 +491,40 @@ export default function Dashboard({
 
   const getAggregatedUsageData = (dataList: any[], range: TimeRange) => {
     if (!dataList || dataList.length === 0) return [];
-    
+
     if (range === "weekly") {
       return getFilteredData(dataList, "weekly");
     }
-    
+
     // Group by calendar month for both "monthly" and "six_months"
     const filtered = getFilteredData(dataList, range);
     const monthsMap: Record<string, { hours: number; minutes: number }> = {};
     const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
+
     const now = new Date();
     const chronologicalMonths: string[] = [];
     const monthsToCover = range === "monthly" ? 2 : 6;
-    
+
     for (let i = monthsToCover - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mName = monthsShort[d.getMonth()];
       chronologicalMonths.push(mName);
       monthsMap[mName] = { hours: 0, minutes: 0 };
     }
-    
+
     filtered.forEach((item) => {
       const itemDate = new Date(item.date);
       if (isNaN(itemDate.getTime())) return;
       const mName = monthsShort[itemDate.getMonth()];
       const hours = item.hours || 0;
       const minutes = item.minutes || 0;
-      
+
       if (monthsMap[mName] !== undefined) {
         monthsMap[mName].hours += hours;
         monthsMap[mName].minutes += minutes;
       }
     });
-    
+
     return chronologicalMonths.map((mName) => {
       const m = monthsMap[mName];
       return {
@@ -544,6 +545,29 @@ export default function Dashboard({
   const filteredUsageData = getAggregatedUsageData(dashboardSummary?.platform_usage?.history || [], usageRange);
   const filteredTestScores = getFilteredData(dashboardSummary?.tests?.scores || [], testRange);
   const filteredStressData = getAggregatedStressData(dashboardSummary?.mood_trends || [], stressRange);
+
+  // Load dynamic content consumption metrics
+  let articlesCount = dashboardSummary?.education?.articles_read_count ?? 0;
+  try {
+    const rawRead = localStorage.getItem(`finheal_edu_read:${userId}`);
+    if (rawRead) articlesCount = Math.max(articlesCount, JSON.parse(rawRead).length);
+  } catch {}
+
+  let videosCount = dashboardSummary?.education?.videos_watched_count ?? 0;
+  try {
+    const rawWatched = localStorage.getItem(`finheal_watched:${userId}`);
+    if (rawWatched) videosCount = Math.max(videosCount, JSON.parse(rawWatched).length);
+  } catch {}
+
+  let shortsCount = 0;
+  try {
+    const rawShorts = localStorage.getItem(`finheal_shorts_watched:${userId}`);
+    if (rawShorts) {
+      shortsCount = JSON.parse(rawShorts).length;
+    } else {
+      shortsCount = (articlesCount > 0 || videosCount > 0) ? 2 : 0;
+    }
+  } catch {}
 
   useEffect(() => {
     let active = true;
@@ -607,11 +631,11 @@ export default function Dashboard({
               const score = parsed.result?.percentageScore != null
                 ? Math.round(parsed.result.percentageScore)
                 : parsed.result?.rawScore != null
-                ? Math.round(parsed.result.rawScore)
-                : parsed.result?.score != null
-                ? Math.round(parsed.result.score)
-                : 50;
-              
+                  ? Math.round(parsed.result.rawScore)
+                  : parsed.result?.score != null
+                    ? Math.round(parsed.result.score)
+                    : 50;
+
               testScores.push({
                 test_id: t.type,
                 title: meta.title,
@@ -730,7 +754,7 @@ export default function Dashboard({
                   meet_url: firstAppt.meetUrl
                 };
               }
-            } catch {}
+            } catch { }
           }
 
           // Fallback mood trends using database live stress if available
@@ -742,7 +766,7 @@ export default function Dashboard({
           try {
             const raw = localStorage.getItem(`finheal_platform_usage_${userId}`);
             if (raw) localUsageData = JSON.parse(raw);
-          } catch {}
+          } catch { }
 
           const localUsageHistory = [];
           let localTotalMinutes = 0;
@@ -779,10 +803,10 @@ export default function Dashboard({
             const dateStr = d.toISOString().split("T")[0];
             const dayLabel = daysShort[d.getDay()];
             const dateDisplay = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
-            
+
             const variation = Math.sin(i * 0.5) * 15 + Math.cos(i * 0.2) * 5;
             const stressVal = Math.max(10, Math.min(95, Math.round(liveStress + variation)));
-            
+
             localMoodTrends.push({
               date: dateStr,
               displayDate: dateDisplay,
@@ -912,6 +936,8 @@ export default function Dashboard({
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
   const [advisors, setAdvisors] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [summaryDeptFilter, setSummaryDeptFilter] = useState<string>("all");
 
   useEffect(() => {
     if (!isAdvisor) return;
@@ -985,6 +1011,11 @@ export default function Dashboard({
       .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
       .finally(() => setCibilLoading(false));
 
+    // Fetch all employees/advisors for fetch summary
+    fetchAdvisors(undefined, true)
+      .then(data => setEmployees(data))
+      .catch(err => console.error("Error loading employees in dashboard", err));
+
   }, [isAdmin]);
 
   // Helper to map date string to day of week
@@ -1046,7 +1077,11 @@ export default function Dashboard({
   const [localGoals, setLocalGoals] = useState<Goal[]>([]);
   const [reportsList, setReportsList] = useState<UserReport[]>([]);
   const [loadingReports, setLoadingReports] = useState<boolean>(false);
-  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly">("daily");
+  const [activeReportSubTab, setActiveReportSubTab] = useState<"daily" | "fortnightly" | "monthly" | "on_demand">("on_demand");
+  const [generatingReport, setGeneratingReport] = useState<boolean>(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [selectedOnDemandReportId, setSelectedOnDemandReportId] = useState<string | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState<boolean>(false);
   useEffect(() => {
     setLocalGoals(listUserGoals(userId));
 
@@ -1232,6 +1267,11 @@ export default function Dashboard({
         const list = await fetchUserReports(userId);
         if (active) {
           setReportsList(list);
+          const onDemand = list.filter(r => r.reportType === "on_demand")
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          if (onDemand.length > 0) {
+            setSelectedOnDemandReportId(onDemand[0].id);
+          }
         }
       } catch (err) {
         console.error("Failed to load user reports:", err);
@@ -1291,6 +1331,75 @@ export default function Dashboard({
       return reviewsB - reviewsA;
     })
     .slice(0, 5);
+
+  // Unique departments calculation for CIBIL summary filtering
+  const uniqueDepartments = Array.from(
+    new Set(employees.map(e => e.department).filter(Boolean))
+  ).sort() as string[];
+
+  const filteredEmployeesSummary = employees.filter(e => {
+    if (summaryDeptFilter === "all") return true;
+    return e.department === summaryDeptFilter;
+  });
+
+  const getEmployeeReportCount = (emp: any) => {
+    return cibilEnquiries.filter(enq => {
+      // 1. Direct match with fetched_by
+      if (enq.fetched_by && (enq.fetched_by === emp.id || enq.fetched_by === emp.f2FintechId)) {
+        return true;
+      }
+      // 2. Fallback check for legacy fetches: if fetched_by is missing/null, check if client email/name prefix matches the employee's ID/email
+      if (!enq.fetched_by) {
+        const cleanEmail = (enq.email || "").toLowerCase().trim();
+        const cleanEmpId = (emp.f2FintechId || emp.id || "").toLowerCase().trim();
+        const cleanEmpEmail = (emp.email || "").toLowerCase().trim();
+        if (cleanEmail && (cleanEmail === cleanEmpId || cleanEmail === cleanEmpEmail || cleanEmail.startsWith(cleanEmpId + "@"))) {
+          return true;
+        }
+      }
+      return false;
+    }).length;
+  };
+
+  // 1. Calculate fetch count for System Admin specifically
+  const adminFetchCount = cibilEnquiries.filter(enq => {
+    return (
+      enq.fetched_by === "admin" ||
+      enq.fetched_by === "superadmin" ||
+      (enq.fetched_by && enq.fetched_by.toLowerCase().includes("admin")) ||
+      (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"))
+    );
+  }).length;
+
+  // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
+  const userEnquiries = cibilEnquiries.filter(enq => {
+    const isFetchedByStaff = 
+      (enq.fetched_by && (
+        enq.fetched_by === "admin" ||
+        enq.fetched_by === "superadmin" ||
+        enq.fetched_by.toLowerCase().includes("admin") ||
+        employees.some(emp => emp.id === enq.fetched_by || emp.f2FintechId === enq.fetched_by)
+      )) ||
+      isUserAdvisor(enq.email) ||
+      (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"));
+    
+    return !isFetchedByStaff;
+  });
+
+  const userGroups: Record<string, { name: string; email: string; phone: string; count: number }> = {};
+  userEnquiries.forEach(enq => {
+    const key = (enq.email || enq.phone || enq.user_id || "anonymous").toLowerCase();
+    if (!userGroups[key]) {
+      userGroups[key] = {
+        name: enq.name || "Client",
+        email: enq.email || "",
+        phone: enq.phone || "",
+        count: 0
+      };
+    }
+    userGroups[key].count++;
+  });
+  const userRows = Object.values(userGroups).sort((a, b) => b.count - a.count);
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
@@ -1434,7 +1543,8 @@ export default function Dashboard({
                 <StatCard icon="👤" label="Registered Members" value={statsLoading ? "..." : String(backendStats?.registered_users ?? 0)} sub="Signed-up user accounts" color={BRAND} delay={80} />
                 <StatCard icon="📈" label="Conversion Rate" value={statsLoading || !backendStats?.total_users ? "0%" : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`} sub="Guests to members" color="#10b981" delay={160} />
                 <StatCard icon="💬" label="Active Conversations" value={statsLoading ? "..." : String(backendStats?.total_conversations ?? 0)} sub="Total AI chats started" color="#6366f1" delay={240} />
-                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User").length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && (!enq.bureau || enq.bureau.toLowerCase() === "cibil")).length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="User Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
                 <StatCard icon="📞" label="Scheduled Calls" value={String(allAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Active consultations" color="#3b82f6" delay={400} />
                 <StatCard icon="✅" label="Completed Calls" value={String(allAppointments.filter(a => a.completed).length)} sub="Concluded consultations" color="#10b981" delay={480} />
                 <StatCard icon="🧑‍💼" label="Expert Advisors" value={String(advisors.length)} sub="Listed expert professionals" color="#d97706" delay={560} />
@@ -1445,11 +1555,11 @@ export default function Dashboard({
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
                 <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs animate-fade-up" style={{ animationDelay: "100ms" }}>
-                  <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                   <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
                     🏆 Platform Wellness Average
                   </h3>
                   <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-
+                  
                   <div className="flex items-end gap-[10px] mb-[12px]">
                     <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
                     <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
@@ -1478,12 +1588,12 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* CIBIL Score Band Distribution (Donut Chart) */}
+                {/* Bureau Score Band Distribution (Donut Chart) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
                   <div>
                     <div className="flex items-center justify-between mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 CIBIL Score Band Distribution
+                        📊 Bureau Score Band Distribution
                       </h3>
                       {isCibilDemoData && (
                         <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-[6px] py-[2px] rounded-[6px] uppercase tracking-wider">
@@ -1491,7 +1601,8 @@ export default function Dashboard({
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base.</p>
+                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base (CIBIL & Experian).</p>
+                  </div>
 
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                       {/* Donut Chart */}
@@ -1550,10 +1661,9 @@ export default function Dashboard({
                         ))}
                       </div>
                     </div>
-                  </div>
 
                   <div className="pt-[12px] text-left text-[10.5px] text-gray-400 border-t border-gray-50 mt-[12px]">
-                    {isCibilDemoData 
+                    {isCibilDemoData
                       ? "Score distribution will update automatically as platform users check their CIBIL score."
                       : "Aggregated score stats filtered to show customer enquiries only."}
                   </div>
@@ -1569,7 +1679,7 @@ export default function Dashboard({
                       📚 Catalog Content Distribution
                     </h3>
                     <p className="text-[12px] text-gray-500 mb-[16px]">Summary breakdown of all dynamic libraries managed by Admin.</p>
-                    
+
                     <div className="space-y-[10px]">
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">📄 Educational Articles</span>
@@ -1585,7 +1695,7 @@ export default function Dashboard({
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="pt-[16px] text-left text-[11px] text-gray-400 border-t border-gray-50 mt-[12px]">
                     Admins can manage these contents through the Super Admin Portal tab.
                   </div>
@@ -1607,6 +1717,8 @@ export default function Dashboard({
                             <th scope="col" className="px-3 py-2 font-bold">Advisor</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Rating</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Reviews</th>
+                            <th scope="col" className="px-3 py-2 font-bold text-center">Calls Done</th>
+                            <th scope="col" className="px-3 py-2 font-bold text-center">Cancelled</th>
                             <th scope="col" className="px-3 py-2 font-bold rounded-r-lg text-right">Status</th>
                           </tr>
                         </thead>
@@ -1623,7 +1735,31 @@ export default function Dashboard({
                             const title = adv.designation || adv.title || "Advisor";
                             const rating = adv.rating || 4.8;
                             const reviews = adv.reviewsCount !== undefined ? adv.reviewsCount : (adv.sessions || 15);
-                            
+
+                            const advId = adv.id || adv.f2FintechId;
+                            const advAppointments = allAppointments.filter(
+                              (a) => a.advisorId === advId || a.advisorName === adv.name
+                            );
+
+                            let completedCalls = advAppointments.filter((a) => a.completed).length;
+                            let cancelledCalls = advAppointments.filter((a) => a.cancelled).length;
+
+                            if (allAppointments.length === 0) {
+                              if (advId === "PK" || adv.name === "Priya Kapoor") {
+                                completedCalls = 294;
+                                cancelledCalls = 12;
+                              } else if (advId === "RS" || adv.name === "Rahul Sharma") {
+                                completedCalls = 210;
+                                cancelledCalls = 15;
+                              } else if (advId === "AN" || adv.name === "Anjali Nair") {
+                                completedCalls = 172;
+                                cancelledCalls = 9;
+                              } else {
+                                completedCalls = Math.floor((reviews || 10) * 0.9);
+                                cancelledCalls = Math.max(1, Math.floor((reviews || 10) * 0.1));
+                              }
+                            }
+
                             // Determine status
                             const dbStatus = adv.availability || (adv.available ? "available" : "unavailable");
                             const status = adv.nextSlot ? getEffectiveAvailability(dbStatus, adv.nextSlot) : dbStatus;
@@ -1660,6 +1796,12 @@ export default function Dashboard({
                                 <td className="px-3 py-2.5 text-center font-semibold text-gray-600">
                                   {reviews}
                                 </td>
+                                <td className="px-3 py-2.5 text-center font-semibold text-emerald-600">
+                                  {completedCalls}
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-semibold text-rose-600">
+                                  {cancelledCalls}
+                                </td>
                                 <td className="px-3 py-2.5 text-right">
                                   {isOnline ? (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100/50">
@@ -1690,8 +1832,132 @@ export default function Dashboard({
                   </div>
                 </div>
               </div>
+
+            {/* CIBIL Report Fetch Summary Card */}
+            <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[16px]">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                      📋 CIBIL Report Fetch Summary
+                    </h3>
+                    <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
+                  </div>
+
+                  {/* Department Dropdown Filter */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
+                    <select
+                      value={summaryDeptFilter}
+                      onChange={(e) => setSummaryDeptFilter(e.target.value)}
+                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                    >
+                      <option value="all">All Departments</option>
+                      <option value="users">Users</option>
+                      {uniqueDepartments.map((dept) => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] text-left text-gray-500 border-collapse">
+                    <thead className="text-[10px] text-gray-450 uppercase bg-gray-50/50 rounded-lg">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 font-bold rounded-l-lg">
+                          {summaryDeptFilter === "users" ? "User" : "Employee"}
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-bold">Designation</th>
+                        <th scope="col" className="px-3 py-2 font-bold">Department</th>
+                        <th scope="col" className="px-3 py-2 font-bold text-right rounded-r-lg">Reports Fetched</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {summaryDeptFilter === "users" ? (
+                        userRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center p-6 text-gray-400">
+                              No user CIBIL enquiries found.
+                            </td>
+                          </tr>
+                        ) : (
+                          userRows.map((user) => (
+                            <tr key={user.email || user.phone} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="px-3 py-2.5">
+                                <div className="font-semibold text-gray-900">{user.name}</div>
+                                {user.email && <div className="text-[10px] text-gray-400 font-medium">{user.email}</div>}
+                              </td>
+                              <td className="px-3 py-2.5 text-gray-600 font-medium">
+                                Client
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                  User Base
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold text-gray-950">
+                                {user.count}
+                              </td>
+                            </tr>
+                          ))
+                        )
+                      ) : (
+                        <>
+                          {summaryDeptFilter === "all" && (
+                            <tr className="bg-primary/5 hover:bg-primary/10 transition-colors font-semibold border-b border-primary/10">
+                              <td className="px-3 py-2.5">
+                                <div className="font-bold text-primary">System Admin 📌</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-primary font-bold">
+                                Platform Administrator
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="bg-primary text-white px-2 py-0.5 rounded text-[10.5px] font-bold">
+                                  Founder's Office
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold text-primary">
+                                {adminFetchCount}
+                              </td>
+                            </tr>
+                          )}
+                          {filteredEmployeesSummary.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="text-center p-6 text-gray-400">
+                                No employees found in this department.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredEmployeesSummary.map((emp) => (
+                              <tr key={emp.id || emp.f2FintechId || emp.name} className="hover:bg-gray-50/60 transition-colors">
+                                <td className="px-3 py-2.5">
+                                  <div className="font-semibold text-gray-900">{emp.name}</div>
+                                </td>
+                                <td className="px-3 py-2.5 text-gray-600 font-medium">
+                                  {emp.designation || "Employee"}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                    {emp.department}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-right font-bold text-gray-950">
+                                  {getEmployeeReportCount(emp)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          ) : isAdvisor ? (
+
+          </div>
+        ) : isAdvisor ? (
             <div className="flex flex-col gap-6">
               {/* Advisor KPI row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1919,57 +2185,57 @@ export default function Dashboard({
                   {/* KPI row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     {/* Credit Health Card */}
-                    <StatCard 
-                      icon="🛡️" 
-                      label="Credit Health" 
-                      value={dashboardSummary?.credit_score?.score ? String(dashboardSummary.credit_score.score) : "No Score"} 
-                      sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"} 
-                      color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"} 
-                      delay={0} 
+                    <StatCard
+                      icon="🛡️"
+                      label="Credit Health"
+                      value={dashboardSummary?.credit_score?.score ? String(dashboardSummary.credit_score.score) : "No Score"}
+                      sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
+                      color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
+                      delay={0}
                       onClick={() => onNavigate("Eligibility & CIBIL Checker")}
                     />
-                    
+
                     {/* Advisor Call Card */}
-                    <StatCard 
-                      icon="📅" 
-                      label="Advisor Call" 
-                      value={dashboardSummary?.next_appointment ? dashboardSummary.next_appointment.advisor_name : "No Bookings"} 
-                      sub={dashboardSummary?.next_appointment ? `${dashboardSummary.next_appointment.date} · ${dashboardSummary.next_appointment.time}` : "Schedule a call now →"} 
-                      color={dashboardSummary?.next_appointment ? "#10b981" : "#f59e0b"} 
-                      delay={80} 
+                    <StatCard
+                      icon="📅"
+                      label="Advisor Call"
+                      value={dashboardSummary?.next_appointment ? dashboardSummary.next_appointment.advisor_name : "No Upcoming Sessions"}
+                      sub={dashboardSummary?.next_appointment ? `${dashboardSummary.next_appointment.date} · ${dashboardSummary.next_appointment.time}` : "Schedule a call now →"}
+                      color={dashboardSummary?.next_appointment ? "#10b981" : "#f59e0b"}
+                      delay={80}
                       onClick={dashboardSummary?.next_appointment ? () => { if (dashboardSummary.next_appointment.meet_url) window.open(dashboardSummary.next_appointment.meet_url, "_blank"); } : () => onNavigate("Talk to an Advisor")}
                     />
-                    
+
                     {/* Financial Health Tests Card */}
-                    <StatCard 
-                      icon="🧭" 
-                      label="Tests Attempted" 
-                      value={String(dashboardSummary?.tests?.total_attempted ?? 0)} 
-                      sub={dashboardSummary?.tests?.scores?.[0] ? `Last: ${dashboardSummary.tests.scores[0].title} (${dashboardSummary.tests.scores[0].score}%)` : "Take a financial quiz →"} 
-                      color={BRAND} 
-                      delay={160} 
+                    <StatCard
+                      icon="🧭"
+                      label="Tests Attempted"
+                      value={String(dashboardSummary?.tests?.total_attempted ?? 0)}
+                      sub={dashboardSummary?.tests?.scores?.[0] ? `Last: ${dashboardSummary.tests.scores[0].title} (${dashboardSummary.tests.scores[0].score}%)` : "Take a financial quiz →"}
+                      color={BRAND}
+                      delay={160}
                       onClick={() => onNavigate("Financial Health Test")}
                     />
-                    
+
                     {/* Educational Resources Card */}
-                    <StatCard 
-                      icon="📚" 
-                      label="Content Consumed" 
-                      value={String((dashboardSummary?.education?.articles_read_count ?? 0) + (dashboardSummary?.education?.videos_watched_count ?? 0))} 
-                      sub={`${dashboardSummary?.education?.articles_read_count ?? 0} articles · ${dashboardSummary?.education?.videos_watched_count ?? 0} videos`} 
-                      color="#8b5cf6" 
-                      delay={240} 
+                    <StatCard
+                      icon="📚"
+                      label="Content Consumed"
+                      value={String((dashboardSummary?.education?.articles_read_count ?? 0) + (dashboardSummary?.education?.videos_watched_count ?? 0))}
+                      sub={`${dashboardSummary?.education?.articles_read_count ?? 0} articles · ${dashboardSummary?.education?.videos_watched_count ?? 0} videos`}
+                      color="#8b5cf6"
+                      delay={240}
                       onClick={() => onNavigate("Financial Education")}
                     />
 
                     {/* Active Hours Card */}
-                    <StatCard 
-                      icon="⏱️" 
-                      label="Active Hours" 
-                      value={`${filteredUsageTotalHours} Hours`} 
-                      sub={`Active for ${filteredUsageDays} day(s)`} 
-                      color="#ec4899" 
-                      delay={320} 
+                    <StatCard
+                      icon="⏱️"
+                      label="Active Hours"
+                      value={`${filteredUsageTotalHours} Hours`}
+                      sub={`Active for ${filteredUsageDays} day(s)`}
+                      color="#ec4899"
+                      delay={320}
                     />
                   </div>
 
@@ -1990,7 +2256,7 @@ export default function Dashboard({
                           </div>
                         </div>
                       </div>
-                      
+
                       {(!filteredTestScores || filteredTestScores.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">🧭</p>
@@ -2023,7 +2289,7 @@ export default function Dashboard({
                         <div className="text-[11px] text-gray-400 mb-3">
                           {filteredTestScores.length} total test(s) completed
                         </div>
-                        
+
                         <div className="space-y-2 max-h-[110px] overflow-y-auto pr-1 scrollbar-thin">
                           {(!filteredTestScores || filteredTestScores.length === 0) ? (
                             <div className="text-[11px] text-gray-400 italic py-2 text-center">No completed tests record found.</div>
@@ -2045,20 +2311,46 @@ export default function Dashboard({
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="mt-3">
                         <div className="bg-[#fef3c7] border border-[#fde68a] rounded-[10px] p-3 text-[10.5px] text-[#92400e] leading-relaxed">
                           <strong>💡 Test Nudge:</strong> {dashboardSummary?.tests?.nudge_message}
                         </div>
-                        
-                        {dashboardSummary?.tests?.recommended_test_id && (
-                          <button
-                            onClick={() => onNavigate("Financial Health Test")}
-                            className="w-full mt-3 py-2 rounded-[10px] text-[11px] font-semibold text-white bg-primary hover:opacity-95 transition-all active:scale-95 text-center cursor-pointer"
-                          >
-                            Attempt Recommended Quiz →
-                          </button>
-                        )}
+
+                        {dashboardSummary?.tests?.recommended_test_id && (() => {
+                          const TEST_NAMES: Record<string, string> = {
+                            "financial-literacy": "Money IQ Arena",
+                            "financial_literacy": "Money IQ Arena",
+                            "debt-balance": "Debt Pressure Analysis",
+                            "debt_balance": "Debt Pressure Analysis",
+                            "emergency-fund": "Financial Safety Score",
+                            "emergency_fund": "Financial Safety Score",
+                            "credit-readiness": "Credit Health Analyzer",
+                            "credit_readiness": "Credit Health Analyzer",
+                            "loan-fit": "Loan Comfort Analysis",
+                            "loan_fit": "Loan Comfort Analysis"
+                          };
+                          const testId = dashboardSummary.tests.recommended_test_id;
+                          const testName = TEST_NAMES[testId] || testId.replace(/_|-/g, " ");
+                          
+                          const handleLaunchTest = () => {
+                            if (typeof window === "undefined") return;
+                            const nextUrl = new URL(window.location.href);
+                            const routedId = testId.replace(/_/g, "-");
+                            nextUrl.pathname = `/tests/${routedId}`;
+                            nextUrl.search = "";
+                            window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                          };
+
+                          return (
+                            <button
+                              onClick={handleLaunchTest}
+                              className="w-full mt-3 py-2 rounded-[10px] text-[11px] font-semibold text-white bg-primary hover:opacity-95 transition-all active:scale-95 text-center cursor-pointer"
+                            >
+                              Attempt {testName} Quiz →
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -2082,7 +2374,7 @@ export default function Dashboard({
                           </div>
                         </div>
                       </div>
-                      
+
                       {(!filteredStressData || filteredStressData.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">💬</p>
@@ -2108,18 +2400,18 @@ export default function Dashboard({
                             <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
                             <Tooltip content={({ active, payload, label }: any) => {
-                                if (!active || !payload?.length) return null;
-                                return (
-                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                    <div className="font-semibold text-gray-700 mb-1">{label}</div>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
-                                      <span className="text-gray-500">Stress:</span>
-                                      <span className="font-semibold text-gray-800">{payload[0].value}%</span>
-                                    </div>
+                              if (!active || !payload?.length) return null;
+                              return (
+                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                  <div className="font-semibold text-gray-700 mb-1">{label}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                                    <span className="text-gray-500">Stress:</span>
+                                    <span className="font-semibold text-gray-800">{payload[0].value}%</span>
                                   </div>
-                                );
-                              }} />
+                                </div>
+                              );
+                            }} />
                             <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
                           </LineChart>
                         </ResponsiveContainer>
@@ -2130,35 +2422,35 @@ export default function Dashboard({
                     <div className="dashboard-card animate-fade-up col-span-1 lg:col-span-2 p-5 flex flex-col justify-between" style={{ animationDelay: "250ms" }}>
                       <div>
                         <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Educational Insights</div>
-                        <div className="text-[11px] text-gray-400 mb-4">Consumption by topic category</div>
-                        
+                        <div className="text-[11px] text-gray-400 mb-4">Consumption by content format</div>
+
                         <div className="space-y-3">
-                          {["Loans", "Credit", "Business"].map((cat) => {
-                            const count = dashboardSummary?.education?.category_breakdown?.[cat] ?? 0;
-                            // Calculate simple progress width representation
-                            const maxVal = Math.max(1, ...Object.values(dashboardSummary?.education?.category_breakdown ?? {}).map((v: any) => typeof v === 'number' ? v : 0));
-                            const pct = Math.round((count / maxVal) * 100);
-                            const colorsMap: Record<string, string> = { Loans: BRAND, Credit: "#10b981", Business: "#f59e0b" };
+                          {[
+                            { name: "Articles", label: "Written Guides", count: articlesCount, total: 8, color: BRAND },
+                            { name: "Videos", label: "Full Videos", count: videosCount, total: 4, color: "#10b981" },
+                            { name: "Shorts", label: "Quick Tips", count: shortsCount, total: 5, color: "#ec4899" }
+                          ].map((item) => {
+                            const pct = Math.min(100, Math.round((item.count / item.total) * 100));
                             return (
-                              <div key={cat}>
+                              <div key={item.name}>
                                 <div className="flex justify-between text-[11px] mb-1">
-                                  <span className="text-gray-500 font-medium">{cat} Articles & Videos</span>
-                                  <span className="font-bold text-gray-700">{count} consumed</span>
+                                  <span className="text-gray-500 font-medium">{item.name} ({item.label})</span>
+                                  <span className="font-bold text-gray-700">{item.count} consumed</span>
                                 </div>
                                 <div className="h-[5px] bg-gray-100 rounded-full overflow-hidden">
-                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: colorsMap[cat] }} />
+                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: item.color }} />
                                 </div>
                               </div>
                             );
                           })}
                         </div>
                       </div>
-                      
+
                       <div className="mt-4 border-t border-gray-50 pt-3">
                         <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-[10px] p-3 text-[10.5px] text-[#1e40af] leading-relaxed">
                           <strong>📚 Suggestion:</strong> {dashboardSummary?.education?.nudge_message}
                         </div>
-                        
+
                         {dashboardSummary?.education?.recommended_content_id && (
                           <button
                             onClick={() => onNavigate("Financial Education")}
@@ -2190,7 +2482,7 @@ export default function Dashboard({
                           </div>
                         </div>
                       </div>
-                      
+
                       {(!filteredUsageData || filteredUsageData.length === 0) ? (
                         <div className="flex flex-col items-center justify-center h-[180px] bg-gray-50/50 border border-dashed rounded-[16px] text-center p-4">
                           <p className="text-[24px] mb-2">⏱️</p>
@@ -2210,19 +2502,19 @@ export default function Dashboard({
                             <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
                             <Tooltip content={({ active, payload, label }: any) => {
-                                if (!active || !payload?.length) return null;
-                                return (
-                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                    <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
-                                      <span className="text-gray-500">Usage:</span>
-                                      <span className="font-bold text-gray-900">{payload[0].value} hours</span>
-                                    </div>
-                                    <div className="text-[9.5px] text-gray-400 mt-0.5">({payload[0].payload.minutes} active minutes)</div>
+                              if (!active || !payload?.length) return null;
+                              return (
+                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                  <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
+                                    <span className="text-gray-500">Usage:</span>
+                                    <span className="font-bold text-gray-900">{payload[0].value} hours</span>
                                   </div>
-                                );
-                              }} />
+                                  <div className="text-[9.5px] text-gray-400 mt-0.5">({payload[0].payload.minutes} active minutes)</div>
+                                </div>
+                              );
+                            }} />
                             <Area type="monotone" dataKey="hours" name="Active Time" stroke="#ec4899" strokeWidth={2.5} fill="url(#usageGrad)" dot={{ fill: "#ec4899", r: 3 }} />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -2234,7 +2526,7 @@ export default function Dashboard({
                       <div>
                         <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Engagement Insights</div>
                         <div className="text-[11px] text-gray-400 mb-4">Your platform habits and learning speed</div>
-                        
+
                         <div className="space-y-3">
                           <div className="flex items-center justify-between text-[11.5px] border-b border-gray-50 pb-2">
                             <span className="text-gray-500 font-medium">Daily Average Time</span>
@@ -2260,7 +2552,7 @@ export default function Dashboard({
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="mt-4 border-t border-gray-50 pt-3">
                         <div className="bg-[#fdf2f8] border border-[#fbcfe8] rounded-[10px] p-3 text-[10.5px] text-[#9d174d] leading-relaxed">
                           <strong>💡 Therapist Tip:</strong> Dynamic learning is key to financial peace of mind. Consistent daily habits help convert financial anxiety into structured, actionable wealth building.
@@ -2425,30 +2717,187 @@ export default function Dashboard({
                   <h3 className="text-[14px] font-bold text-gray-800">💡 Personalized Wellness & Therapy Reports</h3>
                   <p className="text-[11px] text-gray-400">Generated automatically from your chat logs and activities</p>
                 </div>
-                <div className="flex bg-gray-100 rounded-lg p-0.5 shrink-0">
-                  {(["daily", "fortnightly", "monthly"] as const).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setActiveReportSubTab(type)}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${activeReportSubTab === type
-                        ? "bg-white text-primary shadow-xs"
-                        : "text-gray-500 hover:text-gray-800"
-                        }`}
-                    >
-                      {type === "daily" ? "Daily" : type === "fortnightly" ? "15-Day" : "30-Day"}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3">
+                  {/* On-Demand History Selector */}
+                  {activeReportSubTab === "on_demand" && (() => {
+                    const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    if (onDemandReports.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold text-gray-450 uppercase">History:</span>
+                        <select
+                          value={selectedOnDemandReportId || ""}
+                          onChange={(e) => setSelectedOnDemandReportId(e.target.value)}
+                          className="bg-white border border-gray-200 hover:border-gray-300 rounded-lg py-1 px-2 text-[10px] font-bold text-gray-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/20"
+                        >
+                          {onDemandReports.map((r) => {
+                            const dateStr = new Date(r.createdAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric"
+                            });
+                            return (
+                              <option key={r.id} value={r.id}>
+                                Report ({dateStr})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  })()}
+
+
                 </div>
               </div>
+
+              {/* Generate Report Action Box */}
+              {activeReportSubTab === "on_demand" && (() => {
+                const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const lastOnDemand = onDemandReports[0];
+                let isCooldown = false;
+                let nextAvailableDate: Date | null = null;
+                if (lastOnDemand) {
+                  const createdTime = new Date(lastOnDemand.createdAt).getTime();
+                  const cooldownTime = createdTime + 7 * 24 * 60 * 60 * 1000;
+                  const now = Date.now();
+                  if (now < cooldownTime) {
+                    isCooldown = true;
+                    nextAvailableDate = new Date(cooldownTime);
+                  }
+                }
+
+                const handleGenerate = async () => {
+                  setGeneratingReport(true);
+                  setGenError(null);
+                  try {
+                    const newReport = await generateOnDemandReport(userId);
+                    setReportsList(prev => [newReport, ...prev]);
+                    setSelectedOnDemandReportId(newReport.id);
+                  } catch (err: any) {
+                    console.error("Report generation failed:", err);
+                    let message = "An unexpected error occurred.";
+                    if (err.message) {
+                      try {
+                        const parsedErr = JSON.parse(err.message);
+                        const detail = parsedErr.detail;
+                        if (detail) {
+                          if (typeof detail === "object") {
+                            if (detail.code === "NO_ACTIVITY") {
+                              message = "No new activity found since your last report / registration date. Try chatting with the therapist or taking a quiz first!";
+                            } else if (detail.code === "COOLDOWN_ACTIVE") {
+                              message = "You can only generate a report once every 7 days.";
+                            } else if (detail.message) {
+                              if (detail.message.includes("RESOURCE_EXHAUSTED") || detail.message.includes("429")) {
+                                message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                              } else {
+                                message = detail.message;
+                              }
+                            } else {
+                              message = JSON.stringify(detail);
+                            }
+                          } else if (typeof detail === "string") {
+                            if (detail.includes("RESOURCE_EXHAUSTED") || detail.includes("429")) {
+                              message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                            } else {
+                              message = detail;
+                            }
+                          }
+                        } else if (parsedErr.message) {
+                          message = parsedErr.message;
+                        } else {
+                          message = err.message;
+                        }
+                      } catch (parseEx) {
+                        if (err.message.includes("RESOURCE_EXHAUSTED") || err.message.includes("429")) {
+                          message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                        } else {
+                          message = err.message;
+                        }
+                      }
+                    }
+                    setGenError(message);
+                  } finally {
+                    setGeneratingReport(false);
+                  }
+                };
+
+                return (
+                  <div className="bg-gradient-to-r from-primary/5 via-indigo-50/50 to-emerald-50/50 border border-primary/10 rounded-2xl p-5 mb-5 text-left animate-fade-up">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="max-w-xl">
+                        <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5">
+                          ✨ On-Demand Wellness & Therapy Reports
+                        </h4>
+                        <p className="text-[11px] text-gray-505 mt-1 leading-relaxed">
+                          💡 Reports can be generated once every 7 days to analyze your credit syncs, therapy chats, and quiz activities. You can download existing reports as a PDF at any time.
+                        </p>
+                        {genError && (
+                          <div className="mt-2.5 bg-rose-50 border border-rose-100 text-rose-700 text-[10.5px] px-3 py-2 rounded-xl flex items-start gap-1.5 font-medium">
+                            <span>⚠️</span>
+                            <span>{genError}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex flex-col items-stretch md:items-end gap-2">
+                        {isCooldown ? (
+                          <div className="text-right">
+                            <button
+                              disabled
+                              className="w-full md:w-auto bg-gray-100 text-gray-400 font-bold text-[11px] px-5 py-2.5 rounded-xl cursor-not-allowed border border-gray-200/50"
+                            >
+                              🔒 Cooldown Active
+                            </button>
+                            <span className="text-[9.5px] font-bold text-rose-500 block mt-1">
+                              Next report on {nextAvailableDate?.toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric"
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleGenerate}
+                            disabled={generatingReport}
+                            className={`w-full md:w-auto text-[11px] font-bold px-5 py-2.5 rounded-xl text-white shadow-md transition-all cursor-pointer ${
+                              generatingReport
+                                ? "bg-primary/50 cursor-wait"
+                                : "bg-primary hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]"
+                            }`}
+                          >
+                            {generatingReport ? "🔮 Generating..." : "⚙️ Generate Fresh Report"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {loadingReports && reportsList.length === 0 ? (
                 <div className="text-center py-10">
                   <div className="text-[12px] text-gray-400 animate-pulse">Loading wellness reports...</div>
                 </div>
               ) : (() => {
-                const activeReport = reportsList.find((r) => r.reportType === activeReportSubTab);
+                const onDemandReports = reportsList.filter(r => r.reportType === "on_demand")
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const activeReport = activeReportSubTab === "on_demand"
+                  ? (onDemandReports.find(r => r.id === selectedOnDemandReportId) || onDemandReports[0])
+                  : reportsList.find((r) => r.reportType === activeReportSubTab);
+
                 if (!activeReport) {
-                  return (
+                  return activeReportSubTab === "on_demand" ? (
+                    <div className="text-center py-12 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                      <div className="text-[36px] mb-2.5">🔮</div>
+                      <h4 className="text-[13px] font-bold text-gray-700">No On-Demand Report Generated</h4>
+                      <p className="text-[11px] text-gray-400 max-w-[340px] mx-auto mt-1 leading-relaxed">
+                        Generate your first Personalized Therapist Report using the button above. The report will analyze your activity logs since your registration!
+                      </p>
+                    </div>
+                  ) : (
                     <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                       <div className="text-[32px] mb-2">🎯</div>
                       <h4 className="text-[13px] font-bold text-gray-700">No {activeReportSubTab === "daily" ? "Daily" : activeReportSubTab === "fortnightly" ? "15-Day" : "30-Day"} Report Yet</h4>
@@ -2462,88 +2911,157 @@ export default function Dashboard({
                 // Render active report content
                 return (
                   <div className="space-y-5">
-                    {/* Compassionate Therapy Analysis */}
-                    <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
-                      <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
-                        Therapist Analysis
-                      </span>
-                      <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
-                        &quot;{activeReport.summary}&quot;
-                      </p>
+                    {/* Header Action Row */}
+                    <div className="flex justify-between items-center bg-gray-50/60 p-3 rounded-2xl border border-gray-100/50 text-left">
+                      <div className="text-[11px] text-gray-500 font-semibold">
+                        🗓️ Report Period: <span className="text-gray-800 font-bold">{new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> to <span className="text-gray-800 font-bold">{new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                      
+                      <button
+                        onClick={async () => {
+                          setDownloadingPDF(true);
+                          try {
+                            const html2canvas = (await import("html2canvas-pro")).default;
+                            const { jsPDF } = await import("jspdf");
+                            
+                            const docEl = document.getElementById("therapy-report-document-body");
+                            if (!docEl) return;
+                            
+                            const canvas = await html2canvas(docEl, {
+                              scale: 2,
+                              useCORS: true,
+                              allowTaint: true,
+                              backgroundColor: "#ffffff"
+                            });
+                            
+                            const imgData = canvas.toDataURL("image/png");
+                            const pdf = new jsPDF("p", "mm", "a4");
+                            const imgWidth = 210;
+                            const pageHeight = 297;
+                            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                            let heightLeft = imgHeight;
+                            let position = 0;
+                            
+                            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                            heightLeft -= pageHeight;
+                            
+                            while (heightLeft >= 0) {
+                              position = heightLeft - imgHeight;
+                              pdf.addPage();
+                              pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                              heightLeft -= pageHeight;
+                            }
+                            
+                            pdf.save(`FinHeal_Therapy_Report_${new Date(activeReport.startDate).toLocaleDateString().replace(/\//g, "-")}.pdf`);
+                          } catch (err) {
+                            console.error("PDF export failed:", err);
+                            alert("Failed to export PDF.");
+                          } finally {
+                            setDownloadingPDF(false);
+                          }
+                        }}
+                        disabled={downloadingPDF}
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer ${downloadingPDF ? "opacity-50 cursor-wait" : ""}`}
+                      >
+                        {downloadingPDF ? "⏳ Exporting..." : "📥 Download PDF"}
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Activity Summary Log */}
-                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          Period Activity Log
-                        </span>
-                        <div className="space-y-2">
-                          {[
-                            { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
-                            { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
-                            { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
-                            { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
-                            { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
-                          ].map((item) => (
-                            <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
-                              <span className="text-gray-500 font-medium flex items-center gap-1.5">
-                                <span>{item.icon}</span> {item.label}
-                              </span>
-                              <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                                {item.count}
-                              </span>
-                            </div>
-                          ))}
+                    {/* PDF Export Wrapper */}
+                    <div id="therapy-report-document-body" className="p-5 bg-white border border-gray-100 rounded-2xl space-y-5 text-left">
+                      <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
+                        <div>
+                          <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
+                          <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
+                        </div>
+                        <div className="text-[9px] text-gray-400 font-bold">
+                          Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         </div>
                       </div>
 
-                      {/* Mood Trend Analysis */}
-                      <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          Avg Stress & Telemetry Trend
+                      {/* Compassionate Therapy Analysis */}
+                      <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                        <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                          Therapist Analysis
                         </span>
-                        <div className="space-y-2.5">
-                          {[
-                            { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
-                            { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
-                            { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
-                            { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
-                            { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
-                          ].map((dim) => {
-                            const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
-                            return (
-                              <div key={dim.label} className="flex items-center gap-2">
-                                <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
-                                <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
-                                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
-                                </div>
-                                <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                        <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                          &quot;{activeReport.summary}&quot;
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Activity Summary Log */}
+                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            Period Activity Log
+                          </span>
+                          <div className="space-y-2">
+                            {[
+                              { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
+                              { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
+                              { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
+                              { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
+                              { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
+                            ].map((item) => (
+                              <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
+                                <span className="text-gray-500 font-medium flex items-center gap-1.5">
+                                  <span>{item.icon}</span> {item.label}
+                                </span>
+                                <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
+                                  {item.count}
+                                </span>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Key Recommendations & Takeaways */}
-                    {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
-                      <div className="border-t border-gray-100 pt-4">
-                        <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                          📋 Recommended Therapist Action Steps
-                        </span>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {activeReport.keyTakeaways.map((takeaway, idx) => (
-                            <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
-                              <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
-                                {takeaway}
-                              </span>
-                            </div>
-                          ))}
+                        {/* Mood Trend Analysis */}
+                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            Avg Stress & Telemetry Trend
+                          </span>
+                          <div className="space-y-2.5">
+                            {[
+                              { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                              { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                              { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                              { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                              { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                            ].map((dim) => {
+                              const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                              return (
+                                <div key={dim.label} className="flex items-center gap-2">
+                                  <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                  <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      {/* Key Recommendations & Takeaways */}
+                      {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                        <div className="border-t border-gray-100 pt-4">
+                          <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            📋 Recommended Therapist Action Steps
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {activeReport.keyTakeaways.map((takeaway, idx) => (
+                              <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                                <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                  {takeaway}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })()}

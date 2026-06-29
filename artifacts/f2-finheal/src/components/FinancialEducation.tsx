@@ -214,6 +214,23 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     const currentShort = currentIdx !== -1 ? SHORTS[currentIdx] : null;
     const isYoutube = !currentShort || currentShort.platform === "youtube";
 
+    React.useEffect(() => {
+      if (playingShort && userId) {
+        try {
+          const key = `finheal_shorts_watched:${userId}`;
+          const current = localStorage.getItem(key);
+          const list = current ? JSON.parse(current) : [];
+          if (!list.includes(playingShort)) {
+            const updated = [...list, playingShort];
+            localStorage.setItem(key, JSON.stringify(updated));
+            window.dispatchEvent(new Event("storage"));
+          }
+        } catch (e) {
+          console.error("Error saving watched short:", e);
+        }
+      }
+    }, [playingShort]);
+
     const goNext = () => setPlayingShort(SHORTS[currentIdx < SHORTS.length - 1 ? currentIdx + 1 : 0].id);
     const goPrev = () => setPlayingShort(SHORTS[currentIdx > 0 ? currentIdx - 1 : SHORTS.length - 1].id);
 
@@ -266,6 +283,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     <iframe key={playingShort}
                       src={"https://www.instagram.com/reel/" + playingShort + "/embed/"}
                       title="Financial Instagram Reel"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                       allowFullScreen
                       style={{ 
                         position: "absolute", 
@@ -297,7 +315,14 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     </a>
                   )}
                 </div>
-                <div style={{ textAlign: "center", padding: "6px 8px", background: "#f9fafb", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {currentShort?.title}</div>
+                <div style={{ padding: "6px 8px", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
+                  <div style={{ textAlign: "center", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {currentShort?.title}</div>
+                  {!isYoutube && (
+                    <div style={{ textAlign: "center", fontSize: "9.5px", color: "#6b7280", marginTop: "3px", fontStyle: "italic" }}>
+                      *Tip: If the video doesn't play inline, click the Instagram button above to watch it.
+                    </div>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                 <button onClick={goNext}

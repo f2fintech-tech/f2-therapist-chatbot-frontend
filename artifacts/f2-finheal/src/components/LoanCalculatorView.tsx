@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { logCalculatorActivity } from "@/lib/backendAuth";
 import {
   Calculator,
@@ -201,8 +202,87 @@ export default function LoanCalculatorView({
   onLoginRequired,
 }: LoanCalculatorViewProps) {
   // Global States
-  const [activeTab, setActiveTab] = useState<string>("home");
-  const [calcType, setCalcType] = useState<"emi" | "eligibility" | "compare" | "prepayment">("emi");
+  const [location, setLocation] = useLocation();
+
+  const getStatesFromPath = (path: string) => {
+    const parts = path.split("/");
+    if (parts[1] === "loan-calculator" && parts[2]) {
+      const segment = parts[2].toLowerCase().trim();
+      if (segment === "compare") {
+        return { calcType: "compare" as const, activeTab: "home" };
+      }
+      if (segment === "prepayment") {
+        return { calcType: "prepayment" as const, activeTab: "home" };
+      }
+      if (segment === "home-loan" || segment === "home") {
+        return { calcType: "emi" as const, activeTab: "home" };
+      }
+      if (segment === "business-loan" || segment === "business") {
+        return { calcType: "emi" as const, activeTab: "business" };
+      }
+      if (segment === "lap" || segment === "loan-against-property") {
+        return { calcType: "emi" as const, activeTab: "lap" };
+      }
+      if (segment === "education-loan" || segment === "education") {
+        return { calcType: "emi" as const, activeTab: "education" };
+      }
+      if (segment === "personal-loan" || segment === "personal") {
+        return { calcType: "emi" as const, activeTab: "personal" };
+      }
+      if (segment === "professional-loan" || segment === "professional") {
+        return { calcType: "emi" as const, activeTab: "professional" };
+      }
+    }
+    return { calcType: "emi" as const, activeTab: "home" };
+  };
+
+  const getPathFromStates = (cType: string, tabId: string): string => {
+    if (cType === "compare") return "compare";
+    if (cType === "prepayment") return "prepayment";
+    if (tabId === "home") return "home-loan";
+    if (tabId === "business") return "business-loan";
+    if (tabId === "lap") return "loan-against-property";
+    if (tabId === "education") return "education-loan";
+    if (tabId === "personal") return "personal-loan";
+    if (tabId === "professional") return "professional-loan";
+    return tabId;
+  };
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return getStatesFromPath(window.location.pathname).activeTab;
+    }
+    return "home";
+  });
+
+  const [calcType, setCalcType] = useState<"emi" | "eligibility" | "compare" | "prepayment">((() => {
+    if (typeof window !== "undefined") {
+      return getStatesFromPath(window.location.pathname).calcType;
+    }
+    return "emi";
+  })());
+
+  const lastLocationRef = useRef(location);
+
+  useEffect(() => {
+    if (location !== lastLocationRef.current) {
+      lastLocationRef.current = location;
+      const { calcType: newCalcType, activeTab: newActiveTab } = getStatesFromPath(location);
+      if (newCalcType !== calcType) {
+        setCalcType(newCalcType);
+      }
+      if (newActiveTab !== activeTab) {
+        setActiveTab(newActiveTab);
+      }
+    } else {
+      const { calcType: currentCalcType, activeTab: currentActiveTab } = getStatesFromPath(location);
+      if (calcType !== currentCalcType || activeTab !== currentActiveTab) {
+        const newUrl = `/loan-calculator/${getPathFromStates(calcType, activeTab)}`;
+        lastLocationRef.current = newUrl;
+        setLocation(newUrl);
+      }
+    }
+  }, [location, activeTab, calcType, setLocation]);
   const [currency, setCurrency] = useState(CURRENCIES[0]);
 
 
