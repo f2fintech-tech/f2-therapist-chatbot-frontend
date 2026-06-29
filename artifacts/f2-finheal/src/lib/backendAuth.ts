@@ -649,7 +649,7 @@ export function isAdvisorSlotActive(availability: string): boolean {
 export interface UserReport {
   id: string;
   userId: string;
-  reportType: "daily" | "fortnightly" | "monthly";
+  reportType: "daily" | "fortnightly" | "monthly" | "on_demand";
   startDate: string;
   endDate: string;
   summary: string;
@@ -731,3 +731,26 @@ export async function listReferrals(advisorId: string): Promise<ReferralCode[]> 
     method: "GET"
   });
 }
+
+export async function generateOnDemandReport(userId: string): Promise<UserReport> {
+  const result = await authRequest<any>(`chat/reports/${encodeURIComponent(userId)}/generate`, {
+    method: "POST"
+  });
+  if (!result || result.status !== "success" || !result.report) {
+    throw new Error(result?.message || "Failed to generate on-demand report.");
+  }
+  const r = result.report;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    reportType: r.report_type,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    summary: r.summary,
+    keyTakeaways: r.key_takeaways || [],
+    moodTrend: r.mood_trend || {},
+    activitySummary: r.activity_summary || {},
+    createdAt: r.created_at
+  };
+}
+
