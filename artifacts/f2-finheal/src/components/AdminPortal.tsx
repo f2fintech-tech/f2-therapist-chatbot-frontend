@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
@@ -306,6 +306,28 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const currentExpertId = getExpertIdFromEmail(userEmail);
 
+  const [showLimitWarning, setShowLimitWarning] = useState(false);
+  const [limitFetchCount, setLimitFetchCount] = useState(0);
+
+  const checkCibilFetchThreshold = async () => {
+    if (isAdmin || !currentExpertId) return;
+    try {
+      const res = await checkAdvisorCibilLimit(currentExpertId);
+      if (res.trigger_warning) {
+        setLimitFetchCount(res.fetch_count);
+        setShowLimitWarning(true);
+      }
+    } catch (err) {
+      console.error("Failed to check advisor CIBIL limit:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentExpertId && !isAdmin) {
+      checkCibilFetchThreshold();
+    }
+  }, [currentExpertId, isAdmin]);
+
   // Load backend stats (disabled since stats cards are not rendered in the Admin UI)
   // useEffect(() => {
   //   if (isAdmin) {
@@ -527,6 +549,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   useEffect(() => {
     if ((isAdmin && (activeTab === "cibil-enquiries")) || currentExpertId) {
       fetchCibilEnquiries();
+      if (!isAdmin && currentExpertId) {
+        checkCibilFetchThreshold();
+      }
     }
   }, [isAdmin, activeTab, currentExpertId]);
 
@@ -4306,6 +4331,28 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                 onToggleInsights={() => {}} 
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {showLimitWarning && (
+        <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white border border-amber-100 rounded-[24px] p-6 max-w-sm w-full mx-4 shadow-2xl text-center space-y-4 animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center text-2xl mx-auto">
+              ⚠️
+            </div>
+            <div>
+              <h4 className="text-[14px] font-extrabold text-gray-800">CIBIL Fetch Threshold</h4>
+              <p className="text-[11.5px] text-gray-500 mt-1 leading-relaxed font-medium">
+                You have fetched a total of <strong>{limitFetchCount}</strong> CIBIL reports. Please verify your usage guidelines.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowLimitWarning(false)}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] py-2.5 rounded-xl transition-all shadow-md active:scale-98 cursor-pointer"
+            >
+              I Understand
+            </button>
           </div>
         </div>
       )}

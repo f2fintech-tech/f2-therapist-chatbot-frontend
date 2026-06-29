@@ -754,3 +754,15 @@ export async function generateOnDemandReport(userId: string): Promise<UserReport
   };
 }
 
+export async function checkAdvisorCibilLimit(advisorId: string): Promise<{
+  advisor_id: string;
+  fetch_count: number;
+  trigger_warning: boolean;
+  message: string;
+}> {
+  return authRequest<any>(`cibil/advisor-limit-check/${encodeURIComponent(advisorId)}`, {
+    method: "GET"
+  });
+}
+
+

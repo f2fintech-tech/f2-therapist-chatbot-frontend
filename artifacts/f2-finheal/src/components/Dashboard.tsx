@@ -2591,7 +2591,7 @@ export default function Dashboard({
                               message = "You can only generate a report once every 7 days.";
                             } else if (detail.message) {
                               if (detail.message.includes("RESOURCE_EXHAUSTED") || detail.message.includes("429")) {
-                                message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                                message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                               } else {
                                 message = detail.message;
                               }
@@ -2600,7 +2600,7 @@ export default function Dashboard({
                             }
                           } else if (typeof detail === "string") {
                             if (detail.includes("RESOURCE_EXHAUSTED") || detail.includes("429")) {
-                              message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                              message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                             } else {
                               message = detail;
                             }
@@ -2612,7 +2612,7 @@ export default function Dashboard({
                         }
                       } catch (parseEx) {
                         if (err.message.includes("RESOURCE_EXHAUSTED") || err.message.includes("429")) {
-                          message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                          message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                         } else {
                           message = err.message;
                         }
