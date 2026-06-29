@@ -936,6 +936,8 @@ export default function Dashboard({
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
   const [advisors, setAdvisors] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [summaryDeptFilter, setSummaryDeptFilter] = useState<string>("all");
 
   useEffect(() => {
     if (!isAdvisor) return;
@@ -1008,6 +1010,11 @@ export default function Dashboard({
       .then(data => setCibilEnquiries(data))
       .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
       .finally(() => setCibilLoading(false));
+
+    // Fetch all employees/advisors for fetch summary
+    fetchAdvisors(undefined, true)
+      .then(data => setEmployees(data))
+      .catch(err => console.error("Error loading employees in dashboard", err));
 
   }, [isAdmin]);
 
@@ -1315,6 +1322,75 @@ export default function Dashboard({
       return reviewsB - reviewsA;
     })
     .slice(0, 5);
+
+  // Unique departments calculation for CIBIL summary filtering
+  const uniqueDepartments = Array.from(
+    new Set(employees.map(e => e.department).filter(Boolean))
+  ).sort() as string[];
+
+  const filteredEmployeesSummary = employees.filter(e => {
+    if (summaryDeptFilter === "all") return true;
+    return e.department === summaryDeptFilter;
+  });
+
+  const getEmployeeReportCount = (emp: any) => {
+    return cibilEnquiries.filter(enq => {
+      // 1. Direct match with fetched_by
+      if (enq.fetched_by && (enq.fetched_by === emp.id || enq.fetched_by === emp.f2FintechId)) {
+        return true;
+      }
+      // 2. Fallback check for legacy fetches: if fetched_by is missing/null, check if client email/name prefix matches the employee's ID/email
+      if (!enq.fetched_by) {
+        const cleanEmail = (enq.email || "").toLowerCase().trim();
+        const cleanEmpId = (emp.f2FintechId || emp.id || "").toLowerCase().trim();
+        const cleanEmpEmail = (emp.email || "").toLowerCase().trim();
+        if (cleanEmail && (cleanEmail === cleanEmpId || cleanEmail === cleanEmpEmail || cleanEmail.startsWith(cleanEmpId + "@"))) {
+          return true;
+        }
+      }
+      return false;
+    }).length;
+  };
+
+  // 1. Calculate fetch count for System Admin specifically
+  const adminFetchCount = cibilEnquiries.filter(enq => {
+    return (
+      enq.fetched_by === "admin" ||
+      enq.fetched_by === "superadmin" ||
+      (enq.fetched_by && enq.fetched_by.toLowerCase().includes("admin")) ||
+      (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"))
+    );
+  }).length;
+
+  // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
+  const userEnquiries = cibilEnquiries.filter(enq => {
+    const isFetchedByStaff = 
+      (enq.fetched_by && (
+        enq.fetched_by === "admin" ||
+        enq.fetched_by === "superadmin" ||
+        enq.fetched_by.toLowerCase().includes("admin") ||
+        employees.some(emp => emp.id === enq.fetched_by || emp.f2FintechId === enq.fetched_by)
+      )) ||
+      isUserAdvisor(enq.email) ||
+      (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"));
+    
+    return !isFetchedByStaff;
+  });
+
+  const userGroups: Record<string, { name: string; email: string; phone: string; count: number }> = {};
+  userEnquiries.forEach(enq => {
+    const key = (enq.email || enq.phone || enq.user_id || "anonymous").toLowerCase();
+    if (!userGroups[key]) {
+      userGroups[key] = {
+        name: enq.name || "Client",
+        email: enq.email || "",
+        phone: enq.phone || "",
+        count: 0
+      };
+    }
+    userGroups[key].count++;
+  });
+  const userRows = Object.values(userGroups).sort((a, b) => b.count - a.count);
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
@@ -1746,8 +1822,132 @@ export default function Dashboard({
                   </div>
                 </div>
               </div>
+
+            {/* CIBIL Report Fetch Summary Card */}
+            <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[16px]">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                      📋 CIBIL Report Fetch Summary
+                    </h3>
+                    <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
+                  </div>
+
+                  {/* Department Dropdown Filter */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
+                    <select
+                      value={summaryDeptFilter}
+                      onChange={(e) => setSummaryDeptFilter(e.target.value)}
+                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                    >
+                      <option value="all">All Departments</option>
+                      <option value="users">Users</option>
+                      {uniqueDepartments.map((dept) => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px] text-left text-gray-500 border-collapse">
+                    <thead className="text-[10px] text-gray-450 uppercase bg-gray-50/50 rounded-lg">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 font-bold rounded-l-lg">
+                          {summaryDeptFilter === "users" ? "User" : "Employee"}
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-bold">Designation</th>
+                        <th scope="col" className="px-3 py-2 font-bold">Department</th>
+                        <th scope="col" className="px-3 py-2 font-bold text-right rounded-r-lg">Reports Fetched</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {summaryDeptFilter === "users" ? (
+                        userRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center p-6 text-gray-400">
+                              No user CIBIL enquiries found.
+                            </td>
+                          </tr>
+                        ) : (
+                          userRows.map((user) => (
+                            <tr key={user.email || user.phone} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="px-3 py-2.5">
+                                <div className="font-semibold text-gray-900">{user.name}</div>
+                                {user.email && <div className="text-[10px] text-gray-400 font-medium">{user.email}</div>}
+                              </td>
+                              <td className="px-3 py-2.5 text-gray-600 font-medium">
+                                Client
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                  User Base
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold text-gray-950">
+                                {user.count}
+                              </td>
+                            </tr>
+                          ))
+                        )
+                      ) : (
+                        <>
+                          {summaryDeptFilter === "all" && (
+                            <tr className="bg-primary/5 hover:bg-primary/10 transition-colors font-semibold border-b border-primary/10">
+                              <td className="px-3 py-2.5">
+                                <div className="font-bold text-primary">System Admin 📌</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-primary font-bold">
+                                Platform Administrator
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="bg-primary text-white px-2 py-0.5 rounded text-[10.5px] font-bold">
+                                  Founder's Office
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-bold text-primary">
+                                {adminFetchCount}
+                              </td>
+                            </tr>
+                          )}
+                          {filteredEmployeesSummary.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="text-center p-6 text-gray-400">
+                                No employees found in this department.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredEmployeesSummary.map((emp) => (
+                              <tr key={emp.id || emp.f2FintechId || emp.name} className="hover:bg-gray-50/60 transition-colors">
+                                <td className="px-3 py-2.5">
+                                  <div className="font-semibold text-gray-900">{emp.name}</div>
+                                </td>
+                                <td className="px-3 py-2.5 text-gray-600 font-medium">
+                                  {emp.designation || "Employee"}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                    {emp.department}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-right font-bold text-gray-950">
+                                  {getEmployeeReportCount(emp)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          ) : isAdvisor ? (
+
+          </div>
+        ) : isAdvisor ? (
             <div className="flex flex-col gap-6">
               {/* Advisor KPI row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
