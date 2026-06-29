@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -61,17 +62,52 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
 
   useEffect(() => {
+    let active = true;
     try {
       const storedSession = localStorage.getItem("finheal-auth-session");
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        setUserPermissions(parsed?.permissions || []);
+        const cachedPermissions = parsed?.permissions || [];
+        setUserPermissions(cachedPermissions);
+
+        // Sync permissions in the background if logged in as an advisor (employee)
+        if (parsed?.isAdvisor && parsed?.userId) {
+          fetchAdvisorProfile(parsed.userId)
+            .then((profile) => {
+              if (!active) return;
+              const freshPermissions = profile?.permissions || [];
+              
+              // Check if permissions have changed
+              const hasChanged = 
+                freshPermissions.length !== cachedPermissions.length ||
+                freshPermissions.some((p: string) => !cachedPermissions.includes(p));
+
+              if (hasChanged) {
+                // Update local state
+                setUserPermissions(freshPermissions);
+                
+                // Update cached local storage session
+                const updatedSession = { ...parsed, permissions: freshPermissions };
+                localStorage.setItem("finheal-auth-session", JSON.stringify(updatedSession));
+                
+                // Dispatch event so other components get updated session state
+                window.dispatchEvent(new Event("storage"));
+              }
+            })
+            .catch((err) => {
+              console.error("Failed to sync employee permissions in background:", err);
+            });
+        }
       } else {
         setUserPermissions([]);
       }
     } catch (e) {
       setUserPermissions([]);
     }
+
+    return () => {
+      active = false;
+    };
   }, [userId, userEmail]);
 
   useEffect(() => {

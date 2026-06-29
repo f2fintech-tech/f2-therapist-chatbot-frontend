@@ -387,6 +387,13 @@ export async function fetchAdvisors(userId?: string, allEmployees: boolean = fal
   return list.map(mapBackendAdvisorToFrontend);
 }
 
+export async function fetchAdvisorProfile(f2FintechId: string): Promise<any> {
+  const result = await authRequest<BackendAdvisor>(`advisors/profile/${encodeURIComponent(f2FintechId)}`, {
+    method: "GET",
+  });
+  return mapBackendAdvisorToFrontend(result);
+}
+
 export async function saveAdvisor(advisor: any): Promise<any> {
   const payload = mapFrontendAdvisorToBackend(advisor);
   const result = await authRequest<BackendAdvisor>("advisors", {

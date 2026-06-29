@@ -68,6 +68,7 @@ export default function CibilAnalyzerView({
   overrideReport = null
 }: CibilAnalyzerViewProps) {
   const { toast } = useToast();
+  const analyzerRef = React.useRef<HTMLDivElement>(null);
 
   // Core CIBIL Report State
   const [report, setReport] = useState<CibilReport | null>(null);
@@ -304,7 +305,7 @@ export default function CibilAnalyzerView({
     if (!report) return;
     setIsGeneratingPDF(true);
     try {
-      const element = document.querySelector(".cibil-print-section") as HTMLElement;
+      const element = analyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");
       }
@@ -332,7 +333,7 @@ export default function CibilAnalyzerView({
       
       const margin = 10;
       const contentWidth = pdfWidth - (margin * 2); // 190mm
-      const contentHeight = pdfHeight - (margin * 2); // 277mm
+      const printableHeight = pdfHeight - margin; // 287mm (prevents 10mm overlap of rows)
       
       // Calculate how the canvas height maps to PDF height
       const imgWidth = contentWidth;
@@ -343,14 +344,14 @@ export default function CibilAnalyzerView({
       
       // Page 1
       pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-      heightLeft -= contentHeight;
+      heightLeft -= printableHeight;
       
       // Additional pages
       while (heightLeft > 0) {
         position = (heightLeft - imgHeight) + margin;
         pdf.addPage();
         pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-        heightLeft -= contentHeight;
+        heightLeft -= printableHeight;
       }
       
       pdf.save(`CIBIL_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
@@ -368,8 +369,7 @@ export default function CibilAnalyzerView({
         variant: "destructive"
       });
     } finally {
-      // Ensure we cleanup the printing class
-      const element = document.querySelector(".cibil-print-section");
+      const element = analyzerRef.current;
       if (element) {
         element.classList.remove("cibil-pdf-downloading");
       }
@@ -620,7 +620,7 @@ export default function CibilAnalyzerView({
   }
 
   return (
-    <div className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
+    <div ref={analyzerRef} className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
       
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0">
