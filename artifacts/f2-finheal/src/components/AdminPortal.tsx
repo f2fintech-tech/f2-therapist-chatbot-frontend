@@ -2343,26 +2343,24 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                               <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
                             </div>
                             {emp.isAdvisor && (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-400">Rating</span>
-                                  <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-400">Status</span>
-                                  <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {emp.isActive !== false ? 'Active' : 'Deactivated'}
-                                  </span>
-                                </div>
-                                {emp.isActive === false && emp.deactivationReason && (
-                                   <div className="flex justify-between text-[10px]">
-                                     <span className="text-gray-400">Reason</span>
-                                     <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
-                                       {emp.deactivationReason}
-                                     </span>
-                                   </div>
-                                 )}
-                              </>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Rating</span>
+                                <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Status</span>
+                              <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                              </span>
+                            </div>
+                            {emp.isActive === false && emp.deactivationReason && (
+                               <div className="flex justify-between text-[10px]">
+                                 <span className="text-gray-400">Reason</span>
+                                 <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                                   {emp.deactivationReason}
+                                 </span>
+                               </div>
                             )}
                           </div>
 
@@ -2377,14 +2375,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             </button>
 
                             <div className="flex items-center gap-2">
-                              {emp.isAdvisor && (
-                                <button
-                                  onClick={() => handleToggleActive(emp)}
-                                  className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
-                                >
-                                  {emp.isActive !== false ? "Deactivate" : "Activate"}
-                                </button>
-                              )}
+                              <button
+                                onClick={() => handleToggleActive(emp)}
+                                className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                              >
+                                {emp.isActive !== false ? "Deactivate" : "Activate"}
+                              </button>
                               <button
                                 onClick={() => handleOpenEditExpert(emp)}
                                 className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
