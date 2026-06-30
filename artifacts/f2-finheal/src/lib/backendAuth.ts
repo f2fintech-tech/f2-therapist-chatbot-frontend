@@ -654,6 +654,8 @@ export interface UserReport {
   endDate: string;
   summary: string;
   keyTakeaways: string[];
+  strengths?: string[];
+  weaknesses?: string[];
   moodTrend: {
     stress?: number;
     urgency?: number;
@@ -685,6 +687,8 @@ export async function fetchUserReports(userId: string): Promise<UserReport[]> {
     endDate: r.end_date,
     summary: r.summary,
     keyTakeaways: r.key_takeaways || [],
+    strengths: r.strengths || [],
+    weaknesses: r.weaknesses || [],
     moodTrend: r.mood_trend || {},
     activitySummary: r.activity_summary || {},
     createdAt: r.created_at
@@ -705,6 +709,8 @@ export async function triggerReportGeneration(userId: string, reportType: string
     endDate: r.end_date,
     summary: r.summary,
     keyTakeaways: r.key_takeaways || [],
+    strengths: r.strengths || [],
+    weaknesses: r.weaknesses || [],
     moodTrend: r.mood_trend || {},
     activitySummary: r.activity_summary || {},
     createdAt: r.created_at
@@ -748,9 +754,23 @@ export async function generateOnDemandReport(userId: string): Promise<UserReport
     endDate: r.end_date,
     summary: r.summary,
     keyTakeaways: r.key_takeaways || [],
+    strengths: r.strengths || [],
+    weaknesses: r.weaknesses || [],
     moodTrend: r.mood_trend || {},
     activitySummary: r.activity_summary || {},
     createdAt: r.created_at
   };
 }
+
+export async function checkAdvisorCibilLimit(advisorId: string): Promise<{
+  advisor_id: string;
+  fetch_count: number;
+  trigger_warning: boolean;
+  message: string;
+}> {
+  return authRequest<any>(`cibil/advisor-limit-check/${encodeURIComponent(advisorId)}`, {
+    method: "GET"
+  });
+}
+
 

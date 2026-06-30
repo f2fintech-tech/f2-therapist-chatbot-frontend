@@ -3,7 +3,7 @@ import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  LineChart, Line
+  LineChart, Line, Legend
 } from "recharts";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, type Goal } from "@/utils/localGoals";
@@ -2791,7 +2791,7 @@ export default function Dashboard({
                               message = "You can only generate a report once every 7 days.";
                             } else if (detail.message) {
                               if (detail.message.includes("RESOURCE_EXHAUSTED") || detail.message.includes("429")) {
-                                message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                                message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                               } else {
                                 message = detail.message;
                               }
@@ -2800,7 +2800,7 @@ export default function Dashboard({
                             }
                           } else if (typeof detail === "string") {
                             if (detail.includes("RESOURCE_EXHAUSTED") || detail.includes("429")) {
-                              message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                              message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                             } else {
                               message = detail;
                             }
@@ -2812,7 +2812,7 @@ export default function Dashboard({
                         }
                       } catch (parseEx) {
                         if (err.message.includes("RESOURCE_EXHAUSTED") || err.message.includes("429")) {
-                          message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                          message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                         } else {
                           message = err.message;
                         }
@@ -2911,12 +2911,7 @@ export default function Dashboard({
                 // Render active report content
                 return (
                   <div className="space-y-5">
-                    {/* Header Action Row */}
                     <div className="flex justify-between items-center bg-gray-50/60 p-3 rounded-2xl border border-gray-100/50 text-left">
-                      <div className="text-[11px] text-gray-500 font-semibold">
-                        🗓️ Report Period: <span className="text-gray-800 font-bold">{new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> to <span className="text-gray-800 font-bold">{new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
-                      </div>
-                      
                       <button
                         onClick={async () => {
                           setDownloadingPDF(true);
@@ -2924,33 +2919,60 @@ export default function Dashboard({
                             const html2canvas = (await import("html2canvas-pro")).default;
                             const { jsPDF } = await import("jspdf");
                             
-                            const docEl = document.getElementById("therapy-report-document-body");
-                            if (!docEl) return;
+                            const page1El = document.getElementById("therapy-report-page-1");
+                            const page2El = document.getElementById("therapy-report-page-2");
+                            if (!page1El || !page2El) return;
                             
-                            const canvas = await html2canvas(docEl, {
+                            const pdf = new jsPDF("p", "mm", "a4");
+                            
+                            // Render Page 1
+                            const originalWidth1 = page1El.style.width;
+                            const originalMaxWidth1 = page1El.style.maxWidth;
+                            const originalPadding1 = page1El.style.padding;
+                            page1El.style.width = "794px";
+                            page1El.style.maxWidth = "794px";
+                            page1El.style.padding = "30px";
+                            
+                            const canvas1 = await html2canvas(page1El, {
                               scale: 2,
                               useCORS: true,
                               allowTaint: true,
                               backgroundColor: "#ffffff"
                             });
                             
-                            const imgData = canvas.toDataURL("image/png");
-                            const pdf = new jsPDF("p", "mm", "a4");
+                            page1El.style.width = originalWidth1;
+                            page1El.style.maxWidth = originalMaxWidth1;
+                            page1El.style.padding = originalPadding1;
+                            
+                            // Render Page 2
+                            const originalWidth2 = page2El.style.width;
+                            const originalMaxWidth2 = page2El.style.maxWidth;
+                            const originalPadding2 = page2El.style.padding;
+                            page2El.style.width = "794px";
+                            page2El.style.maxWidth = "794px";
+                            page2El.style.padding = "30px";
+                            
+                            const canvas2 = await html2canvas(page2El, {
+                              scale: 2,
+                              useCORS: true,
+                              allowTaint: true,
+                              backgroundColor: "#ffffff"
+                            });
+                            
+                            page2El.style.width = originalWidth2;
+                            page2El.style.maxWidth = originalMaxWidth2;
+                            page2El.style.padding = originalPadding2;
+                            
                             const imgWidth = 210;
-                            const pageHeight = 297;
-                            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                            let heightLeft = imgHeight;
-                            let position = 0;
                             
-                            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                            heightLeft -= pageHeight;
+                            // Add Page 1
+                            const imgHeight1 = (canvas1.height * imgWidth) / canvas1.width;
+                            pdf.addImage(canvas1.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight1);
                             
-                            while (heightLeft >= 0) {
-                              position = heightLeft - imgHeight;
-                              pdf.addPage();
-                              pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                              heightLeft -= pageHeight;
-                            }
+                            // Add Page 2
+                            pdf.addPage();
+                            const imgHeight2 = (canvas2.height * imgWidth) / canvas2.width;
+                            pdf.addImage(canvas2.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight2);
                             
                             pdf.save(`FinHeal_Therapy_Report_${new Date(activeReport.startDate).toLocaleDateString().replace(/\//g, "-")}.pdf`);
                           } catch (err) {
@@ -2968,204 +2990,250 @@ export default function Dashboard({
                     </div>
 
                     {/* PDF Export Wrapper */}
-                    <div id="therapy-report-document-body" className="p-5 bg-white border border-gray-100 rounded-2xl space-y-5 text-left">
-                      <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
-                        <div>
-                          <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
-                          <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
-                        </div>
-                        <div className="text-[9px] text-gray-400 font-bold">
-                          Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                        </div>
-                      </div>
-
-                      {/* Compassionate Therapy Analysis */}
-                      <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
-                        <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
-                          Therapist Analysis
-                        </span>
-                        <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
-                          &quot;{activeReport.summary}&quot;
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Activity Summary Log */}
-                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            Period Activity Log
-                          </span>
-                          <div className="space-y-2">
-                            {[
-                              { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
-                              { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
-                              { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
-                              { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
-                              { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
-                            ].map((item) => (
-                              <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
-                                <span className="text-gray-500 font-medium flex items-center gap-1.5">
-                                  <span>{item.icon}</span> {item.label}
-                                </span>
-                                <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                                  {item.count}
-                                </span>
-                              </div>
-                            ))}
+                    <div id="therapy-report-document-body" className="bg-white border border-gray-100 rounded-2xl overflow-hidden text-left">
+                      
+                      {/* PAGE 1: Header, Analysis, Activity Log, Strengths & Weaknesses */}
+                      <div id="therapy-report-page-1" className="p-5 space-y-5">
+                        <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
+                          <div>
+                            <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
+                            <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
+                          </div>
+                          <div className="text-right flex flex-col items-end shrink-0">
+                            <span className="text-[9px] text-gray-400 font-bold">
+                              Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                            </span>
+                            <span className="text-[9.5px] text-primary font-bold mt-1">
+                              📅 Data Range: {new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – {new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Mood Trend Analysis */}
-                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            Avg Stress & Telemetry Trend
+                        {/* Compassionate Therapy Analysis */}
+                        <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                          <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                            Therapist Analysis
                           </span>
-                          <div className="space-y-2.5">
-                            {[
-                              { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
-                              { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
-                              { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
-                              { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
-                              { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
-                            ].map((dim) => {
-                              const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
-                              return (
-                                <div key={dim.label} className="flex items-center gap-2">
-                                  <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
-                                  <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                          <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                            &quot;{activeReport.summary}&quot;
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Period Activity Log with Pie/Donut Chart */}
+                          <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                                Period Activity Log
+                              </span>
+                              
+                              {(() => {
+                                const chartData = [
+                                  { name: "Chats", value: activeReport.activitySummary?.msg_count || 0, color: "#8b5cf6" },
+                                  { name: "CIBIL Syncs", value: activeReport.activitySummary?.cibil_checks || 0, color: "#06b6d4" },
+                                  { name: "Quizzes", value: activeReport.activitySummary?.tests_completed || 0, color: "#10b981" },
+                                  { name: "Calculators", value: activeReport.activitySummary?.calculator_runs || 0, color: "#f59e0b" },
+                                  { name: "Videos", value: activeReport.activitySummary?.videos_watched || 0, color: "#ec4899" }
+                                ].filter(item => item.value > 0);
+
+                                const totalCount = chartData.reduce((acc, c) => acc + c.value, 0);
+
+                                if (totalCount === 0) {
+                                  return (
+                                    <div className="text-[11px] text-gray-400 py-6 text-center">
+                                      No recorded activities during this period.
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="flex items-center gap-4">
+                                    {/* Donut Chart using Recharts */}
+                                    <div className="shrink-0 w-[120px] h-[120px] flex items-center justify-center relative">
+                                      <PieChart width={120} height={120}>
+                                        <Pie
+                                          data={chartData}
+                                          cx={55}
+                                          cy={55}
+                                          innerRadius={36}
+                                          outerRadius={50}
+                                          paddingAngle={3}
+                                          dataKey="value"
+                                        >
+                                          {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                          ))}
+                                        </Pie>
+                                      </PieChart>
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-[14px] font-extrabold text-gray-800 leading-none">{totalCount}</span>
+                                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">Total</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Custom Legend */}
+                                    <div className="flex-1 space-y-1">
+                                      {chartData.map((item) => (
+                                        <div key={item.name} className="flex justify-between items-center text-[10.5px]">
+                                          <span className="text-gray-500 font-semibold flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                            {item.name}
+                                          </span>
+                                          <span className="font-extrabold text-gray-700">{item.value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Mood Trend Analysis */}
+                          <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                            <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                              Avg Stress & Telemetry Trend
+                            </span>
+                            <div className="space-y-2.5">
+                              {[
+                                { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                                { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                                { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                                { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                                { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                              ].map((dim) => {
+                                const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                                return (
+                                  <div key={dim.label} className="flex items-center gap-2">
+                                    <div className="text-[11px] text-gray-650 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                    <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Strengths & Weaknesses Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                          <div className="bg-emerald-50/20 border border-emerald-100/40 rounded-2xl p-4 text-left">
+                            <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider mb-2 block">
+                              🌟 Core Progress & Strengths
+                            </span>
+                            <ul className="space-y-1.5 list-disc pl-4 text-[11.5px] text-gray-650 font-medium">
+                              {(activeReport.strengths && activeReport.strengths.length > 0) ? (
+                                activeReport.strengths.map((str, idx) => (
+                                  <li key={idx}>{str}</li>
+                                ))
+                              ) : (
+                                <>
+                                  <li>Demonstrated active engagement with therapist chats.</li>
+                                  <li>Proactive in researching and testing loan calculator tools.</li>
+                                </>
+                              )}
+                            </ul>
+                          </div>
+                          <div className="bg-rose-50/20 border border-rose-100/40 rounded-2xl p-4 text-left">
+                            <span className="text-[10px] font-extrabold text-rose-800 uppercase tracking-wider mb-2 block">
+                              ⚠️ Anxieties & Areas to Focus
+                            </span>
+                            <ul className="space-y-1.5 list-disc pl-4 text-[11.5px] text-gray-650 font-medium">
+                              {(activeReport.weaknesses && activeReport.weaknesses.length > 0) ? (
+                                activeReport.weaknesses.map((weak, idx) => (
+                                  <li key={idx}>{weak}</li>
+                                ))
+                              ) : (
+                                <>
+                                  <li>Acknowledge anxiety patterns regarding debt and loan obligations.</li>
+                                  <li>Opportunity to build daily financial literacy quiz consistency.</li>
+                                </>
+                              )}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PAGE 2: Recommendations, Action Steps, Timeline Progress Graph */}
+                      <div id="therapy-report-page-2" className="p-5 space-y-5 border-t border-gray-100/50 bg-gray-50/5">
+                        {/* Key Recommendations & Takeaways */}
+                        {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                          <div>
+                            <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                              📋 Recommended Therapist Action Steps
+                            </span>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {activeReport.keyTakeaways.map((takeaway, idx) => (
+                                <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                                  <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                    {takeaway}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Wellness Telemetry History Timeline */}
+                        <div className="border-t border-gray-100 pt-4 text-left">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            📈 Historical Progress & Report Timeline
+                          </span>
+                          
+                          {(() => {
+                            const dateCounts: { [key: string]: number } = {};
+                            reportsList.forEach(r => {
+                              const dStr = new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                              dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
+                            });
+
+                            const sortedDates = Object.keys(dateCounts).sort((a, b) => {
+                              const year = new Date().getFullYear();
+                              return new Date(`${a}, ${year}`).getTime() - new Date(`${b}, ${year}`).getTime();
+                            });
+
+                            const historicalData = sortedDates.map(date => ({
+                              date,
+                              "Reports": dateCounts[date]
+                            }));
+
+                            if (historicalData.length <= 1) {
+                              return (
+                                <div className="bg-gray-50/50 rounded-xl p-3 border border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                                  <span>📊 Generation history will plot a line chart here once you generate future on-demand reports.</span>
+                                  <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+                                    First report: {historicalData[0]?.date || "Today"}
+                                  </span>
                                 </div>
                               );
-                            })}
-                          </div>
+                            }
+
+                            return (
+                              <div className="w-full bg-gray-50/40 rounded-xl p-3 border border-gray-100/50">
+                                <div className="h-[120px] w-full">
+                                  <LineChart width={734} height={120} data={historicalData} margin={{ top: 10, right: 15, left: -25, bottom: 0 }}>
+                                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} stroke="#e5e7eb" />
+                                    <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} stroke="#e5e7eb" allowDecimals={false} />
+                                    <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} />
+                                    <Legend wrapperStyle={{ fontSize: 9, marginTop: -5 }} />
+                                    <Line type="monotone" dataKey="Reports" name="Reports Generated" stroke="#3244e6" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                  </LineChart>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
-
-                      {/* Key Recommendations & Takeaways */}
-                      {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
-                        <div className="border-t border-gray-100 pt-4">
-                          <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            📋 Recommended Therapist Action Steps
-                          </span>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {activeReport.keyTakeaways.map((takeaway, idx) => (
-                              <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
-                                <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
-                                  {takeaway}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Health summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
-                {[
-                  { label: "Savings Rate", pct: 27, color: "#10b981" },
-                  { label: "Debt Ratio", pct: emiPct, color: "#ef4444" },
-                  { label: "Credit Score", pct: Math.min(100, Math.max(0, Math.round(((cibilReport?.score || 742) - 300) / 600 * 100))), color: BRAND },
-                  { label: "Emergency Fund", pct: 20, color: "#f59e0b" },
-                  { label: "Investment Rate", pct: 12, color: "#8b5cf6" },
-                ].map((item, i) => (
-                  <div key={item.label} className="mb-3 last:mb-0">
-                    <div className="flex justify-between text-[11px] mb-1.5">
-                      <span className="text-gray-500 font-medium">{item.label}</span>
-                      <span className="font-semibold" style={{ color: item.color }}>{item.pct}%</span>
-                    </div>
-                    <AnimBar pct={item.pct} color={item.color} delay={i * 120} />
-                  </div>
-                ))}
-              </div>
 
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Net Worth Trend</div>
-                <div className="text-[11px] text-gray-400 mb-3">↑ ₹78K growth in 6 months</div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={netWorthData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
-                    <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
-                    <Area type="monotone" dataKey="worth" name="Net Worth" stroke="#10b981" strokeWidth={2.5} fill="url(#gradNW)" dot={{ fill: "#10b981", r: 3 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Full income/expense bar */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800">Monthly Cash Flow</div>
-                  <div className="text-[11px] text-gray-400">Income vs total outflows</div>
-                </div>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: BRAND }} />Income</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#ef4444]" />Expenses</span>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="income" name="Income" fill={BRAND} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Insight tiles */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              {(() => {
-                const currentScore = cibilReport?.score || 742;
-                const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
-                const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
-                const scoreDesc = cibilReport
-                  ? `Report Subject: ${cibilReport.name || "N/A"}. Score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan || "N/A"}.`
-                  : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
-
-                const avgGoalProgress = localGoals.length > 0
-                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100)
-                  : 0;
-
-                const tiles = [
-                  { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
-                  ...(!isStaff ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
-                  { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
-                ];
-
-                return tiles.map((tile) => (
-                  <div key={tile.title} className="dashboard-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[18px]">{tile.icon}</span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
-                    </div>
-                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
-                    <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
-                    <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
-                  </div>
-                ));
-              })()}
-            </div>
           </div>
         )}
 
