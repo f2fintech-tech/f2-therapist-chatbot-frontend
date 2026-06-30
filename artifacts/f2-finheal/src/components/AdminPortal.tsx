@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -84,6 +84,183 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
   return "User";
 }
 
+interface EmployeeDirectoryProps {
+  employees: Advisor[];
+  employeesLoading: boolean;
+  handleOpenAddExpert: () => void;
+  handleToggleAdvisorRole: (f2FintechId: string, currentIsAdvisor: boolean) => Promise<void>;
+  handleToggleActive: (adv: any) => Promise<void>;
+  handleOpenEditExpert: (adv: Advisor) => void;
+  handleDeleteExpert: (id: string) => void;
+}
+
+function EmployeeDirectory({
+  employees,
+  employeesLoading,
+  handleOpenAddExpert,
+  handleToggleAdvisorRole,
+  handleToggleActive,
+  handleOpenEditExpert,
+  handleDeleteExpert
+}: EmployeeDirectoryProps) {
+  const [employeeSearch, setEmployeeSearch] = useState("");
+
+  const filteredEmployees = useMemo(() => {
+    const search = employeeSearch.toLowerCase().trim();
+    if (!search) return employees;
+    return employees.filter(emp => {
+      return (
+        (emp.name || "").toLowerCase().includes(search) ||
+        (emp.designation || "").toLowerCase().includes(search) ||
+        (emp.department || "").toLowerCase().includes(search) ||
+        (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
+      );
+    });
+  }, [employees, employeeSearch]);
+
+  return (
+    <div className="space-y-[16px] animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <div>
+          <h3 className="text-[14px] font-bold text-gray-900">
+            Employees Directory ({filteredEmployees.length})
+          </h3>
+          <p className="text-[10px] text-gray-400 mt-[2px]">
+            Manage company employee records and toggle active client-facing advisors.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={employeeSearch}
+            onChange={e => setEmployeeSearch(e.target.value)}
+            placeholder="Search employees by name, ID, dept..."
+            className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
+          />
+          <button
+            onClick={handleOpenAddExpert}
+            className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
+          >
+            + Add Employee
+          </button>
+        </div>
+      </div>
+
+      {employeesLoading ? (
+        <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
+      ) : employees.length === 0 ? (
+        <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
+          No employee profiles created yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
+          {filteredEmployees.map((emp) => {
+            const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
+            const isAvailable = emp.availability === "available";
+            
+            return (
+              <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div className={`absolute top-0 left-0 w-full h-[3px] transition-colors duration-300 ${emp.isAdvisor ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                
+                <div className="flex items-start gap-[12px] mt-1">
+                  <div className="relative shrink-0">
+                    {emp.avatarUrl ? (
+                      <img
+                        src={emp.avatarUrl}
+                        alt={emp.name}
+                        className="w-[48px] h-[48px] rounded-xl object-cover border"
+                      />
+                    ) : (
+                      <div className="w-[48px] h-[48px] rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[18px] uppercase">
+                        {emp.name ? emp.name.charAt(0) : "U"}
+                      </div>
+                    )}
+                    <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${isAvailable ? 'bg-emerald-500' : 'bg-gray-400'}`} title={isAvailable ? 'Available' : 'Unavailable'}></span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-gray-900 truncate leading-snug">{emp.name}</h4>
+                    <div className="text-[10px] text-gray-400 truncate mt-[1px]">{emp.designation}</div>
+                    <div className="text-[9.5px] font-bold text-primary/80 uppercase mt-[4px] tracking-wider">{emp.department || "General"}</div>
+                  </div>
+                </div>
+
+                <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[4px] text-[11px] text-gray-600">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Employee ID</span>
+                    <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Email</span>
+                    <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
+                  </div>
+                  {emp.isAdvisor && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Rating</span>
+                        <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Status</span>
+                        <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                        </span>
+                      </div>
+                      {emp.isActive === false && emp.deactivationReason && (
+                         <div className="flex justify-between text-[10px]">
+                           <span className="text-gray-400">Reason</span>
+                           <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                             {emp.deactivationReason}
+                           </span>
+                         </div>
+                       )}
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
+                  <button
+                    onClick={() => handleToggleAdvisorRole(emp.f2FintechId || emp.id, emp.isAdvisor || false)}
+                    className={`flex items-center gap-[6px] px-[10px] py-[4px] rounded-[8px] text-[10px] font-bold border transition ${emp.isAdvisor 
+                      ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
+                      : 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10'}`}
+                  >
+                    {emp.isAdvisor ? "Remove Advisor" : "Make Advisor"}
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {emp.isAdvisor && (
+                      <button
+                        onClick={() => handleToggleActive(emp)}
+                        className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                      >
+                        {emp.isActive !== false ? "Deactivate" : "Activate"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenEditExpert(emp)}
+                      className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteExpert(emp.f2FintechId || emp.id)}
+                      className="text-rose-500 hover:underline text-[11px] font-bold cursor-pointer transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
@@ -106,7 +283,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [employees, setEmployees] = useState<Advisor[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
-  const [employeeSearch, setEmployeeSearch] = useState("");
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
@@ -2607,168 +2783,44 @@ ${sheetDataXml}
                     </tbody>
                   </table>
                 </div>
+                {/* Bottom Pagination Controls */}
+                {filteredEnquiries.length > 0 && (
+                  <div className="flex items-center justify-end gap-1.5 pt-2">
+                    <button
+                      disabled={safeCibilPage === 1}
+                      onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                      className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                      title="Previous Page"
+                    >
+                      ←
+                    </button>
+                    <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                      {safeCibilPage} / {totalPages}
+                    </span>
+                    <button
+                      disabled={safeCibilPage === totalPages}
+                      onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                      className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                      title="Next Page"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
             {/* TAB: EMPLOYEES DIRECTORY */}
             {activeTab === "employees" && (
-              <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">
-                      Employees Directory ({employees.filter(emp => {
-                        const search = employeeSearch.toLowerCase().trim();
-                        if (!search) return true;
-                        return (
-                          (emp.name || "").toLowerCase().includes(search) ||
-                          (emp.designation || "").toLowerCase().includes(search) ||
-                          (emp.department || "").toLowerCase().includes(search) ||
-                          (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
-                        );
-                      }).length})
-                    </h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">
-                      Manage company employee records and toggle active client-facing advisors.
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      value={employeeSearch}
-                      onChange={e => setEmployeeSearch(e.target.value)}
-                      placeholder="Search employees by name, ID, dept..."
-                      className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
-                    />
-                    <button
-                      onClick={handleOpenAddExpert}
-                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
-                    >
-                      + Add Employee
-                    </button>
-                  </div>
-                </div>
-
-                {employeesLoading ? (
-                  <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
-                ) : employees.length === 0 ? (
-                  <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
-                    No employee profiles created yet.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
-                    {employees.filter(emp => {
-                      const search = employeeSearch.toLowerCase().trim();
-                      if (!search) return true;
-                      return (
-                        (emp.name || "").toLowerCase().includes(search) ||
-                        (emp.designation || "").toLowerCase().includes(search) ||
-                        (emp.department || "").toLowerCase().includes(search) ||
-                        (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
-                      );
-                    }).map((emp) => {
-                      const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
-                      const isAvailable = emp.availability === "available";
-                      
-                      return (
-                        <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                          <div className={`absolute top-0 left-0 w-full h-[3px] transition-colors duration-300 ${emp.isAdvisor ? 'bg-primary' : 'bg-gray-200'}`}></div>
-                          
-                          <div className="flex items-start gap-[12px] mt-1">
-                            <div className="relative shrink-0">
-                              {emp.avatarUrl ? (
-                                <img
-                                  src={emp.avatarUrl}
-                                  alt={emp.name}
-                                  className="w-[48px] h-[48px] rounded-xl object-cover border"
-                                />
-                              ) : (
-                                <div className="w-[48px] h-[48px] rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[18px] uppercase">
-                                  {emp.name ? emp.name.charAt(0) : "U"}
-                                </div>
-                              )}
-                              <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${isAvailable ? 'bg-emerald-500' : 'bg-gray-400'}`} title={isAvailable ? 'Available' : 'Unavailable'}></span>
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-bold text-gray-900 truncate leading-snug">{emp.name}</h4>
-                              <div className="text-[10px] text-gray-400 truncate mt-[1px]">{emp.designation}</div>
-                              <div className="text-[9.5px] font-bold text-primary/80 uppercase mt-[4px] tracking-wider">{emp.department || "General"}</div>
-                            </div>
-                          </div>
-
-                          <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[4px] text-[11px] text-gray-600">
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Employee ID</span>
-                              <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Email</span>
-                              <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
-                            </div>
-                            {emp.isAdvisor && (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-400">Rating</span>
-                                  <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-400">Status</span>
-                                  <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {emp.isActive !== false ? 'Active' : 'Deactivated'}
-                                  </span>
-                                </div>
-                                {emp.isActive === false && emp.deactivationReason && (
-                                   <div className="flex justify-between text-[10px]">
-                                     <span className="text-gray-400">Reason</span>
-                                     <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
-                                       {emp.deactivationReason}
-                                     </span>
-                                   </div>
-                                 )}
-                              </>
-                            )}
-                          </div>
-
-                          <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
-                            <button
-                              onClick={() => handleToggleAdvisorRole(emp.f2FintechId || emp.id, emp.isAdvisor || false)}
-                              className={`flex items-center gap-[6px] px-[10px] py-[4px] rounded-[8px] text-[10px] font-bold border transition ${emp.isAdvisor 
-                                ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
-                                : 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10'}`}
-                            >
-                              {emp.isAdvisor ? "Remove Advisor" : "Make Advisor"}
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                              {emp.isAdvisor && (
-                                <button
-                                  onClick={() => handleToggleActive(emp)}
-                                  className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
-                                >
-                                  {emp.isActive !== false ? "Deactivate" : "Activate"}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleOpenEditExpert(emp)}
-                                className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteExpert(emp.f2FintechId || emp.id)}
-                                className="text-rose-500 hover:underline text-[11px] font-bold cursor-pointer transition"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <EmployeeDirectory
+                employees={employees}
+                employeesLoading={employeesLoading}
+                handleOpenAddExpert={handleOpenAddExpert}
+                handleToggleAdvisorRole={handleToggleAdvisorRole}
+                handleToggleActive={handleToggleActive}
+                handleOpenEditExpert={handleOpenEditExpert}
+                handleDeleteExpert={handleDeleteExpert}
+              />
             )}
           </div>
         ) : (
@@ -3740,6 +3792,30 @@ ${sheetDataXml}
                         </tbody>
                       </table>
                     </div>
+                    {/* Bottom Pagination Controls */}
+                    {filteredEnquiries.length > 0 && (
+                      <div className="flex items-center justify-end gap-1.5 pt-2">
+                        <button
+                          disabled={safeCibilPage === 1}
+                          onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                          title="Previous Page"
+                        >
+                          ←
+                        </button>
+                        <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                          {safeCibilPage} / {totalPages}
+                        </span>
+                        <button
+                          disabled={safeCibilPage === totalPages}
+                          onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                          title="Next Page"
+                        >
+                          →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
