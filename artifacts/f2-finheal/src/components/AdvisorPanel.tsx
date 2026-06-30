@@ -24,6 +24,8 @@ export interface Advisor {
   testRating?: number;
   department?: string;
   isAdvisor?: boolean;
+  isActive?: boolean;
+  deactivationReason?: string;
   permissions?: string[];
 }
 

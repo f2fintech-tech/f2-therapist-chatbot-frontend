@@ -68,6 +68,7 @@ export default function CibilAnalyzerView({
   overrideReport = null
 }: CibilAnalyzerViewProps) {
   const { toast } = useToast();
+  const analyzerRef = React.useRef<HTMLDivElement>(null);
 
   // Core CIBIL Report State
   const [report, setReport] = useState<CibilReport | null>(null);
@@ -303,24 +304,95 @@ export default function CibilAnalyzerView({
   const handleDownloadPDF = async () => {
     if (!report) return;
     setIsGeneratingPDF(true);
+    
+    let clone: HTMLElement | null = null;
     try {
-      const element = document.querySelector(".cibil-print-section") as HTMLElement;
+      const element = analyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");
       }
       
-      // Temporarily mark the container to apply print-hiding styles during pdf render
-      element.classList.add("cibil-pdf-downloading");
+      // Create an offscreen clone of the report element to capture the full expanded height
+      clone = element.cloneNode(true) as HTMLElement;
+      clone.classList.add("cibil-pdf-downloading");
       
-      // Wait for layout reflow to expand scroll height and hide print-hidden elements
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Style the clone to render offscreen and expand to its natural height
+      clone.style.setProperty("position", "absolute", "important");
+      clone.style.setProperty("top", "0", "important");
+      clone.style.setProperty("left", "-9999px", "important");
+      clone.style.setProperty("width", "1024px", "important");
+      clone.style.setProperty("height", "auto", "important");
+      clone.style.setProperty("max-height", "none", "important");
+      clone.style.setProperty("overflow", "visible", "important");
+      clone.style.setProperty("display", "block", "important");
       
-      // Generate canvas using html2canvas-pro (which supports oklch)
-      const canvas = await html2canvas(element, {
+      // Expand all scrollable containers inside the clone
+      const scrollableElements = Array.from(clone.querySelectorAll(".cibil-print-scrollable")) as HTMLElement[];
+      scrollableElements.forEach(el => {
+        el.style.setProperty("height", "auto", "important");
+        el.style.setProperty("min-height", "0", "important");
+        el.style.setProperty("max-height", "none", "important");
+        el.style.setProperty("overflow", "visible", "important");
+        el.style.setProperty("display", "block", "important");
+      });
+      
+      // Hide all elements with print-hide class inside the clone
+      const hideElements = Array.from(clone.querySelectorAll(".cibil-print-hide")) as HTMLElement[];
+      hideElements.forEach(el => {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+      });
+
+      document.body.appendChild(clone);
+      
+      // Wait for layout reflow
+      await new Promise(resolve => setTimeout(resolve, 350));
+      
+      // Adjust positions of elements in the clone to avoid breaking them across A4 page splits
+      const cloneWidth = clone.clientWidth || 1024;
+      const pageHeightPx = Math.floor(cloneWidth * 1.45789); // A4 printable area ratio (277 / 190) -> ~1493px
+      
+      const breakables = Array.from(clone.querySelectorAll([
+        ".divide-y > div",
+        ".divide-y > a",
+        "tr",
+        "h1", "h2", "h3", "h4"
+      ].join(", "))) as HTMLElement[];
+
+      const cloneRect = clone.getBoundingClientRect();
+
+      breakables.forEach(el => {
+        const elRect = el.getBoundingClientRect();
+        const top = elRect.top - cloneRect.top;
+        const height = elRect.height;
+        const bottom = top + height;
+        
+        const pageNumStart = Math.floor(top / pageHeightPx);
+        const pageNumEnd = Math.floor(bottom / pageHeightPx);
+        
+        if (pageNumStart !== pageNumEnd && height < pageHeightPx) {
+          const topOnPage = top % pageHeightPx;
+          const remainingPageSpace = pageHeightPx - topOnPage;
+          
+          const spacer = document.createElement("div");
+          spacer.style.height = `${remainingPageSpace}px`;
+          spacer.style.width = "100%";
+          spacer.style.clear = "both";
+          
+          if (el.parentNode) {
+            el.parentNode.insertBefore(spacer, el);
+          }
+        }
+      });
+      
+      // Generate canvas from the adjusted offscreen clone
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: "#ffffff"
+        backgroundColor: "#ffffff",
+        scrollX: 0,
+        scrollY: 0
       });
       
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -332,7 +404,7 @@ export default function CibilAnalyzerView({
       
       const margin = 10;
       const contentWidth = pdfWidth - (margin * 2); // 190mm
-      const contentHeight = pdfHeight - (margin * 2); // 277mm
+      const contentHeight = 277; // Exactly 277mm printable area (10mm to 287mm)
       
       // Calculate how the canvas height maps to PDF height
       const imgWidth = contentWidth;
@@ -341,8 +413,16 @@ export default function CibilAnalyzerView({
       let heightLeft = imgHeight;
       let position = margin;
       
+      // Mask function to cover top/bottom margins with solid white rectangles
+      const drawMarginMasks = (pdfDoc: typeof pdf) => {
+        pdfDoc.setFillColor(255, 255, 255);
+        pdfDoc.rect(0, 0, pdfWidth, margin, "F"); // Top margin mask
+        pdfDoc.rect(0, pdfHeight - margin, pdfWidth, margin, "F"); // Bottom margin mask
+      };
+      
       // Page 1
       pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+      drawMarginMasks(pdf);
       heightLeft -= contentHeight;
       
       // Additional pages
@@ -350,7 +430,33 @@ export default function CibilAnalyzerView({
         position = (heightLeft - imgHeight) + margin;
         pdf.addPage();
         pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+        drawMarginMasks(pdf);
         heightLeft -= contentHeight;
+      }
+      
+      // Post-process to draw elegant divider lines, header & footer labels, and page numbers
+      const totalPages = (pdf.internal as any).getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        
+        // Draw thin horizontal separator lines
+        pdf.setDrawColor(229, 231, 235); // gray-200
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, margin, pdfWidth - margin, margin); // Top line
+        pdf.line(margin, pdfHeight - margin, pdfWidth - margin, pdfHeight - margin); // Bottom line
+        
+        // Draw Header text
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(156, 163, 175); // gray-400
+        pdf.text("CIBIL BUREAU ANALYZER", margin, margin - 3.5);
+        
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`CLIENT: ${report.name.toUpperCase()}`, pdfWidth - margin, margin - 3.5, { align: "right" });
+        
+        // Draw Footer text
+        pdf.text("F2 FINTECH • CREDIT REPORT ANALYSER", margin, pdfHeight - margin + 5.5);
+        pdf.text(`Page ${i} of ${totalPages}`, pdfWidth - margin, pdfHeight - margin + 5.5, { align: "right" });
       }
       
       pdf.save(`CIBIL_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
@@ -368,10 +474,8 @@ export default function CibilAnalyzerView({
         variant: "destructive"
       });
     } finally {
-      // Ensure we cleanup the printing class
-      const element = document.querySelector(".cibil-print-section");
-      if (element) {
-        element.classList.remove("cibil-pdf-downloading");
+      if (clone && clone.parentNode) {
+        document.body.removeChild(clone);
       }
       setIsGeneratingPDF(false);
     }
@@ -463,7 +567,7 @@ export default function CibilAnalyzerView({
       // Gate 2: Income check
       if (income < l.minMonthlyIncome) {
         eligible = false;
-        reasons.push(`Monthly income ${income.toLocaleString()} is below lender minimum of ${l.minMonthlyIncome.toLocaleString()}`);
+        reasons.push(`Monthly income ${income.toLocaleString("en-IN")} is below lender minimum of ${l.minMonthlyIncome.toLocaleString("en-IN")}`);
       }
       // Gate 3: Tenure check
       if (tenure > l.maxTenureYears) {
@@ -485,7 +589,7 @@ export default function CibilAnalyzerView({
       
       if (maxLimit < l.minAmount) {
         eligible = false;
-        reasons.push(`Max eligible amount is below lender minimum loan size of ${l.minAmount.toLocaleString()}`);
+        reasons.push(`Max eligible amount is below lender minimum loan size of ${l.minAmount.toLocaleString("en-IN")}`);
       }
 
       // Likelihood rating
@@ -620,7 +724,7 @@ export default function CibilAnalyzerView({
   }
 
   return (
-    <div className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
+    <div ref={analyzerRef} className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
       
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0">
@@ -917,19 +1021,8 @@ export default function CibilAnalyzerView({
                           Next update: {nextDate}
                         </span>
                       );
-                    } else {
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReport(null);
-                          }}
-                          className="text-[11px] text-primary hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
-                        >
-                          Refresh Report {exempt && "(Admin)"}
-                        </button>
-                      );
                     }
+                    return null;
                   })()}
                 </div>
                 
@@ -1175,7 +1268,7 @@ export default function CibilAnalyzerView({
                                     </span>
                                   </td>
                                   <td className="px-[12px] py-[10px] text-right font-semibold text-gray-700">
-                                    ₹{totalOutstanding.toLocaleString()}
+                                    ₹{totalOutstanding.toLocaleString("en-IN")}
                                   </td>
                                 </tr>
                               );
@@ -1185,7 +1278,7 @@ export default function CibilAnalyzerView({
                               <td className="px-[12px] py-[10px] text-gray-800">Total Open Accounts</td>
                               <td className="px-[12px] py-[10px] text-center text-[14px] font-black text-primary">{openAccounts.length}</td>
                               <td className="px-[12px] py-[10px] text-right text-gray-800">
-                                ₹{openAccounts.reduce((s, a) => s + a.outstanding_balance, 0).toLocaleString()}
+                                ₹{openAccounts.reduce((s, a) => s + a.outstanding_balance, 0).toLocaleString("en-IN")}
                               </td>
                             </tr>
                           </tbody>
@@ -1224,7 +1317,7 @@ export default function CibilAnalyzerView({
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-[13px] font-extrabold text-gray-800">₹{acc.outstanding_balance.toLocaleString()}</div>
+                                    <div className="text-[13px] font-extrabold text-gray-800">₹{acc.outstanding_balance.toLocaleString("en-IN")}</div>
                                     <div className="flex items-center gap-[4px] justify-end mt-[2px]">
                                       <span className={`w-[6px] h-[6px] rounded-full ${acc.payment_status.includes("Past Due") ? "bg-rose-500" : "bg-emerald-500"}`} />
                                       <span className={`text-[11px] font-medium ${acc.payment_status.includes("Past Due") ? "text-rose-600" : "text-gray-500"}`}>
@@ -1283,7 +1376,7 @@ export default function CibilAnalyzerView({
                     <div>
                       <div className="flex justify-between text-[12px] font-semibold text-gray-600 mb-[6px]">
                         <span>Loan Amount</span>
-                        <span className="text-primary font-bold">₹{Number(emiAmount).toLocaleString()}</span>
+                        <span className="text-primary font-bold">₹{Number(emiAmount).toLocaleString("en-IN")}</span>
                       </div>
                       <input
                         type="range"
@@ -1332,21 +1425,21 @@ export default function CibilAnalyzerView({
                     <div>
                       <div className="text-center py-[10px] border-b border-gray-200/60 mb-[16px]">
                         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px]">Your Monthly EMI</span>
-                        <div className="text-[32px] font-black text-primary mt-[2px]">₹{emiOutput.monthlyPayment.toLocaleString()}</div>
+                        <div className="text-[32px] font-black text-primary mt-[2px]">₹{emiOutput.monthlyPayment.toLocaleString("en-IN")}</div>
                       </div>
 
                       <div className="space-y-[8px]">
                         <div className="flex justify-between text-[12px] text-gray-600">
                           <span>Principal Loan Amount:</span>
-                          <span className="font-semibold text-gray-800">₹{Number(emiAmount).toLocaleString()}</span>
+                          <span className="font-semibold text-gray-800">₹{Number(emiAmount).toLocaleString("en-IN")}</span>
                         </div>
                         <div className="flex justify-between text-[12px] text-gray-600">
                           <span>Total Interest Payable:</span>
-                          <span className="font-semibold text-gray-800">₹{emiOutput.totalInterest.toLocaleString()}</span>
+                          <span className="font-semibold text-gray-800">₹{emiOutput.totalInterest.toLocaleString("en-IN")}</span>
                         </div>
                         <div className="flex justify-between text-[12px] text-gray-600 border-t border-gray-200/40 pt-[8px] mt-[8px]">
                           <span>Total Amount Payable:</span>
-                          <span className="font-bold text-gray-800">₹{emiOutput.totalPayable.toLocaleString()}</span>
+                          <span className="font-bold text-gray-800">₹{emiOutput.totalPayable.toLocaleString("en-IN")}</span>
                         </div>
                       </div>
                     </div>
@@ -1388,7 +1481,7 @@ export default function CibilAnalyzerView({
                     <div>
                       <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-[4px]">
                         <span>Monthly Gross Income</span>
-                        <span className="text-primary font-bold">₹{Number(eligIncome).toLocaleString()}</span>
+                        <span className="text-primary font-bold">₹{Number(eligIncome).toLocaleString("en-IN")}</span>
                       </div>
                       <input
                         type="range"
@@ -1404,7 +1497,7 @@ export default function CibilAnalyzerView({
                     <div>
                       <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-[4px]">
                         <span>Existing Monthly EMIs</span>
-                        <span className="text-primary font-bold">₹{Number(eligEmi).toLocaleString()}</span>
+                        <span className="text-primary font-bold">₹{Number(eligEmi).toLocaleString("en-IN")}</span>
                       </div>
                       <input
                         type="range"
@@ -1492,7 +1585,7 @@ export default function CibilAnalyzerView({
                             <div className="text-left sm:text-right mt-[8px] sm:mt-0">
                               <span className="text-[11px] text-gray-400 block font-medium">Eligible Loan Limit</span>
                               <div className="text-[15px] font-black text-gray-800">
-                                {off.likelihood === "Ineligible" ? "₹0" : `₹${off.eligibleLimit.toLocaleString()}`}
+                                {off.likelihood === "Ineligible" ? "₹0" : `₹${off.eligibleLimit.toLocaleString("en-IN")}`}
                               </div>
                               
                               {off.likelihood !== "Ineligible" && (
@@ -1525,7 +1618,7 @@ export default function CibilAnalyzerView({
                       <div>
                         <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                           <span>Loan Amount</span>
-                          <span className="font-bold text-primary">₹{Number(compAmountA).toLocaleString()}</span>
+                          <span className="font-bold text-primary">₹{Number(compAmountA).toLocaleString("en-IN")}</span>
                         </div>
                         <input
                           type="range"
@@ -1568,7 +1661,7 @@ export default function CibilAnalyzerView({
                       <div>
                         <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                           <span>Loan Amount</span>
-                          <span className="font-bold text-primary">₹{Number(compAmountB).toLocaleString()}</span>
+                          <span className="font-bold text-primary">₹{Number(compAmountB).toLocaleString("en-IN")}</span>
                         </div>
                         <input
                           type="range"
@@ -1618,20 +1711,20 @@ export default function CibilAnalyzerView({
                     <div className="space-y-[10px] text-center text-[13px]">
                       <div className="grid grid-cols-3 gap-[10px] py-[6px] border-b border-gray-55 items-center">
                         <div className="text-left font-medium text-gray-500">Monthly EMI</div>
-                        <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanA.emi.toLocaleString()}</div>
-                        <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanB.emi.toLocaleString()}</div>
+                        <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanA.emi.toLocaleString("en-IN")}</div>
+                        <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanB.emi.toLocaleString("en-IN")}</div>
                       </div>
                       
                       <div className="grid grid-cols-3 gap-[10px] py-[6px] border-b border-gray-55 items-center">
                         <div className="text-left font-medium text-gray-500">Total Interest</div>
-                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanA.totalInterest.toLocaleString()}</div>
-                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanB.totalInterest.toLocaleString()}</div>
+                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanA.totalInterest.toLocaleString("en-IN")}</div>
+                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanB.totalInterest.toLocaleString("en-IN")}</div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-[10px] py-[6px] border-b border-gray-55 items-center">
                         <div className="text-left font-medium text-gray-500">Total Outflow</div>
-                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanA.totalPayable.toLocaleString()}</div>
-                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanB.totalPayable.toLocaleString()}</div>
+                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanA.totalPayable.toLocaleString("en-IN")}</div>
+                        <div className="font-bold text-gray-700">₹{comparisonOutput.loanB.totalPayable.toLocaleString("en-IN")}</div>
                       </div>
                     </div>
 
@@ -1642,7 +1735,7 @@ export default function CibilAnalyzerView({
                         <div>
                           <p className="text-[12px] text-gray-600 font-medium">FinHeal AI analysis shows:</p>
                           <p className="text-[14px] font-black text-gray-800">
-                            {comparisonOutput.bestLoan} saves you ₹{comparisonOutput.interestDiff.toLocaleString()} in interest outflow!
+                            {comparisonOutput.bestLoan} saves you ₹{comparisonOutput.interestDiff.toLocaleString("en-IN")} in interest outflow!
                           </p>
                         </div>
                       </div>
@@ -1677,7 +1770,7 @@ export default function CibilAnalyzerView({
                     <div>
                       <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                         <span>Current Loan Principal</span>
-                        <span className="font-bold text-primary">₹{Number(prepAmount).toLocaleString()}</span>
+                        <span className="font-bold text-primary">₹{Number(prepAmount).toLocaleString("en-IN")}</span>
                       </div>
                       <input
                         type="range"
@@ -1747,7 +1840,7 @@ export default function CibilAnalyzerView({
                             <span className="text-[12px] text-gray-700 font-semibold">Total Interest Saved:</span>
                           </div>
                           <span className="text-[16px] font-black text-emerald-700">
-                            ₹{prepaymentOutput.interestSaved.toLocaleString()}
+                            ₹{prepaymentOutput.interestSaved.toLocaleString("en-IN")}
                           </span>
                         </div>
 
@@ -1765,11 +1858,11 @@ export default function CibilAnalyzerView({
                       <div className="space-y-[6px] text-[11.5px] text-gray-500">
                         <div className="flex justify-between">
                           <span>Standard Total Interest:</span>
-                          <span>₹{prepaymentOutput.standardInterest.toLocaleString()}</span>
+                          <span>₹{prepaymentOutput.standardInterest.toLocaleString("en-IN")}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Interest after prepayments:</span>
-                          <span>₹{prepaymentOutput.prepaidInterest.toLocaleString()}</span>
+                          <span>₹{prepaymentOutput.prepaidInterest.toLocaleString("en-IN")}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Revised Tenure:</span>

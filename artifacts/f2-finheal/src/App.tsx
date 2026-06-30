@@ -77,6 +77,7 @@ function Router() {
       <Route path="/admin" component={FinHealChat} />
       <Route path="/dashboard" component={FinHealChat} />
       <Route path="/education" component={FinHealChat} />
+      <Route path="/loan-calculator/:loanType" component={FinHealChat} />
       <Route path="/loan-calculator" component={FinHealChat} />
       <Route path="/cibil-analyzer" component={FinHealChat} />
       <Route path="/eligibility-cibil" component={FinHealChat} />
