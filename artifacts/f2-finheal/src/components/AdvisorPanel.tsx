@@ -184,6 +184,9 @@ export default function AdvisorPanel({
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [categoriesList, setCategoriesList] = useState(categories);
   const [advisorReviews, setAdvisorReviews] = useState<Record<string, Appointment[]>>({});
+  const [selectedAdvisorAppointments, setSelectedAdvisorAppointments] = useState<Appointment[]>([]);
+  const [reschedulingAdvisorAppts, setReschedulingAdvisorAppts] = useState<Appointment[]>([]);
+
 
   const loadAdvisors = async () => {
     try {
@@ -303,6 +306,41 @@ export default function AdvisorPanel({
     5: "Outstanding! 🏆"
   };
 
+  useEffect(() => {
+    const fetchAdvisorBookings = async () => {
+      if (!selectedAdvisor) {
+        setSelectedAdvisorAppointments([]);
+        return;
+      }
+      try {
+        const list = await fetchAdvisorAppointments(selectedAdvisor.id);
+        setSelectedAdvisorAppointments(list);
+      } catch (e) {
+        console.error("Error fetching advisor appointments:", e);
+        setSelectedAdvisorAppointments([]);
+      }
+    };
+    fetchAdvisorBookings();
+  }, [selectedAdvisor]);
+
+  useEffect(() => {
+    const fetchRescheduleBookings = async () => {
+      if (!reschedulingApptId) {
+        setReschedulingAdvisorAppts([]);
+        return;
+      }
+      const appt = appointments.find(a => a.id === reschedulingApptId || a.advisorId === reschedulingApptId);
+      if (!appt) return;
+      try {
+        const list = await fetchAdvisorAppointments(appt.advisorId);
+        setReschedulingAdvisorAppts(list);
+      } catch (e) {
+        console.error("Error loading reschedule advisor appointments:", e);
+        setReschedulingAdvisorAppts([]);
+      }
+    };
+    fetchRescheduleBookings();
+  }, [reschedulingApptId, appointments]);
 
 
   // // ANIMATION: BUTTON RIPPLE
@@ -999,20 +1037,28 @@ export default function AdvisorPanel({
                           </div>
                           {rescheduleDate && (
                             <div className="grid grid-cols-3 gap-[6px]">
-                              {timeSlots.map((slot) => (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  onClick={() => setRescheduleTime(slot)}
-                                  className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${
-                                    rescheduleTime === slot
-                                      ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {slot}
-                                </button>
-                              ))}
+                              {timeSlots.map((slot) => {
+                                const isBooked = reschedulingAdvisorAppts.some(
+                                  a => a.date === rescheduleDate && a.time === slot && !a.cancelled
+                                );
+                                return (
+                                  <button
+                                    key={slot}
+                                    type="button"
+                                    disabled={isBooked}
+                                    onClick={() => setRescheduleTime(slot)}
+                                    className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition ${
+                                      isBooked
+                                        ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                        : rescheduleTime === slot
+                                        ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold cursor-pointer"
+                                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+                                    }`}
+                                  >
+                                    {slot}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                           <div className="flex gap-[8px] justify-end pt-[4px]">
@@ -1376,20 +1422,28 @@ export default function AdvisorPanel({
                               </div>
                               {rescheduleDate && (
                                 <div className="grid grid-cols-3 gap-[4px]">
-                                  {timeSlots.map((slot) => (
-                                    <button
-                                      key={slot}
-                                      type="button"
-                                      onClick={() => setRescheduleTime(slot)}
-                                      className={`py-[5px] px-[4px] rounded-[6px] text-[10px] font-semibold text-center border transition cursor-pointer ${
-                                        rescheduleTime === slot
-                                          ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                      }`}
-                                    >
-                                      {slot}
-                                    </button>
-                                  ))}
+                                  {timeSlots.map((slot) => {
+                                    const isBooked = reschedulingAdvisorAppts.some(
+                                      a => a.date === rescheduleDate && a.time === slot && !a.cancelled
+                                    );
+                                    return (
+                                      <button
+                                        key={slot}
+                                        type="button"
+                                        disabled={isBooked}
+                                        onClick={() => setRescheduleTime(slot)}
+                                        className={`py-[5px] px-[4px] rounded-[6px] text-[10px] font-semibold text-center border transition ${
+                                          isBooked
+                                            ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                            : rescheduleTime === slot
+                                            ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold cursor-pointer"
+                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+                                        }`}
+                                      >
+                                        {slot}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                               <div className="flex gap-[6px] justify-end pt-[2px]">
@@ -1802,20 +1856,28 @@ export default function AdvisorPanel({
                           </span>
                         </div>
                       ) : (
-                        activeTimeSlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            onClick={() => setSelectedTimeSlot(slot)}
-                            className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition cursor-pointer ${
-                              selectedTimeSlot === slot
-                                ? "bg-primary/10 border-primary text-primary font-bold"
-                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {slot}
-                          </button>
-                        ))
+                        activeTimeSlots.map((slot) => {
+                          const isBooked = selectedAdvisorAppointments.some(
+                            a => a.date === selectedDateStr && a.time === slot && !a.cancelled
+                          );
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled={isBooked}
+                              onClick={() => setSelectedTimeSlot(slot)}
+                              className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition ${
+                                isBooked
+                                  ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                  : selectedTimeSlot === slot
+                                  ? "bg-primary/10 border-primary text-primary font-bold cursor-pointer"
+                                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer"
+                              }`}
+                            >
+                              {slot}
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                   </div>
