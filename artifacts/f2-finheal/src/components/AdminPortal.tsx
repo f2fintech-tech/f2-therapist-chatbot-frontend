@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -84,6 +84,183 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
   return "User";
 }
 
+interface EmployeeDirectoryProps {
+  employees: Advisor[];
+  employeesLoading: boolean;
+  handleOpenAddExpert: () => void;
+  handleToggleAdvisorRole: (f2FintechId: string, currentIsAdvisor: boolean) => Promise<void>;
+  handleToggleActive: (adv: any) => Promise<void>;
+  handleOpenEditExpert: (adv: Advisor) => void;
+  handleDeleteExpert: (id: string) => void;
+}
+
+function EmployeeDirectory({
+  employees,
+  employeesLoading,
+  handleOpenAddExpert,
+  handleToggleAdvisorRole,
+  handleToggleActive,
+  handleOpenEditExpert,
+  handleDeleteExpert
+}: EmployeeDirectoryProps) {
+  const [employeeSearch, setEmployeeSearch] = useState("");
+
+  const filteredEmployees = useMemo(() => {
+    const search = employeeSearch.toLowerCase().trim();
+    if (!search) return employees;
+    return employees.filter(emp => {
+      return (
+        (emp.name || "").toLowerCase().includes(search) ||
+        (emp.designation || "").toLowerCase().includes(search) ||
+        (emp.department || "").toLowerCase().includes(search) ||
+        (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
+      );
+    });
+  }, [employees, employeeSearch]);
+
+  return (
+    <div className="space-y-[16px] animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <div>
+          <h3 className="text-[14px] font-bold text-gray-900">
+            Employees Directory ({filteredEmployees.length})
+          </h3>
+          <p className="text-[10px] text-gray-400 mt-[2px]">
+            Manage company employee records and toggle active client-facing advisors.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={employeeSearch}
+            onChange={e => setEmployeeSearch(e.target.value)}
+            placeholder="Search employees by name, ID, dept..."
+            className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
+          />
+          <button
+            onClick={handleOpenAddExpert}
+            className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
+          >
+            + Add Employee
+          </button>
+        </div>
+      </div>
+
+      {employeesLoading ? (
+        <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
+      ) : employees.length === 0 ? (
+        <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
+          No employee profiles created yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
+          {filteredEmployees.map((emp) => {
+            const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
+            const isAvailable = emp.availability === "available";
+            
+            return (
+              <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div className={`absolute top-0 left-0 w-full h-[3px] transition-colors duration-300 ${emp.isAdvisor ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                
+                <div className="flex items-start gap-[12px] mt-1">
+                  <div className="relative shrink-0">
+                    {emp.avatarUrl ? (
+                      <img
+                        src={emp.avatarUrl}
+                        alt={emp.name}
+                        className="w-[48px] h-[48px] rounded-xl object-cover border"
+                      />
+                    ) : (
+                      <div className="w-[48px] h-[48px] rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[18px] uppercase">
+                        {emp.name ? emp.name.charAt(0) : "U"}
+                      </div>
+                    )}
+                    <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${isAvailable ? 'bg-emerald-500' : 'bg-gray-400'}`} title={isAvailable ? 'Available' : 'Unavailable'}></span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-gray-900 truncate leading-snug">{emp.name}</h4>
+                    <div className="text-[10px] text-gray-400 truncate mt-[1px]">{emp.designation}</div>
+                    <div className="text-[9.5px] font-bold text-primary/80 uppercase mt-[4px] tracking-wider">{emp.department || "General"}</div>
+                  </div>
+                </div>
+
+                <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[4px] text-[11px] text-gray-600">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Employee ID</span>
+                    <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Email</span>
+                    <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
+                  </div>
+                  {emp.isAdvisor && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Rating</span>
+                        <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Status</span>
+                        <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                        </span>
+                      </div>
+                      {emp.isActive === false && emp.deactivationReason && (
+                         <div className="flex justify-between text-[10px]">
+                           <span className="text-gray-400">Reason</span>
+                           <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                             {emp.deactivationReason}
+                           </span>
+                         </div>
+                       )}
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
+                  <button
+                    onClick={() => handleToggleAdvisorRole(emp.f2FintechId || emp.id, emp.isAdvisor || false)}
+                    className={`flex items-center gap-[6px] px-[10px] py-[4px] rounded-[8px] text-[10px] font-bold border transition ${emp.isAdvisor 
+                      ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
+                      : 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10'}`}
+                  >
+                    {emp.isAdvisor ? "Remove Advisor" : "Make Advisor"}
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {emp.isAdvisor && (
+                      <button
+                        onClick={() => handleToggleActive(emp)}
+                        className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                      >
+                        {emp.isActive !== false ? "Deactivate" : "Activate"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenEditExpert(emp)}
+                      className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteExpert(emp.f2FintechId || emp.id)}
+                      className="text-rose-500 hover:underline text-[11px] font-bold cursor-pointer transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
@@ -106,7 +283,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [employees, setEmployees] = useState<Advisor[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
-  const [employeeSearch, setEmployeeSearch] = useState("");
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
@@ -366,15 +542,27 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
+  const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterLoanType, setFilterLoanType] = useState<string>("all");
+  
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
 
-  // Reset page when filterDate or filterRole changes
+  const todayStr = (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
+  // Reset page when filterDate, filterEndDate, filterRole, or filterLoanType changes
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterRole]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType]);
+
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
     // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
@@ -392,8 +580,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (!isFetchedByMe) return false;
     }
 
-    // 1. Filter by Date
-    if (filterDate) {
+    // 1. Filter by Date (Start & End Date range)
+    if (filterDate || filterEndDate) {
       if (!enq.fetched_at) return false;
       const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
       const localDate = new Date(utcStr);
@@ -401,7 +589,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       const month = String(localDate.getMonth() + 1).padStart(2, '0');
       const day = String(localDate.getDate()).padStart(2, '0');
       const localDateStr = `${year}-${month}-${day}`;
-      if (localDateStr !== filterDate) return false;
+      
+      if (filterDate && filterEndDate) {
+        if (localDateStr < filterDate || localDateStr > filterEndDate) return false;
+      } else if (filterDate) {
+        if (localDateStr !== filterDate) return false;
+      } else if (filterEndDate) {
+        if (localDateStr > filterEndDate) return false;
+      }
     }
 
     // 2. Filter by Role
@@ -410,8 +605,51 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (role !== filterRole) return false;
     }
 
+    // 3. Filter by Loan Type
+    if (filterLoanType !== "all") {
+      const activeAccounts = (enq.accounts || []).filter(
+        (acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1
+      );
+      const hasMatchingLoan = activeAccounts.some((acc: any) => {
+        const typeClean = (acc.type || "").toLowerCase();
+        if (filterLoanType === "home") return typeClean.includes("home") || typeClean.includes("housing");
+        if (filterLoanType === "personal") return typeClean.includes("personal");
+        if (filterLoanType === "professional") return typeClean.includes("professional");
+        if (filterLoanType === "creditcard") return typeClean.includes("card") || typeClean.includes("cc");
+        if (filterLoanType === "auto") return typeClean.includes("auto") || typeClean.includes("car") || typeClean.includes("vehicle") || typeClean.includes("wheeler");
+        if (filterLoanType === "business") return typeClean.includes("business");
+        if (filterLoanType === "gold") return typeClean.includes("gold");
+        if (filterLoanType === "education") return typeClean.includes("education") || typeClean.includes("student");
+        if (filterLoanType === "property") return typeClean.includes("property") || typeClean.includes("lap");
+        if (filterLoanType === "other") {
+          const isMatchedByAnyKnown = ["home", "housing", "personal", "professional", "card", "cc", "auto", "car", "vehicle", "wheeler", "business", "gold", "education", "student", "property", "lap"].some(
+            keyword => typeClean.includes(keyword)
+          );
+          return !isMatchedByAnyKnown;
+        }
+        return false;
+      });
+      if (!hasMatchingLoan) return false;
+    }
+
     return true;
   });
+
+  const getDateFilterDescription = () => {
+    if (filterDate && filterEndDate) {
+      if (filterDate === filterEndDate) {
+        return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      }
+      return `Showing records fetched between ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterDate) {
+      return `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    if (filterEndDate) {
+      return `Showing records fetched up to ${new Date(filterEndDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+    return "Showing all credit score fetches across the platform.";
+  };
 
   const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
   const safeCibilPage = Math.min(cibilPage, totalPages);
@@ -420,67 +658,360 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     safeCibilPage * cibilPageSize
   );
 
-  const handleExportCSV = () => {
+  const escapeXml = (unsafe: string) => {
+    if (!unsafe) return "";
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
+  const getColumnLetter = (colIndex: number) => {
+    let temp = colIndex;
+    let letter = "";
+    while (temp > 0) {
+      let modulo = (temp - 1) % 26;
+      letter = String.fromCharCode(65 + modulo) + letter;
+      temp = Math.floor((temp - modulo) / 26);
+    }
+    return letter;
+  };
+
+  const handleExportExcel = () => {
     if (filteredEnquiries.length === 0) return;
 
-    // Header row
-    const headers = ["Name", "Phone", "Email", "CIBIL Score", "Bureau", "Existing Open Accounts", "Date Fetched"];
+    // 1. Helper function for CRC32 calculation
+    const makeCRCTable = () => {
+      let c;
+      const crcTable = [];
+      for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+          c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        crcTable[n] = c;
+      }
+      return crcTable;
+    };
 
-    // Map rows
-    const rows = filteredEnquiries.map(enq => {
-      // 1. Get only active (open) accounts
-      const activeAccountsList = (enq.accounts || []).filter((acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1);
+    const crcTable = makeCRCTable();
 
-      // 2. Format active accounts list
-      const formattedAccounts = activeAccountsList.length > 0
-        ? activeAccountsList.map((acc: any) => {
-          const bal = acc.outstanding_balance !== undefined ? acc.outstanding_balance : 0;
-          return `${acc.lender} (${acc.type}) - Bal: Rs.${bal}`;
-        }).join("; ")
-        : "No open accounts";
+    const calculateCrc32 = (bytes: Uint8Array) => {
+      let crc = 0 ^ (-1);
+      for (let i = 0; i < bytes.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xFF];
+      }
+      return (crc ^ (-1)) >>> 0;
+    };
 
-      // 3. Date formatting
-      const dateFormatted = enq.fetched_at
-        ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
-        : "-";
+    // 2. Helper function to create an uncompressed ZIP file
+    const createZipBlob = (files: { name: string; content: string }[]) => {
+      const encoder = new TextEncoder();
+      const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
+      let currentOffset = 0;
+      const parts: BlobPart[] = [];
 
-      return [
-        enq.name || "Guest",
-        enq.phone || "-",
-        enq.email || "-",
-        enq.score || "-",
-        enq.bureau || "CIBIL",
-        formattedAccounts,
-        dateFormatted
-      ];
+      files.forEach((file) => {
+        const nameBytes = encoder.encode(file.name);
+        const contentBytes = encoder.encode(file.content);
+        const crc = calculateCrc32(contentBytes);
+
+        const header = new Uint8Array(30 + nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x04034b50, true); // Local file header signature
+        view.setUint16(4, 10, true);         // Version needed to extract
+        view.setUint16(6, 0, true);          // General purpose bit flag
+        view.setUint16(8, 0, true);          // Compression method (0 = Store)
+        view.setUint32(10, 0, true);         // Last mod time / date (not set)
+        view.setUint32(14, crc, true);       // CRC-32
+        view.setUint32(18, contentBytes.length, true); // Compressed size
+        view.setUint32(22, contentBytes.length, true); // Uncompressed size
+        view.setUint16(26, nameBytes.length, true);    // File name length
+        view.setUint16(28, 0, true);         // Extra field length
+
+        header.set(nameBytes, 30);
+
+        zipData.push({
+          nameBytes,
+          contentBytes,
+          crc,
+          offset: currentOffset
+        });
+
+        parts.push(header);
+        parts.push(contentBytes);
+
+        currentOffset += header.length + contentBytes.length;
+      });
+
+      const centralDirectoryOffset = currentOffset;
+      let centralDirectorySize = 0;
+
+      zipData.forEach((file) => {
+        const header = new Uint8Array(46 + file.nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x02014b50, true); // Central file header signature
+        view.setUint16(4, 20, true);         // Version made by
+        view.setUint16(6, 10, true);         // Version needed to extract
+        view.setUint16(8, 0, true);          // General purpose bit flag
+        view.setUint16(10, 0, true);         // Compression method (Store)
+        view.setUint32(12, 0, true);         // Last mod time / date
+        view.setUint32(16, file.crc, true);  // CRC-32
+        view.setUint32(20, file.contentBytes.length, true); // Compressed size
+        view.setUint32(24, file.contentBytes.length, true); // Uncompressed size
+        view.setUint16(28, file.nameBytes.length, true);    // File name length
+        view.setUint16(30, 0, true);         // Extra field length
+        view.setUint16(32, 0, true);         // File comment length
+        view.setUint16(34, 0, true);         // Disk number start
+        view.setUint16(36, 0, true);         // Internal file attributes
+        view.setUint32(38, 0, true);         // External file attributes
+        view.setUint32(42, file.offset, true); // Local header offset
+
+        header.set(file.nameBytes, 46);
+        parts.push(header);
+
+        centralDirectorySize += header.length;
+        currentOffset += header.length;
+      });
+
+      const eocd = new Uint8Array(22);
+      const view = new DataView(eocd.buffer);
+
+      view.setUint32(0, 0x06054b50, true); // End of central dir signature
+      view.setUint16(4, 0, true);          // Number of this disk
+      view.setUint16(6, 0, true);          // Disk where central dir starts
+      view.setUint16(8, files.length, true); // Directory records on this disk
+      view.setUint16(10, files.length, true); // Total directory records
+      view.setUint32(12, centralDirectorySize, true); // Size of central dir
+      view.setUint32(16, centralDirectoryOffset, true); // Offset of central dir
+      view.setUint16(20, 0, true);         // Comment length
+
+      parts.push(eocd);
+
+      return new Blob(parts, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    };
+
+    // 3. Split data
+    const under700 = filteredEnquiries.filter(enq => {
+      const scoreVal = Number(enq.score);
+      return isNaN(scoreVal) || scoreVal < 700;
+    });
+    const above700 = filteredEnquiries.filter(enq => {
+      const scoreVal = Number(enq.score);
+      return !isNaN(scoreVal) && scoreVal >= 700;
     });
 
-    // Convert to CSV string, escaping quotes
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row =>
-        row.map(val => {
-          const strVal = String(val);
-          // Escape double quotes by doubling them
-          const escaped = strVal.replace(/"/g, '""');
-          // If it contains commas, quotes, or newlines, wrap in quotes
-          if (escaped.includes(",") || escaped.includes('"') || escaped.includes("\n") || escaped.includes(";")) {
-            return `"${escaped}"`;
-          }
-          return escaped;
-        }).join(",")
-      )
-    ].join("\n");
+    const loanTypesConfig = [
+      { key: "home_loan", label: "Home Loan" },
+      { key: "personal_loan", label: "Personal Loan" },
+      { key: "professional_loan", label: "Professional Loan" },
+      { key: "car_loan", label: "Car Loan" },
+      { key: "credit_card", label: "Credit Card" },
+      { key: "education_loan", label: "Education Loan" },
+      { key: "business_loan", label: "Business Loan" },
+      { key: "gold_loan", label: "Gold Loan" },
+      { key: "other_loans", label: "Other Loan" }
+    ];
 
-    // Create Blob and trigger download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const maxLoanCounts: Record<string, number> = {};
+    loanTypesConfig.forEach(cfg => {
+      let maxCount = 0;
+      filteredEnquiries.forEach(enq => {
+        const val = enq[cfg.key];
+        if (val) {
+          const count = val.split("; ").filter(Boolean).length;
+          if (count > maxCount) {
+            maxCount = count;
+          }
+        }
+      });
+      maxLoanCounts[cfg.key] = maxCount;
+    });
+
+    const generateWorksheetXml = (data: any[]) => {
+      const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
+      const loanCols: { key: string; label: string; count: number }[] = [];
+      
+      loanTypesConfig.forEach(cfg => {
+        const count = maxLoanCounts[cfg.key] || 0;
+        if (count > 0) {
+          loanCols.push({ key: cfg.key, label: cfg.label, count });
+          for (let i = 0; i < count; i++) {
+            headers.push(count > 1 ? `${cfg.label} ${i + 1}` : cfg.label);
+          }
+        }
+      });
+
+      const totalCols = headers.length;
+      const lastColLetter = getColumnLetter(totalCols);
+
+      let sheetDataXml = "";
+      
+      // Header row
+      sheetDataXml += `    <row r="1" spans="1:${totalCols}">\n`;
+      headers.forEach((h, idx) => {
+        const r = `${getColumnLetter(idx + 1)}1`;
+        sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
+      });
+      sheetDataXml += `    </row>\n`;
+
+      // Data rows
+      data.forEach((enq, rowIdx) => {
+        const rowIndex = rowIdx + 2;
+        sheetDataXml += `    <row r="${rowIndex}" spans="1:${totalCols}">\n`;
+
+        const dateFormatted = enq.fetched_at
+          ? new Date(enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`).toLocaleString("en-IN")
+          : "-";
+
+        const fields = [
+          enq.name || "Guest",
+          enq.phone || "-",
+          enq.pan || "-",
+          enq.score !== undefined && enq.score !== null ? String(enq.score) : "-",
+          enq.email || "-",
+          enq.bureau || "CIBIL",
+          dateFormatted
+        ];
+
+        loanCols.forEach(col => {
+          const val = enq[col.key] || "";
+          const loansList = val.split("; ").filter(Boolean);
+          for (let i = 0; i < col.count; i++) {
+            if (i < loansList.length) {
+              fields.push(loansList[i]);
+            } else {
+              fields.push("-");
+            }
+          }
+        });
+
+        fields.forEach((val, colIdx) => {
+          const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
+          const isNumber = colIdx === 3 && !isNaN(Number(val)) && val !== "-";
+          if (isNumber) {
+            sheetDataXml += `      <c r="${r}" s="2" t="n"><v>${val}</v></c>\n`;
+          } else {
+            sheetDataXml += `      <c r="${r}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>\n`;
+          }
+        });
+
+        sheetDataXml += `    </row>\n`;
+      });
+
+      let colsXml = "  <cols>\n";
+      colsXml += `    <col min="1" max="1" width="22" customWidth="1"/>\n`; // Name
+      colsXml += `    <col min="2" max="2" width="16" customWidth="1"/>\n`; // Phone
+      colsXml += `    <col min="3" max="3" width="16" customWidth="1"/>\n`; // PAN
+      colsXml += `    <col min="4" max="4" width="14" customWidth="1"/>\n`; // CIBIL Score
+      colsXml += `    <col min="5" max="5" width="26" customWidth="1"/>\n`; // Email
+      colsXml += `    <col min="6" max="6" width="12" customWidth="1"/>\n`; // Bureau
+      colsXml += `    <col min="7" max="7" width="20" customWidth="1"/>\n`; // Date Fetched
+      if (totalCols > 7) {
+        colsXml += `    <col min="8" max="${totalCols}" width="35" customWidth="1"/>\n`; // Dynamic Loans
+      }
+      colsXml += "  </cols>\n";
+
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:${lastColLetter}${data.length + 1}"/>
+${colsXml}
+  <sheetData>
+${sheetDataXml}
+  </sheetData>
+</worksheet>`;
+    };
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+    const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Leads CIBIL under 700" sheetId="1" r:id="rId1"/>
+    <sheet name="Leads CIBIL 700 and above" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/></font>
+    <font><b/><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FFFFFFFF"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border/>
+    <border>
+      <left style="thin"><color rgb="FFD1D5DB"/></left>
+      <right style="thin"><color rgb="FFD1D5DB"/></right>
+      <top style="thin"><color rgb="FFD1D5DB"/></top>
+      <bottom style="thin"><color rgb="FFD1D5DB"/></bottom>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="3">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+  </cellXfs>
+</styleSheet>`;
+
+    const sheet1Xml = generateWorksheetXml(under700);
+    const sheet2Xml = generateWorksheetXml(above700);
+
+    const files = [
+      { name: "[Content_Types].xml", content: contentTypesXml },
+      { name: "_rels/.rels", content: relsXml },
+      { name: "xl/workbook.xml", content: workbookXml },
+      { name: "xl/_rels/workbook.xml.rels", content: workbookRelsXml },
+      { name: "xl/styles.xml", content: stylesXml },
+      { name: "xl/worksheets/sheet1.xml", content: sheet1Xml },
+      { name: "xl/worksheets/sheet2.xml", content: sheet2Xml }
+    ];
+
+    const blob = createZipBlob(files);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split('T')[0];
 
-    const roleName = filterRole === "all" ? "All" : filterRole === "User" ? "Leads" : filterRole;
-    const dateStr = filterDate ? `_${filterDate}` : "";
     link.setAttribute("href", url);
-    link.setAttribute("download", `FinHeal_CIBIL_${roleName}_Enquiries${dateStr}.csv`);
+    link.setAttribute("download", `leads_${dateStr}.xlsx`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -534,7 +1065,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      const res = await fetch(`${apiBase}/cibil/enquiries`, { headers });
+      const res = await fetch(`${apiBase}/cibil/leads`, { headers });
       if (res.ok) {
         const data = await res.json();
         setCibilEnquiries(data);
@@ -2040,9 +2571,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                       </h3>
                       <p className="text-[10px] text-gray-400 mt-[2px]">
-                        {filterDate
-                          ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                          : "Showing all credit score fetches across the platform."}
+                        {getDateFilterDescription()}
                       </p>
                     </div>
 
@@ -2076,46 +2605,82 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                   <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Enquiry Made By:</span>
+                      <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
                       <select
                         value={filterRole}
                         onChange={(e) => setFilterRole(e.target.value)}
                         className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
                       >
                         <option value="all">All Enquirers</option>
-                        <option value="User">Regular Users (Leads)</option>
+                        <option value="User">Users (Leads)</option>
                         <option value="Admin">Admins</option>
                         <option value="Manager">Managers</option>
                         <option value="Senior Leadership">Senior Leadership</option>
                       </select>
                     </div>
 
+                    {/* Active Loan Type Filter Selector */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
+                      <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                      <select
+                        value={filterLoanType}
+                        onChange={(e) => setFilterLoanType(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Loan Types</option>
+                        <option value="home">Home Loan</option>
+                        <option value="personal">Personal Loan</option>
+                        <option value="professional">Professional Loan</option>
+                        <option value="creditcard">Credit Card</option>
+                        <option value="auto">Auto / Vehicle Loan</option>
+                        <option value="business">Business Loan</option>
+                        <option value="gold">Gold Loan</option>
+                        <option value="education">Education Loan</option>
+                        <option value="property">Loan Against Property (LAP)</option>
+                        <option value="other">Other Loans</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
                       <input
                         type="date"
                         value={filterDate}
                         onChange={(e) => setFilterDate(e.target.value)}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       />
-                      {(filterDate || filterRole !== "all") && (
-                        <button
-                          onClick={() => { setFilterDate(""); setFilterRole("all"); }}
-                          className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-600 cursor-pointer transition"
-                        >
-                          Reset Filters
-                        </button>
-                      )}
-                      {filteredEnquiries.length > 0 && (
-                        <button
-                          onClick={handleExportCSV}
-                          className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                          title="Export leads to Excel/CSV sheet"
-                        >
-                          📥 Export Leads
-                        </button>
-                      )}
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                      <input
+                        type="date"
+                        value={filterEndDate}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                        max={todayStr}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                      <button
+                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                      >
+                        Reset Filters
+                      </button>
+                    )}
+
+                    {filteredEnquiries.length > 0 && (
+                      <button
+                        onClick={handleExportExcel}
+                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                        title="Export leads to Excel workbook (.xlsx)"
+                      >
+                        📥 Export Leads
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2243,164 +2808,44 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                     </tbody>
                   </table>
                 </div>
+                {/* Bottom Pagination Controls */}
+                {filteredEnquiries.length > 0 && (
+                  <div className="flex items-center justify-end gap-1.5 pt-2">
+                    <button
+                      disabled={safeCibilPage === 1}
+                      onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                      className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                      title="Previous Page"
+                    >
+                      ←
+                    </button>
+                    <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                      {safeCibilPage} / {totalPages}
+                    </span>
+                    <button
+                      disabled={safeCibilPage === totalPages}
+                      onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                      className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-600 transition flex items-center justify-center cursor-pointer"
+                      title="Next Page"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
             {/* TAB: EMPLOYEES DIRECTORY */}
             {activeTab === "employees" && (
-              <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">
-                      Employees Directory ({employees.filter(emp => {
-                        const search = employeeSearch.toLowerCase().trim();
-                        if (!search) return true;
-                        return (
-                          (emp.name || "").toLowerCase().includes(search) ||
-                          (emp.designation || "").toLowerCase().includes(search) ||
-                          (emp.department || "").toLowerCase().includes(search) ||
-                          (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
-                        );
-                      }).length})
-                    </h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">
-                      Manage company employee records and toggle active client-facing advisors.
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      value={employeeSearch}
-                      onChange={e => setEmployeeSearch(e.target.value)}
-                      placeholder="Search employees by name, ID, dept..."
-                      className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
-                    />
-                    <button
-                      onClick={handleOpenAddExpert}
-                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
-                    >
-                      + Add Employee
-                    </button>
-                  </div>
-                </div>
-
-                {employeesLoading ? (
-                  <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
-                ) : employees.length === 0 ? (
-                  <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
-                    No employee profiles created yet.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
-                    {employees.filter(emp => {
-                      const search = employeeSearch.toLowerCase().trim();
-                      if (!search) return true;
-                      return (
-                        (emp.name || "").toLowerCase().includes(search) ||
-                        (emp.designation || "").toLowerCase().includes(search) ||
-                        (emp.department || "").toLowerCase().includes(search) ||
-                        (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
-                      );
-                    }).map((emp) => {
-                      const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
-                      const isAvailable = emp.availability === "available";
-                      
-                      return (
-                        <div key={emp.id} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                          <div className={`absolute top-0 left-0 w-full h-[3px] transition-colors duration-300 ${emp.isAdvisor ? 'bg-primary' : 'bg-gray-200'}`}></div>
-                          
-                          <div className="flex items-start gap-[12px] mt-1">
-                            <div className="relative shrink-0">
-                              {emp.avatarUrl ? (
-                                <img
-                                  src={emp.avatarUrl}
-                                  alt={emp.name}
-                                  className="w-[48px] h-[48px] rounded-xl object-cover border"
-                                />
-                              ) : (
-                                <div className="w-[48px] h-[48px] rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-[18px] uppercase">
-                                  {emp.name ? emp.name.charAt(0) : "U"}
-                                </div>
-                              )}
-                              <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${isAvailable ? 'bg-emerald-500' : 'bg-gray-400'}`} title={isAvailable ? 'Available' : 'Unavailable'}></span>
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-bold text-gray-900 truncate leading-snug">{emp.name}</h4>
-                              <div className="text-[10px] text-gray-400 truncate mt-[1px]">{emp.designation}</div>
-                              <div className="text-[9.5px] font-bold text-primary/80 uppercase mt-[4px] tracking-wider">{emp.department || "General"}</div>
-                            </div>
-                          </div>
-
-                          <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[4px] text-[11px] text-gray-600">
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Employee ID</span>
-                              <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Email</span>
-                              <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
-                            </div>
-                            {emp.isAdvisor && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-400">Rating</span>
-                                <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Status</span>
-                              <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {emp.isActive !== false ? 'Active' : 'Deactivated'}
-                              </span>
-                            </div>
-                            {emp.isActive === false && emp.deactivationReason && (
-                               <div className="flex justify-between text-[10px]">
-                                 <span className="text-gray-400">Reason</span>
-                                 <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
-                                   {emp.deactivationReason}
-                                 </span>
-                               </div>
-                            )}
-                          </div>
-
-                          <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
-                            <button
-                              onClick={() => handleToggleAdvisorRole(emp.f2FintechId || emp.id, emp.isAdvisor || false)}
-                              className={`flex items-center gap-[6px] px-[10px] py-[4px] rounded-[8px] text-[10px] font-bold border transition ${emp.isAdvisor 
-                                ? 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100' 
-                                : 'bg-primary/5 border-primary/10 text-primary hover:bg-primary/10'}`}
-                            >
-                              {emp.isAdvisor ? "Remove Advisor" : "Make Advisor"}
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleToggleActive(emp)}
-                                className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
-                              >
-                                {emp.isActive !== false ? "Deactivate" : "Activate"}
-                              </button>
-                              <button
-                                onClick={() => handleOpenEditExpert(emp)}
-                                className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteExpert(emp.f2FintechId || emp.id)}
-                                className="text-rose-500 hover:underline text-[11px] font-bold cursor-pointer transition"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <EmployeeDirectory
+                employees={employees}
+                employeesLoading={employeesLoading}
+                handleOpenAddExpert={handleOpenAddExpert}
+                handleToggleAdvisorRole={handleToggleAdvisorRole}
+                handleToggleActive={handleToggleActive}
+                handleOpenEditExpert={handleOpenEditExpert}
+                handleDeleteExpert={handleDeleteExpert}
+              />
             )}
           </div>
         ) : (
@@ -3156,9 +3601,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                             📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
                           </h3>
                           <p className="text-[10px] text-gray-400 mt-[2px]">
-                            {filterDate
-                              ? `Showing records fetched on ${new Date(filterDate).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}`
-                              : "Showing all credit score fetches across the platform."}
+                            {getDateFilterDescription()}
                           </p>
                         </div>
 
@@ -3190,29 +3633,60 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
                       {/* Row 2: Filters & Export */}
                       <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                        {/* Active Loan Type Filter Selector */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Date:</span>
-                          <input
-                            type="date"
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                          />
-                          {(filterDate || filterRole !== "all") && (
-                            <button
-                              onClick={() => { setFilterDate(""); setFilterRole("all"); }}
-                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                            >
-                              Reset Filters
-                            </button>
-                          )}
+                          <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                          <select
+                            value={filterLoanType}
+                            onChange={(e) => setFilterLoanType(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Loan Types</option>
+                            <option value="home">Home Loan</option>
+                            <option value="personal">Personal Loan</option>
+                            <option value="professional">Professional Loan</option>
+                            <option value="creditcard">Credit Card</option>
+                            <option value="auto">Auto / Vehicle Loan</option>
+                            <option value="business">Business Loan</option>
+                            <option value="gold">Gold Loan</option>
+                            <option value="education">Education Loan</option>
+                            <option value="property">Loan Against Property (LAP)</option>
+                            <option value="other">Other Loans</option>
+                          </select>
+                        </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                            <input
+                              type="date"
+                              value={filterDate}
+                              onChange={(e) => setFilterDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                            <input
+                              type="date"
+                              value={filterEndDate}
+                              onChange={(e) => setFilterEndDate(e.target.value)}
+                              max={todayStr}
+                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                            />
+                            {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                              <button
+                                onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                                className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                              >
+                                Reset Filters
+                              </button>
+                            )}
                           {filteredEnquiries.length > 0 && (
                             <button
-                              onClick={handleExportCSV}
+                              onClick={handleExportExcel}
                               className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                              title="Export leads to Excel/CSV sheet"
+                              title="Export leads to Excel workbook (.xlsx)"
                             >
-                              📥 Export Leads
+                              📥 Export Leads (Excel)
                             </button>
                           )}
                         </div>
@@ -3343,6 +3817,30 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
                         </tbody>
                       </table>
                     </div>
+                    {/* Bottom Pagination Controls */}
+                    {filteredEnquiries.length > 0 && (
+                      <div className="flex items-center justify-end gap-1.5 pt-2">
+                        <button
+                          disabled={safeCibilPage === 1}
+                          onClick={() => setCibilPage(prev => Math.max(prev - 1, 1))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                          title="Previous Page"
+                        >
+                          ←
+                        </button>
+                        <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                          {safeCibilPage} / {totalPages}
+                        </span>
+                        <button
+                          disabled={safeCibilPage === totalPages}
+                          onClick={() => setCibilPage(prev => Math.min(prev + 1, totalPages))}
+                          className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                          title="Next Page"
+                        >
+                          →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
