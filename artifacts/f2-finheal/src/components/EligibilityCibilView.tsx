@@ -367,11 +367,14 @@ export default function EligibilityCibilView({
     async function loadStoredReport() {
       try {
         setCibilLoading(true);
+        // Do not auto-load stored report on mount/refresh to ensure a blank checker page
+        /*
         const report = await getStoredCibilReport(userId);
         if (report) {
           setStoredCibilReport(report);
           setCibilReport(report);
         }
+        */
       } catch (err) {
         console.log("No stored CIBIL report found on mount:", err);
       } finally {
