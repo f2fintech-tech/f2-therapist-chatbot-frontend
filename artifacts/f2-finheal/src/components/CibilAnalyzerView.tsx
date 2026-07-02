@@ -247,6 +247,7 @@ export default function CibilAnalyzerView({
       // Trigger update event to notify wellness score sidebar
       const event = new CustomEvent("finheal:wellness_update");
       window.dispatchEvent(event);
+      window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
       toast({ 
         title: "Fetch Failed", 

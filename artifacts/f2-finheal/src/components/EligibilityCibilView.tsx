@@ -498,6 +498,7 @@ export default function EligibilityCibilView({
       setCibilError(null);
       toast({ title: "Report Retrieved!", description: `${cibilBureau.toUpperCase()} Score: ${result.score}` });
       window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+      window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
       const errorMsg = err.message || "Failed to fetch score.";
       if (errorMsg.toLowerCase().includes("no credit record") || errorMsg.toLowerCase().includes("no record")) {
