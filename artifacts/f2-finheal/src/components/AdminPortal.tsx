@@ -286,6 +286,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+  const [filterAdvisor, setFilterAdvisor] = useState<string>("all");
+  const [filterTestName, setFilterTestName] = useState<string>("all");
 
   // Lenders Catalog States
   const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
@@ -2140,6 +2142,36 @@ ${sheetDataXml}
   const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
+  const filteredAppointments = allAppointments.filter((appt) => {
+    if (filterAdvisor !== "all") {
+      const matchAdv = advisors.find(a => (a.f2FintechId || a.id) === filterAdvisor || a.id === filterAdvisor);
+      if (matchAdv) {
+        const matchId = matchAdv.id;
+        const matchF2Id = matchAdv.f2FintechId || "";
+        
+        const apptAdvIdClean = (appt.advisorId || "").toLowerCase().trim();
+        const selectIdClean = matchId.toLowerCase().trim();
+        const selectF2IdClean = matchF2Id.toLowerCase().trim();
+        
+        if (apptAdvIdClean !== selectIdClean && apptAdvIdClean !== selectF2IdClean) {
+          return false;
+        }
+      } else {
+        if ((appt.advisorId || "").toLowerCase().trim() !== filterAdvisor.toLowerCase().trim()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  const filteredTests = testCatalog.filter((test) => {
+    if (filterTestName !== "all" && test.title !== filterTestName) {
+      return false;
+    }
+    return true;
+  });
+
   // ==================== RENDERING WORKSPACE ====================
   if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
     return (
@@ -2398,14 +2430,37 @@ ${sheetDataXml}
             {/* TAB: MANAGE TESTS */}
             {activeTab === "tests" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({testCatalog.length})</h3>
-                  <button
-                    onClick={handleOpenAddTest}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add New Test
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Test Title Filter Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
+                      <select
+                        value={filterTestName}
+                        onChange={(e) => setFilterTestName(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Tests</option>
+                        {testCatalog.map((test) => (
+                          <option key={test.id} value={test.title}>
+                            {test.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddTest}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add New Test
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2420,7 +2475,14 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {testCatalog.map((test) => (
+                      {filteredTests.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center p-6 text-gray-400">
+                            No health tests match the selected filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTests.map((test) => (
                         <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] max-w-[200px]">
                             <strong className="text-gray-900 block truncate">{test.title}</strong>
@@ -2444,7 +2506,8 @@ ${sheetDataXml}
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                     </tbody>
                   </table>
                 </div>
@@ -2454,16 +2517,42 @@ ${sheetDataXml}
             {/* TAB: SCHEDULED CALLS FEED */}
             {activeTab === "appointments" && (
               <div className="space-y-[16px] animate-fade-in">
-                <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({allAppointments.length})</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                  </div>
+                  
+                  {/* Advisor Filter Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Advisor:</span>
+                    <select
+                      value={filterAdvisor}
+                      onChange={(e) => setFilterAdvisor(e.target.value)}
+                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                    >
+                      <option value="all">All Advisors</option>
+                      {advisors.map((adv) => (
+                        <option key={adv.id} value={adv.f2FintechId || adv.id}>
+                          {adv.name} ({adv.f2FintechId || adv.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                {allAppointments.length === 0 ? (
+                {filteredAppointments.length === 0 ? (
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
-                    <div className="text-[12px] text-gray-400 mt-[6px]">No scheduled calls have been booked on the platform yet.</div>
+                    <div className="text-[12px] text-gray-400 mt-[6px]">
+                      {filterAdvisor !== "all" 
+                        ? "No scheduled calls found for this particular advisor." 
+                        : "No scheduled calls have been booked on the platform yet."}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-[10px]">
-                    {allAppointments.map((appt, idx) => (
+                    {filteredAppointments.map((appt, idx) => (
                       <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
                         <div className="space-y-[4px]">
                           <div className="flex items-center gap-[8px] flex-wrap">
