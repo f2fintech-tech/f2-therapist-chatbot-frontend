@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -932,12 +932,40 @@ export default function Dashboard({
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [cibilLoading, setCibilLoading] = useState(false);
+  const [selectedBureauTab, setSelectedBureauTab] = useState<"cibil" | "experian">("cibil");
 
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
   const [advisors, setAdvisors] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [summaryDeptFilter, setSummaryDeptFilter] = useState<string>("all");
+
+  const loadCibilEnquiries = useCallback(() => {
+    const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+    setCibilLoading(true);
+    const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (configuredApiKey) {
+      headers["Authorization"] = `Bearer ${configuredApiKey}`;
+      headers["X-API-Key"] = configuredApiKey;
+    }
+    if (userId) {
+      headers["X-Requester-ID"] = userId;
+    }
+    fetch(`${apiBase}/cibil/enquiries`, { headers })
+      .then(res => res.json())
+      .then(data => setCibilEnquiries(data))
+      .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
+      .finally(() => setCibilLoading(false));
+  }, [userId]);
+
+  useEffect(() => {
+    window.addEventListener("finheal:cibil_update", loadCibilEnquiries);
+    return () => {
+      window.removeEventListener("finheal:cibil_update", loadCibilEnquiries);
+    };
+  }, [loadCibilEnquiries]);
+
 
   useEffect(() => {
     if (!isAdvisor) return;
@@ -995,28 +1023,14 @@ export default function Dashboard({
       .catch(err => console.error("Error loading lenders in dashboard", err));
 
     // Fetch CIBIL Enquiries
-    setCibilLoading(true);
-    const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (configuredApiKey) {
-      headers["Authorization"] = `Bearer ${configuredApiKey}`;
-      headers["X-API-Key"] = configuredApiKey;
-    }
-    if (userId) {
-      headers["X-Requester-ID"] = userId;
-    }
-    fetch(`${apiBase}/cibil/enquiries`, { headers })
-      .then(res => res.json())
-      .then(data => setCibilEnquiries(data))
-      .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
-      .finally(() => setCibilLoading(false));
+    loadCibilEnquiries();
 
     // Fetch all employees/advisors for fetch summary
     fetchAdvisors(undefined, true)
       .then(data => setEmployees(data))
       .catch(err => console.error("Error loading employees in dashboard", err));
 
-  }, [isAdmin]);
+  }, [isAdmin, loadCibilEnquiries]);
 
   // Helper to map date string to day of week
   const getDayOfWeek = (dateStr: string): string => {
@@ -1287,37 +1301,68 @@ export default function Dashboard({
     };
   }, [userId, activeTab]);
 
-  // Calculate CIBIL distribution data for users
-  const userCibilEnquiries = cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User");
-  let excellentCount = 0; // >= 750
-  let goodCount = 0;      // 700 - 749
-  let fairCount = 0;      // 600 - 699
-  let poorCount = 0;      // < 600
+  // Calculate CIBIL score distribution
+  const cibilOnlyEnquiries = cibilEnquiries.filter(enq => !enq.bureau || enq.bureau.toLowerCase() === "cibil");
+  let cibilExcellent = 0;
+  let cibilGood = 0;
+  let cibilFair = 0;
+  let cibilPoor = 0;
 
-  userCibilEnquiries.forEach(enq => {
+  cibilOnlyEnquiries.forEach(enq => {
     const scoreVal = typeof enq.score === "number" ? enq.score : parseInt(enq.score, 10);
     if (isNaN(scoreVal) || scoreVal <= 0) return;
-    if (scoreVal >= 750) excellentCount++;
-    else if (scoreVal >= 700) goodCount++;
-    else if (scoreVal >= 600) fairCount++;
-    else poorCount++;
+    if (scoreVal >= 750) cibilExcellent++;
+    else if (scoreVal >= 700) cibilGood++;
+    else if (scoreVal >= 600) cibilFair++;
+    else cibilPoor++;
   });
 
-  const totalValidScores = excellentCount + goodCount + fairCount + poorCount;
-  const isCibilDemoData = totalValidScores === 0;
+  const totalCibilValidScores = cibilExcellent + cibilGood + cibilFair + cibilPoor;
+  const isCibilDemoData = totalCibilValidScores === 0;
 
-  // Fallback to beautiful mockup counts if no data exists
-  const finalExcellent = isCibilDemoData ? 14 : excellentCount;
-  const finalGood = isCibilDemoData ? 18 : goodCount;
-  const finalFair = isCibilDemoData ? 6 : fairCount;
-  const finalPoor = isCibilDemoData ? 4 : poorCount;
-  const finalTotal = finalExcellent + finalGood + finalFair + finalPoor;
+  const finalCibilExcellent = isCibilDemoData ? 14 : cibilExcellent;
+  const finalCibilGood = isCibilDemoData ? 18 : cibilGood;
+  const finalCibilFair = isCibilDemoData ? 6 : cibilFair;
+  const finalCibilPoor = isCibilDemoData ? 4 : cibilPoor;
+  const finalCibilTotal = finalCibilExcellent + finalCibilGood + finalCibilFair + finalCibilPoor;
 
   const cibilDistributionData = [
-    { name: "Excellent (750+)", value: finalExcellent, color: "#10b981", percent: finalTotal > 0 ? Math.round((finalExcellent / finalTotal) * 100) : 0 },
-    { name: "Good (700-749)", value: finalGood, color: "#3b82f6", percent: finalTotal > 0 ? Math.round((finalGood / finalTotal) * 100) : 0 },
-    { name: "Fair (600-699)", value: finalFair, color: "#f59e0b", percent: finalTotal > 0 ? Math.round((finalFair / finalTotal) * 100) : 0 },
-    { name: "Poor (< 600)", value: finalPoor, color: "#ef4444", percent: finalTotal > 0 ? Math.round((finalPoor / finalTotal) * 100) : 0 }
+    { name: "Excellent (750+)", value: finalCibilExcellent, color: "#10b981", percent: finalCibilTotal > 0 ? Math.round((finalCibilExcellent / finalCibilTotal) * 100) : 0 },
+    { name: "Good (700-749)", value: finalCibilGood, color: "#3b82f6", percent: finalCibilTotal > 0 ? Math.round((finalCibilGood / finalCibilTotal) * 100) : 0 },
+    { name: "Fair (600-699)", value: finalCibilFair, color: "#f59e0b", percent: finalCibilTotal > 0 ? Math.round((finalCibilFair / finalCibilTotal) * 100) : 0 },
+    { name: "Poor (< 600)", value: finalCibilPoor, color: "#ef4444", percent: finalCibilTotal > 0 ? Math.round((finalCibilPoor / finalCibilTotal) * 100) : 0 }
+  ];
+
+  // Calculate Experian score distribution
+  const experianOnlyEnquiries = cibilEnquiries.filter(enq => enq.bureau && enq.bureau.toLowerCase() === "experian");
+  let expExcellent = 0;
+  let expGood = 0;
+  let expFair = 0;
+  let expPoor = 0;
+
+  experianOnlyEnquiries.forEach(enq => {
+    const scoreVal = typeof enq.score === "number" ? enq.score : parseInt(enq.score, 10);
+    if (isNaN(scoreVal) || scoreVal <= 0) return;
+    if (scoreVal >= 750) expExcellent++;
+    else if (scoreVal >= 700) expGood++;
+    else if (scoreVal >= 600) expFair++;
+    else expPoor++;
+  });
+
+  const totalExpValidScores = expExcellent + expGood + expFair + expPoor;
+  const isExpDemoData = totalExpValidScores === 0;
+
+  const finalExpExcellent = isExpDemoData ? 3 : expExcellent;
+  const finalExpGood = isExpDemoData ? 4 : expGood;
+  const finalExpFair = isExpDemoData ? 1 : expFair;
+  const finalExpPoor = isExpDemoData ? 1 : expPoor;
+  const finalExpTotal = finalExpExcellent + finalExpGood + finalExpFair + finalExpPoor;
+
+  const experianDistributionData = [
+    { name: "Excellent (750+)", value: finalExpExcellent, color: "#10b981", percent: finalExpTotal > 0 ? Math.round((finalExpExcellent / finalExpTotal) * 100) : 0 },
+    { name: "Good (700-749)", value: finalExpGood, color: "#3b82f6", percent: finalExpTotal > 0 ? Math.round((finalExpGood / finalExpTotal) * 100) : 0 },
+    { name: "Fair (600-699)", value: finalExpFair, color: "#f59e0b", percent: finalExpTotal > 0 ? Math.round((finalExpFair / finalExpTotal) * 100) : 0 },
+    { name: "Poor (< 600)", value: finalExpPoor, color: "#ef4444", percent: finalExpTotal > 0 ? Math.round((finalExpPoor / finalExpTotal) * 100) : 0 }
   ];
 
   // Calculate sorted advisors list for Super Admin
@@ -1543,8 +1588,8 @@ export default function Dashboard({
                 <StatCard icon="👤" label="Registered Members" value={statsLoading ? "..." : String(backendStats?.registered_users ?? 0)} sub="Signed-up user accounts" color={BRAND} delay={80} />
                 <StatCard icon="📈" label="Conversion Rate" value={statsLoading || !backendStats?.total_users ? "0%" : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`} sub="Guests to members" color="#10b981" delay={160} />
                 <StatCard icon="💬" label="Active Conversations" value={statsLoading ? "..." : String(backendStats?.total_conversations ?? 0)} sub="Total AI chats started" color="#6366f1" delay={240} />
-                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && (!enq.bureau || enq.bureau.toLowerCase() === "cibil")).length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
-                <StatCard icon="📑" label="User Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
+                <StatCard icon="📑" label="CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => !enq.bureau || enq.bureau.toLowerCase() === "cibil").length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
                 <StatCard icon="📞" label="Scheduled Calls" value={String(allAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Active consultations" color="#3b82f6" delay={400} />
                 <StatCard icon="✅" label="Completed Calls" value={String(allAppointments.filter(a => a.completed).length)} sub="Concluded consultations" color="#10b981" delay={480} />
                 <StatCard icon="🧑‍💼" label="Expert Advisors" value={String(advisors.length)} sub="Listed expert professionals" color="#d97706" delay={560} />
@@ -1554,22 +1599,24 @@ export default function Dashboard({
               {/* Additional Visual Panel */}
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
-                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs animate-fade-up" style={{ animationDelay: "100ms" }}>
-                   <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                    🏆 Platform Wellness Average
-                  </h3>
-                  <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                  
-                  <div className="flex items-end gap-[10px] mb-[12px]">
-                    <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
-                    <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
-                    <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
-                      Good Health
-                    </span>
-                  </div>
+                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                      🏆 Platform Wellness Average
+                    </h3>
+                    <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
+                    
+                    <div className="flex items-end gap-[10px] mb-[12px]">
+                      <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
+                      <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
+                      <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
+                        Good Health
+                      </span>
+                    </div>
 
-                  <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
-                    <div className="h-full bg-primary" style={{ width: "68%" }} />
+                    <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
+                      <div className="h-full bg-primary" style={{ width: "68%" }} />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
@@ -1588,84 +1635,115 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* Bureau Score Band Distribution (Donut Chart) */}
+                {/* Bureau Score Band Distribution (Donut Chart with Toggle) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
                   <div>
-                    <div className="flex items-center justify-between mb-[4px]">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 Bureau Score Band Distribution
+                        📊 {selectedBureauTab === "cibil" ? "CIBIL" : "Experian"} Score Band Distribution
                       </h3>
-                      {isCibilDemoData && (
-                        <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-[6px] py-[2px] rounded-[6px] uppercase tracking-wider">
-                          Demo Data
-                        </span>
-                      )}
+                      
+                      {/* Premium Tab Toggles */}
+                      <div className="flex bg-gray-100 p-0.5 rounded-[8px] border border-gray-150 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBureauTab("cibil")}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
+                            selectedBureauTab === "cibil"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          CIBIL ({cibilOnlyEnquiries.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBureauTab("experian")}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
+                            selectedBureauTab === "experian"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          Experian ({experianOnlyEnquiries.length})
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base (CIBIL & Experian).</p>
+                    <p className="text-[12px] text-gray-500 mb-[12px]">
+                      Credit health breakdown of platform user base ({selectedBureauTab === "cibil" ? "CIBIL" : "Experian"}).
+                    </p>
                   </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-6">
-                      {/* Donut Chart */}
-                      <div className="relative flex items-center justify-center w-[130px] h-[130px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={cibilDistributionData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={42}
-                              outerRadius={58}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {cibilDistributionData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  const data = payload[0].payload;
-                                  return (
-                                    <div className="bg-white border border-gray-150 rounded-[10px] p-2.5 shadow-md text-[10.5px]">
-                                      <div className="font-bold" style={{ color: data.color }}>{data.name}</div>
-                                      <div className="text-gray-500 mt-0.5">
-                                        Users: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
-                                      </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-6 my-2">
+                    {/* Donut Chart */}
+                    <div className="relative flex items-center justify-center w-[130px] h-[130px] shrink-0 mx-auto">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={42}
+                            outerRadius={58}
+                            paddingAngle={3}
+                            dataKey="value"
+                          >
+                            {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-white border border-gray-150 rounded-[10px] p-2.5 shadow-md text-[10.5px]">
+                                    <div className="font-bold" style={{ color: data.color }}>{data.name}</div>
+                                    <div className="text-gray-500 mt-0.5">
+                                      Reports: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
                                     </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute flex flex-col items-center justify-center text-center">
-                          <span className="text-[18px] font-bold text-gray-900 leading-none">{totalValidScores}</span>
-                          <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5">Reports</span>
-                        </div>
-                      </div>
-
-                      {/* Legend */}
-                      <div className="flex-1 w-full space-y-1.5">
-                        {cibilDistributionData.map((item) => (
-                          <div key={item.name} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: item.color }} />
-                              <span className="text-gray-600 font-medium">{item.name}</span>
-                            </span>
-                            <span className="font-bold text-gray-800">
-                              {item.value} <span className="text-gray-400 font-normal">({item.percent}%)</span>
-                            </span>
-                          </div>
-                        ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute flex flex-col items-center justify-center text-center">
+                        <span className="text-[18px] font-bold text-gray-900 leading-none">
+                          {selectedBureauTab === "cibil" ? totalCibilValidScores : totalExpValidScores}
+                        </span>
+                        <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5">Reports</span>
                       </div>
                     </div>
 
+                    {/* Legend */}
+                    <div className="flex-1 w-full space-y-1.5">
+                      {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((item) => (
+                        <div key={item.name} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: item.color }} />
+                            <span className="text-gray-600 font-medium">{item.name}</span>
+                          </span>
+                          <span className="font-bold text-gray-800">
+                            {item.value} <span className="text-gray-400 font-normal">({item.percent}%)</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="pt-[12px] text-left text-[10.5px] text-gray-400 border-t border-gray-50 mt-[12px]">
-                    {isCibilDemoData
-                      ? "Score distribution will update automatically as platform users check their CIBIL score."
-                      : "Aggregated score stats filtered to show customer enquiries only."}
+                    {selectedBureauTab === "cibil" ? (
+                      isCibilDemoData
+                        ? "Score distribution will update automatically as platform users check their CIBIL score."
+                        : "Aggregated score stats from database (CIBIL bureau only)."
+                    ) : (
+                      isExpDemoData
+                        ? "Score distribution will update automatically as platform users check their Experian score."
+                        : "Aggregated score stats from database (Experian bureau only)."
+                    )}
                   </div>
                 </div>
               </div>

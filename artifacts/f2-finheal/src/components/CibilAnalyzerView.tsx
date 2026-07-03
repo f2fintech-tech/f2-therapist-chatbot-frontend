@@ -153,11 +153,14 @@ export default function CibilAnalyzerView({
 
       try {
         setIsLoading(true);
+        // Do not auto-load stored report on mount/refresh to ensure a blank checker page
+        /*
         const reportData = await getStoredCibilReport(userId);
         if (reportData) {
           setStoredReport(reportData);
           setReport(reportData);
         }
+        */
       } catch (err) {
         console.log("No stored CIBIL report found on mount:", err);
       } finally {
@@ -246,6 +249,7 @@ export default function CibilAnalyzerView({
       // Trigger update event to notify wellness score sidebar
       const event = new CustomEvent("finheal:wellness_update");
       window.dispatchEvent(event);
+      window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
       toast({ 
         title: "Fetch Failed", 

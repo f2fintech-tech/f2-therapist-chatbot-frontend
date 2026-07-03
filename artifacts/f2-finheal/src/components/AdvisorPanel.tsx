@@ -184,6 +184,9 @@ export default function AdvisorPanel({
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [categoriesList, setCategoriesList] = useState(categories);
   const [advisorReviews, setAdvisorReviews] = useState<Record<string, Appointment[]>>({});
+  const [selectedAdvisorAppointments, setSelectedAdvisorAppointments] = useState<Appointment[]>([]);
+  const [reschedulingAdvisorAppts, setReschedulingAdvisorAppts] = useState<Appointment[]>([]);
+
 
   const loadAdvisors = async () => {
     try {
@@ -258,7 +261,7 @@ export default function AdvisorPanel({
 
     setCategoriesList(baseCategories);
   }, [advisors]);
-  
+
   // Interactive calendar and selection states
   const [dateList, setDateList] = useState<{ dayName: string; dayNum: number; fullStr: string }[]>([]);
   const [selectedDateStr, setSelectedDateStr] = useState<string>("");
@@ -302,6 +305,113 @@ export default function AdvisorPanel({
     4: "Great Consultation! 😄",
     5: "Outstanding! 🏆"
   };
+
+  useEffect(() => {
+    const fetchAdvisorBookings = async () => {
+      if (!selectedAdvisor) {
+        setSelectedAdvisorAppointments([]);
+        return;
+      }
+      try {
+        const list = await fetchAdvisorAppointments(selectedAdvisor.id);
+        setSelectedAdvisorAppointments(list);
+      } catch (e) {
+        console.error("Error fetching advisor appointments:", e);
+        setSelectedAdvisorAppointments([]);
+      }
+    };
+    fetchAdvisorBookings();
+  }, [selectedAdvisor]);
+
+  useEffect(() => {
+    const fetchRescheduleBookings = async () => {
+      if (!reschedulingApptId) {
+        setReschedulingAdvisorAppts([]);
+        return;
+      }
+      const appt = appointments.find(a => a.id === reschedulingApptId || a.advisorId === reschedulingApptId);
+      if (!appt) return;
+      try {
+        const list = await fetchAdvisorAppointments(appt.advisorId);
+        setReschedulingAdvisorAppts(list);
+      } catch (e) {
+        console.error("Error loading reschedule advisor appointments:", e);
+        setReschedulingAdvisorAppts([]);
+      }
+    };
+    fetchRescheduleBookings();
+  }, [reschedulingApptId, appointments]);
+
+
+  // // ANIMATION: BUTTON RIPPLE
+  useEffect(() => {
+    const handleButtonClick = (e: MouseEvent) => {
+      const button = (e.target as HTMLElement).closest(".advisor-view button");
+      if (!button) return;
+      
+      const btnElement = button as HTMLElement;
+      if (btnElement.style.position !== "relative") {
+        btnElement.style.setProperty("position", "relative", "important");
+      }
+      if (btnElement.style.overflow !== "hidden") {
+        btnElement.style.setProperty("overflow", "hidden", "important");
+      }
+      
+      const rect = btnElement.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const ripple = document.createElement("span");
+      ripple.style.position = "absolute";
+      ripple.style.borderRadius = "50%";
+      ripple.style.background = "rgba(255, 255, 255, 0.4)";
+      ripple.style.width = "40px";
+      ripple.style.height = "40px";
+      ripple.style.left = `${x - 20}px`;
+      ripple.style.top = `${y - 20}px`;
+      ripple.style.pointerEvents = "none";
+      ripple.style.transform = "scale(0)";
+      ripple.style.transition = "transform 0.55s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.55s ease";
+      
+      btnElement.appendChild(ripple);
+      
+      requestAnimationFrame(() => {
+        ripple.style.transform = "scale(3.5)";
+        ripple.style.opacity = "0";
+      });
+      
+      setTimeout(() => {
+        ripple.remove();
+      }, 550);
+    };
+    
+    document.addEventListener("click", handleButtonClick);
+    return () => {
+      document.removeEventListener("click", handleButtonClick);
+    };
+  }, []);
+
+  // // ANIMATION: BUTTON SUCCESS
+  useEffect(() => {
+    if (bookingConfirmed) {
+      const btns = document.querySelectorAll(".advisor-view button, .advisor-view .group");
+      btns.forEach((btn) => {
+        if (
+          btn.textContent?.includes("Book") ||
+          btn.textContent?.includes("Pay") ||
+          btn.textContent?.includes("Confirm")
+        ) {
+          const originalHTML = btn.innerHTML;
+          btn.classList.add("booking-success-flash");
+          btn.innerHTML = "✓ Booked!";
+          setTimeout(() => {
+            btn.classList.remove("booking-success-flash");
+            btn.innerHTML = originalHTML;
+          }, 1600);
+        }
+      });
+    }
+  }, [bookingConfirmed]);
 
   const handleOpenFeedbackModal = (appt: Appointment) => {
     setRatingAppt(appt);
@@ -759,27 +869,27 @@ export default function AdvisorPanel({
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px] scrollbar-thin">
         
         {/* BANNER PROMO */}
-        <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
-          <div className="absolute right-[-24px] top-[-24px] h-[120px] w-[120px] rounded-full bg-gradient-to-br from-primary to-[#7c8cff] opacity-10" />
+        <section className="relative overflow-hidden rounded-[24px] border border-transparent bg-primary p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
+          <div className="absolute right-[-24px] top-[-24px] h-[120px] w-[120px] rounded-full bg-white/10 opacity-20" />
           <div className="relative z-10 max-w-[640px]">
             <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
               Personalized Guidance
             </div>
-            <h1 className="font-serif text-[28px] leading-[1.1] text-gray-900 sm:text-[34px]">
+            <h1 className="font-serif text-[28px] leading-[1.1] text-white sm:text-[34px]">
               Solve complex money questions with real-time advisors.
             </h1>
-            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-gray-600 sm:text-[14px]">
+            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-white/80 sm:text-[14px]">
               Get specific, action-oriented strategies on taxes, debt reduction, mutual funds, or home loan options. No sales pitches, just expert guidance.
             </p>
-            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">💬 1 Hour Consultation</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🛡️ Verified Experts</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">⭐ 4.9/5 Advisor Rating</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🔒 Private & Confidential</span>
+            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-white/90">
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">💬 1 Hour Consultation</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">🛡️ Verified Experts</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">⭐ 4.9/5 Advisor Rating</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">🔒 Private & Confidential</span>
             </div>
           </div>
         </section>
-
+        
         {/* UPCOMING APPOINTMENTS SECTION */}
         {activeAppointments.length > 0 && (
           <section className="mt-[20px] animate-fade-up">
@@ -927,20 +1037,28 @@ export default function AdvisorPanel({
                           </div>
                           {rescheduleDate && (
                             <div className="grid grid-cols-3 gap-[6px]">
-                              {timeSlots.map((slot) => (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  onClick={() => setRescheduleTime(slot)}
-                                  className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition cursor-pointer ${
-                                    rescheduleTime === slot
-                                      ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {slot}
-                                </button>
-                              ))}
+                              {timeSlots.map((slot) => {
+                                const isBooked = reschedulingAdvisorAppts.some(
+                                  a => a.date === rescheduleDate && a.time === slot && !a.cancelled
+                                );
+                                return (
+                                  <button
+                                    key={slot}
+                                    type="button"
+                                    disabled={isBooked}
+                                    onClick={() => setRescheduleTime(slot)}
+                                    className={`py-[7px] px-[6px] rounded-[8px] text-[10.5px] font-semibold text-center border transition ${
+                                      isBooked
+                                        ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                        : rescheduleTime === slot
+                                        ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold cursor-pointer"
+                                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+                                    }`}
+                                  >
+                                    {slot}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                           <div className="flex gap-[8px] justify-end pt-[4px]">
@@ -1062,10 +1180,10 @@ export default function AdvisorPanel({
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`flex items-center gap-[6px] px-[14px] py-[8px] rounded-full text-[12px] font-semibold whitespace-nowrap transition cursor-pointer ${
+                className={`shrink-0 flex items-center gap-[6px] px-[14px] py-[8px] rounded-full text-[12px] font-semibold whitespace-nowrap cursor-pointer ${
                   activeCategory === cat.id
-                    ? "bg-primary text-white shadow-md shadow-primary/15 scale-102"
-                    : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                    ? "bg-primary text-white"
+                    : "bg-gray-50 border border-gray-200 text-gray-600"
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -1098,15 +1216,17 @@ export default function AdvisorPanel({
 
           <div className={isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}>
             <section className="mt-[20px]">
-          <div className="mb-[14px] flex flex-wrap items-center justify-between gap-[10px]">
+          <div className="mb-[14px] flex flex-wrap items-center justify-between gap-[12px] w-full">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.9px] text-gray-400 hidden sm:block">Our Trusted Advisors</h2>
-            <div className="flex flex-wrap items-center gap-[12px] ml-auto">
-              <div className="flex items-center gap-[10px] text-[10.5px] text-gray-500 font-medium bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
-                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> Available</span>
-                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></span> In Meeting</span>
-                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></span> Not Available</span>
+            <div className="flex flex-wrap items-center gap-[12px] ml-auto w-full sm:w-auto justify-between sm:justify-end">
+              <div className="flex items-center gap-[10px] text-[10.5px] text-gray-500 font-medium bg-white px-3 py-1.5 rounded-full border border-gray-100">
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Available</span>
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> In Meeting</span>
+                <span className="flex items-center gap-[4px]"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Not Available</span>
               </div>
-              <div className="text-[11px] text-gray-400 font-medium border-l border-gray-200 pl-[12px]">Showing {filteredAdvisors.length} active experts</div>
+              <div className="text-[10.5px] text-gray-500 font-semibold bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200">
+                Showing {filteredAdvisors.length} active experts
+              </div>
             </div>
           </div>
  
@@ -1118,7 +1238,7 @@ export default function AdvisorPanel({
               return (
                 <Card 
                   key={advisor.id} 
-                  className={`relative overflow-hidden border-gray-200 shadow-sm flex flex-col justify-between transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
+                  className={`h-full relative overflow-hidden border border-gray-200 shadow-sm flex flex-col justify-between bg-white ${
                     activeAppt ? "ring-2 ring-primary/20 border-primary/20" : ""
                   }`}
                 >
@@ -1126,17 +1246,11 @@ export default function AdvisorPanel({
                   {/* Visual Availability dot on top right corner */}
                   <div className="absolute top-[20px] right-[20px]">
                     {effectiveAvail === "available" ? (
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
-                      </span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     ) : effectiveAvail === "in meeting" ? (
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></span>
-                      </span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
                     ) : (
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                     )}
                   </div>
 
@@ -1221,34 +1335,38 @@ export default function AdvisorPanel({
                       {activeAppt ? (
                         /* Appt booked visual indicator inside expert card */
                         <div className="w-full">
-                          <div className="bg-emerald-50/70 border border-emerald-100 rounded-[12px] px-[12px] py-[8px] flex items-center justify-between text-[11px] mb-[8px]">
-                            <div>
-                              <div className="text-emerald-800 font-bold">Confirmed booking!</div>
-                              <div className="text-emerald-600 font-medium">{activeAppt.date} at {activeAppt.time}</div>
+                          <div className="bg-emerald-50/70 border border-emerald-100 rounded-[12px] p-[12px] flex flex-col gap-[8px] text-[11px] mb-[8px] text-left">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="text-emerald-800 font-bold">Confirmed booking!</div>
+                                <div className="text-emerald-600 font-medium mt-0.5">{activeAppt.date} at {activeAppt.time}</div>
+                              </div>
                             </div>
-                            <button
-                              onClick={() => {
-                                setCancellingApptId(activeAppt.id || activeAppt.advisorId);
-                                setCancelReason("");
-                                setReschedulingApptId(null);
-                              }}
-                              className="text-rose-500 font-bold hover:underline ml-2 cursor-pointer"
-                              title="Cancel appointment"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => {
-                                setReschedulingApptId(activeAppt.id || activeAppt.advisorId);
-                                setRescheduleDate("");
-                                setRescheduleTime("");
-                                setCancellingApptId(null);
-                              }}
-                              className="text-blue-500 font-bold hover:underline ml-2 cursor-pointer"
-                              title="Reschedule appointment"
-                            >
-                              Reschedule
-                            </button>
+                            <div className="flex gap-[12px] border-t border-emerald-100/50 pt-[8px] justify-end">
+                              <button
+                                onClick={() => {
+                                  setCancellingApptId(activeAppt.id || activeAppt.advisorId);
+                                  setCancelReason("");
+                                  setReschedulingApptId(null);
+                                }}
+                                className="text-rose-500 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                                title="Cancel appointment"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setReschedulingApptId(activeAppt.id || activeAppt.advisorId);
+                                  setRescheduleDate("");
+                                  setRescheduleTime("");
+                                  setCancellingApptId(null);
+                                }}
+                                className="text-blue-500 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                                title="Reschedule appointment"
+                              >
+                                Reschedule
+                              </button>
+                            </div>
                           </div>
                           
                           {cancellingApptId === (activeAppt.id || activeAppt.advisorId) && (
@@ -1304,20 +1422,28 @@ export default function AdvisorPanel({
                               </div>
                               {rescheduleDate && (
                                 <div className="grid grid-cols-3 gap-[4px]">
-                                  {timeSlots.map((slot) => (
-                                    <button
-                                      key={slot}
-                                      type="button"
-                                      onClick={() => setRescheduleTime(slot)}
-                                      className={`py-[5px] px-[4px] rounded-[6px] text-[10px] font-semibold text-center border transition cursor-pointer ${
-                                        rescheduleTime === slot
-                                          ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold"
-                                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                                      }`}
-                                    >
-                                      {slot}
-                                    </button>
-                                  ))}
+                                  {timeSlots.map((slot) => {
+                                    const isBooked = reschedulingAdvisorAppts.some(
+                                      a => a.date === rescheduleDate && a.time === slot && !a.cancelled
+                                    );
+                                    return (
+                                      <button
+                                        key={slot}
+                                        type="button"
+                                        disabled={isBooked}
+                                        onClick={() => setRescheduleTime(slot)}
+                                        className={`py-[5px] px-[4px] rounded-[6px] text-[10px] font-semibold text-center border transition ${
+                                          isBooked
+                                            ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                            : rescheduleTime === slot
+                                            ? "bg-blue-600/10 border-blue-600 text-blue-700 font-bold cursor-pointer"
+                                            : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+                                        }`}
+                                      >
+                                        {slot}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               )}
                               <div className="flex gap-[6px] justify-end pt-[2px]">
@@ -1368,7 +1494,7 @@ export default function AdvisorPanel({
                           </div>
                           <button
                             onClick={() => handleOpenBooking(advisor)}
-                            className="group relative overflow-hidden bg-gradient-to-r from-primary to-[#5b6bf9] text-white font-bold py-[5px] px-[12px] rounded-[6px] text-[10.5px] shadow-[0_2px_8px_rgba(50,68,230,0.15)] hover:shadow-[0_4px_12px_rgba(50,68,230,0.25)] hover:-translate-y-[1px] active:scale-[0.97] transition-all duration-300 cursor-pointer flex items-center"
+                            className="group relative overflow-hidden bg-gradient-to-r from-primary to-[#5b6bf9] text-white font-bold py-[5px] px-[12px] rounded-[6px] text-[10.5px] shadow-[0_2px_8px_rgba(50,68,230,0.15)] cursor-pointer flex items-center"
                           >
                             <span className="relative z-10">Book Call</span>
                             {/* Subtle shine effect on hover */}
@@ -1730,20 +1856,28 @@ export default function AdvisorPanel({
                           </span>
                         </div>
                       ) : (
-                        activeTimeSlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            onClick={() => setSelectedTimeSlot(slot)}
-                            className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition cursor-pointer ${
-                              selectedTimeSlot === slot
-                                ? "bg-primary/10 border-primary text-primary font-bold"
-                                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {slot}
-                          </button>
-                        ))
+                        activeTimeSlots.map((slot) => {
+                          const isBooked = selectedAdvisorAppointments.some(
+                            a => a.date === selectedDateStr && a.time === slot && !a.cancelled
+                          );
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled={isBooked}
+                              onClick={() => setSelectedTimeSlot(slot)}
+                              className={`py-[9px] px-[8px] rounded-[10px] text-[11.5px] font-semibold text-center border transition ${
+                                isBooked
+                                  ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-50"
+                                  : selectedTimeSlot === slot
+                                  ? "bg-primary/10 border-primary text-primary font-bold cursor-pointer"
+                                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer"
+                              }`}
+                            >
+                              {slot}
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                   </div>
