@@ -78,6 +78,9 @@ export interface LenderProduct {
   docsRequired: string[];
   processingFee?: string;
   emiPerLakhMin?: string;
+  annualMaintenanceCharges?: string;
+  insuranceCharges?: string;
+  otherCharges?: string;
   extraParams?: {
     eligibilityCriteria?: string;
     abb_to_emi_factor?: number;

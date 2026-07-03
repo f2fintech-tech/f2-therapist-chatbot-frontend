@@ -92,6 +92,7 @@ interface EmployeeDirectoryProps {
   handleToggleActive: (adv: any) => Promise<void>;
   handleOpenEditExpert: (adv: Advisor) => void;
   handleDeleteExpert: (id: string) => void;
+  onRenameDeptClick: (deptName: string) => void;
 }
 
 function EmployeeDirectory({
@@ -101,14 +102,24 @@ function EmployeeDirectory({
   handleToggleAdvisorRole,
   handleToggleActive,
   handleOpenEditExpert,
-  handleDeleteExpert
+  handleDeleteExpert,
+  onRenameDeptClick
 }: EmployeeDirectoryProps) {
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
+
+  const uniqueDepartments = useMemo(() => {
+    return Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort() as string[];
+  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     const search = employeeSearch.toLowerCase().trim();
-    if (!search) return employees;
-    return employees.filter(emp => {
+    let list = employees;
+    if (selectedDeptFilter !== "all") {
+      list = list.filter(emp => emp.department === selectedDeptFilter);
+    }
+    if (!search) return list;
+    return list.filter(emp => {
       return (
         (emp.name || "").toLowerCase().includes(search) ||
         (emp.designation || "").toLowerCase().includes(search) ||
@@ -116,7 +127,7 @@ function EmployeeDirectory({
         (emp.f2FintechId || emp.id || "").toLowerCase().includes(search)
       );
     });
-  }, [employees, employeeSearch]);
+  }, [employees, employeeSearch, selectedDeptFilter]);
 
   return (
     <div className="space-y-[16px] animate-fade-in">
@@ -136,8 +147,31 @@ function EmployeeDirectory({
             value={employeeSearch}
             onChange={e => setEmployeeSearch(e.target.value)}
             placeholder="Search employees by name, ID, dept..."
-            className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[240px]"
+            className="h-[32px] px-[12px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[200px]"
           />
+          
+          <div className="flex items-center gap-1.5 shrink-0">
+            <select
+              value={selectedDeptFilter}
+              onChange={(e) => setSelectedDeptFilter(e.target.value)}
+              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary cursor-pointer transition max-w-[150px]"
+            >
+              <option value="all">All Departments</option>
+              {uniqueDepartments.map((dept) => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+            {selectedDeptFilter !== "all" && (
+              <button
+                onClick={() => onRenameDeptClick(selectedDeptFilter)}
+                title="Rename Selected Department"
+                className="h-[32px] w-[32px] flex items-center justify-center border border-gray-200 rounded-[10px] text-[12px] text-gray-500 hover:text-primary hover:border-primary cursor-pointer bg-white transition"
+              >
+                ✏️
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleOpenAddExpert}
             className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[11px] cursor-pointer shrink-0 transition"
@@ -292,6 +326,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [lendersLoading, setLendersLoading] = useState(false);
   const [lenderModalOpen, setLenderModalOpen] = useState(false);
   const [editingLender, setEditingLender] = useState<LenderProduct | null>(null);
+  const [lenderDeleteConfirmOpen, setLenderDeleteConfirmOpen] = useState(false);
+  const [lenderToDelete, setLenderToDelete] = useState<LenderProduct | null>(null);
+  const [isDeletingLender, setIsDeletingLender] = useState(false);
+  const [isOtherSelected, setIsOtherSelected] = useState(false);
   const [lenderForm, setLenderForm] = useState({
     id: "",
     name: "",
@@ -313,6 +351,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     docsRequired: "",
     processingFee: "As per offer at login",
     emiPerLakhMin: "",
+    annualMaintenanceCharges: "",
+    insuranceCharges: "",
+    otherCharges: "",
   });
 
   // Loading and Error States
@@ -328,6 +369,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
+  
+  // Department Renaming Modal States
+  const [renameDeptModalOpen, setRenameDeptModalOpen] = useState(false);
+  const [renameOldDept, setRenameOldDept] = useState("");
+  const [renameNewDept, setRenameNewDept] = useState("");
+  const [renamingDept, setRenamingDept] = useState(false);
+  const [renameDeptError, setRenameDeptError] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Deactivation reason modal states
@@ -549,6 +597,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
+  const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
 
   const todayStr = (() => {
     const today = new Date();
@@ -1018,7 +1067,7 @@ ${sheetDataXml}
     document.body.removeChild(link);
   };
 
-  const handleGenerateCAM = async (userId: string, name: string) => {
+  const handleGenerateCAM = async (userId: string, name: string, reportId?: string) => {
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
       const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
@@ -1028,7 +1077,11 @@ ${sheetDataXml}
         headers["X-API-Key"] = configuredApiKey;
       }
 
-      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      const requestUrl = reportId 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
+        : `${apiBase}/cibil/cam/generate/${userId}`;
+
+      const res = await fetch(requestUrl, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
@@ -1087,8 +1140,56 @@ ${sheetDataXml}
   }, [isAdmin, activeTab, currentExpertId]);
 
   // Lenders CRUD Handlers
+  const getProductPrefix = (category: string, productType: string): string => {
+    const cat = (category || "").toLowerCase().trim();
+    const prod = (productType || "").toLowerCase().trim();
+    
+    if (cat === "home") return "HL";
+    if (cat === "personal") return "PL";
+    if (cat === "professional") return "PR";
+    
+    if (prod.includes("home")) return "HL";
+    if (prod.includes("personal")) return "PL";
+    if (prod.includes("professional") || prod.includes("prof")) return "PR";
+    
+    const words = (productType || category || "").split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    const cleanStr = (productType || category || "").replace(/[^a-zA-Z]/g, "");
+    if (cleanStr.length >= 2) {
+      return cleanStr.substring(0, 2).toUpperCase();
+    }
+    return "LN";
+  };
+
+  const handleUpdateLenderField = (updatedFields: Partial<typeof lenderForm>) => {
+    const nextForm = { ...lenderForm, ...updatedFields };
+    const prefix = getProductPrefix(nextForm.category || "", nextForm.productType || "");
+    const cleanName = (nextForm.name || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    nextForm.id = cleanName ? `${prefix}-${cleanName}` : prefix;
+    setLenderForm(nextForm);
+  };
+
+  const renderRupeeHelper = (val: string) => {
+    if (!val) return null;
+    const cleanVal = val.trim();
+    if (/^\d+(\.\d+)?$/.test(cleanVal)) {
+      const num = Number(cleanVal);
+      if (num > 0) {
+        return (
+          <span className="text-[10px] text-primary/80 font-bold block mt-[2px] ml-[2px]">
+            ₹{num.toLocaleString("en-IN")}
+          </span>
+        );
+      }
+    }
+    return null;
+  };
+
   const handleOpenAddLender = () => {
     setEditingLender(null);
+    setIsOtherSelected(false);
     setLenderForm({
       id: "",
       name: "",
@@ -1110,12 +1211,17 @@ ${sheetDataXml}
       docsRequired: "PAN & Aadhaar, 3 months salary slips, 6 months bank statements",
       processingFee: "Up to 2% + GST",
       emiPerLakhMin: "",
+      annualMaintenanceCharges: "",
+      insuranceCharges: "",
+      otherCharges: "",
     });
     setLenderModalOpen(true);
   };
 
   const handleOpenEditLender = (l: LenderProduct) => {
     setEditingLender(l);
+    const existingLenderNames = Array.from(new Set(lenderList.map(item => item.name).filter(Boolean)));
+    setIsOtherSelected(!existingLenderNames.includes(l.name));
     setLenderForm({
       id: l.id,
       name: l.name,
@@ -1137,6 +1243,9 @@ ${sheetDataXml}
       docsRequired: l.docsRequired.join(", "),
       processingFee: l.processingFee || "",
       emiPerLakhMin: l.emiPerLakhMin || "",
+      annualMaintenanceCharges: l.annualMaintenanceCharges || "",
+      insuranceCharges: l.insuranceCharges || "",
+      otherCharges: l.otherCharges || "",
     });
     setLenderModalOpen(true);
   };
@@ -1170,6 +1279,9 @@ ${sheetDataXml}
       docsRequired: (lenderForm.docsRequired || "").split(",").map(d => d.trim()).filter(Boolean),
       processingFee: lenderForm.processingFee?.trim() || "As per offer at login",
       emiPerLakhMin: lenderForm.emiPerLakhMin?.trim() || "",
+      annualMaintenanceCharges: lenderForm.annualMaintenanceCharges?.trim() || "",
+      insuranceCharges: lenderForm.insuranceCharges?.trim() || "",
+      otherCharges: lenderForm.otherCharges?.trim() || "",
     };
 
     let updatedList: LenderProduct[];
@@ -1203,27 +1315,81 @@ ${sheetDataXml}
     }
   };
 
-  const handleDeleteLender = async (id: string) => {
-    if (confirm("Are you sure you want to delete this lender product?")) {
-      const updatedList = lenderList.filter(l => l.id !== id);
-      try {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-        const res = await fetch(`${apiBase}/lenders`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updatedList),
-        });
-        if (res.ok) {
-          setLenderList(updatedList);
-          window.dispatchEvent(new CustomEvent("finheal:lenders_update"));
-        } else {
-          alert("Failed to delete lender product.");
-        }
-      } catch (err) {
-        console.error("Error deleting lender:", err);
+  const handleDeleteLender = (l: LenderProduct) => {
+    setLenderToDelete(l);
+    setLenderDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteLender = async () => {
+    if (!lenderToDelete) return;
+    setIsDeletingLender(true);
+    const updatedList = lenderList.filter(l => l.id !== lenderToDelete.id);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/lenders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedList),
+      });
+      if (res.ok) {
+        setLenderList(updatedList);
+        window.dispatchEvent(new CustomEvent("finheal:lenders_update"));
+        setLenderDeleteConfirmOpen(false);
+        setLenderToDelete(null);
+      } else {
+        alert("Failed to delete lender product.");
       }
+    } catch (err) {
+      console.error("Error deleting lender:", err);
+      alert("Network error connecting to backend API.");
+    } finally {
+      setIsDeletingLender(false);
+    }
+  };
+
+  const handleRenameDepartment = async () => {
+    const oldName = renameOldDept?.trim();
+    const newName = renameNewDept?.trim();
+    if (!oldName || !newName) {
+      setRenameDeptError("Both old and new department names are required!");
+      return;
+    }
+    if (oldName === newName) {
+      setRenameDeptError("The new name must be different from the old name!");
+      return;
+    }
+
+    setRenamingDept(true);
+    setRenameDeptError("");
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/advisors/departments/rename`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          old_name: oldName,
+          new_name: newName,
+        }),
+      });
+      if (res.ok) {
+        await loadEmployees(true);
+        await loadAdvisors();
+        setRenameDeptModalOpen(false);
+        setRenameOldDept("");
+        setRenameNewDept("");
+      } else {
+        const err = await res.json();
+        setRenameDeptError(err.detail || "Failed to rename department.");
+      }
+    } catch (err) {
+      console.error("Error renaming department:", err);
+      setRenameDeptError("Network error connecting to backend API.");
+    } finally {
+      setRenamingDept(false);
     }
   };
 
@@ -2531,12 +2697,11 @@ ${sheetDataXml}
                             <td className="p-[12px] font-semibold text-gray-500 uppercase">{l.category}</td>
                             <td className="p-[12px] font-bold text-emerald-600">{l.minRate}% - {l.maxRate}%</td>
                             <td className="p-[12px] font-semibold text-gray-800">
-                              ₹{l.minAmount >= 10000000 ? `${(l.minAmount / 10000000).toFixed(1)}Cr` : l.minAmount >= 100000 ? `${(l.minAmount / 100000).toFixed(0)}L` : l.minAmount} -
-                              ₹{l.maxAmount >= 10000000 ? `${(l.maxAmount / 10000000).toFixed(0)}Cr` : l.maxAmount >= 100000 ? `${(l.maxAmount / 100000).toFixed(0)}L` : l.maxAmount}
+                              ₹{l.minAmount.toLocaleString("en-IN")} - ₹{l.maxAmount.toLocaleString("en-IN")}
                             </td>
                             <td className="p-[12px] text-gray-500">
                               <span>CIBIL: ≥{l.minCibil}</span>
-                              <span className="block text-[10px] text-gray-400">Min Income: ₹{l.minMonthlyIncome}</span>
+                              <span className="block text-[10px] text-gray-400">Min Income: ₹{l.minMonthlyIncome.toLocaleString("en-IN")}</span>
                             </td>
                             <td className="p-[12px] text-right space-x-[6px]">
                               <button
@@ -2546,7 +2711,7 @@ ${sheetDataXml}
                                 Edit
                               </button>
                               <button
-                                onClick={() => handleDeleteLender(l.id)}
+                                onClick={() => handleDeleteLender(l)}
                                 className="text-rose-500 hover:underline font-bold cursor-pointer"
                               >
                                 Delete
@@ -2777,7 +2942,10 @@ ${sheetDataXml}
                               <td className="p-[12px] text-right">
                                 {enq.report_data ? (
                                   <button
-                                    onClick={() => setViewingCibilReport(enq.report_data)}
+                                    onClick={() => {
+                                      setViewingCibilReport(enq.report_data);
+                                      setViewingCibilReportId(enq.id);
+                                    }}
                                     className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
                                   >
                                     View Report ↗
@@ -2795,7 +2963,7 @@ ${sheetDataXml}
                                   <span className="text-gray-400 block">-</span>
                                 )}
                                 <button
-                                  onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                  onClick={() => handleGenerateCAM(enq.user_id, enq.name, enq.id)}
                                   className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                 >
                                   Generate CAM 📊
@@ -2845,6 +3013,12 @@ ${sheetDataXml}
                 handleToggleActive={handleToggleActive}
                 handleOpenEditExpert={handleOpenEditExpert}
                 handleDeleteExpert={handleDeleteExpert}
+                onRenameDeptClick={(deptName) => {
+                  setRenameDeptError("");
+                  setRenameOldDept(deptName);
+                  setRenameNewDept("");
+                  setRenameDeptModalOpen(true);
+                }}
               />
             )}
           </div>
@@ -3786,7 +3960,10 @@ ${sheetDataXml}
                                   <td className="p-[12px] text-right">
                                     {enq.report_data ? (
                                       <button
-                                        onClick={() => setViewingCibilReport(enq.report_data)}
+                                        onClick={() => {
+                                          setViewingCibilReport(enq.report_data);
+                                          setViewingCibilReportId(enq.id);
+                                        }}
                                         className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
                                       >
                                         View Report ↗
@@ -3804,7 +3981,7 @@ ${sheetDataXml}
                                       <span className="text-gray-400 block">-</span>
                                     )}
                                     <button
-                                      onClick={() => handleGenerateCAM(enq.user_id, enq.name)}
+                                      onClick={() => handleGenerateCAM(enq.user_id, enq.name, enq.id)}
                                       className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                     >
                                       Generate CAM 📊
@@ -4248,6 +4425,130 @@ ${sheetDataXml}
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* ==================== DELETE LENDER PRODUCT CONFIRMATION MODAL ============ */}
+      {/* ========================================================================= */}
+      {lenderDeleteConfirmOpen && lenderToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col animate-scale-up">
+
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-rose-50/50">
+              <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
+                ⚠️ Delete Lender Product
+              </h3>
+              <button 
+                onClick={() => setLenderDeleteConfirmOpen(false)} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[14px]">
+              <p className="text-[12px] leading-relaxed text-gray-600">
+                Are you sure you want to permanently delete the loan product <strong className="text-gray-800">{lenderToDelete.name} — {lenderToDelete.productType}</strong>? 
+                This action cannot be undone and will remove it from the catalogue.
+              </p>
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button 
+                onClick={() => setLenderDeleteConfirmOpen(false)} 
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteLender}
+                disabled={isDeletingLender}
+                className="flex-1 py-[11px] bg-rose-600 text-white font-bold rounded-[12px] text-[12px] hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {isDeletingLender ? "Deleting..." : "Delete Product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ==================== BULK RENAME DEPARTMENT MODAL ======================= */}
+      {/* ========================================================================= */}
+      {renameDeptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col animate-scale-up">
+
+            <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
+              <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[8px]">
+                🏢 Bulk Rename Department
+              </h3>
+              <button 
+                onClick={() => setRenameDeptModalOpen(false)} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[20px] space-y-[14px]">
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                This will rename the department for all matching employees in the directory.
+              </p>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                  Select Department
+                </label>
+                <select
+                  value={renameOldDept}
+                  onChange={(e) => setRenameOldDept(e.target.value)}
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                >
+                  <option value="">-- Choose Department --</option>
+                  {Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort().map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                  New Department Name
+                </label>
+                <input
+                  type="text"
+                  value={renameNewDept}
+                  onChange={(e) => setRenameNewDept(e.target.value)}
+                  placeholder="e.g. Sales"
+                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                />
+              </div>
+
+              {renameDeptError && (
+                <div className="p-[10px] bg-rose-50 border border-rose-100 rounded-[10px] text-[11px] text-rose-700 font-medium">
+                  {renameDeptError}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
+              <button 
+                onClick={() => setRenameDeptModalOpen(false)} 
+                className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenameDepartment}
+                disabled={renamingDept || !renameOldDept || !renameNewDept}
+                className="flex-1 py-[11px] bg-primary text-white font-bold rounded-[12px] text-[12px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer shadow-md"
+              >
+                {renamingDept ? "Renaming..." : "Rename"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== DEACTIVATE ADVISOR REASON MODAL ==================== */}
       {deactivateConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
@@ -4579,20 +4880,44 @@ ${sheetDataXml}
               <div className="grid grid-cols-2 gap-[10px]">
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Lender Name</label>
-                  <input
-                    type="text"
-                    value={lenderForm.name || ""}
-                    onChange={(e) => setLenderForm({ ...lenderForm, name: e.target.value })}
-                    placeholder="e.g. SBI"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                  />
+                  <select
+                    value={isOtherSelected ? "__other__" : (lenderForm.name || "")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__other__") {
+                        setIsOtherSelected(true);
+                        handleUpdateLenderField({ name: "" });
+                      } else {
+                        setIsOtherSelected(false);
+                        handleUpdateLenderField({ name: val });
+                      }
+                    }}
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                  >
+                    <option value="">Select Lender</option>
+                    {Array.from(new Set(lenderList.map(l => l.name).filter(Boolean))).sort().map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                    <option value="__other__">Other (Add new partner...)</option>
+                  </select>
+                  
+                  {isOtherSelected && (
+                    <input
+                      type="text"
+                      value={lenderForm.name || ""}
+                      onChange={(e) => handleUpdateLenderField({ name: e.target.value })}
+                      placeholder="Type new lender name (e.g. Axis Bank)"
+                      className="w-full mt-[8px] px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary animate-fade-in"
+                      autoFocus
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Product Type</label>
                   <input
                     type="text"
                     value={lenderForm.productType || ""}
-                    onChange={(e) => setLenderForm({ ...lenderForm, productType: e.target.value })}
+                    onChange={(e) => handleUpdateLenderField({ productType: e.target.value })}
                     placeholder="e.g. Home Loan"
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
@@ -4604,7 +4929,7 @@ ${sheetDataXml}
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Category</label>
                   <select
                     value={lenderForm.category || "home"}
-                    onChange={(e) => setLenderForm({ ...lenderForm, category: e.target.value as any })}
+                    onChange={(e) => handleUpdateLenderField({ category: e.target.value as any })}
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white animate-fade-in"
                   >
                     <option value="home">Home Loan</option>
@@ -4645,7 +4970,7 @@ ${sheetDataXml}
                     step="0.01"
                     value={lenderForm.minRate || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, minRate: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -4655,7 +4980,7 @@ ${sheetDataXml}
                     step="0.01"
                     value={lenderForm.maxRate || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, maxRate: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -4664,7 +4989,7 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.minTenureYears || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, minTenureYears: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -4673,7 +4998,7 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.maxTenureYears || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, maxTenureYears: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -4685,7 +5010,7 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.minCibil || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, minCibil: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -4694,7 +5019,7 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.maxFoirPct || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, maxFoirPct: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div className="col-span-2">
@@ -4703,8 +5028,13 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.minMonthlyIncome || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, minMonthlyIncome: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
+                  {Number(lenderForm.minMonthlyIncome) > 0 && (
+                    <span className="text-[10px] text-primary/80 font-bold block mt-[2px] ml-[2px]">
+                      ₹{Number(lenderForm.minMonthlyIncome).toLocaleString("en-IN")}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -4715,8 +5045,13 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.minAmount || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, minAmount: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
+                  {Number(lenderForm.minAmount) > 0 && (
+                    <span className="text-[10px] text-primary/80 font-bold block mt-[2px] ml-[2px]">
+                      ₹{Number(lenderForm.minAmount).toLocaleString("en-IN")}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Max Loan Amount</label>
@@ -4724,8 +5059,13 @@ ${sheetDataXml}
                     type="number"
                     value={lenderForm.maxAmount || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, maxAmount: Number(e.target.value) })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
+                  {Number(lenderForm.maxAmount) > 0 && (
+                    <span className="text-[10px] text-primary/80 font-bold block mt-[2px] ml-[2px]">
+                      ₹{Number(lenderForm.maxAmount).toLocaleString("en-IN")}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -4737,7 +5077,7 @@ ${sheetDataXml}
                     value={lenderForm.disbursalTime || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, disbursalTime: e.target.value })}
                     placeholder="e.g. 2-5 working days"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
@@ -4747,13 +5087,49 @@ ${sheetDataXml}
                     value={lenderForm.processingFee || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, processingFee: e.target.value })}
                     placeholder="e.g. 2.0% + GST"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px]"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
 
+              <div className="grid grid-cols-3 gap-[10px]">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Annual Maintenance Charges</label>
+                  <input
+                    type="text"
+                    value={lenderForm.annualMaintenanceCharges || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, annualMaintenanceCharges: e.target.value })}
+                    placeholder="e.g. ₹500/year"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                  {renderRupeeHelper(lenderForm.annualMaintenanceCharges || "")}
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Insurance Charges</label>
+                  <input
+                    type="text"
+                    value={lenderForm.insuranceCharges || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, insuranceCharges: e.target.value })}
+                    placeholder="e.g. Group term cover"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                  {renderRupeeHelper(lenderForm.insuranceCharges || "")}
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Other Charges</label>
+                  <input
+                    type="text"
+                    value={lenderForm.otherCharges || ""}
+                    onChange={(e) => setLenderForm({ ...lenderForm, otherCharges: e.target.value })}
+                    placeholder="e.g. Legal/Valuation"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                  />
+                  {renderRupeeHelper(lenderForm.otherCharges || "")}
+                </div>
+              </div>
+
               <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Pros (comma-separated)</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Pros</label>
                 <input
                   type="text"
                   value={lenderForm.pros || ""}
@@ -4764,7 +5140,7 @@ ${sheetDataXml}
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Cons (comma-separated)</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Cons</label>
                 <input
                   type="text"
                   value={lenderForm.cons || ""}
@@ -4775,7 +5151,7 @@ ${sheetDataXml}
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Required Documents (comma-separated)</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Required Documents</label>
                 <textarea
                   value={lenderForm.docsRequired || ""}
                   onChange={(e) => setLenderForm({ ...lenderForm, docsRequired: e.target.value })}
@@ -4821,6 +5197,7 @@ ${sheetDataXml}
               <CibilAnalyzerView 
                 userId={userId || "admin"} 
                 overrideReport={viewingCibilReport} 
+                reportId={viewingCibilReportId || undefined}
                 onToggleSidebar={() => {}} 
                 onToggleInsights={() => {}} 
               />
