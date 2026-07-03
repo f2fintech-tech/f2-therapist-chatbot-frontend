@@ -545,6 +545,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
+  const [filterSearch, setFilterSearch] = useState<string>("");
+  const [filterBureau, setFilterBureau] = useState<string>("all");
   
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
@@ -558,10 +560,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return `${year}-${month}-${day}`;
   })();
 
-  // Reset page when filterDate, filterEndDate, filterRole, or filterLoanType changes
+  // Reset page when filters change
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterEndDate, filterRole, filterLoanType]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
 
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
@@ -630,6 +632,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         return false;
       });
       if (!hasMatchingLoan) return false;
+    }
+
+    // 4. Filter by Search Query
+    if (filterSearch.trim() !== "") {
+      const query = filterSearch.toLowerCase().trim();
+      const nameMatch = (enq.name || "").toLowerCase().includes(query);
+      const emailMatch = (enq.email || "").toLowerCase().includes(query);
+      const panMatch = (enq.pan || "").toLowerCase().includes(query);
+      if (!nameMatch && !emailMatch && !panMatch) return false;
+    }
+
+    // 5. Filter by Bureau
+    if (filterBureau !== "all") {
+      const bureauClean = (enq.bureau || "").toLowerCase().trim();
+      if (bureauClean !== filterBureau.toLowerCase().trim()) return false;
     }
 
     return true;
@@ -1074,6 +1091,43 @@ ${sheetDataXml}
       console.error("Error loading CIBIL enquiries:", err);
     } finally {
       setCibilLoading(false);
+    }
+  };
+
+  const handleDeleteEnquiry = async (reportId: string) => {
+    if (!window.confirm("Are you sure you want to delete this enquiry? This action cannot be undone and will remove it from the database.")) {
+      return;
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      if (userId) {
+        headers["X-Requester-ID"] = userId;
+      }
+
+      const res = await fetch(`${apiBase}/cibil/leads/${reportId}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (res.ok) {
+        alert("Enquiry deleted successfully.");
+        fetchCibilEnquiries(); // Refresh the table
+      } else {
+        const errData = await res.json();
+        alert(errData.detail || "Failed to delete the credit report.");
+      }
+    } catch (err: any) {
+      console.error("Error deleting enquiry:", err);
+      alert("Error: " + (err.message || "An unexpected error occurred."));
     }
   };
 
@@ -2603,6 +2657,32 @@ ${sheetDataXml}
 
                   {/* Row 2: Filters & Export */}
                   <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                    {/* Search Input */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                      <input
+                        type="text"
+                        placeholder="Search Name, Email, PAN..."
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        className="h-[32px] px-[12px] w-[200px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      />
+                    </div>
+
+                    {/* Bureau Filter Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
+                      <select
+                        value={filterBureau}
+                        onChange={(e) => setFilterBureau(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Bureaus</option>
+                        <option value="cibil">CIBIL</option>
+                        <option value="experian">Experian</option>
+                      </select>
+                    </div>
+
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
@@ -2663,9 +2743,9 @@ ${sheetDataXml}
                       />
                     </div>
 
-                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
                       <button
-                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
                         className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
                       >
                         Reset Filters
@@ -2693,7 +2773,7 @@ ${sheetDataXml}
                         <th className="p-[12px]">PAN Card</th>
                         <th className="p-[12px]">Credit Score</th>
                         <th className="p-[12px]">Date & Time</th>
-                        <th className="p-[12px] text-right">PDF Report</th>
+                        <th className="p-[12px] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2799,6 +2879,12 @@ ${sheetDataXml}
                                   className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                 >
                                   Generate CAM 📊
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEnquiry(enq.id)}
+                                  className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                >
+                                  Delete Inquiry 🗑️
                                 </button>
                               </td>
                             </tr>
@@ -3702,7 +3788,7 @@ ${sheetDataXml}
                             <th className="p-[12px]">PAN Card</th>
                             <th className="p-[12px]">Credit Score</th>
                             <th className="p-[12px]">Date & Time</th>
-                            <th className="p-[12px] text-right">PDF Report</th>
+                            <th className="p-[12px] text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3808,6 +3894,12 @@ ${sheetDataXml}
                                       className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                     >
                                       Generate CAM 📊
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEnquiry(enq.id)}
+                                      className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                    >
+                                      Delete Inquiry 🗑️
                                     </button>
                                   </td>
                                 </tr>
