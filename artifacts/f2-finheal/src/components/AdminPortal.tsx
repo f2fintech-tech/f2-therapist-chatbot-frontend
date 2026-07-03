@@ -156,7 +156,6 @@ function EmployeeDirectory({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
           {filteredEmployees.map((emp) => {
-            const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
             const isAvailable = emp.availability === "available";
             
             return (
@@ -190,10 +189,6 @@ function EmployeeDirectory({
                   <div className="flex justify-between">
                     <span className="text-gray-400">Employee ID</span>
                     <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Email</span>
-                    <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
                   </div>
                   {emp.isAdvisor && (
                     <>
@@ -288,6 +283,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [filterAdvisor, setFilterAdvisor] = useState<string>("all");
   const [filterTestName, setFilterTestName] = useState<string>("all");
+  const [filterLenderSearch, setFilterLenderSearch] = useState<string>("");
+  const [filterEduType, setFilterEduType] = useState<string>("all");
 
   // Lenders Catalog States
   const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
@@ -2172,6 +2169,26 @@ ${sheetDataXml}
     return true;
   });
 
+  const filteredLenders = lenderList.filter((l) => {
+    if (filterLenderSearch.trim() !== "") {
+      const query = filterLenderSearch.toLowerCase().trim();
+      const nameMatch = (l.name || "").toLowerCase().includes(query);
+      const productMatch = (l.productType || "").toLowerCase().includes(query);
+      const lenderTypeMatch = (l.lenderType || "").toLowerCase().includes(query);
+      if (!nameMatch && !productMatch && !lenderTypeMatch) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const filteredEducation = educationContent.filter((item) => {
+    if (filterEduType !== "all" && item.type.toLowerCase() !== filterEduType.toLowerCase()) {
+      return false;
+    }
+    return true;
+  });
+
   // ==================== RENDERING WORKSPACE ====================
   if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
     return (
@@ -2361,14 +2378,34 @@ ${sheetDataXml}
             {/* TAB: MANAGE EDUCATION */}
             {activeTab === "education" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Education Content ({educationContent.length})</h3>
-                  <button
-                    onClick={handleOpenAddEdu}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add Content
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Education Content ({filteredEducation.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Create and update platform educational guide cards.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Education Type Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Filter Type:</span>
+                      <select
+                        value={filterEduType}
+                        onChange={(e) => setFilterEduType(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Content</option>
+                        <option value="article">Articles</option>
+                        <option value="video">Videos</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddEdu}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add Content
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2384,7 +2421,14 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {educationContent.map((item) => (
+                      {filteredEducation.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center p-6 text-gray-400">
+                            No educational content items found matching the filter criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredEducation.map((item) => (
                         <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] max-w-[240px]">
                             <div className="flex items-center gap-[8px]">
@@ -2420,7 +2464,8 @@ ${sheetDataXml}
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                     </tbody>
                   </table>
                 </div>
@@ -2630,14 +2675,32 @@ ${sheetDataXml}
             {/* TAB: MANAGE LENDERS */}
             {activeTab === "lenders" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({lenderList.length})</h3>
-                  <button
-                    onClick={handleOpenAddLender}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add Lender Product
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({filteredLenders.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize bank loan products catalog list.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Lender Search Input */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                      <input
+                        type="text"
+                        placeholder="Search Bank/Product..."
+                        value={filterLenderSearch}
+                        onChange={(e) => setFilterLenderSearch(e.target.value)}
+                        className="h-[32px] px-[12px] w-[180px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddLender}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add Lender Product
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2658,12 +2721,14 @@ ${sheetDataXml}
                         <tr>
                           <td colSpan={7} className="text-center p-6 text-gray-400">Loading catalog...</td>
                         </tr>
-                      ) : lenderList.length === 0 ? (
+                      ) : filteredLenders.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center p-6 text-gray-400">No lenders listed. Click "+ Add Lender Product" to seed catalog.</td>
+                          <td colSpan={7} className="text-center p-6 text-gray-400">
+                            {filterLenderSearch ? "No lenders match your search query." : "No lenders listed. Click '+ Add Lender Product' to seed catalog."}
+                          </td>
                         </tr>
                       ) : (
-                        lenderList.map((l) => (
+                        filteredLenders.map((l) => (
                           <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                             <td className="p-[12px] max-w-[200px]">
                               <strong className="text-gray-900 block">{l.name}</strong>

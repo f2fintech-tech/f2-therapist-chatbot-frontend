@@ -1796,8 +1796,7 @@ export default function Dashboard({
                             <th scope="col" className="px-3 py-2 font-bold text-center">Rating</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Reviews</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Calls Done</th>
-                            <th scope="col" className="px-3 py-2 font-bold text-center">Cancelled</th>
-                            <th scope="col" className="px-3 py-2 font-bold rounded-r-lg text-right">Status</th>
+                            <th scope="col" className="px-3 py-2 font-bold rounded-r-lg text-right">Cancelled</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -1877,25 +1876,8 @@ export default function Dashboard({
                                 <td className="px-3 py-2.5 text-center font-semibold text-emerald-600">
                                   {completedCalls}
                                 </td>
-                                <td className="px-3 py-2.5 text-center font-semibold text-rose-600">
+                                <td className="px-3 py-2.5 text-right font-semibold text-rose-600">
                                   {cancelledCalls}
-                                </td>
-                                <td className="px-3 py-2.5 text-right">
-                                  {isOnline ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100/50">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                      Online
-                                    </span>
-                                  ) : isInMeeting ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100/50">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                      Meeting
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-100">
-                                      Offline
-                                    </span>
-                                  )}
                                 </td>
                               </tr>
                             );
