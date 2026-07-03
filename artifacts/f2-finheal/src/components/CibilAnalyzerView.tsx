@@ -39,6 +39,7 @@ interface CibilAnalyzerViewProps {
   onApplyNow?: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
   overrideReport?: CibilReport | null;
+  reportId?: string;
 }
 
 interface LenderProduct {
@@ -65,7 +66,8 @@ export default function CibilAnalyzerView({
   onToggleInsights,
   onApplyNow,
   onTalkToAdvisor,
-  overrideReport = null
+  overrideReport = null,
+  reportId
 }: CibilAnalyzerViewProps) {
   const { toast } = useToast();
   const analyzerRef = React.useRef<HTMLDivElement>(null);
@@ -267,7 +269,11 @@ export default function CibilAnalyzerView({
         headers["X-API-Key"] = configuredApiKey;
       }
       
-      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      const requestUrl = reportId 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
+        : `${apiBase}/cibil/cam/generate/${userId}`;
+
+      const res = await fetch(requestUrl, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
