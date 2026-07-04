@@ -411,7 +411,29 @@ export default function FinHealChat() {
         
         if (isStaff) {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-          const res = await fetch(`${apiBase}/advisors/profile/${encodeURIComponent(authSession.userId)}`);
+          
+          let f2FintechId = authSession.userId;
+          const stored = localStorage.getItem("finheal_advisors_list");
+          if (stored) {
+            try {
+              const list = JSON.parse(stored);
+              const matched = list.find((a: any) => 
+                a.f2FintechId && email && (
+                  email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+                  email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+                )
+              );
+              if (matched) {
+                f2FintechId = matched.f2FintechId;
+              } else if (email) {
+                f2FintechId = email.split("@")[0];
+              }
+            } catch (e) {}
+          } else if (email) {
+            f2FintechId = email.split("@")[0];
+          }
+
+          const res = await fetch(`${apiBase}/advisors/profile/${encodeURIComponent(f2FintechId)}`);
           if (res.ok) {
             const data = await res.json();
             const nextSession = {
