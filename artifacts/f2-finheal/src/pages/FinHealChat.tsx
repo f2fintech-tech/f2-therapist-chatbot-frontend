@@ -400,6 +400,74 @@ export default function FinHealChat() {
     };
   }, [userId]);
 
+  // Sync auth session profile & permissions from backend on load, on tab focus, and periodically
+  useEffect(() => {
+    if (!authSession || authSession.isGuest) return;
+
+    const syncProfile = async () => {
+      try {
+        const email = authSession.email || "";
+        const isStaff = authSession.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+        
+        if (isStaff) {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+          const res = await fetch(`${apiBase}/advisors/profile/${encodeURIComponent(authSession.userId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const nextSession = {
+              ...authSession,
+              isAdvisor: data.is_advisor,
+              permissions: data.permissions || [],
+              displayName: data.name || authSession.displayName,
+              avatarUrl: data.avatar_url || authSession.avatarUrl,
+            };
+            if (
+              authSession.isAdvisor !== nextSession.isAdvisor ||
+              JSON.stringify(authSession.permissions) !== JSON.stringify(nextSession.permissions) ||
+              authSession.displayName !== nextSession.displayName ||
+              authSession.avatarUrl !== nextSession.avatarUrl
+            ) {
+              setStoredAuthSession(nextSession);
+              setAuthSession(nextSession);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sync auth session profile:", err);
+      }
+    };
+
+    // 1. Initial sync on load
+    void syncProfile();
+
+    // 2. Re-sync when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncProfile();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 3. Re-sync on custom advisors update events
+    const handleAdvisorsEvent = () => {
+      void syncProfile();
+    };
+    window.addEventListener("finheal:advisors_update", handleAdvisorsEvent);
+
+    // 4. Periodic fallback: re-sync every 60s
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncProfile();
+      }
+    }, 60_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("finheal:advisors_update", handleAdvisorsEvent);
+      clearInterval(intervalId);
+    };
+  }, [authSession]);
+
   // Redirect staff users away from goals page
   useEffect(() => {
     if (authSession) {
