@@ -1512,7 +1512,11 @@ export default function Dashboard({
               <div className="text-white/70 text-[11px] sm:text-[12px] mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {userProfile.email && (
                   <>
-                    <span className="truncate">📧 {userProfile.email}</span>
+                    {(isAdvisor || isStaff) ? (
+                      <span className="truncate">🆔 {userProfile.email.split("@")[0].toUpperCase()}</span>
+                    ) : (
+                      <span className="truncate">📧 {userProfile.email}</span>
+                    )}
                     <span>·</span>
                   </>
                 )}
