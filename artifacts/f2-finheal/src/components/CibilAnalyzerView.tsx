@@ -1121,9 +1121,9 @@ export default function CibilAnalyzerView({
                   />
                   <FactorCard
                     label="Recent Enquiries"
-                    value={String(report.metrics.enquiries_l6m)}
-                    subtext="Bureau queries"
-                    status={report.metrics.enquiries_l6m <= 1 ? "Excellent" : report.metrics.enquiries_l6m <= 3 ? "Good" : "Poor"}
+                    value={String(report.metrics.enquiries_l3m)}
+                    subtext="Bureau queries (3M)"
+                    status={report.metrics.enquiries_l3m <= 1 ? "Excellent" : report.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
                   />
                 </div>
                 

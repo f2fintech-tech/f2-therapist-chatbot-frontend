@@ -190,7 +190,6 @@ function EmployeeDirectory({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
           {filteredEmployees.map((emp) => {
-            const email = `${(emp.f2FintechId || emp.id).toLowerCase()}@f2fintech.com`;
             const isAvailable = emp.availability === "available";
             
             return (
@@ -224,10 +223,6 @@ function EmployeeDirectory({
                   <div className="flex justify-between">
                     <span className="text-gray-400">Employee ID</span>
                     <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Email</span>
-                    <span className="text-gray-700 truncate max-w-[150px]" title={email}>{email}</span>
                   </div>
                   {emp.isAdvisor && (
                     <>
@@ -320,6 +315,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+  const [filterAdvisor, setFilterAdvisor] = useState<string>("all");
+  const [filterTestName, setFilterTestName] = useState<string>("all");
+  const [filterLenderSearch, setFilterLenderSearch] = useState<string>("");
+  const [filterEduType, setFilterEduType] = useState<string>("all");
 
   // Lenders Catalog States
   const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
@@ -593,6 +592,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
+  const [filterSearch, setFilterSearch] = useState<string>("");
+  const [filterBureau, setFilterBureau] = useState<string>("all");
   
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
@@ -607,10 +608,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return `${year}-${month}-${day}`;
   })();
 
-  // Reset page when filterDate, filterEndDate, filterRole, or filterLoanType changes
+  // Reset page when filters change
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterEndDate, filterRole, filterLoanType]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
 
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
@@ -679,6 +680,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
         return false;
       });
       if (!hasMatchingLoan) return false;
+    }
+
+    // 4. Filter by Search Query
+    if (filterSearch.trim() !== "") {
+      const query = filterSearch.toLowerCase().trim();
+      const nameMatch = (enq.name || "").toLowerCase().includes(query);
+      const emailMatch = (enq.email || "").toLowerCase().includes(query);
+      const panMatch = (enq.pan || "").toLowerCase().includes(query);
+      if (!nameMatch && !emailMatch && !panMatch) return false;
+    }
+
+    // 5. Filter by Bureau
+    if (filterBureau !== "all") {
+      const bureauClean = (enq.bureau || "").toLowerCase().trim();
+      if (bureauClean !== filterBureau.toLowerCase().trim()) return false;
     }
 
     return true;
@@ -1127,6 +1143,43 @@ ${sheetDataXml}
       console.error("Error loading CIBIL enquiries:", err);
     } finally {
       setCibilLoading(false);
+    }
+  };
+
+  const handleDeleteEnquiry = async (reportId: string) => {
+    if (!window.confirm("Are you sure you want to delete this enquiry? This action cannot be undone and will remove it from the database.")) {
+      return;
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      if (userId) {
+        headers["X-Requester-ID"] = userId;
+      }
+
+      const res = await fetch(`${apiBase}/cibil/leads/${reportId}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (res.ok) {
+        alert("Enquiry deleted successfully.");
+        fetchCibilEnquiries(); // Refresh the table
+      } else {
+        const errData = await res.json();
+        alert(errData.detail || "Failed to delete the credit report.");
+      }
+    } catch (err: any) {
+      console.error("Error deleting enquiry:", err);
+      alert("Error: " + (err.message || "An unexpected error occurred."));
     }
   };
 
@@ -2252,6 +2305,56 @@ ${sheetDataXml}
   const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
 
+  const filteredAppointments = allAppointments.filter((appt) => {
+    if (filterAdvisor !== "all") {
+      const matchAdv = advisors.find(a => (a.f2FintechId || a.id) === filterAdvisor || a.id === filterAdvisor);
+      if (matchAdv) {
+        const matchId = matchAdv.id;
+        const matchF2Id = matchAdv.f2FintechId || "";
+        
+        const apptAdvIdClean = (appt.advisorId || "").toLowerCase().trim();
+        const selectIdClean = matchId.toLowerCase().trim();
+        const selectF2IdClean = matchF2Id.toLowerCase().trim();
+        
+        if (apptAdvIdClean !== selectIdClean && apptAdvIdClean !== selectF2IdClean) {
+          return false;
+        }
+      } else {
+        if ((appt.advisorId || "").toLowerCase().trim() !== filterAdvisor.toLowerCase().trim()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  const filteredTests = testCatalog.filter((test) => {
+    if (filterTestName !== "all" && test.title !== filterTestName) {
+      return false;
+    }
+    return true;
+  });
+
+  const filteredLenders = lenderList.filter((l) => {
+    if (filterLenderSearch.trim() !== "") {
+      const query = filterLenderSearch.toLowerCase().trim();
+      const nameMatch = (l.name || "").toLowerCase().includes(query);
+      const productMatch = (l.productType || "").toLowerCase().includes(query);
+      const lenderTypeMatch = (l.lenderType || "").toLowerCase().includes(query);
+      if (!nameMatch && !productMatch && !lenderTypeMatch) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const filteredEducation = educationContent.filter((item) => {
+    if (filterEduType !== "all" && item.type.toLowerCase() !== filterEduType.toLowerCase()) {
+      return false;
+    }
+    return true;
+  });
+
   // ==================== RENDERING WORKSPACE ====================
   if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
     return (
@@ -2441,14 +2544,34 @@ ${sheetDataXml}
             {/* TAB: MANAGE EDUCATION */}
             {activeTab === "education" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Education Content ({educationContent.length})</h3>
-                  <button
-                    onClick={handleOpenAddEdu}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add Content
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Education Content ({filteredEducation.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Create and update platform educational guide cards.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Education Type Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Filter Type:</span>
+                      <select
+                        value={filterEduType}
+                        onChange={(e) => setFilterEduType(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Content</option>
+                        <option value="article">Articles</option>
+                        <option value="video">Videos</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddEdu}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add Content
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2464,7 +2587,14 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {educationContent.map((item) => (
+                      {filteredEducation.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center p-6 text-gray-400">
+                            No educational content items found matching the filter criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredEducation.map((item) => (
                         <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] max-w-[240px]">
                             <div className="flex items-center gap-[8px]">
@@ -2500,7 +2630,8 @@ ${sheetDataXml}
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                     </tbody>
                   </table>
                 </div>
@@ -2510,14 +2641,37 @@ ${sheetDataXml}
             {/* TAB: MANAGE TESTS */}
             {activeTab === "tests" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({testCatalog.length})</h3>
-                  <button
-                    onClick={handleOpenAddTest}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add New Test
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Test Title Filter Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
+                      <select
+                        value={filterTestName}
+                        onChange={(e) => setFilterTestName(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Tests</option>
+                        {testCatalog.map((test) => (
+                          <option key={test.id} value={test.title}>
+                            {test.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddTest}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add New Test
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2532,7 +2686,14 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {testCatalog.map((test) => (
+                      {filteredTests.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center p-6 text-gray-400">
+                            No health tests match the selected filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTests.map((test) => (
                         <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] max-w-[200px]">
                             <strong className="text-gray-900 block truncate">{test.title}</strong>
@@ -2556,7 +2717,8 @@ ${sheetDataXml}
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                     </tbody>
                   </table>
                 </div>
@@ -2566,16 +2728,42 @@ ${sheetDataXml}
             {/* TAB: SCHEDULED CALLS FEED */}
             {activeTab === "appointments" && (
               <div className="space-y-[16px] animate-fade-in">
-                <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({allAppointments.length})</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                  </div>
+                  
+                  {/* Advisor Filter Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Advisor:</span>
+                    <select
+                      value={filterAdvisor}
+                      onChange={(e) => setFilterAdvisor(e.target.value)}
+                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                    >
+                      <option value="all">All Advisors</option>
+                      {advisors.map((adv) => (
+                        <option key={adv.id} value={adv.f2FintechId || adv.id}>
+                          {adv.name} ({adv.f2FintechId || adv.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                {allAppointments.length === 0 ? (
+                {filteredAppointments.length === 0 ? (
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
-                    <div className="text-[12px] text-gray-400 mt-[6px]">No scheduled calls have been booked on the platform yet.</div>
+                    <div className="text-[12px] text-gray-400 mt-[6px]">
+                      {filterAdvisor !== "all" 
+                        ? "No scheduled calls found for this particular advisor." 
+                        : "No scheduled calls have been booked on the platform yet."}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-[10px]">
-                    {allAppointments.map((appt, idx) => (
+                    {filteredAppointments.map((appt, idx) => (
                       <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center">
                         <div className="space-y-[4px]">
                           <div className="flex items-center gap-[8px] flex-wrap">
@@ -2653,14 +2841,32 @@ ${sheetDataXml}
             {/* TAB: MANAGE LENDERS */}
             {activeTab === "lenders" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({lenderList.length})</h3>
-                  <button
-                    onClick={handleOpenAddLender}
-                    className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                  >
-                    + Add Lender Product
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({filteredLenders.length})</h3>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize bank loan products catalog list.</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Lender Search Input */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                      <input
+                        type="text"
+                        placeholder="Search Bank/Product..."
+                        value={filterLenderSearch}
+                        onChange={(e) => setFilterLenderSearch(e.target.value)}
+                        className="h-[32px] px-[12px] w-[180px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddLender}
+                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                    >
+                      + Add Lender Product
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
@@ -2681,12 +2887,14 @@ ${sheetDataXml}
                         <tr>
                           <td colSpan={7} className="text-center p-6 text-gray-400">Loading catalog...</td>
                         </tr>
-                      ) : lenderList.length === 0 ? (
+                      ) : filteredLenders.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center p-6 text-gray-400">No lenders listed. Click "+ Add Lender Product" to seed catalog.</td>
+                          <td colSpan={7} className="text-center p-6 text-gray-400">
+                            {filterLenderSearch ? "No lenders match your search query." : "No lenders listed. Click '+ Add Lender Product' to seed catalog."}
+                          </td>
                         </tr>
                       ) : (
-                        lenderList.map((l) => (
+                        filteredLenders.map((l) => (
                           <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                             <td className="p-[12px] max-w-[200px]">
                               <strong className="text-gray-900 block">{l.name}</strong>
@@ -2768,6 +2976,32 @@ ${sheetDataXml}
 
                   {/* Row 2: Filters & Export */}
                   <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
+                    {/* Search Input */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                      <input
+                        type="text"
+                        placeholder="Search Name, Email, PAN..."
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        className="h-[32px] px-[12px] w-[200px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      />
+                    </div>
+
+                    {/* Bureau Filter Selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
+                      <select
+                        value={filterBureau}
+                        onChange={(e) => setFilterBureau(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Bureaus</option>
+                        <option value="cibil">CIBIL</option>
+                        <option value="experian">Experian</option>
+                      </select>
+                    </div>
+
                     {/* Role Filter Selector */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
@@ -2828,9 +3062,9 @@ ${sheetDataXml}
                       />
                     </div>
 
-                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
                       <button
-                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
                         className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
                       >
                         Reset Filters
@@ -2858,7 +3092,7 @@ ${sheetDataXml}
                         <th className="p-[12px]">PAN Card</th>
                         <th className="p-[12px]">Credit Score</th>
                         <th className="p-[12px]">Date & Time</th>
-                        <th className="p-[12px] text-right">PDF Report</th>
+                        <th className="p-[12px] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2967,6 +3201,12 @@ ${sheetDataXml}
                                   className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                 >
                                   Generate CAM 📊
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEnquiry(enq.id)}
+                                  className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                >
+                                  Delete Inquiry 🗑️
                                 </button>
                               </td>
                             </tr>
@@ -3876,7 +4116,7 @@ ${sheetDataXml}
                             <th className="p-[12px]">PAN Card</th>
                             <th className="p-[12px]">Credit Score</th>
                             <th className="p-[12px]">Date & Time</th>
-                            <th className="p-[12px] text-right">PDF Report</th>
+                            <th className="p-[12px] text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3985,6 +4225,12 @@ ${sheetDataXml}
                                       className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
                                     >
                                       Generate CAM 📊
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEnquiry(enq.id)}
+                                      className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                    >
+                                      Delete Inquiry 🗑️
                                     </button>
                                   </td>
                                 </tr>

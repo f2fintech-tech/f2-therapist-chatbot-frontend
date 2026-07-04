@@ -1877,9 +1877,9 @@ export default function EligibilityCibilView({
                       />
                       <FactorCard
                         label="Recent Queries"
-                        value={String(cibilReport.metrics.enquiries_l6m)}
-                        subtext="Enquiries (6M)"
-                        status={cibilReport.metrics.enquiries_l6m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l6m <= 3 ? "Good" : "Poor"}
+                        value={String(cibilReport.metrics.enquiries_l3m)}
+                        subtext="Enquiries (3M)"
+                        status={cibilReport.metrics.enquiries_l3m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
                       />
                     </div>
                     <div className="mt-4 bg-gray-50 rounded-[12px] p-3 flex items-start gap-2 text-[11px] text-gray-500 border border-gray-100">
