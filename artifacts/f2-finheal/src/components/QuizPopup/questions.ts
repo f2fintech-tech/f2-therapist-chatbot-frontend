@@ -9,7 +9,7 @@ export interface QuizQuestion {
 
 export const quizQuestions: QuizQuestion[] = [
   {
-    scenario: "Your monthly EMI is fixed, but you just got a pay bump. What do you do to reduce the total interest paid?",
+    scenario: "Your monthly EMI is fixed, but you just got a salary raise. What do you do to reduce the total interest paid?",
     options: [
       "Keep paying the same EMI and save the extra amount separately.",
       "Ask the lender to extend the loan tenure so the EMI drops.",

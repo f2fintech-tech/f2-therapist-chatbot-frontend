@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  LineChart, Line
+  LineChart, Line, Legend
 } from "recharts";
 import type { UserProfile } from "@/utils/user";
 import { listUserGoals, type Goal } from "@/utils/localGoals";
@@ -932,12 +932,40 @@ export default function Dashboard({
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [cibilLoading, setCibilLoading] = useState(false);
+  const [selectedBureauTab, setSelectedBureauTab] = useState<"cibil" | "experian">("cibil");
 
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
   const [advisors, setAdvisors] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [summaryDeptFilter, setSummaryDeptFilter] = useState<string>("all");
+
+  const loadCibilEnquiries = useCallback(() => {
+    const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+    setCibilLoading(true);
+    const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (configuredApiKey) {
+      headers["Authorization"] = `Bearer ${configuredApiKey}`;
+      headers["X-API-Key"] = configuredApiKey;
+    }
+    if (userId) {
+      headers["X-Requester-ID"] = userId;
+    }
+    fetch(`${apiBase}/cibil/enquiries`, { headers })
+      .then(res => res.json())
+      .then(data => setCibilEnquiries(data))
+      .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
+      .finally(() => setCibilLoading(false));
+  }, [userId]);
+
+  useEffect(() => {
+    window.addEventListener("finheal:cibil_update", loadCibilEnquiries);
+    return () => {
+      window.removeEventListener("finheal:cibil_update", loadCibilEnquiries);
+    };
+  }, [loadCibilEnquiries]);
+
 
   useEffect(() => {
     if (!isAdvisor) return;
@@ -995,28 +1023,14 @@ export default function Dashboard({
       .catch(err => console.error("Error loading lenders in dashboard", err));
 
     // Fetch CIBIL Enquiries
-    setCibilLoading(true);
-    const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (configuredApiKey) {
-      headers["Authorization"] = `Bearer ${configuredApiKey}`;
-      headers["X-API-Key"] = configuredApiKey;
-    }
-    if (userId) {
-      headers["X-Requester-ID"] = userId;
-    }
-    fetch(`${apiBase}/cibil/enquiries`, { headers })
-      .then(res => res.json())
-      .then(data => setCibilEnquiries(data))
-      .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
-      .finally(() => setCibilLoading(false));
+    loadCibilEnquiries();
 
     // Fetch all employees/advisors for fetch summary
     fetchAdvisors(undefined, true)
       .then(data => setEmployees(data))
       .catch(err => console.error("Error loading employees in dashboard", err));
 
-  }, [isAdmin]);
+  }, [isAdmin, loadCibilEnquiries]);
 
   // Helper to map date string to day of week
   const getDayOfWeek = (dateStr: string): string => {
@@ -1287,37 +1301,68 @@ export default function Dashboard({
     };
   }, [userId, activeTab]);
 
-  // Calculate CIBIL distribution data for users
-  const userCibilEnquiries = cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User");
-  let excellentCount = 0; // >= 750
-  let goodCount = 0;      // 700 - 749
-  let fairCount = 0;      // 600 - 699
-  let poorCount = 0;      // < 600
+  // Calculate CIBIL score distribution
+  const cibilOnlyEnquiries = cibilEnquiries.filter(enq => !enq.bureau || enq.bureau.toLowerCase() === "cibil");
+  let cibilExcellent = 0;
+  let cibilGood = 0;
+  let cibilFair = 0;
+  let cibilPoor = 0;
 
-  userCibilEnquiries.forEach(enq => {
+  cibilOnlyEnquiries.forEach(enq => {
     const scoreVal = typeof enq.score === "number" ? enq.score : parseInt(enq.score, 10);
     if (isNaN(scoreVal) || scoreVal <= 0) return;
-    if (scoreVal >= 750) excellentCount++;
-    else if (scoreVal >= 700) goodCount++;
-    else if (scoreVal >= 600) fairCount++;
-    else poorCount++;
+    if (scoreVal >= 750) cibilExcellent++;
+    else if (scoreVal >= 700) cibilGood++;
+    else if (scoreVal >= 600) cibilFair++;
+    else cibilPoor++;
   });
 
-  const totalValidScores = excellentCount + goodCount + fairCount + poorCount;
-  const isCibilDemoData = totalValidScores === 0;
+  const totalCibilValidScores = cibilExcellent + cibilGood + cibilFair + cibilPoor;
+  const isCibilDemoData = totalCibilValidScores === 0;
 
-  // Fallback to beautiful mockup counts if no data exists
-  const finalExcellent = isCibilDemoData ? 14 : excellentCount;
-  const finalGood = isCibilDemoData ? 18 : goodCount;
-  const finalFair = isCibilDemoData ? 6 : fairCount;
-  const finalPoor = isCibilDemoData ? 4 : poorCount;
-  const finalTotal = finalExcellent + finalGood + finalFair + finalPoor;
+  const finalCibilExcellent = isCibilDemoData ? 14 : cibilExcellent;
+  const finalCibilGood = isCibilDemoData ? 18 : cibilGood;
+  const finalCibilFair = isCibilDemoData ? 6 : cibilFair;
+  const finalCibilPoor = isCibilDemoData ? 4 : cibilPoor;
+  const finalCibilTotal = finalCibilExcellent + finalCibilGood + finalCibilFair + finalCibilPoor;
 
   const cibilDistributionData = [
-    { name: "Excellent (750+)", value: finalExcellent, color: "#10b981", percent: finalTotal > 0 ? Math.round((finalExcellent / finalTotal) * 100) : 0 },
-    { name: "Good (700-749)", value: finalGood, color: "#3b82f6", percent: finalTotal > 0 ? Math.round((finalGood / finalTotal) * 100) : 0 },
-    { name: "Fair (600-699)", value: finalFair, color: "#f59e0b", percent: finalTotal > 0 ? Math.round((finalFair / finalTotal) * 100) : 0 },
-    { name: "Poor (< 600)", value: finalPoor, color: "#ef4444", percent: finalTotal > 0 ? Math.round((finalPoor / finalTotal) * 100) : 0 }
+    { name: "Excellent (750+)", value: finalCibilExcellent, color: "#10b981", percent: finalCibilTotal > 0 ? Math.round((finalCibilExcellent / finalCibilTotal) * 100) : 0 },
+    { name: "Good (700-749)", value: finalCibilGood, color: "#3b82f6", percent: finalCibilTotal > 0 ? Math.round((finalCibilGood / finalCibilTotal) * 100) : 0 },
+    { name: "Fair (600-699)", value: finalCibilFair, color: "#f59e0b", percent: finalCibilTotal > 0 ? Math.round((finalCibilFair / finalCibilTotal) * 100) : 0 },
+    { name: "Poor (< 600)", value: finalCibilPoor, color: "#ef4444", percent: finalCibilTotal > 0 ? Math.round((finalCibilPoor / finalCibilTotal) * 100) : 0 }
+  ];
+
+  // Calculate Experian score distribution
+  const experianOnlyEnquiries = cibilEnquiries.filter(enq => enq.bureau && enq.bureau.toLowerCase() === "experian");
+  let expExcellent = 0;
+  let expGood = 0;
+  let expFair = 0;
+  let expPoor = 0;
+
+  experianOnlyEnquiries.forEach(enq => {
+    const scoreVal = typeof enq.score === "number" ? enq.score : parseInt(enq.score, 10);
+    if (isNaN(scoreVal) || scoreVal <= 0) return;
+    if (scoreVal >= 750) expExcellent++;
+    else if (scoreVal >= 700) expGood++;
+    else if (scoreVal >= 600) expFair++;
+    else expPoor++;
+  });
+
+  const totalExpValidScores = expExcellent + expGood + expFair + expPoor;
+  const isExpDemoData = totalExpValidScores === 0;
+
+  const finalExpExcellent = isExpDemoData ? 3 : expExcellent;
+  const finalExpGood = isExpDemoData ? 4 : expGood;
+  const finalExpFair = isExpDemoData ? 1 : expFair;
+  const finalExpPoor = isExpDemoData ? 1 : expPoor;
+  const finalExpTotal = finalExpExcellent + finalExpGood + finalExpFair + finalExpPoor;
+
+  const experianDistributionData = [
+    { name: "Excellent (750+)", value: finalExpExcellent, color: "#10b981", percent: finalExpTotal > 0 ? Math.round((finalExpExcellent / finalExpTotal) * 100) : 0 },
+    { name: "Good (700-749)", value: finalExpGood, color: "#3b82f6", percent: finalExpTotal > 0 ? Math.round((finalExpGood / finalExpTotal) * 100) : 0 },
+    { name: "Fair (600-699)", value: finalExpFair, color: "#f59e0b", percent: finalExpTotal > 0 ? Math.round((finalExpFair / finalExpTotal) * 100) : 0 },
+    { name: "Poor (< 600)", value: finalExpPoor, color: "#ef4444", percent: finalExpTotal > 0 ? Math.round((finalExpPoor / finalExpTotal) * 100) : 0 }
   ];
 
   // Calculate sorted advisors list for Super Admin
@@ -1467,7 +1512,11 @@ export default function Dashboard({
               <div className="text-white/70 text-[11px] sm:text-[12px] mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 {userProfile.email && (
                   <>
-                    <span className="truncate">📧 {userProfile.email}</span>
+                    {(isAdvisor || isStaff) ? (
+                      <span className="truncate">🆔 {userProfile.email.split("@")[0].toUpperCase()}</span>
+                    ) : (
+                      <span className="truncate">📧 {userProfile.email}</span>
+                    )}
                     <span>·</span>
                   </>
                 )}
@@ -1543,8 +1592,8 @@ export default function Dashboard({
                 <StatCard icon="👤" label="Registered Members" value={statsLoading ? "..." : String(backendStats?.registered_users ?? 0)} sub="Signed-up user accounts" color={BRAND} delay={80} />
                 <StatCard icon="📈" label="Conversion Rate" value={statsLoading || !backendStats?.total_users ? "0%" : `${Math.round((backendStats.registered_users / backendStats.total_users) * 100)}%`} sub="Guests to members" color="#10b981" delay={160} />
                 <StatCard icon="💬" label="Active Conversations" value={statsLoading ? "..." : String(backendStats?.total_conversations ?? 0)} sub="Total AI chats started" color="#6366f1" delay={240} />
-                <StatCard icon="📑" label="User CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && (!enq.bureau || enq.bureau.toLowerCase() === "cibil")).length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
-                <StatCard icon="📑" label="User Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => classifyEnquiryRole(enq.email, enq.name, advisors) === "User" && enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
+                <StatCard icon="📑" label="CIBIL Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => !enq.bureau || enq.bureau.toLowerCase() === "cibil").length)} sub="CIBIL reports generated" color="#f43f5e" delay={320} />
+                <StatCard icon="📑" label="Experian Enquiries" value={cibilLoading ? "..." : String(cibilEnquiries.filter(enq => enq.bureau && enq.bureau.toLowerCase() === "experian").length)} sub="Experian reports generated" color="#8b5cf6" delay={360} />
                 <StatCard icon="📞" label="Scheduled Calls" value={String(allAppointments.filter(a => !a.completed && !a.cancelled).length)} sub="Active consultations" color="#3b82f6" delay={400} />
                 <StatCard icon="✅" label="Completed Calls" value={String(allAppointments.filter(a => a.completed).length)} sub="Concluded consultations" color="#10b981" delay={480} />
                 <StatCard icon="🧑‍💼" label="Expert Advisors" value={String(advisors.length)} sub="Listed expert professionals" color="#d97706" delay={560} />
@@ -1554,22 +1603,24 @@ export default function Dashboard({
               {/* Additional Visual Panel */}
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
-                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs animate-fade-up" style={{ animationDelay: "100ms" }}>
-                   <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                    🏆 Platform Wellness Average
-                  </h3>
-                  <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                  
-                  <div className="flex items-end gap-[10px] mb-[12px]">
-                    <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
-                    <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
-                    <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
-                      Good Health
-                    </span>
-                  </div>
+                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                      🏆 Platform Wellness Average
+                    </h3>
+                    <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
+                    
+                    <div className="flex items-end gap-[10px] mb-[12px]">
+                      <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
+                      <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
+                      <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
+                        Good Health
+                      </span>
+                    </div>
 
-                  <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
-                    <div className="h-full bg-primary" style={{ width: "68%" }} />
+                    <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
+                      <div className="h-full bg-primary" style={{ width: "68%" }} />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
@@ -1588,84 +1639,115 @@ export default function Dashboard({
                   </div>
                 </div>
 
-                {/* Bureau Score Band Distribution (Donut Chart) */}
+                {/* Bureau Score Band Distribution (Donut Chart with Toggle) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
                   <div>
-                    <div className="flex items-center justify-between mb-[4px]">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 Bureau Score Band Distribution
+                        📊 {selectedBureauTab === "cibil" ? "CIBIL" : "Experian"} Score Band Distribution
                       </h3>
-                      {isCibilDemoData && (
-                        <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-[6px] py-[2px] rounded-[6px] uppercase tracking-wider">
-                          Demo Data
-                        </span>
-                      )}
+                      
+                      {/* Premium Tab Toggles */}
+                      <div className="flex bg-gray-100 p-0.5 rounded-[8px] border border-gray-150 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBureauTab("cibil")}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
+                            selectedBureauTab === "cibil"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          CIBIL ({cibilOnlyEnquiries.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBureauTab("experian")}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
+                            selectedBureauTab === "experian"
+                              ? "bg-white text-gray-900 shadow-xs"
+                              : "text-gray-500 hover:text-gray-800"
+                          }`}
+                        >
+                          Experian ({experianOnlyEnquiries.length})
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-[12px] text-gray-500 mb-[12px]">Credit health breakdown of platform user base (CIBIL & Experian).</p>
+                    <p className="text-[12px] text-gray-500 mb-[12px]">
+                      Credit health breakdown of platform user base ({selectedBureauTab === "cibil" ? "CIBIL" : "Experian"}).
+                    </p>
                   </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-6">
-                      {/* Donut Chart */}
-                      <div className="relative flex items-center justify-center w-[130px] h-[130px] shrink-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={cibilDistributionData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={42}
-                              outerRadius={58}
-                              paddingAngle={3}
-                              dataKey="value"
-                            >
-                              {cibilDistributionData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  const data = payload[0].payload;
-                                  return (
-                                    <div className="bg-white border border-gray-150 rounded-[10px] p-2.5 shadow-md text-[10.5px]">
-                                      <div className="font-bold" style={{ color: data.color }}>{data.name}</div>
-                                      <div className="text-gray-500 mt-0.5">
-                                        Users: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
-                                      </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-6 my-2">
+                    {/* Donut Chart */}
+                    <div className="relative flex items-center justify-center w-[130px] h-[130px] shrink-0 mx-auto">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={42}
+                            outerRadius={58}
+                            paddingAngle={3}
+                            dataKey="value"
+                          >
+                            {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-white border border-gray-150 rounded-[10px] p-2.5 shadow-md text-[10.5px]">
+                                    <div className="font-bold" style={{ color: data.color }}>{data.name}</div>
+                                    <div className="text-gray-500 mt-0.5">
+                                      Reports: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
                                     </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute flex flex-col items-center justify-center text-center">
-                          <span className="text-[18px] font-bold text-gray-900 leading-none">{totalValidScores}</span>
-                          <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5">Reports</span>
-                        </div>
-                      </div>
-
-                      {/* Legend */}
-                      <div className="flex-1 w-full space-y-1.5">
-                        {cibilDistributionData.map((item) => (
-                          <div key={item.name} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: item.color }} />
-                              <span className="text-gray-600 font-medium">{item.name}</span>
-                            </span>
-                            <span className="font-bold text-gray-800">
-                              {item.value} <span className="text-gray-400 font-normal">({item.percent}%)</span>
-                            </span>
-                          </div>
-                        ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute flex flex-col items-center justify-center text-center">
+                        <span className="text-[18px] font-bold text-gray-900 leading-none">
+                          {selectedBureauTab === "cibil" ? totalCibilValidScores : totalExpValidScores}
+                        </span>
+                        <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5">Reports</span>
                       </div>
                     </div>
 
+                    {/* Legend */}
+                    <div className="flex-1 w-full space-y-1.5">
+                      {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((item) => (
+                        <div key={item.name} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: item.color }} />
+                            <span className="text-gray-600 font-medium">{item.name}</span>
+                          </span>
+                          <span className="font-bold text-gray-800">
+                            {item.value} <span className="text-gray-400 font-normal">({item.percent}%)</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="pt-[12px] text-left text-[10.5px] text-gray-400 border-t border-gray-50 mt-[12px]">
-                    {isCibilDemoData
-                      ? "Score distribution will update automatically as platform users check their CIBIL score."
-                      : "Aggregated score stats filtered to show customer enquiries only."}
+                    {selectedBureauTab === "cibil" ? (
+                      isCibilDemoData
+                        ? "Score distribution will update automatically as platform users check their CIBIL score."
+                        : "Aggregated score stats from database (CIBIL bureau only)."
+                    ) : (
+                      isExpDemoData
+                        ? "Score distribution will update automatically as platform users check their Experian score."
+                        : "Aggregated score stats from database (Experian bureau only)."
+                    )}
                   </div>
                 </div>
               </div>
@@ -1718,8 +1800,7 @@ export default function Dashboard({
                             <th scope="col" className="px-3 py-2 font-bold text-center">Rating</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Reviews</th>
                             <th scope="col" className="px-3 py-2 font-bold text-center">Calls Done</th>
-                            <th scope="col" className="px-3 py-2 font-bold text-center">Cancelled</th>
-                            <th scope="col" className="px-3 py-2 font-bold rounded-r-lg text-right">Status</th>
+                            <th scope="col" className="px-3 py-2 font-bold rounded-r-lg text-right">Cancelled</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -1799,25 +1880,8 @@ export default function Dashboard({
                                 <td className="px-3 py-2.5 text-center font-semibold text-emerald-600">
                                   {completedCalls}
                                 </td>
-                                <td className="px-3 py-2.5 text-center font-semibold text-rose-600">
+                                <td className="px-3 py-2.5 text-right font-semibold text-rose-600">
                                   {cancelledCalls}
-                                </td>
-                                <td className="px-3 py-2.5 text-right">
-                                  {isOnline ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100/50">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                      Online
-                                    </span>
-                                  ) : isInMeeting ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100/50">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                      Meeting
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 px-2.5 py-0.5 rounded-full border border-gray-100">
-                                      Offline
-                                    </span>
-                                  )}
                                 </td>
                               </tr>
                             );
@@ -2791,7 +2855,7 @@ export default function Dashboard({
                               message = "You can only generate a report once every 7 days.";
                             } else if (detail.message) {
                               if (detail.message.includes("RESOURCE_EXHAUSTED") || detail.message.includes("429")) {
-                                message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                                message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                               } else {
                                 message = detail.message;
                               }
@@ -2800,7 +2864,7 @@ export default function Dashboard({
                             }
                           } else if (typeof detail === "string") {
                             if (detail.includes("RESOURCE_EXHAUSTED") || detail.includes("429")) {
-                              message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                              message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                             } else {
                               message = detail;
                             }
@@ -2812,7 +2876,7 @@ export default function Dashboard({
                         }
                       } catch (parseEx) {
                         if (err.message.includes("RESOURCE_EXHAUSTED") || err.message.includes("429")) {
-                          message = "⚠️ You have exceeded your Gemini API rate limit quota (429 Resource Exhausted). Please check your API key billing details, or try again in a few minutes.";
+                          message = "⚠️ The report generation service is temporarily busy. Please try again in a few minutes.";
                         } else {
                           message = err.message;
                         }
@@ -2911,12 +2975,7 @@ export default function Dashboard({
                 // Render active report content
                 return (
                   <div className="space-y-5">
-                    {/* Header Action Row */}
                     <div className="flex justify-between items-center bg-gray-50/60 p-3 rounded-2xl border border-gray-100/50 text-left">
-                      <div className="text-[11px] text-gray-500 font-semibold">
-                        🗓️ Report Period: <span className="text-gray-800 font-bold">{new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> to <span className="text-gray-800 font-bold">{new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
-                      </div>
-                      
                       <button
                         onClick={async () => {
                           setDownloadingPDF(true);
@@ -2924,33 +2983,60 @@ export default function Dashboard({
                             const html2canvas = (await import("html2canvas-pro")).default;
                             const { jsPDF } = await import("jspdf");
                             
-                            const docEl = document.getElementById("therapy-report-document-body");
-                            if (!docEl) return;
+                            const page1El = document.getElementById("therapy-report-page-1");
+                            const page2El = document.getElementById("therapy-report-page-2");
+                            if (!page1El || !page2El) return;
                             
-                            const canvas = await html2canvas(docEl, {
+                            const pdf = new jsPDF("p", "mm", "a4");
+                            
+                            // Render Page 1
+                            const originalWidth1 = page1El.style.width;
+                            const originalMaxWidth1 = page1El.style.maxWidth;
+                            const originalPadding1 = page1El.style.padding;
+                            page1El.style.width = "794px";
+                            page1El.style.maxWidth = "794px";
+                            page1El.style.padding = "30px";
+                            
+                            const canvas1 = await html2canvas(page1El, {
                               scale: 2,
                               useCORS: true,
                               allowTaint: true,
                               backgroundColor: "#ffffff"
                             });
                             
-                            const imgData = canvas.toDataURL("image/png");
-                            const pdf = new jsPDF("p", "mm", "a4");
+                            page1El.style.width = originalWidth1;
+                            page1El.style.maxWidth = originalMaxWidth1;
+                            page1El.style.padding = originalPadding1;
+                            
+                            // Render Page 2
+                            const originalWidth2 = page2El.style.width;
+                            const originalMaxWidth2 = page2El.style.maxWidth;
+                            const originalPadding2 = page2El.style.padding;
+                            page2El.style.width = "794px";
+                            page2El.style.maxWidth = "794px";
+                            page2El.style.padding = "30px";
+                            
+                            const canvas2 = await html2canvas(page2El, {
+                              scale: 2,
+                              useCORS: true,
+                              allowTaint: true,
+                              backgroundColor: "#ffffff"
+                            });
+                            
+                            page2El.style.width = originalWidth2;
+                            page2El.style.maxWidth = originalMaxWidth2;
+                            page2El.style.padding = originalPadding2;
+                            
                             const imgWidth = 210;
-                            const pageHeight = 297;
-                            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                            let heightLeft = imgHeight;
-                            let position = 0;
                             
-                            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                            heightLeft -= pageHeight;
+                            // Add Page 1
+                            const imgHeight1 = (canvas1.height * imgWidth) / canvas1.width;
+                            pdf.addImage(canvas1.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight1);
                             
-                            while (heightLeft >= 0) {
-                              position = heightLeft - imgHeight;
-                              pdf.addPage();
-                              pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                              heightLeft -= pageHeight;
-                            }
+                            // Add Page 2
+                            pdf.addPage();
+                            const imgHeight2 = (canvas2.height * imgWidth) / canvas2.width;
+                            pdf.addImage(canvas2.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight2);
                             
                             pdf.save(`FinHeal_Therapy_Report_${new Date(activeReport.startDate).toLocaleDateString().replace(/\//g, "-")}.pdf`);
                           } catch (err) {
@@ -2968,204 +3054,250 @@ export default function Dashboard({
                     </div>
 
                     {/* PDF Export Wrapper */}
-                    <div id="therapy-report-document-body" className="p-5 bg-white border border-gray-100 rounded-2xl space-y-5 text-left">
-                      <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
-                        <div>
-                          <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
-                          <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
-                        </div>
-                        <div className="text-[9px] text-gray-400 font-bold">
-                          Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                        </div>
-                      </div>
-
-                      {/* Compassionate Therapy Analysis */}
-                      <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
-                        <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
-                          Therapist Analysis
-                        </span>
-                        <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
-                          &quot;{activeReport.summary}&quot;
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Activity Summary Log */}
-                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            Period Activity Log
-                          </span>
-                          <div className="space-y-2">
-                            {[
-                              { label: "AI Therapy Chat Messages", count: activeReport.activitySummary?.msg_count || 0, icon: "💬" },
-                              { label: "CIBIL Score Checker Syncs", count: activeReport.activitySummary?.cibil_checks || 0, icon: "🔍" },
-                              { label: "Financial Quizzes Completed", count: activeReport.activitySummary?.tests_completed || 0, icon: "📝" },
-                              { label: "Loan Calculator runs", count: activeReport.activitySummary?.calculator_runs || 0, icon: "🧮" },
-                              { label: "Educational Videos Watched", count: activeReport.activitySummary?.videos_watched || 0, icon: "🎥" }
-                            ].map((item) => (
-                              <div key={item.label} className="flex justify-between items-center text-[11.5px] border-b border-gray-100/50 pb-1.5 last:border-0 last:pb-0">
-                                <span className="text-gray-500 font-medium flex items-center gap-1.5">
-                                  <span>{item.icon}</span> {item.label}
-                                </span>
-                                <span className={`font-bold rounded-full px-2 py-0.5 text-[10.5px] ${item.count > 0 ? "bg-primary/10 text-primary" : "bg-gray-100 text-gray-400"}`}>
-                                  {item.count}
-                                </span>
-                              </div>
-                            ))}
+                    <div id="therapy-report-document-body" className="bg-white border border-gray-100 rounded-2xl overflow-hidden text-left">
+                      
+                      {/* PAGE 1: Header, Analysis, Activity Log, Strengths & Weaknesses */}
+                      <div id="therapy-report-page-1" className="p-5 space-y-5">
+                        <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
+                          <div>
+                            <div className="text-[9px] font-extrabold text-primary uppercase tracking-widest">FinHeal Wellness Platform</div>
+                            <h4 className="text-[13.5px] font-extrabold text-gray-800 mt-0.5">Therapeutic Wellness & Progress Report</h4>
+                          </div>
+                          <div className="text-right flex flex-col items-end shrink-0">
+                            <span className="text-[9px] text-gray-400 font-bold">
+                              Issued on: {new Date(activeReport.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                            </span>
+                            <span className="text-[9.5px] text-primary font-bold mt-1">
+                              📅 Data Range: {new Date(activeReport.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – {new Date(activeReport.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                            </span>
                           </div>
                         </div>
 
-                        {/* Mood Trend Analysis */}
-                        <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            Avg Stress & Telemetry Trend
+                        {/* Compassionate Therapy Analysis */}
+                        <div className="bg-indigo-50/30 border border-indigo-100/50 rounded-2xl p-4 text-left relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-4 opacity-15 text-[64px] font-serif select-none pointer-events-none">“</div>
+                          <span className="text-[10px] font-extrabold text-indigo-800 bg-indigo-100/50 px-2 py-0.5 rounded-md uppercase tracking-wider mb-2.5 inline-block">
+                            Therapist Analysis
                           </span>
-                          <div className="space-y-2.5">
-                            {[
-                              { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
-                              { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
-                              { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
-                              { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
-                              { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
-                            ].map((dim) => {
-                              const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
-                              return (
-                                <div key={dim.label} className="flex items-center gap-2">
-                                  <div className="text-[11px] text-gray-600 w-[90px] font-medium shrink-0">{dim.label}</div>
-                                  <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                          <p className="text-[12.5px] italic text-gray-650 leading-relaxed font-medium relative z-10">
+                            &quot;{activeReport.summary}&quot;
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Period Activity Log with Pie/Donut Chart */}
+                          <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                                Period Activity Log
+                              </span>
+                              
+                              {(() => {
+                                const chartData = [
+                                  { name: "Chats", value: activeReport.activitySummary?.msg_count || 0, color: "#8b5cf6" },
+                                  { name: "CIBIL Syncs", value: activeReport.activitySummary?.cibil_checks || 0, color: "#06b6d4" },
+                                  { name: "Quizzes", value: activeReport.activitySummary?.tests_completed || 0, color: "#10b981" },
+                                  { name: "Calculators", value: activeReport.activitySummary?.calculator_runs || 0, color: "#f59e0b" },
+                                  { name: "Videos", value: activeReport.activitySummary?.videos_watched || 0, color: "#ec4899" }
+                                ].filter(item => item.value > 0);
+
+                                const totalCount = chartData.reduce((acc, c) => acc + c.value, 0);
+
+                                if (totalCount === 0) {
+                                  return (
+                                    <div className="text-[11px] text-gray-400 py-6 text-center">
+                                      No recorded activities during this period.
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="flex items-center gap-4">
+                                    {/* Donut Chart using Recharts */}
+                                    <div className="shrink-0 w-[120px] h-[120px] flex items-center justify-center relative">
+                                      <PieChart width={120} height={120}>
+                                        <Pie
+                                          data={chartData}
+                                          cx={55}
+                                          cy={55}
+                                          innerRadius={36}
+                                          outerRadius={50}
+                                          paddingAngle={3}
+                                          dataKey="value"
+                                        >
+                                          {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                          ))}
+                                        </Pie>
+                                      </PieChart>
+                                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-[14px] font-extrabold text-gray-800 leading-none">{totalCount}</span>
+                                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">Total</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Custom Legend */}
+                                    <div className="flex-1 space-y-1">
+                                      {chartData.map((item) => (
+                                        <div key={item.name} className="flex justify-between items-center text-[10.5px]">
+                                          <span className="text-gray-500 font-semibold flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                            {item.name}
+                                          </span>
+                                          <span className="font-extrabold text-gray-700">{item.value}</span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Mood Trend Analysis */}
+                          <div className="border border-gray-100 rounded-2xl p-4 bg-gray-50/30">
+                            <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                              Avg Stress & Telemetry Trend
+                            </span>
+                            <div className="space-y-2.5">
+                              {[
+                                { label: "Stress Level", val: activeReport.moodTrend?.stress, color: "#f43f5e" },
+                                { label: "Financial Urgency", val: activeReport.moodTrend?.urgency, color: "#ef4444" },
+                                { label: "Openness to Solutions", val: activeReport.moodTrend?.openness, color: "#10b981" },
+                                { label: "Learning Willingness", val: activeReport.moodTrend?.willingness, color: BRAND },
+                                { label: "General Emotion", val: activeReport.moodTrend?.emotion, color: "#f59e0b" }
+                              ].map((dim) => {
+                                const valLabel = typeof dim.val === "number" ? `${Math.round(dim.val)}%` : "—";
+                                return (
+                                  <div key={dim.label} className="flex items-center gap-2">
+                                    <div className="text-[11px] text-gray-650 w-[90px] font-medium shrink-0">{dim.label}</div>
+                                    <div className="flex-1 h-[4.5px] bg-gray-200 rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${dim.val ?? 0}%`, backgroundColor: dim.color }} />
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 w-[24px] text-right shrink-0">{valLabel}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Strengths & Weaknesses Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                          <div className="bg-emerald-50/20 border border-emerald-100/40 rounded-2xl p-4 text-left">
+                            <span className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider mb-2 block">
+                              🌟 Core Progress & Strengths
+                            </span>
+                            <ul className="space-y-1.5 list-disc pl-4 text-[11.5px] text-gray-650 font-medium">
+                              {(activeReport.strengths && activeReport.strengths.length > 0) ? (
+                                activeReport.strengths.map((str, idx) => (
+                                  <li key={idx}>{str}</li>
+                                ))
+                              ) : (
+                                <>
+                                  <li>Demonstrated active engagement with therapist chats.</li>
+                                  <li>Proactive in researching and testing loan calculator tools.</li>
+                                </>
+                              )}
+                            </ul>
+                          </div>
+                          <div className="bg-rose-50/20 border border-rose-100/40 rounded-2xl p-4 text-left">
+                            <span className="text-[10px] font-extrabold text-rose-800 uppercase tracking-wider mb-2 block">
+                              ⚠️ Anxieties & Areas to Focus
+                            </span>
+                            <ul className="space-y-1.5 list-disc pl-4 text-[11.5px] text-gray-650 font-medium">
+                              {(activeReport.weaknesses && activeReport.weaknesses.length > 0) ? (
+                                activeReport.weaknesses.map((weak, idx) => (
+                                  <li key={idx}>{weak}</li>
+                                ))
+                              ) : (
+                                <>
+                                  <li>Acknowledge anxiety patterns regarding debt and loan obligations.</li>
+                                  <li>Opportunity to build daily financial literacy quiz consistency.</li>
+                                </>
+                              )}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PAGE 2: Recommendations, Action Steps, Timeline Progress Graph */}
+                      <div id="therapy-report-page-2" className="p-5 space-y-5 border-t border-gray-100/50 bg-gray-50/5">
+                        {/* Key Recommendations & Takeaways */}
+                        {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
+                          <div>
+                            <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                              📋 Recommended Therapist Action Steps
+                            </span>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {activeReport.keyTakeaways.map((takeaway, idx) => (
+                                <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
+                                  <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
+                                    {takeaway}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Wellness Telemetry History Timeline */}
+                        <div className="border-t border-gray-100 pt-4 text-left">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
+                            📈 Historical Progress & Report Timeline
+                          </span>
+                          
+                          {(() => {
+                            const dateCounts: { [key: string]: number } = {};
+                            reportsList.forEach(r => {
+                              const dStr = new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                              dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
+                            });
+
+                            const sortedDates = Object.keys(dateCounts).sort((a, b) => {
+                              const year = new Date().getFullYear();
+                              return new Date(`${a}, ${year}`).getTime() - new Date(`${b}, ${year}`).getTime();
+                            });
+
+                            const historicalData = sortedDates.map(date => ({
+                              date,
+                              "Reports": dateCounts[date]
+                            }));
+
+                            if (historicalData.length <= 1) {
+                              return (
+                                <div className="bg-gray-50/50 rounded-xl p-3 border border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                                  <span>📊 Generation history will plot a line chart here once you generate future on-demand reports.</span>
+                                  <span className="font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+                                    First report: {historicalData[0]?.date || "Today"}
+                                  </span>
                                 </div>
                               );
-                            })}
-                          </div>
+                            }
+
+                            return (
+                              <div className="w-full bg-gray-50/40 rounded-xl p-3 border border-gray-100/50">
+                                <div className="h-[120px] w-full">
+                                  <LineChart width={734} height={120} data={historicalData} margin={{ top: 10, right: 15, left: -25, bottom: 0 }}>
+                                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#9ca3af" }} stroke="#e5e7eb" />
+                                    <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} stroke="#e5e7eb" allowDecimals={false} />
+                                    <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} />
+                                    <Legend wrapperStyle={{ fontSize: 9, marginTop: -5 }} />
+                                    <Line type="monotone" dataKey="Reports" name="Reports Generated" stroke="#3244e6" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                  </LineChart>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
-
-                      {/* Key Recommendations & Takeaways */}
-                      {activeReport.keyTakeaways && activeReport.keyTakeaways.length > 0 && (
-                        <div className="border-t border-gray-100 pt-4">
-                          <span className="text-[10.5px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
-                            📋 Recommended Therapist Action Steps
-                          </span>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {activeReport.keyTakeaways.map((takeaway, idx) => (
-                              <div key={idx} className="bg-amber-50/20 border border-amber-100/40 rounded-xl p-3 flex gap-2">
-                                <span className="text-[12px] text-gray-650 leading-relaxed font-semibold">
-                                  {takeaway}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
               })()}
             </div>
 
-            {/* Health summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "80ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-4">Financial Health Breakdown</div>
-                {[
-                  { label: "Savings Rate", pct: 27, color: "#10b981" },
-                  { label: "Debt Ratio", pct: emiPct, color: "#ef4444" },
-                  { label: "Credit Score", pct: Math.min(100, Math.max(0, Math.round(((cibilReport?.score || 742) - 300) / 600 * 100))), color: BRAND },
-                  { label: "Emergency Fund", pct: 20, color: "#f59e0b" },
-                  { label: "Investment Rate", pct: 12, color: "#8b5cf6" },
-                ].map((item, i) => (
-                  <div key={item.label} className="mb-3 last:mb-0">
-                    <div className="flex justify-between text-[11px] mb-1.5">
-                      <span className="text-gray-500 font-medium">{item.label}</span>
-                      <span className="font-semibold" style={{ color: item.color }}>{item.pct}%</span>
-                    </div>
-                    <AnimBar pct={item.pct} color={item.color} delay={i * 120} />
-                  </div>
-                ))}
-              </div>
 
-              <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "160ms" }}>
-                <div className="text-[13px] font-semibold text-gray-800 mb-0.5">Net Worth Trend</div>
-                <div className="text-[11px] text-gray-400 mb-3">↑ ₹78K growth in 6 months</div>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={netWorthData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
-                    <Tooltip formatter={(v: any) => `₹${v.toLocaleString()}`} />
-                    <Area type="monotone" dataKey="worth" name="Net Worth" stroke="#10b981" strokeWidth={2.5} fill="url(#gradNW)" dot={{ fill: "#10b981", r: 3 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Full income/expense bar */}
-            <div className="dashboard-card animate-fade-up p-5" style={{ animationDelay: "200ms" }}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-[13px] font-semibold text-gray-800">Monthly Cash Flow</div>
-                  <div className="text-[11px] text-gray-400">Income vs total outflows</div>
-                </div>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: BRAND }} />Income</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#ef4444]" />Expenses</span>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={dynamicSpendData} margin={{ top: 4, right: 0, left: -24, bottom: 0 }} barGap={6}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="income" name="Income" fill={BRAND} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Insight tiles */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "240ms" }}>
-              {(() => {
-                const currentScore = cibilReport?.score || 742;
-                const scoreBand = cibilReport?.band || (currentScore >= 750 ? "Excellent" : currentScore >= 700 ? "Good" : currentScore >= 630 ? "Fair" : "Poor");
-                const scoreTagColor = currentScore >= 750 ? "#10b981" : currentScore >= 700 ? BRAND : currentScore >= 630 ? "#f59e0b" : "#ef4444";
-                const scoreDesc = cibilReport
-                  ? `Report Subject: ${cibilReport.name || "N/A"}. Score is ${currentScore} (${scoreBand}). Stored PAN: ${cibilReport.pan || "N/A"}.`
-                  : "No CIBIL report fetched yet. Use the CIBIL Score Checker to sync your credit profile.";
-
-                const avgGoalProgress = localGoals.length > 0
-                  ? Math.round(localGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / localGoals.length * 100)
-                  : 0;
-
-                const tiles = [
-                  { icon: "📊", title: "CIBIL Score", value: String(currentScore), tag: scoreBand, tagColor: scoreTagColor, desc: scoreDesc },
-                  ...(!isStaff ? [{ icon: "🎯", title: "Goal Progress", value: `${avgGoalProgress}%`, tag: avgGoalProgress >= 50 ? "Good" : "Needs Attention", tagColor: avgGoalProgress >= 50 ? BRAND : "#f59e0b", desc: `${localGoals.length} active goal${localGoals.length === 1 ? "" : "s"} tracked. Redirect surplus to speed up progress.` }] : []),
-                  { icon: "💡", title: "Savings Potential", value: `₹${Math.round(incomeVal * 0.05).toLocaleString()}`, tag: "Opportunity", tagColor: "#f59e0b", desc: `Reduce unnecessary dining & transport by 5%. Redirect to your emergency fund.` },
-                ];
-
-                return tiles.map((tile) => (
-                  <div key={tile.title} className="dashboard-card p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[18px]">{tile.icon}</span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${tile.tagColor}18`, color: tile.tagColor }}>{tile.tag}</span>
-                    </div>
-                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{tile.title}</div>
-                    <div className="font-serif text-[26px] font-bold text-gray-900 leading-none mb-2">{tile.value}</div>
-                    <div className="text-[11px] text-gray-500 leading-relaxed">{tile.desc}</div>
-                  </div>
-                ));
-              })()}
-            </div>
           </div>
         )}
 

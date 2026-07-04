@@ -429,6 +429,201 @@ main > div.sticky > div:first-child {
 }
 
 /* Premium styling and shadow glows for profile avatar trigger */
+@media print {
+  /* Reset height/overflow limitations for all scrollable parent elements */
+  html, body, #root, #root *, main, article, section {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Make sure we preserve the absolute and relative positions for layout charts, dials, etc. */
+  .absolute {
+    position: absolute !important;
+  }
+  .relative {
+    position: relative !important;
+  }
+  
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Make sure the modal backdrop parent wrapper is visible and acts as a static block */
+  .cibil-modal-backdrop,
+  .cibil-modal-backdrop * {
+    visibility: visible !important;
+  }
+  
+  .cibil-modal-backdrop {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Make the modal content dialog wrapper full width and non-restricted in height */
+  .cibil-modal-content {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Allow the scroll wrapper to expand fully so browser handles pages naturally */
+  .cibil-modal-scroll {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .cibil-print-section,
+  .cibil-print-section * {
+    visibility: visible !important;
+  }
+  
+  .cibil-print-section {
+    display: block !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+
+  .cibil-print-scrollable {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .cibil-print-hide,
+  .cibil-print-hide * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Ensure colors and background-colors print exactly as defined */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Styling to hide specific elements when compiling a client-side PDF document */
+.cibil-pdf-downloading .cibil-print-hide {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Reset height/overflow limitations during pdf download so canvas renders full content */
+.cibil-pdf-downloading.cibil-print-section {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+}
+
+.cibil-pdf-downloading .cibil-print-scrollable {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: block !important;
+}
+
+/* Show user name in header only inside the downloaded PDF */
+.cibil-pdf-only-name {
+  display: none !important;
+}
+.cibil-pdf-downloading .cibil-pdf-only-name {
+  display: inline-block !important;
+}
+
+/* Pad all page view headers on the right to accommodate the global pinned profile avatar */
+main > div.border-b:not(.sticky),
+main > header.border-b,
+div.flex-col > header.border-b,
+main > div.sticky > div:first-child {
+  padding-right: 64px !important;
+}
+
+/* Position and center the global profile dropdown avatar vertically in a straight line */
+.global-profile-dropdown {
+  top: 10px; /* Standard vertical alignment for w-10 h-10 avatar in standard headers */
+}
+
+/* Center in taller headers (height: ~72px, avatar: 40px) */
+.eligibility-view ~ .global-profile-dropdown,
+.cibil-view ~ .global-profile-dropdown,
+.profile-view ~ .global-profile-dropdown,
+.loan-calculator-view ~ .global-profile-dropdown,
+.education-view ~ .global-profile-dropdown {
+  top: 16px;
+}
+
+/* Center in mid-size/standard headers (height: ~62px, avatar: 40px) */
+.reminders-view ~ .global-profile-dropdown,
+.emergency-fund-view ~ .global-profile-dropdown,
+.credit-readiness-view ~ .global-profile-dropdown,
+.loan-fit-view ~ .global-profile-dropdown,
+.financial-literacy-view ~ .global-profile-dropdown,
+.test-catalog-view ~ .global-profile-dropdown,
+.chat-view ~ .global-profile-dropdown,
+.debt-balance-view ~ .global-profile-dropdown,
+.admin-view ~ .global-profile-dropdown,
+.advisor-view ~ .global-profile-dropdown {
+  top: 11px;
+}
+
+/* Center vertically in the Dashboard view's hero profile banner (aligns with the glassmorphic cards) */
+@media (min-width: 640px) {
+  .dashboard-view ~ .global-profile-dropdown {
+    top: 40px;
+  }
+}
+@media (max-width: 639px) {
+  .dashboard-view ~ .global-profile-dropdown {
+    top: 32px;
+  }
+}
+
+/* Premium styling and shadow glows for profile avatar trigger */
 .global-profile-avatar {
   box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
@@ -441,4 +636,112 @@ main > div.sticky > div:first-child {
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   border-color: rgba(255, 255, 255, 1);
 }
+
+/* ANIMATION: AVATAR RING */
+
+@keyframes avatarGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
+  }
+}
+
+.advisor-view .grid > div:has(.bg-emerald-500) img,
+.advisor-view .grid > div:has(.bg-emerald-500) .w-\[64px\] {
+  animation: avatarGlowPulse 2s ease-out infinite;
+}
+
+/* ANIMATION: CARD HOVER */
+
+.advisor-card,
+.advisor-view .grid > div {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.25s ease !important;
+}
+
+.advisor-card:hover,
+.advisor-view .grid > div:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12) !important;
+}
+
+.advisor-card img,
+.advisor-card .w-\[64px\],
+.advisor-view .grid > div img,
+.advisor-view .grid > div .w-\[64px\] {
+  transition: transform 0.3s ease !important;
+}
+
+.advisor-card:hover img,
+.advisor-card:hover .w-\[64px\],
+.advisor-view .grid > div:hover img,
+.advisor-view .grid > div:hover .w-\[64px\] {
+  transform: scale(1.08) !important;
+}
+
+/* ANIMATION: TAGS */
+
+.advisor-view .grid span.bg-\[\#f6f7fe\] {
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease !important;
+  display: inline-block !important;
+}
+
+.advisor-view .grid span.bg-\[\#f6f7fe\]:hover {
+  transform: scale(1.07) !important;
+  background-color: #3244e6 !important;
+  color: #ffffff !important;
+  border-color: #3244e6 !important;
+}
+
+/* ANIMATION: BUTTON SHIMMER */
+
+@keyframes shimmerBtnSweep {
+  0% {
+    left: -150%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
+.advisor-view button {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.advisor-view button::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -150% !important;
+  width: 50% !important;
+  height: 100% !important;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0) 100%
+  ) !important;
+  transform: skewX(-25deg) !important;
+  pointer-events: none !important;
+}
+
+.advisor-view button:hover::before {
+  animation: shimmerBtnSweep 0.55s ease forwards !important;
+}
+
+/* ANIMATION: BUTTON SUCCESS */
+
+.booking-success-flash {
+  background: #10b981 !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+
+
 
