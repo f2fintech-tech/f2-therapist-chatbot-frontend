@@ -663,8 +663,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
             )}
 
-            {/* If Expert/Advisor/Staff — only show Workspace if they have at least one active permission */}
-            {isStaff && !isSuperAdmin && userPermissions.length > 0 && (
+            {/* If Expert/Advisor/Staff — show Workspace if they are a front-facing advisor */}
+            {isUserAdvisor(userEmail) && !isSuperAdmin && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 

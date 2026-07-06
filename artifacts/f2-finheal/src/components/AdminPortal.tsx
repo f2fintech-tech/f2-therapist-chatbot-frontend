@@ -5492,7 +5492,7 @@ ${sheetDataXml}
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
               <CibilAnalyzerView 
-                userId={userId || "admin"} 
+                userId={cibilEnquiries.find((e: any) => e.id === viewingCibilReportId)?.user_id || userId || "admin"}
                 overrideReport={viewingCibilReport} 
                 reportId={viewingCibilReportId || undefined}
                 onToggleSidebar={() => {}} 
