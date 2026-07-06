@@ -110,7 +110,7 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
       <div className="bg-gray-50 rounded-[10px] p-3">
         <div className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Remaining</div>
-        <div className="text-[16px] font-bold" style={{ color }}>₹{remaining.toLocaleString()}</div>
+        <div className="text-[16px] font-extrabold" style={{ color }}>₹{remaining.toLocaleString("en-IN")}</div>
       </div>
     </div>
   );
@@ -2748,7 +2748,7 @@ export default function Dashboard({
             )}
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <StatCard icon="💰" label="Total Outstanding" value={`₹${(totalDebtVal / 100000).toFixed(1)}L`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
+              <StatCard icon="💰" label="Total Outstanding" value={`₹${totalDebtVal.toLocaleString("en-IN")}`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
               <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub="Sync'd from credit report" color="#f59e0b" delay={80} />
             </div>
 
