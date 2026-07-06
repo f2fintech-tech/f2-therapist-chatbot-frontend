@@ -237,6 +237,23 @@ export async function fetchTestResults(userId: string): Promise<{
   return authRequest(`test-results/${encodeURIComponent(userId)}`, { method: "GET" });
 }
 
+export interface AdminTestResult {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  test_type: string;
+  score: number | null;
+  percentage_score: number | null;
+  risk_level: string | null;
+  category: string | null;
+  completed_at: string;
+}
+
+export async function fetchAllTestResults(): Promise<AdminTestResult[]> {
+  return authRequest("test-results/", { method: "GET" });
+}
+
 export async function fetchUserProfile(userId: string): Promise<BackendUserProfile> {
   return authRequest(`auth/profile/${encodeURIComponent(userId)}`, { method: "GET" });
 }
