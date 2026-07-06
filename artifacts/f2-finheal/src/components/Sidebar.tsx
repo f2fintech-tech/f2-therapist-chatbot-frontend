@@ -6,6 +6,7 @@ import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Goal } from "@/utils/localGoals";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
 interface SidebarProps {
   userId: string;
@@ -61,17 +62,44 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
 
   useEffect(() => {
-    try {
-      const storedSession = localStorage.getItem("finheal-auth-session");
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        setUserPermissions(parsed?.permissions || []);
-      } else {
+    const isSuperAdmin = userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase());
+
+    const loadPermissions = async () => {
+      // Super admins have all permissions — no need to check
+      if (isSuperAdmin) {
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
+        return;
+      }
+
+      // Check if userId is an Employee ID (F2-XXX-XXX), not a UUID
+      const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (isEmployeeId) {
+        try {
+          const data = await fetchAdvisorProfile(userId);
+          setUserPermissions(data.permissions || []);
+          return;
+        } catch (e) {
+          // fall through to localStorage
+        }
+      }
+
+      // Fallback: read from cached session in localStorage
+      try {
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          setUserPermissions(parsed?.permissions || []);
+        } else {
+          setUserPermissions([]);
+        }
+      } catch (e) {
         setUserPermissions([]);
       }
-    } catch (e) {
-      setUserPermissions([]);
-    }
+    };
+
+    void loadPermissions();
+    window.addEventListener("finheal:advisors_update", () => void loadPermissions());
+    return () => window.removeEventListener("finheal:advisors_update", () => void loadPermissions());
   }, [userId, userEmail]);
 
   useEffect(() => {
@@ -271,26 +299,18 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     return false;
   };
 
-  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
 
   const hasPermission = (perm: string) => {
     if (isSuperAdmin) return true;
     if (!isStaff) return true;
-    try {
-      const storedSession = localStorage.getItem("finheal-auth-session");
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed && !("permissions" in parsed)) {
-          return true;
-        }
-      }
-    } catch (e) {}
     return userPermissions.includes(perm);
   };
 
   const handleOpenAdmin = () => {
-    setActiveNav(isUserAdvisor(userEmail) ? "Advisor Workspace" : "Admin Portal");
+    setActiveNav(isStaff && !isSuperAdmin ? "Advisor Workspace" : "Admin Portal");
     onOpenAdmin?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
@@ -643,8 +663,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
             )}
 
-            {/* If Expert/Advisor */}
-            {isUserAdvisor(userEmail) && (
+            {/* If Expert/Advisor/Staff — only show Workspace if they have at least one active permission */}
+            {isStaff && !isSuperAdmin && userPermissions.length > 0 && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 

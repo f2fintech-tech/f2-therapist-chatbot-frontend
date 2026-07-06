@@ -14,6 +14,7 @@ interface AdminPortalProps {
   userEmail: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  initialTab?: string;
 }
 
 interface Appointment {
@@ -290,21 +291,32 @@ function EmployeeDirectory({
   );
 }
 
-export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
+export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
 
 
   // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries
   // Dynamic URL Routing for admin tabs (replacing local useState to support URLs like /admin/tests)
-  const [match, params] = useRoute("/admin/:tab");
+  const [matchAdmin, paramsAdmin] = useRoute("/admin/:tab");
+  const [matchWorkspace, paramsWorkspace] = useRoute("/advisor-workspace/:tab");
+  const match = matchAdmin || matchWorkspace;
+  const params = matchAdmin ? paramsAdmin : paramsWorkspace;
+  
   const [_, setLocation] = useLocation();
-  const activeTab = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
+  
+  const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
     ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees")
-    : "experts";
+    : null;
+    
+  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(initialTab) 
+    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") 
+    : null;
+    
+  const activeTab = activeTabUrl || validInitialTab || "experts";
 
   const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") => {
-    setLocation(`/admin/${newTab}`);
+    setLocation(isAdmin ? `/admin/${newTab}` : `/advisor-workspace/${newTab}`);
   };
 
   // State Management
@@ -409,7 +421,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
   });
 
   // Education form state
@@ -527,7 +539,32 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return found ? found.id : null;
   };
 
-  const currentExpertId = getExpertIdFromEmail(userEmail);
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  const currentExpertId = isEmployeeId ? userId : getExpertIdFromEmail(userEmail);
+  
+  const foundAdvisor = currentExpertId ? advisors.find(a => (a.id === currentExpertId || a.f2FintechId === currentExpertId)) : null;
+  
+  // Construct a fallback expert profile from session if they are an employee but not in the public advisors list
+  const activeExpert = foundAdvisor || (isEmployeeId ? (() => {
+    try {
+      const sessionStr = localStorage.getItem("finheal-auth-session");
+      if (sessionStr) {
+        const parsed = JSON.parse(sessionStr);
+        return {
+          id: userId,
+          f2FintechId: userId,
+          name: parsed.displayName || userEmail,
+          isAdvisor: parsed.isAdvisor || false,
+          permissions: parsed.permissions || [],
+          expertise: [],
+          designation: "Staff",
+          avatarUrl: "",
+          rating: 0
+        };
+      }
+    } catch (e) {}
+    return null;
+  })() : null);
 
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [limitFetchCount, setLimitFetchCount] = useState(0);
@@ -615,8 +652,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
-    // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
-    if (!isAdmin) {
+    // 0. Filter by Manager ownership (if logged-in user is not Super Admin and does not have cibil_view_all permission)
+    const hasViewAllPerm = activeExpert?.permissions?.includes("cibil_view_all");
+    if (!isAdmin && !hasViewAllPerm) {
       const cleanUserEmail = (userEmail || "").toLowerCase().trim();
       const cleanEnqEmail = (enq.email || "").toLowerCase().trim();
       const cleanExpertId = (currentExpertId || "").toLowerCase().trim();
@@ -1712,7 +1750,7 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -1739,7 +1777,7 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -2300,7 +2338,6 @@ ${sheetDataXml}
     setReschedulingApptId(null);
   };
 
-  const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
   const activeExpertAppointments = allAppointments.filter(a => a.advisorId === currentExpertId);
   const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
@@ -2356,7 +2393,18 @@ ${sheetDataXml}
   });
 
   // ==================== RENDERING WORKSPACE ====================
-  if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
+  let hasSessionPermission = false;
+  try {
+    const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
+    hasSessionPermission = (session?.permissions || []).includes("cibil_view") || (session?.permissions || []).includes("cibil_view_all");
+  } catch (e) {}
+
+  const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
+    hasSessionPermission || 
+    (activeExpert?.permissions || []).some(p => p === "cibil_view" || p === "cibil_view_all")
+  ));
+  console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
+  if (!isAdmin && !isEmployeeId) {
     return (
       <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
         <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
@@ -2410,35 +2458,37 @@ ${sheetDataXml}
         {/* ========================================================================= */}
         {/* ===================== SUPER ADMIN VIEW RENDER =========================== */}
         {/* ========================================================================= */}
-        {isAdmin ? (
+        {showAdminView ? (
           <div className="space-y-[24px]">
 
             {/* TABS MENU */}
-            <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", overflowX: "auto", maxWidth: "100%", scrollbarWidth: "none" }} className="no-scrollbar">
-              <style>{`
-                .no-scrollbar::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
-              {[
-                { id: "experts", label: "🧑‍💼 Manage Experts" },
-                { id: "education", label: "📚 Manage Education" },
-                { id: "tests", label: "🧭 Manage Tests" },
-                { id: "appointments", label: "📅 Scheduled Calls" },
-                { id: "lenders", label: "🏦 Lenders Catalog" },
-                { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
-                { id: "employees", label: "👥 Employees Directory" }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
-                  className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
-                    }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            {isAdmin && (
+              <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", overflowX: "auto", maxWidth: "100%", scrollbarWidth: "none" }} className="no-scrollbar">
+                <style>{`
+                  .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
+                {[
+                  { id: "experts", label: "🧑‍💼 Manage Experts" },
+                  { id: "education", label: "📚 Manage Education" },
+                  { id: "tests", label: "🧭 Manage Tests" },
+                  { id: "appointments", label: "📅 Scheduled Calls" },
+                  { id: "lenders", label: "🏦 Lenders Catalog" },
+                  { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
+                  { id: "employees", label: "👥 Employees Directory" }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id as any)}
+                    className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
+                      }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
 
 
@@ -4005,7 +4055,7 @@ ${sheetDataXml}
                 </div>
 
                 {/* Section: CIBIL Enquiries */}
-                {activeExpert?.permissions?.includes("cibil_view") && (
+                {(activeExpert?.permissions?.includes("cibil_view") || activeExpert?.permissions?.includes("cibil_view_all")) && (
                   <div className="border border-gray-200 rounded-[20px] p-[20px] bg-white shadow-sm space-y-[16px] text-left animate-fade-in mt-[20px]">
                     <div className="border-b border-gray-100 pb-3 space-y-3">
                       {/* Row 1: Title & Pagination */}
@@ -4377,6 +4427,7 @@ ${sheetDataXml}
                   {[
                     { key: "cibil_fetch", label: "Credit Report Fetching" },
                     { key: "cibil_view", label: "View Credit Records" },
+                    { key: "cibil_view_all", label: "View All Credit Reports" },
                     { key: "scheduled_calls", label: "Manage Call Calendars" },
                     { key: "lenders_edit", label: "Edit Lenders Catalog" },
                     { key: "education_edit", label: "Edit Education Content" },
