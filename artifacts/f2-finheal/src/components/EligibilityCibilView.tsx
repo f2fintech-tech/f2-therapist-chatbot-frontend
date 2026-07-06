@@ -23,6 +23,7 @@ import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
 export function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
@@ -81,6 +82,7 @@ interface EligibilityCibilViewProps {
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
+  onOpenAdmin?: (tab?: string) => void;
 }
 
 export interface LenderProduct {
@@ -287,10 +289,103 @@ export default function EligibilityCibilView({
   onToggleInsights,
   onApplyNow,
   onTalkToAdvisor,
+  onOpenAdmin,
 }: EligibilityCibilViewProps) {
   const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil">("eligibility");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const { toast } = useToast();
+
+  const isUserAdvisor = (email?: string) => {
+    if (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) return false;
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          ) && a.isAdvisor === true
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const isStaff = useMemo(() => {
+    const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    return isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
+  }, [userId, userEmail]);
+
+  const isSuperAdmin = useMemo(() => {
+    return userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
+  }, [userEmail]);
+
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const isSuperAdmin = userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase());
+
+    const loadPermissions = async () => {
+      if (isSuperAdmin) {
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
+        return;
+      }
+
+      // If userId looks like an Employee ID (not a UUID), fetch fresh from backend
+      const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (isEmployeeId) {
+        try {
+          const data = await fetchAdvisorProfile(userId);
+          setUserPermissions(data.permissions || []);
+          return;
+        } catch (e) {
+          // fall through to localStorage
+        }
+      }
+
+      // Fallback: read from cached session
+      try {
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          setUserPermissions(parsed?.permissions || []);
+        } else {
+          setUserPermissions([]);
+        }
+      } catch (e) {
+        setUserPermissions([]);
+      }
+    };
+
+    void loadPermissions();
+    window.addEventListener("finheal:advisors_update", () => void loadPermissions());
+    return () => window.removeEventListener("finheal:advisors_update", () => void loadPermissions());
+  }, [userId, userEmail]);
+
+  const hasCibilFetchPermission = useMemo(() => {
+    if (isSuperAdmin) return true;
+    if (!isStaff) return true;
+    return userPermissions.includes("cibil_fetch");
+  }, [isStaff, isSuperAdmin, userPermissions]);
+
+  const hasCibilViewPermission = useMemo(() => {
+    if (isSuperAdmin) return true;
+    if (!isStaff) return false;
+    return userPermissions.includes("cibil_view") || userPermissions.includes("cibil_view_all");
+  }, [isStaff, isSuperAdmin, userPermissions]);
 
   // CIBIL Score States
   const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
@@ -990,6 +1085,17 @@ export default function EligibilityCibilView({
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>CIBIL Score Checker</span>
           </button>
+          
+          {hasCibilViewPermission && (
+            <button
+              type="button"
+              onClick={() => onOpenAdmin?.("cibil-enquiries")}
+              className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>Past Reports fetched</span>
+            </button>
+          )}
         </div>
 
         {/* ----------------- ELIGIBILITY CHECKER SUBTAB ----------------- */}
@@ -1401,7 +1507,31 @@ export default function EligibilityCibilView({
                 <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
                   
-                  {storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
+                  {!hasCibilFetchPermission ? (
+                    <div className="text-center py-4">
+                      <div className="mx-auto w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 mb-3">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-[16px] font-bold text-gray-900">
+                        Credit Check Locked
+                      </h2>
+                      <p className="text-[11px] text-gray-400 mt-[2px] font-semibold">Access Denied</p>
+                      <div className="my-4 p-4 rounded-[14px] bg-rose-550 border border-rose-100 text-rose-900 text-left" style={{ backgroundColor: "#fef2f2" }}>
+                        <p className="text-[12px] leading-normal text-rose-700 font-medium">
+                          You do not have permission to fetch credit score reports. Please contact your Super Admin to adjust your Role-Based Access controls (RBA).
+                        </p>
+                      </div>
+                      {storedCibilReport && (
+                        <button
+                          type="button"
+                          onClick={() => setCibilReport(storedCibilReport)}
+                          className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                        >
+                          View Stored Report
+                        </button>
+                      )}
+                    </div>
+                  ) : storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
                     <div className="text-center py-4">
                       <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
                         <Lock className="w-5 h-5" />
@@ -1877,9 +2007,9 @@ export default function EligibilityCibilView({
                       />
                       <FactorCard
                         label="Recent Queries"
-                        value={String(cibilReport.metrics.enquiries_l3m)}
-                        subtext="Enquiries (3M)"
-                        status={cibilReport.metrics.enquiries_l3m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
+                        value={String(cibilReport.metrics.enquiries_l6m)}
+                        subtext="Enquiries (6M)"
+                        status={cibilReport.metrics.enquiries_l6m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l6m <= 2 ? "Good" : "Poor"}
                       />
                     </div>
                     <div className="mt-4 bg-gray-50 rounded-[12px] p-3 flex items-start gap-2 text-[11px] text-gray-500 border border-gray-100">

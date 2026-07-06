@@ -97,6 +97,7 @@ export default function FinHealChat() {
     if (location === "/tests/loan-fit" || location === "/loan-fit") return "loan-fit";
     if (location === "/tests/credit-readiness" || location === "/credit-readiness") return "credit-readiness";
     if (location === "/tests/debt-balance" || location === "/debt-balance") return "debt-balance";
+    if (location.startsWith("/advisor-workspace")) return location.substring(1);
     return "chat";
   }, [location]) as any;
 
@@ -400,6 +401,109 @@ export default function FinHealChat() {
     };
   }, [userId]);
 
+  // Sync auth session profile & permissions from backend on load, on tab focus, and periodically
+  useEffect(() => {
+    if (!authSession || authSession.isGuest) return;
+
+    const syncProfile = async () => {
+      try {
+        const email = authSession.email || "";
+
+        // Super admins have no advisor profile row — skip sync entirely
+        const isSuperAdmin = email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase());
+        if (isSuperAdmin) return;
+
+        const isStaff = authSession.isAdvisor || isUserAdvisor(email);
+        
+        if (isStaff) {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+          
+          // For advisor sessions, authSession.userId IS their Employee ID (e.g. "F2-369-403").
+          // Use it directly. Only fall back to email-prefix lookup if userId looks like a UUID.
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+          let f2FintechId = authSession.userId;
+          
+          if (isUUID) {
+            // Standard user UUID — try to resolve via advisors list by email
+            const stored = localStorage.getItem("finheal_advisors_list");
+            if (stored) {
+              try {
+                const list = JSON.parse(stored);
+                const matched = list.find((a: any) =>
+                  a.f2FintechId && email && (
+                    email.toLowerCase() === a.f2FintechId.toLowerCase() ||
+                    email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+                  )
+                );
+                if (matched) {
+                  f2FintechId = matched.f2FintechId;
+                } else if (email) {
+                  f2FintechId = email.split("@")[0];
+                }
+              } catch (e) {}
+            } else if (email) {
+              f2FintechId = email.split("@")[0];
+            }
+          }
+
+          const res = await fetch(`${apiBase}/advisors/profile/${encodeURIComponent(f2FintechId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const nextSession = {
+              ...authSession,
+              isAdvisor: data.is_advisor,
+              permissions: data.permissions || [],
+              displayName: data.name || authSession.displayName,
+              avatarUrl: data.avatar_url || authSession.avatarUrl,
+            };
+             if (
+              authSession.isAdvisor !== nextSession.isAdvisor ||
+              JSON.stringify(authSession.permissions) !== JSON.stringify(nextSession.permissions) ||
+              authSession.displayName !== nextSession.displayName ||
+              authSession.avatarUrl !== nextSession.avatarUrl
+            ) {
+              setStoredAuthSession(nextSession);
+              setAuthSession(nextSession);
+              window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sync auth session profile:", err);
+      }
+    };
+
+    // 1. Initial sync on load
+    void syncProfile();
+
+    // 2. Re-sync when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncProfile();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 3. Re-sync on custom advisors update events
+    const handleAdvisorsEvent = () => {
+      void syncProfile();
+    };
+    window.addEventListener("finheal:advisors_update", handleAdvisorsEvent);
+
+    // 4. Periodic fallback: re-sync every 60s
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncProfile();
+      }
+    }, 60_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("finheal:advisors_update", handleAdvisorsEvent);
+      clearInterval(intervalId);
+    };
+  }, [authSession]);
+
   // Redirect staff users away from goals page
   useEffect(() => {
     if (authSession) {
@@ -480,7 +584,11 @@ export default function FinHealChat() {
   const openEducation = () => setMainView("education");
   const openProfilePage = () => setMainView("profile");
   const openAdvisor = () => setMainView("advisor");
-  const openAdmin = () => setMainView("admin");
+  const openAdmin = (tab?: string) => {
+    const isSuperAdmin = authSession?.email ? ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase()) : false;
+    const basePath = isSuperAdmin ? "admin" : "advisor-workspace";
+    setMainView(tab ? `${basePath}/${tab}` : basePath);
+  };
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
@@ -572,7 +680,7 @@ export default function FinHealChat() {
       ? "Settings"
       : mainView === "advisor"
         ? "Talk to an Advisor"
-        : mainView === "admin"
+        : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace"))
           ? (isUserAdvisor(authSession?.email)
               ? "Advisor Workspace"
               : "Admin Portal")
@@ -923,12 +1031,13 @@ export default function FinHealChat() {
             isGuest={authSession?.isGuest ?? true}
             onLoginRequired={handleLogout}
           />
-        ) : mainView === "admin" ? (
+        ) : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) ? (
           <AdminPortal
             userId={userId}
             userEmail={authSession.email || ""}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
+            initialTab={mainView.split("/")[1] || "experts"}
           />
         ) : mainView === "loan-calculator" ? (
           <LoanCalculatorView
@@ -980,6 +1089,7 @@ export default function FinHealChat() {
             onToggleInsights={() => setInsightsOpen((open) => !open)}
             onApplyNow={handleApplyLoan}
             onTalkToAdvisor={() => setMainView("advisor")}
+            onOpenAdmin={openAdmin}
           />
         ) : mainView === "cibil-analyzer" ? (
           <CibilAnalyzerView
