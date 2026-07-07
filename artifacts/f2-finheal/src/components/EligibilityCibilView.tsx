@@ -345,16 +345,13 @@ export default function EligibilityCibilView({
         return;
       }
 
-      // If userId looks like an Employee ID (not a UUID), fetch fresh from backend
+       // If userId looks like an Employee ID (not a UUID), fetch fresh from backend
       const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
       if (isEmployeeId) {
         try {
-<<<<<<< HEAD
-=======
           // Temporarily use any since the function isn't perfectly mapped in scope without importing
           // We will restore the import as well
           const { fetchAdvisorProfile } = await import('@/lib/backendAuth');
->>>>>>> 16f07adce2c1c2b991e3b1934c36deb774a28e39
           const data = await fetchAdvisorProfile(userId);
           setUserPermissions(data.permissions || []);
           return;
@@ -393,10 +390,7 @@ export default function EligibilityCibilView({
     if (!isStaff) return false;
     return userPermissions.includes("cibil_view") || userPermissions.includes("cibil_view_all");
   }, [isStaff, isSuperAdmin, userPermissions]);
-<<<<<<< HEAD
-=======
 
->>>>>>> 16f07adce2c1c2b991e3b1934c36deb774a28e39
   // CIBIL Score States
   const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
   const [storedCibilReport, setStoredCibilReport] = useState<CibilReport | null>(null);
@@ -1166,10 +1160,6 @@ export default function EligibilityCibilView({
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>CIBIL Score Checker</span>
           </button>
-<<<<<<< HEAD
-=======
-          
->>>>>>> 16f07adce2c1c2b991e3b1934c36deb774a28e39
           {hasCibilViewPermission && (
             <button
               type="button"
@@ -1180,10 +1170,6 @@ export default function EligibilityCibilView({
               <span>Past Reports fetched</span>
             </button>
           )}
-<<<<<<< HEAD
-
-=======
->>>>>>> 16f07adce2c1c2b991e3b1934c36deb774a28e39
           <button
             type="button"
             onClick={() => setCibilSubTab("bsa")}
