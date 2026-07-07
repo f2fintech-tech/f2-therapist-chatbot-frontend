@@ -7,7 +7,6 @@ import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Goal } from "@/utils/localGoals";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
 interface SidebarProps {
   userId: string;
