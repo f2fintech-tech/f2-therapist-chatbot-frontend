@@ -1156,8 +1156,6 @@ export default function EligibilityCibilView({
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>CIBIL Score Checker</span>
           </button>
-<<<<<<< HEAD
-          
           {hasCibilViewPermission && (
             <button
               type="button"
@@ -1168,7 +1166,7 @@ export default function EligibilityCibilView({
               <span>Past Reports fetched</span>
             </button>
           )}
-=======
+
           <button
             type="button"
             onClick={() => setCibilSubTab("bsa")}
@@ -1181,7 +1179,6 @@ export default function EligibilityCibilView({
             <Sparkles className="h-4 w-4 shrink-0" />
             <span>Bank Statement Analyzer</span>
           </button>
->>>>>>> c8b39b81c48894f5942f6b4cc3bbc4da75ac572e
         </div>
 
         {/* ----------------- ELIGIBILITY CHECKER SUBTAB ----------------- */}
