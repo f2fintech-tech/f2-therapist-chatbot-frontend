@@ -291,9 +291,6 @@ function EmployeeDirectory({
   );
 }
 
-<<<<<<< HEAD
-export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
-=======
 const TEST_NAMES: Record<string, string> = {
   "financial-literacy": "Money IQ Arena",
   "financial_literacy": "Money IQ Arena",
@@ -308,8 +305,7 @@ const TEST_NAMES: Record<string, string> = {
 };
 
 
-export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
->>>>>>> 7d873db2284100e2289fc7891a1331f51ba472e9
+export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
 
