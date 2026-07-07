@@ -2037,7 +2037,7 @@ export default function EligibilityCibilView({
       </div>
 
       {/* Floating Comparison Bar */}
-      {selectedLenderIds.length > 0 && (
+      {cibilSubTab === "eligibility" && selectedLenderIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-[600px] animate-fade-up">
           <div className="bg-white rounded-[20px] border border-gray-250 shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
