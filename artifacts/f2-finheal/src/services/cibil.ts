@@ -22,6 +22,7 @@ export interface CibilReportMetric {
   credit_utilization_pct: number;
   credit_history_age_years: number;
   enquiries_l6m: number;
+  enquiries_l3m: number;
   secured_loans_count: number;
   unsecured_loans_count: number;
   write_offs: number;

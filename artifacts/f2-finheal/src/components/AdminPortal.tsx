@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
@@ -291,7 +291,25 @@ function EmployeeDirectory({
   );
 }
 
+<<<<<<< HEAD
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
+=======
+const TEST_NAMES: Record<string, string> = {
+  "financial-literacy": "Money IQ Arena",
+  "financial_literacy": "Money IQ Arena",
+  "debt-balance": "Debt Pressure Analysis",
+  "debt_balance": "Debt Pressure Analysis",
+  "emergency-fund": "Financial Safety Score",
+  "emergency_fund": "Financial Safety Score",
+  "credit-readiness": "Credit Health Analyzer",
+  "credit_readiness": "Credit Health Analyzer",
+  "loan-fit": "Loan Comfort Analysis",
+  "loan_fit": "Loan Comfort Analysis"
+};
+
+
+export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
+>>>>>>> 7d873db2284100e2289fc7891a1331f51ba472e9
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
 
@@ -331,6 +349,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterTestName, setFilterTestName] = useState<string>("all");
   const [filterLenderSearch, setFilterLenderSearch] = useState<string>("");
   const [filterEduType, setFilterEduType] = useState<string>("all");
+  const [filterApptStatus, setFilterApptStatus] = useState<string>("all");
+  const [filterApptStartDate, setFilterApptStartDate] = useState<string>("");
+  const [filterApptEndDate, setFilterApptEndDate] = useState<string>("");
+
+  // Manage Tests Submissions States
+  const [testSubTab, setTestSubTab] = useState<"templates" | "logs">("templates");
+  const [testSubmissions, setTestSubmissions] = useState<AdminTestResult[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState<boolean>(false);
+  const [submissionsSearch, setSubmissionsSearch] = useState<string>("");
+  const [submissionsPage, setSubmissionsPage] = useState<number>(1);
 
   // Lenders Catalog States
   const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
@@ -1651,6 +1679,25 @@ ${sheetDataXml}
     }
   }, [currentExpertId, isAdmin]);
 
+  // Load test submissions
+  useEffect(() => {
+    if (isAdmin && activeTab === "tests") {
+      loadTestSubmissions();
+    }
+  }, [isAdmin, activeTab]);
+
+  const loadTestSubmissions = async () => {
+    setSubmissionsLoading(true);
+    try {
+      const data = await fetchAllTestResults();
+      setTestSubmissions(data);
+    } catch (err) {
+      console.error("Error loading test submissions:", err);
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!expertNextSlot) {
       const today = new Date();
@@ -2362,6 +2409,26 @@ ${sheetDataXml}
         }
       }
     }
+    
+    // Status Filter
+    if (filterApptStatus !== "all") {
+      const isCompleted = appt.completed || hasSessionEnded(appt.date, appt.time);
+      const isCancelled = appt.cancelled;
+      const isPending = !appt.completed && !appt.cancelled && !hasSessionEnded(appt.date, appt.time);
+      
+      if (filterApptStatus === "completed" && !isCompleted) return false;
+      if (filterApptStatus === "cancelled" && !isCancelled) return false;
+      if (filterApptStatus === "pending" && !isPending) return false;
+    }
+    
+    // Date Range Filter
+    if (filterApptStartDate) {
+      if (appt.date < filterApptStartDate) return false;
+    }
+    if (filterApptEndDate) {
+      if (appt.date > filterApptEndDate) return false;
+    }
+    
     return true;
   });
 
@@ -2371,6 +2438,35 @@ ${sheetDataXml}
     }
     return true;
   });
+
+  const filteredSubmissions = useMemo(() => {
+    return testSubmissions.filter((sub) => {
+      // 1. Filter by Test Name
+      if (filterTestName !== "all") {
+        const subFriendlyName = TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ");
+        if (filterTestName.toLowerCase().trim() !== subFriendlyName.toLowerCase().trim()) {
+          return false;
+        }
+      }
+      // 2. Filter by search query (user name, email)
+      if (submissionsSearch.trim() !== "") {
+        const query = submissionsSearch.toLowerCase().trim();
+        const nameMatch = (sub.user_name || "").toLowerCase().includes(query);
+        const emailMatch = (sub.user_email || "").toLowerCase().includes(query);
+        if (!nameMatch && !emailMatch) return false;
+      }
+      return true;
+    });
+  }, [testSubmissions, filterTestName, submissionsSearch]);
+
+  // Submissions pagination parameters
+  const submissionsPerPage = 8;
+  const totalSubPages = Math.ceil(filteredSubmissions.length / submissionsPerPage) || 1;
+  const safeSubPage = Math.min(submissionsPage, totalSubPages);
+  const paginatedSubmissions = useMemo(() => {
+    const startIndex = (safeSubPage - 1) * submissionsPerPage;
+    return filteredSubmissions.slice(startIndex, startIndex + submissionsPerPage);
+  }, [filteredSubmissions, safeSubPage]);
 
   const filteredLenders = lenderList.filter((l) => {
     if (filterLenderSearch.trim() !== "") {
@@ -2688,117 +2784,381 @@ ${sheetDataXml}
               </div>
             )}
 
-            {/* TAB: MANAGE TESTS */}
+            {/* TAB: MANAGE HEALTH TESTS */}
             {activeTab === "tests" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Test Title Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
-                      <select
-                        value={filterTestName}
-                        onChange={(e) => setFilterTestName(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Tests</option>
-                        {testCatalog.map((test) => (
-                          <option key={test.id} value={test.title}>
-                            {test.title}
-                          </option>
-                        ))}
-                      </select>
+                {/* Secondary Sub-Tabs Toggle */}
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <button
+                    onClick={() => setTestSubTab("templates")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition border-none cursor-pointer ${
+                      testSubTab === "templates"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-transparent text-gray-400 hover:text-gray-650"
+                    }`}
+                  >
+                    📋 Test Templates
+                  </button>
+                  <button
+                    onClick={() => setTestSubTab("logs")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition border-none cursor-pointer ${
+                      testSubTab === "logs"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-transparent text-gray-400 hover:text-gray-650"
+                    }`}
+                  >
+                    📝 User Submissions Log
+                  </button>
+                </div>
+
+                {testSubTab === "templates" && (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
+                        <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Test Title Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
+                          <select
+                            value={filterTestName}
+                            onChange={(e) => setFilterTestName(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Tests</option>
+                            {testCatalog.map((test) => (
+                              <option key={test.id} value={test.title}>
+                                {test.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={handleOpenAddTest}
+                          className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                        >
+                          + Add New Test
+                        </button>
+                      </div>
                     </div>
 
-                    <button
-                      onClick={handleOpenAddTest}
-                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                    >
-                      + Add New Test
-                    </button>
-                  </div>
-                </div>
+                    <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                            <th className="p-[12px]">Test Title</th>
+                            <th className="p-[12px]">Duration</th>
+                            <th className="p-[12px]">Primary Focus</th>
+                            <th className="p-[12px]">Score output</th>
+                            <th className="p-[12px] text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredTests.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center p-6 text-gray-400">
+                                No health tests match the selected filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredTests.map((test) => (
+                            <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                              <td className="p-[12px] max-w-[200px]">
+                                <strong className="text-gray-900 block truncate">{test.title}</strong>
+                                <span className="text-[10px] text-gray-400 block truncate">{test.description}</span>
+                              </td>
+                              <td className="p-[12px] font-semibold text-gray-600">{test.duration}</td>
+                              <td className="p-[12px] text-gray-500">{test.focus}</td>
+                              <td className="p-[12px] text-gray-400">{test.result}</td>
+                              <td className="p-[12px] text-right space-x-[6px]">
+                                <button
+                                  onClick={() => handleOpenEditTest(test)}
+                                  className="text-primary hover:underline font-bold cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTest(test.id)}
+                                  className="text-rose-500 hover:underline font-bold cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
 
-                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
-                  <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
-                        <th className="p-[12px]">Test Title</th>
-                        <th className="p-[12px]">Duration</th>
-                        <th className="p-[12px]">Primary Focus</th>
-                        <th className="p-[12px]">Score output</th>
-                        <th className="p-[12px] text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTests.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-center p-6 text-gray-400">
-                            No health tests match the selected filter.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredTests.map((test) => (
-                        <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
-                          <td className="p-[12px] max-w-[200px]">
-                            <strong className="text-gray-900 block truncate">{test.title}</strong>
-                            <span className="text-[10px] text-gray-400 block truncate">{test.description}</span>
-                          </td>
-                          <td className="p-[12px] font-semibold text-gray-600">{test.duration}</td>
-                          <td className="p-[12px] text-gray-500">{test.focus}</td>
-                          <td className="p-[12px] text-gray-400">{test.result}</td>
-                          <td className="p-[12px] text-right space-x-[6px]">
+                {testSubTab === "logs" && (
+                  <>
+                    <div className="border-b border-gray-100 pb-3 space-y-3">
+                      {/* Row 1: Title and pagination */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-[14px] font-bold text-gray-900">User Submissions Log ({filteredSubmissions.length})</h3>
+                          <p className="text-[10px] text-gray-400 mt-[2px]">View and search scores for financial wellness tests taken by platform users.</p>
+                        </div>
+                        
+                        {/* Compact Pagination Controls in top right corner */}
+                        {filteredSubmissions.length > 0 && (
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
-                              onClick={() => handleOpenEditTest(test)}
-                              className="text-primary hover:underline font-bold cursor-pointer"
+                              disabled={safeSubPage === 1}
+                              onClick={() => setSubmissionsPage(prev => Math.max(prev - 1, 1))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                              title="Previous Page"
                             >
-                              Edit
+                              ←
                             </button>
+                            <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                              {safeSubPage} / {totalSubPages}
+                            </span>
                             <button
-                              onClick={() => handleDeleteTest(test.id)}
-                              className="text-rose-500 hover:underline font-bold cursor-pointer"
+                              disabled={safeSubPage === totalSubPages}
+                              onClick={() => setSubmissionsPage(prev => Math.min(prev + 1, totalSubPages))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-655 transition flex items-center justify-center cursor-pointer"
+                              title="Next Page"
                             >
-                              Delete
+                              →
                             </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 2: Filters */}
+                      <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                          <input
+                            type="text"
+                            placeholder="Search Name or Email..."
+                            value={submissionsSearch}
+                            onChange={(e) => {
+                              setSubmissionsSearch(e.target.value);
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[12px] w-[180px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                          />
+                        </div>
+
+                        {/* Test Title Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Test Taken:</span>
+                          <select
+                            value={filterTestName}
+                            onChange={(e) => {
+                              setFilterTestName(e.target.value);
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Tests</option>
+                            {testCatalog.map((test) => (
+                              <option key={test.id} value={test.title}>
+                                {test.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reset Filters */}
+                        {(submissionsSearch !== "" || filterTestName !== "all") && (
+                          <button
+                            onClick={() => {
+                              setSubmissionsSearch("");
+                              setFilterTestName("all");
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-150 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full min-w-[750px] text-left text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                            <th className="p-[12px]">User Identity</th>
+                            <th className="p-[12px]">Test Title</th>
+                            <th className="p-[12px]">Calculated Score</th>
+                            <th className="p-[12px]">Assessment Outcome</th>
+                            <th className="p-[12px]">Date Completed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {submissionsLoading ? (
+                            <tr>
+                              <td colSpan={5} className="text-center p-6 text-gray-400">Loading user submissions...</td>
+                            </tr>
+                          ) : filteredSubmissions.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center p-6 text-gray-400">No submissions found matching filter criteria.</td>
+                            </tr>
+                          ) : (
+                            paginatedSubmissions.map((sub) => {
+                              let riskColor = "text-gray-600 bg-gray-50 border-gray-200";
+                              if (sub.risk_level) {
+                                const r = sub.risk_level.toLowerCase();
+                                if (r.includes("high") || r.includes("severe")) {
+                                  riskColor = "text-rose-700 bg-rose-50 border-rose-200";
+                                } else if (r.includes("mod") || r.includes("medium")) {
+                                  riskColor = "text-amber-700 bg-amber-50 border-amber-250";
+                                } else if (r.includes("low") || r.includes("minimal")) {
+                                  riskColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                                }
+                              }
+                              
+                              return (
+                                <tr key={sub.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                  <td className="p-[12px]">
+                                    <strong className="text-gray-900 block">{sub.user_name || "Guest User"}</strong>
+                                    {sub.user_email && <span className="text-[10px] text-gray-400 block">{sub.user_email}</span>}
+                                    <span className="text-[9px] text-gray-400 block font-mono">UID: {sub.user_id}</span>
+                                  </td>
+                                  <td className="p-[12px] font-semibold text-gray-700 capitalize">
+                                    {sub.test_type ? (TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ")) : "-"}
+                                  </td>
+                                  <td className="p-[12px]">
+                                    {sub.score !== null ? (
+                                      <div className="space-y-[2px]">
+                                        <span className="text-[13px] font-extrabold text-gray-900">{sub.score} points</span>
+                                        {sub.percentage_score !== null && (
+                                          <span className="text-[10px] text-gray-400 block">Percentage: {sub.percentage_score}%</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-[12px]">
+                                    <div className="space-y-[4px]">
+                                      {sub.category && (
+                                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-150 uppercase">
+                                          {sub.category}
+                                        </span>
+                                      )}
+                                      {sub.risk_level && (
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-extrabold uppercase border ml-1 ${riskColor}`}>
+                                          {sub.risk_level}
+                                        </span>
+                                      )}
+                                      {!sub.category && !sub.risk_level && <span className="text-gray-400">-</span>}
+                                    </div>
+                                  </td>
+                                  <td className="p-[12px] text-gray-500">
+                                    {new Date(sub.completed_at).toLocaleString("en-IN", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      hour12: true
+                                    })}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
             {/* TAB: SCHEDULED CALLS FEED */}
             {activeTab === "appointments" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                <div className="border-b border-gray-100 pb-3 space-y-3">
+                  {/* Row 1: Title */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
+                      <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                    </div>
                   </div>
                   
-                  {/* Advisor Filter Dropdown */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Advisor:</span>
-                    <select
-                      value={filterAdvisor}
-                      onChange={(e) => setFilterAdvisor(e.target.value)}
-                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                    >
-                      <option value="all">All Advisors</option>
-                      {advisors.map((adv) => (
-                        <option key={adv.id} value={adv.f2FintechId || adv.id}>
-                          {adv.name} ({adv.f2FintechId || adv.id})
-                        </option>
-                      ))}
-                    </select>
+                  {/* Row 2: Filters Grid/Flex */}
+                  <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
+                    {/* Advisor Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Advisor:</span>
+                      <select
+                        value={filterAdvisor}
+                        onChange={(e) => setFilterAdvisor(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Advisors</option>
+                        {advisors.map((adv) => (
+                          <option key={adv.id} value={adv.f2FintechId || adv.id}>
+                            {adv.name} ({adv.f2FintechId || adv.id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Status:</span>
+                      <select
+                        value={filterApptStatus}
+                        onChange={(e) => setFilterApptStatus(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Active / Booked</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Date Filters */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                      <input
+                        type="date"
+                        value={filterApptStartDate}
+                        onChange={(e) => setFilterApptStartDate(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                      <input
+                        type="date"
+                        value={filterApptEndDate}
+                        onChange={(e) => setFilterApptEndDate(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Reset Button */}
+                    {(filterAdvisor !== "all" || filterApptStatus !== "all" || filterApptStartDate !== "" || filterApptEndDate !== "") && (
+                      <button
+                        onClick={() => {
+                          setFilterAdvisor("all");
+                          setFilterApptStatus("all");
+                          setFilterApptStartDate("");
+                          setFilterApptEndDate("");
+                        }}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                      >
+                        Reset
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2806,8 +3166,8 @@ ${sheetDataXml}
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
                     <div className="text-[12px] text-gray-400 mt-[6px]">
-                      {filterAdvisor !== "all" 
-                        ? "No scheduled calls found for this particular advisor." 
+                      {(filterAdvisor !== "all" || filterApptStatus !== "all" || filterApptStartDate !== "" || filterApptEndDate !== "") 
+                        ? "No scheduled calls match the selected filter criteria." 
                         : "No scheduled calls have been booked on the platform yet."}
                     </div>
                   </div>
