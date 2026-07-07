@@ -36,6 +36,9 @@ import CibilAnalyzerView from "@/components/CibilAnalyzerView";
 import EligibilityCibilView from "@/components/EligibilityCibilView";
 import Dashboard from "@/components/Dashboard";
 import RemindersView from "@/components/RemindersView";
+import { useIdleTimeout } from "@/hooks/useIdleTimeout";
+
+const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 
 export default function FinHealChat() {
@@ -527,6 +530,11 @@ export default function FinHealChat() {
     setInsightsOpen(false);
     setMainView("chat");
   };
+
+  // Auto-logout after 6 hours of inactivity
+  useIdleTimeout(() => {
+    if (authSession) handleLogout();
+  }, SESSION_TIMEOUT_MS);
 
   const handleSendMessage = useCallback(async (text: string) => {
     await chat.sendMessage(text);
