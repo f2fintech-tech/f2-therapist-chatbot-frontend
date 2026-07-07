@@ -26,7 +26,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
 
-export function getLenderLogoUrl(name: string): string | null {
+function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
   if (clean.includes("icici")) return "/icici_bank.png";
   if (clean.includes("axis")) return "/axis_bank.png";
@@ -292,7 +292,7 @@ export default function EligibilityCibilView({
   onTalkToAdvisor,
   onOpenAdmin,
 }: EligibilityCibilViewProps) {
-  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil">("eligibility");
+  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa">("eligibility");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const { toast } = useToast();
 
@@ -420,6 +420,15 @@ export default function EligibilityCibilView({
   const [eligDegree, setEligDegree] = useState<string>("MBBS");
   const [eligExperience, setEligExperience] = useState<string>("3");
 
+  // BSA States
+  const [bsaUploading, setBsaUploading] = useState<boolean>(false);
+  const [bsaPassword, setBsaPassword] = useState<string>("");
+  const [bsaVerified, setBsaVerified] = useState<boolean>(false);
+  const [bsaExcelUrl, setBsaExcelUrl] = useState<string>("");
+  const [bsaBankName, setBsaBankName] = useState<string>("");
+  const [bsaPeriod, setBsaPeriod] = useState<string>("");
+  const [bsaError, setBsaError] = useState<string | null>(null);
+
   // Lenders Catalog State
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
@@ -509,6 +518,66 @@ export default function EligibilityCibilView({
       window.removeEventListener("finheal:lenders_update", handleUpdate);
     };
   }, []);
+
+  const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBsaUploading(true);
+    setBsaError(null);
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("file", file);
+    if (bsaPassword) {
+      formData.append("password", bsaPassword);
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Failed to analyze bank statement");
+      }
+
+      const data = await res.json();
+      
+      // Auto-fill states
+      if (data.metrics) {
+        setEligIncome(String(Math.round(data.metrics.verified_monthly_salary)));
+        setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi)));
+      }
+      if (data.excel_report_url) {
+        setBsaExcelUrl(data.excel_report_url);
+      }
+      setBsaBankName(data.bank_name || "Verified Bank");
+      setBsaPeriod(data.metrics?.statement_period || "");
+      setBsaVerified(true);
+      
+      toast({
+        title: "Bank Statement Verified!",
+        description: `Income: ${formatCurrency(data.metrics.verified_monthly_salary)}, EMI: ${formatCurrency(data.metrics.total_existing_monthly_emi)}`,
+      });
+      
+      // Dispatch update to sync other components
+      window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+    } catch (err: any) {
+      console.error(err);
+      setBsaError(err.message || "Failed to process file");
+      toast({
+        title: "Analysis Failed",
+        description: err.message || "Failed to process bank statement",
+        variant: "destructive",
+      });
+    } finally {
+      setBsaUploading(false);
+    }
+  };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -609,8 +678,6 @@ export default function EligibilityCibilView({
   };
 
   const handleGenerateCAM = async () => {
-    const report = cibilReport || storedCibilReport;
-    if (!report) return;
     setIsGeneratingCAM(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -630,7 +697,8 @@ export default function EligibilityCibilView({
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const cleanName = report.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      const report = cibilReport || storedCibilReport;
+      const cleanName = report?.name ? report.name.replace(/[^a-zA-Z0-9_]/g, "_") : "User";
       link.setAttribute("href", url);
       link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
       link.style.visibility = "hidden";
@@ -1088,6 +1156,7 @@ export default function EligibilityCibilView({
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>CIBIL Score Checker</span>
           </button>
+<<<<<<< HEAD
           
           {hasCibilViewPermission && (
             <button
@@ -1099,6 +1168,20 @@ export default function EligibilityCibilView({
               <span>Past Reports fetched</span>
             </button>
           )}
+=======
+          <button
+            type="button"
+            onClick={() => setCibilSubTab("bsa")}
+            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              cibilSubTab === "bsa"
+                ? "bg-primary text-white shadow-md"
+                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span>Bank Statement Analyzer</span>
+          </button>
+>>>>>>> c8b39b81c48894f5942f6b4cc3bbc4da75ac572e
         </div>
 
         {/* ----------------- ELIGIBILITY CHECKER SUBTAB ----------------- */}
@@ -1127,10 +1210,19 @@ export default function EligibilityCibilView({
                 </div>
               </div>
 
+
+
               {/* Monthly Income */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
+                    {bsaVerified && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-150">
+                        <Check className="h-2.5 w-2.5" /> Verified
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligIncome) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
@@ -1162,7 +1254,14 @@ export default function EligibilityCibilView({
               {/* Existing EMIs */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
+                    {bsaVerified && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-150">
+                        <Check className="h-2.5 w-2.5" /> Verified
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligEmi) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
@@ -2410,6 +2509,117 @@ export default function EligibilityCibilView({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- BANK STATEMENT ANALYZER (BSA) SUBTAB ----------------- */}
+      {cibilSubTab === "bsa" && (
+        <div className="animate-fade-up max-w-[500px] mx-auto my-6 flex flex-col gap-6">
+          
+          {/* Card 1: Upload Box */}
+          <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
+            
+            <div className="flex items-center justify-center gap-2 text-center w-full">
+              <Sparkles className="h-4.5 w-4.5 text-indigo-600 animate-pulse shrink-0" />
+              <span className="text-[14.5px] font-extrabold text-indigo-950">Verify instantly with Bank Statement Analyzer</span>
+            </div>
+            <p className="text-[12px] text-gray-500 leading-normal text-center w-full">
+              Upload your 3-6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
+            </p>
+            
+            {bsaVerified ? (
+              <div className="bg-white border border-emerald-100 rounded-[10px] p-3.5 flex flex-col items-center justify-center gap-2 shadow-sm text-center">
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span className="text-[12.5px] font-bold text-gray-850">{bsaBankName} Verified</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 font-semibold">Period: {bsaPeriod}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBsaVerified(false);
+                    setBsaExcelUrl("");
+                    setBsaBankName("");
+                    setBsaPeriod("");
+                    setBsaError(null);
+                  }}
+                  className="text-[11px] text-rose-500 font-extrabold hover:underline cursor-pointer bg-transparent border-none p-0 mt-1"
+                >
+                  Reset Statement
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="Enter statement password (if any)"
+                    value={bsaPassword}
+                    onChange={(e) => setBsaPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-[10px] text-[12px] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium shadow-inner"
+                  />
+                </div>
+                
+                <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
+                  <FileText className="h-4.5 w-4.5 text-indigo-500" />
+                  <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
+                    {bsaUploading ? "Analyzing statement..." : "Upload Bank Statement (PDF/Excel)"}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".pdf,.xls,.xlsx,.csv"
+                    className="hidden"
+                    onChange={handleBsaUpload}
+                    disabled={bsaUploading}
+                  />
+                </label>
+                {bsaError && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-rose-500 font-medium text-center justify-center w-full">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {bsaError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: Results Dashboard / Empty State */}
+          <div className="w-full">
+            {bsaVerified ? (
+              <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden flex flex-col items-center justify-center gap-4 text-center animate-fade-up">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500" />
+                
+                <h3 className="text-[15px] font-extrabold text-gray-800">Bank Statement Analyzed Successfully</h3>
+                
+                {bsaExcelUrl ? (
+                  <a
+                    href={bsaExcelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-6 py-3 rounded-[12px] bg-indigo-600 text-white text-[13px] font-bold border border-indigo-700 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-md cursor-pointer font-sans"
+                  >
+                    <Download className="h-4 w-4" /> Download BSA Excel Report
+                  </a>
+                ) : (
+                  <p className="text-[12px] text-gray-500">Retrieving secure Excel link...</p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-700">No Statement Uploaded Yet</h3>
+                  <p className="text-[11.5px] text-gray-400 mt-1 max-w-[340px] leading-normal font-medium font-sans">
+                    Please upload your bank e-statement above. The system will process your cashflows and show a detailed dashboard of your verified financial indicators here.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

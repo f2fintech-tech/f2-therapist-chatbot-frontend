@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackendRequestError, ChatMessage, MoodDimensions } from "@/lib/backendChat";
 import { extractMoodDimensions, formatConversationDateLabel, formatMessageTimestamp } from "@/lib/backendChat";
 import type { UserProfile } from "@/utils/user";
+import { useToast } from "@/hooks/use-toast";
 
 
 import StreamingMessage from "./StreamingMessage";
@@ -60,6 +61,7 @@ export default function ChatArea({
   onOpenEligibilityCibil,
   onOpenProfile,
 }: ChatAreaProps) {
+  const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [showAd, setShowAd] = useState(true);
@@ -177,6 +179,76 @@ export default function ChatArea({
 
   const handleFileSelected = async (file: File | null) => {
     if (!file || isLoading || isSendingMessage) return;
+
+    // Check if the file is a PDF, Excel, or CSV and ask if it's a bank statement
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const isDocType = ext && ['pdf', 'xls', 'xlsx', 'csv'].includes(ext);
+
+    if (isDocType) {
+      const isBsa = window.confirm(
+        `Would you like to analyze "${file.name}" as a bank statement to verify your loan eligibility?`
+      );
+      
+      if (isBsa) {
+        const password = window.prompt(
+          "If this statement is password-protected, enter the password (otherwise leave blank):"
+        );
+        
+        toast({
+          title: "Analyzing Statement",
+          description: "Analyzing statement using Bank Statement Analyzer API...",
+        });
+
+        const formData = new FormData();
+        formData.append("user_id", userProfile.userId);
+        formData.append("file", file);
+        if (password !== null && password !== "") {
+          formData.append("password", password);
+        }
+
+        try {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+          const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const errJson = await res.json();
+            throw new Error(errJson.detail || "Failed to analyze bank statement");
+          }
+
+          const data = await res.json();
+          
+          toast({
+            title: "Bank Statement Verified!",
+            description: "Your monthly income and EMIs have been updated successfully.",
+          });
+
+          // Dispatch sync event
+          window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+
+          // Send message to bot to react to the upload
+          const verifiedIncome = data.metrics?.verified_monthly_salary || 0;
+          const verifiedEmi = data.metrics?.total_existing_monthly_emi || 0;
+          const formattedIncome = Number(verifiedIncome).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+          const formattedEmi = Number(verifiedEmi).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+          await onSendMessage(
+            `I have uploaded my bank statement. It verifies my gross monthly income as ${formattedIncome} and existing EMIs as ${formattedEmi}. Please analyze my loan eligibility based on this.`
+          );
+        } catch (err: any) {
+          console.error(err);
+          toast({
+            title: "Analysis Failed",
+            description: err.message || "Failed to process bank statement",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = async () => {
       const result = reader.result as string | ArrayBuffer | null;
