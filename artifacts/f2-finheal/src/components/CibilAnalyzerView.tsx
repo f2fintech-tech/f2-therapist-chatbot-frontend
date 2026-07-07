@@ -778,7 +778,7 @@ export default function CibilAnalyzerView({
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
+      <div className="flex-1 overflow-y-auto no-scrollbar p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
           // State A: Form to retrieve CIBIL Report
           <div className="mx-auto max-w-[520px] my-[24px]">
             <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">

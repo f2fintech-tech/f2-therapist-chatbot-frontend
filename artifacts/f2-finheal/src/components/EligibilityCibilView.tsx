@@ -1132,7 +1132,7 @@ export default function EligibilityCibilView({
       </header>
 
       {/* Main Content Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
         
         {/* CIBIL / Eligibility Tab Switcher */}
         <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5 cibil-print-hide">
@@ -2526,7 +2526,7 @@ export default function EligibilityCibilView({
               <span className="text-[14.5px] font-extrabold text-indigo-950">Verify instantly with Bank Statement Analyzer</span>
             </div>
             <p className="text-[12px] text-gray-500 leading-normal text-center w-full">
-              Upload your 3-6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
+              Upload your 6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
             </p>
             
             {bsaVerified ? (

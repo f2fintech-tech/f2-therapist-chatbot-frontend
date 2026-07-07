@@ -699,7 +699,7 @@ export default function FinHealChat() {
               : mainView === "cibil-analyzer"
                 ? "CIBIL Analyzer"
                 : mainView === "eligibility-cibil"
-                  ? "Eligibility & CIBIL Checker"
+                  ? "Eligibility, CIBIL & BSA"
                   : mainView === "dashboard"
                     ? "My Dashboard"
                     : mainView === "reminders"
@@ -1082,7 +1082,7 @@ export default function FinHealChat() {
                 setMainView("advisor");
               } else if (page === "Financial Education") {
                 setMainView("education");
-              } else if (page === "Eligibility & CIBIL Checker") {
+              } else if (page === "Eligibility, CIBIL & BSA") {
                 setMainView("eligibility-cibil");
               }
             }}
