@@ -25,6 +25,7 @@ import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
+
 export function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
   if (clean.includes("icici")) return "/icici_bank.png";
@@ -386,13 +387,14 @@ export default function EligibilityCibilView({
     if (!isStaff) return false;
     return userPermissions.includes("cibil_view") || userPermissions.includes("cibil_view_all");
   }, [isStaff, isSuperAdmin, userPermissions]);
-
   // CIBIL Score States
   const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
   const [storedCibilReport, setStoredCibilReport] = useState<CibilReport | null>(null);
   const [cibilLoading, setCibilLoading] = useState<boolean>(true);
   const [cibilFetching, setCibilFetching] = useState<boolean>(false);
   const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
+
+
   const [cibilError, setCibilError] = useState<string | null>(null);
   const [cibilName, setCibilName] = useState<string>("");
   const [cibilFirstName, setCibilFirstName] = useState<string>("");
@@ -1018,7 +1020,7 @@ export default function EligibilityCibilView({
         <div className="flex items-center gap-[10px]">
           <button
             onClick={onToggleSidebar}
-            className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-gray-50 hover:bg-gray-100 lg:hidden cursor-pointer"
+            className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-gray-50 hover:bg-gray-100 lg:hidden cursor-pointer cibil-print-hide"
             aria-label="Toggle Navigation"
           >
             ☰
@@ -1034,7 +1036,7 @@ export default function EligibilityCibilView({
         
         {/* Currency & Database Indicators */}
         <div className="flex flex-wrap items-center gap-[12px] shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cibil-print-hide">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.5px]">Currency:</span>
             <div className="relative">
               <select
@@ -1053,6 +1055,7 @@ export default function EligibilityCibilView({
               </div>
             </div>
           </div>
+
         </div>
       </header>
 
@@ -1060,7 +1063,7 @@ export default function EligibilityCibilView({
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
         
         {/* CIBIL / Eligibility Tab Switcher */}
-        <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5">
+        <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5 cibil-print-hide">
           <button
             type="button"
             onClick={() => setCibilSubTab("eligibility")}
@@ -1959,7 +1962,7 @@ export default function EligibilityCibilView({
                         href={cibilReport.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
                       >
                         <Download className="w-4 h-4 shrink-0" />
                         <span>Download PDF Report</span>
@@ -1969,7 +1972,7 @@ export default function EligibilityCibilView({
                       type="button"
                       onClick={handleGenerateCAM}
                       disabled={isGeneratingCAM}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
                       <Sparkles className="w-4 h-4 shrink-0" />
                       <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
@@ -1977,7 +1980,7 @@ export default function EligibilityCibilView({
                     <button
                       type="button"
                       onClick={() => setCibilReport(null)}
-                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
                     >
                       Check Different PAN
                     </button>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
