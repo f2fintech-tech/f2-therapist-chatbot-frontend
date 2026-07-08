@@ -509,22 +509,22 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
         )}
 
         {/* BANNER PROMO */}
-        <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px] mb-[20px]">
-          <div className="absolute right-[-24px] top-[-24px] h-[120px] w-[120px] rounded-full bg-gradient-to-br from-primary to-[#7c8cff] opacity-10" />
+        <section className="relative overflow-hidden rounded-[24px] border border-transparent bg-primary p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px] mb-[20px]">
+          <div className="absolute right-[-24px] top-[-24px] h-[120px] w-[120px] rounded-full bg-white/10 opacity-20" />
           <div className="relative z-10 max-w-[640px]">
             <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
               Learning Hub
             </div>
-            <h1 className="font-serif text-[28px] leading-[1.1] text-gray-900 sm:text-[34px]">
+            <h1 className="font-serif text-[28px] leading-[1.1] text-white sm:text-[34px]">
               Master your money with structured learning.
             </h1>
-            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-gray-600 sm:text-[14px]">
+            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-white/80 sm:text-[14px]">
               Explore expert-curated articles, video guides, and interactive quizzes to build your financial intelligence.
             </p>
-            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">📖 Articles & Guides</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🎥 Expert Videos</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px] flex items-center gap-[4px]">🧠 Interactive Quizzes</span>
+            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-white/90">
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">📖 Articles & Guides</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">🎥 Expert Videos</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] flex items-center gap-[4px] backdrop-blur-md">🧠 Interactive Quizzes</span>
             </div>
           </div>
         </section>

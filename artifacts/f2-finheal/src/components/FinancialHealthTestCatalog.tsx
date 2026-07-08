@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { fetchTestResults } from "@/lib/backendAuth";
 
 interface FinancialHealthTestCatalogProps {
-  userId?: string;
+  userId: string;
   isGuest?: boolean;
   onLoginRequired?: () => void;
   onToggleSidebar: () => void;
@@ -14,6 +14,14 @@ interface FinancialHealthTestCatalogProps {
   onOpenDebtBalanceReview: () => void;
   onOpenCreditReadiness?: () => void;
   onViewPastResult?: (testId: string) => void;
+  onOpenCustomTest?: (testId: string) => void;
+}
+
+export interface TestQuestion {
+  id: string;
+  questionText: string;
+  options: string[];
+  correctOptionIndex: number;
 }
 
 export type TestCard = {
@@ -24,6 +32,7 @@ export type TestCard = {
   focus: string;
   result: string;
   accent: string;
+  questions?: TestQuestion[];
 };
 
 type PastResult = {
@@ -95,7 +104,7 @@ export const testCards: TestCard[] = [
 
 export default function FinancialHealthTestCatalog({
   userId,
-  isGuest = false,
+  isGuest = true,
   onLoginRequired,
   onToggleSidebar,
   onToggleInsights,
@@ -105,35 +114,50 @@ export default function FinancialHealthTestCatalog({
   onOpenDebtBalanceReview,
   onOpenCreditReadiness,
   onViewPastResult,
+  onOpenCustomTest,
 }: FinancialHealthTestCatalogProps) {
   const [pastResults, setPastResults] = useState<PastResult[]>([]);
   const [showPastResults, setShowPastResults] = useState(false);
   const [showLoginGate, setShowLoginGate] = useState(false);
   const [tests, setTests] = useState<TestCard[]>([]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("finheal_health_tests_list");
-    if (stored) {
-      try {
-        setTests(JSON.parse(stored));
-      } catch (e) {
-        setTests(testCards);
+  const fetchCustomTests = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
       }
-    } else {
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
-      setTests(testCards);
+      const res = await fetch(`${apiBase}/custom-tests`, { headers });
+      if (res.ok) {
+        const customTestsList = await res.json();
+        const merged = [...testCards];
+        customTestsList.forEach((ct: any) => {
+          const idx = merged.findIndex(t => t.id === ct.id);
+          if (idx !== -1) {
+            merged[idx] = ct;
+          } else {
+            merged.push(ct);
+          }
+        });
+        setTests(merged);
+      }
+    } catch (err) {
+      console.error("Error loading custom tests:", err);
     }
+  };
+
+  useEffect(() => {
+    setTests(testCards);
+    fetchCustomTests();
 
     const handleUpdate = () => {
-      const nextStored = localStorage.getItem("finheal_health_tests_list");
-      if (nextStored) {
-        try { setTests(JSON.parse(nextStored)); } catch {}
-      }
+      fetchCustomTests();
     };
-    window.addEventListener("storage", handleUpdate);
     window.addEventListener("finheal:tests_update", handleUpdate);
     return () => {
-      window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("finheal:tests_update", handleUpdate);
     };
   }, []);
@@ -154,15 +178,15 @@ export default function FinancialHealthTestCatalog({
 
       try {
         const backendResults = await fetchTestResults(uid);
-          for (const r of backendResults) {
+        for (const r of backendResults) {
           const meta = testMeta[r.test_type];
           if (!meta || seen.has(r.test_type)) continue;
           seen.add(r.test_type);
           const score = r.percentage_score != null
             ? `${r.percentage_score}%`
             : r.score != null
-            ? String(r.score)
-            : r.risk_level || r.category || "Done";
+              ? String(r.score)
+              : r.risk_level || r.category || "Done";
           const date = new Date(r.completed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
           results.push({
             testId: r.test_type,
@@ -174,7 +198,7 @@ export default function FinancialHealthTestCatalog({
             riskLevel: r.risk_level,
           });
         }
-      } catch {}
+      } catch { }
 
       const localTests = [
         { key: `finheal_loan_fit_test:${uid}`, type: "loan_fit" },
@@ -195,10 +219,10 @@ export default function FinancialHealthTestCatalog({
           const score = parsed.result?.percentageScore != null
             ? `${Math.round(parsed.result.percentageScore)}%`
             : parsed.result?.rawScore != null
-            ? String(parsed.result.rawScore)
-            : parsed.result?.score != null
-            ? String(parsed.result.score)
-            : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
+              ? String(parsed.result.rawScore)
+              : parsed.result?.score != null
+                ? String(parsed.result.score)
+                : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
           const date = parsed.updatedAt
             ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
             : "Completed";
@@ -211,7 +235,7 @@ export default function FinancialHealthTestCatalog({
             category: parsed.result.category ?? null,
             riskLevel: parsed.result.riskLevel ?? parsed.result.risk ?? null,
           });
-        } catch {}
+        } catch { }
       }
 
       setPastResults(results);
@@ -229,14 +253,14 @@ export default function FinancialHealthTestCatalog({
           className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
           aria-label="Toggle sidebar"
         >
-          ☰
+          ☰k\
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold text-gray-900 sm:text-[14px]">Financial Health Tests</div>
-          <div className="text-[10px] text-gray-400 sm:text-[11px]">Choose a test to check one part of your financial health.</div>
+          <div className="text-[35px] font-bold text-gray-900 sm:text-[14px]">Financial Health Tests</div>
+          <div className="text-[30px] text-gray-400 sm:text-[11px]">Choose a test to check one part of your financial health.</div>
         </div>
-
+        0
         <button
           type="button"
           onClick={onToggleInsights}
@@ -248,22 +272,22 @@ export default function FinancialHealthTestCatalog({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
-        <section className="relative overflow-hidden rounded-[24px] border border-[#d4d8fa] bg-[linear-gradient(135deg,#f6f7fe_0%,#eef0fd_48%,#ffffff_100%)] p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
-          <div className={`absolute right-[-32px] top-[-32px] h-[130px] w-[130px] rounded-full bg-gradient-to-br ${featuredTest.accent} opacity-10`} />
+        <section className="relative overflow-hidden rounded-[24px] border border-transparent bg-primary p-[18px] shadow-[0_16px_40px_rgba(50,68,230,0.08)] sm:p-[24px]">
+          <div className="absolute right-[-32px] top-[-32px] h-[130px] w-[130px] rounded-full bg-white/10 opacity-20" />
           <div className="relative z-10 max-w-[620px]">
             <div className="mb-[10px] inline-flex rounded-[999px] bg-white px-[10px] py-[5px] text-[10px] font-semibold uppercase tracking-[0.8px] text-primary shadow-[0_4px_16px_rgba(50,68,230,0.08)]">
               New test library
             </div>
-            <h1 className="font-serif text-[28px] leading-[1.1] text-gray-900 sm:text-[34px]">
+            <h1 className="font-serif text-[28px] leading-[1.1] text-white sm:text-[34px]">
               Pick the financial area you want to understand first.
             </h1>
-            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-gray-600 sm:text-[14px]">
+            <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-white/80 sm:text-[14px]">
               Each test gives a focused score and a short summary so users can move quickly from a question to a clear next step.
             </p>
-            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-gray-600">
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Instant summary</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Simple scoring</span>
-              <span className="rounded-[999px] border border-gray-200 bg-white px-[10px] py-[5px]">Safe to revisit</span>
+            <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-white/90">
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] backdrop-blur-md">Instant summary</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] backdrop-blur-md">Simple scoring</span>
+              <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] backdrop-blur-md">Safe to revisit</span>
             </div>
           </div>
         </section>
@@ -304,44 +328,44 @@ export default function FinancialHealthTestCatalog({
               <div className="mt-[10px] space-y-[10px]">
                 {/* Selected result panel removed */}
 
-              <div className="grid gap-[8px] grid-cols-2 xl:grid-cols-3">
-                {pastResults.map((r, i) => (
-                  <div key={i} className={`overflow-hidden rounded-[14px] border bg-white shadow-sm border-gray-200`}>
-                    <div className={`h-[3px] bg-gradient-to-r ${r.accent}`} />
-                    <div className="flex items-center justify-between gap-2 px-[12px] py-[10px]">
-                      <div className="min-w-0">
-                        <div className="text-[12px] font-semibold text-gray-900 truncate">{r.title}</div>
-                        <div className="text-[10px] text-gray-400">{r.date}</div>
-                        <div className="mt-[4px] text-[10px] font-medium text-emerald-600 flex items-center gap-[3px]">
-                          <span>✅</span> Completed
+                <div className="grid gap-[8px] grid-cols-2 xl:grid-cols-3">
+                  {pastResults.map((r, i) => (
+                    <div key={i} className={`overflow-hidden rounded-[14px] border bg-white shadow-sm border-gray-200`}>
+                      <div className={`h-[3px] bg-gradient-to-r ${r.accent}`} />
+                      <div className="flex items-center justify-between gap-2 px-[12px] py-[10px]">
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-semibold text-gray-900 truncate">{r.title}</div>
+                          <div className="text-[10px] text-gray-400">{r.date}</div>
+                          <div className="mt-[4px] text-[10px] font-medium text-emerald-600 flex items-center gap-[3px]">
+                            <span>✅</span> Completed
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-[6px]">
-                        <div className="rounded-[10px] bg-[#eef0fd] px-[10px] py-[5px] text-[14px] font-bold text-primary">
-                          {r.score}
+                        <div className="flex shrink-0 flex-col items-end gap-[6px]">
+                          <div className="rounded-[10px] bg-[#eef0fd] px-[10px] py-[5px] text-[14px] font-bold text-primary">
+                            {r.score}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onViewPastResult) {
+                                onViewPastResult(r.testId);
+                                return;
+                              }
+                              if (typeof window === "undefined") return;
+                              const nextUrl = new URL(window.location.href);
+                              const view = r.testId.replace(/_/g, "-");
+                              nextUrl.searchParams.set("view", view);
+                              window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                            }}
+                            className="rounded-[999px] border border-[#d4d8fa] bg-white px-[9px] py-[4px] text-[10px] font-semibold text-primary transition hover:bg-[#f6f7fe]"
+                          >
+                            View Results
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onViewPastResult) {
-                              onViewPastResult(r.testId);
-                              return;
-                            }
-                            if (typeof window === "undefined") return;
-                            const nextUrl = new URL(window.location.href);
-                            const view = r.testId.replace(/_/g, "-");
-                            nextUrl.searchParams.set("view", view);
-                            window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
-                          }}
-                          className="rounded-[999px] border border-[#d4d8fa] bg-white px-[9px] py-[4px] text-[10px] font-semibold text-primary transition hover:bg-[#f6f7fe]"
-                        >
-                          View Results
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -421,10 +445,22 @@ export default function FinancialHealthTestCatalog({
                         else if (test.id === "loan-fit") onOpenLoanFitTest?.();
                         else if (test.id === "debt-balance") onOpenDebtBalanceReview?.();
                         else if (test.id === "credit-readiness") onOpenCreditReadiness?.();
+                        else if (test.questions && test.questions.length > 0) {
+                          if (onOpenCustomTest) {
+                            onOpenCustomTest(test.id);
+                          } else {
+                            if (typeof window !== "undefined") {
+                              const nextUrl = new URL(window.location.href);
+                              nextUrl.pathname = `/tests/${test.id}`;
+                              nextUrl.search = "";
+                              window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                            }
+                          }
+                        }
                       }}
                       className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] cursor-pointer font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
-                        {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : "Open"}
+                      {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : (test.questions && test.questions.length > 0) ? "Start test" : "Open"}
                     </button>
                   </div>
                 </CardContent>
@@ -457,6 +493,8 @@ export default function FinancialHealthTestCatalog({
           </div>
         </div>
       )}
+
+      {/* Dynamic quiz runner modal removed */}
     </main>
   );
 }

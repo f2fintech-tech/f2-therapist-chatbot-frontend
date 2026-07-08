@@ -16,6 +16,7 @@ import EmergencyFundCheckView from "@/components/EmergencyFundCheckView";
 import LoanFitTestView from "@/components/LoanFitTestView";
 import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
 import CreditReadinessReviewView from "@/components/CreditReadinessReviewView";
+import DynamicTestView from "@/components/DynamicTestView";
 import InsightsPanel from "@/components/InsightsPanel";
 import AuthScreen from "@/components/AuthScreen";
 import ProfilePage from "@/components/ProfilePage";
@@ -83,6 +84,13 @@ export default function FinHealChat() {
     }
   }, [authSession, location, setLocation]);
 
+  const customTestId = useMemo(() => {
+    if (location.startsWith("/tests/") && !["financial-literacy", "emergency-fund", "loan-fit", "credit-readiness", "debt-balance"].includes(location.split("/tests/")[1] || "")) {
+      return location.split("/tests/")[1] || null;
+    }
+    return null;
+  }, [location]);
+
   const mainView = useMemo(() => {
     if (location === "/profile") return "profile";
     if (location === "/advisor") return "advisor";
@@ -100,9 +108,10 @@ export default function FinHealChat() {
     if (location === "/tests/loan-fit" || location === "/loan-fit") return "loan-fit";
     if (location === "/tests/credit-readiness" || location === "/credit-readiness") return "credit-readiness";
     if (location === "/tests/debt-balance" || location === "/debt-balance") return "debt-balance";
+    if (customTestId) return "custom-test";
     if (location.startsWith("/advisor-workspace")) return location.substring(1);
     return "chat";
-  }, [location]) as any;
+  }, [location, customTestId]) as any;
 
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
@@ -111,6 +120,7 @@ export default function FinHealChat() {
     else if (view === "loan-fit") setLocation("/tests/loan-fit");
     else if (view === "credit-readiness") setLocation("/tests/credit-readiness");
     else if (view === "debt-balance") setLocation("/tests/debt-balance");
+    else if (view.startsWith("test-")) setLocation(`/tests/${view}`);
     else setLocation(`/${view}`);
   };
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
@@ -1019,6 +1029,13 @@ export default function FinHealChat() {
             userId={userId}
             onToggleSidebar={() => setSidebarOpen((open) => !open)}
             onToggleInsights={() => setInsightsOpen((open) => !open)}
+            onBackToCatalog={openTestCatalog}
+            onOpenFinancialWellnessAssistant={openChatView}
+          />
+        ) : mainView === "custom-test" ? (
+          <DynamicTestView
+            userId={userId}
+            testId={customTestId || ""}
             onBackToCatalog={openTestCatalog}
             onOpenFinancialWellnessAssistant={openChatView}
           />

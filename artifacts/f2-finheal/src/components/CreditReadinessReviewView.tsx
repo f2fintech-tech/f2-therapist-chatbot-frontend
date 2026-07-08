@@ -70,21 +70,21 @@ function writeState(userId: string, state: ProgressState) {
 }
 
 function ScoreRing({ score, max }: { score: number; max: number }) {
-  const size = 140;
+  const size = 168;
   const stroke = 12;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / max) * circumference;
   return (
-    <div className="relative mx-auto flex w-fit items-center justify-center">
+    <div className="relative mx-auto flex w-[168px] h-[168px] items-center justify-center">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#eef2ff" strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#06b6d4" strokeWidth={stroke} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <div className="text-[12px] font-semibold text-gray-500">Credit Readiness</div>
-        <div className="mt-1 text-[34px] font-sans font-bold text-gray-900 tracking-tight">{score}</div>
-        <div className="text-[11px] text-gray-500">of {max}</div>
+        <div className="mt-1 text-[34px] font-sans font-bold text-gray-900 tracking-tight leading-none">{score}</div>
+        <div className="text-[11px] text-gray-500 mt-1">of {max}</div>
       </div>
     </div>
   );
@@ -268,18 +268,18 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
     return (
       <main className="credit-readiness-view flex-1 flex flex-col overflow-hidden rounded-[16px] border bg-white dark:bg-slate-950">
         <div className="flex items-center gap-3 border-b p-4">
-          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] hover:bg-gray-50" aria-label="Back to test catalog">
-            ←
+          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded-[8px] border border-cyan-200 bg-cyan-50/50 text-cyan-700 flex items-center justify-center shadow-sm transition-all duration-200 hover:scale-105 hover:bg-cyan-100 active:scale-95 cursor-pointer dark:bg-cyan-950/30 dark:border-cyan-800 dark:text-cyan-400 dark:hover:bg-cyan-900/50" aria-label="Back to test catalog">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
           </button>
           <div className="font-bold">Credit Readiness Review Results</div>
         </div>
         <div className="p-6 overflow-auto">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card><CardContent><ScoreRing score={displayScore} max={creditReadinessMaximumScore} /><div className="mt-4 text-center"><div className="text-sm font-semibold">{currentResult.category}</div><div className="text-xs text-gray-500 mt-1">{currentResult.risk}</div><div className="mt-2 text-sm">{currentResult.summary}</div></div></CardContent></Card>
+            <Card><CardContent className="pt-6"><ScoreRing score={displayScore} max={creditReadinessMaximumScore} /><div className="mt-4 text-center"><div className="text-sm font-semibold">{currentResult.category}</div><div className="text-xs text-gray-500 mt-1">{currentResult.risk}</div><div className="mt-2 text-sm">{currentResult.summary}</div></div></CardContent></Card>
             <div className="space-y-4">
-              <Card><CardContent><div className="text-sm font-semibold">Repayment reliability</div><div className="mt-2">{currentResult.repaymentReliability}</div></CardContent></Card>
-              <Card><CardContent><div className="text-sm font-semibold">Utilization</div><div className="mt-2">{currentResult.utilizationLevel}</div></CardContent></Card>
-              <Card><CardContent><div className="text-sm font-semibold">Borrowing dependency</div><div className="mt-2">{currentResult.borrowingDependency}</div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="text-sm font-semibold">Repayment reliability</div><div className="mt-2">{currentResult.repaymentReliability}</div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="text-sm font-semibold">Utilization</div><div className="mt-2">{currentResult.utilizationLevel}</div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="text-sm font-semibold">Borrowing dependency</div><div className="mt-2">{currentResult.borrowingDependency}</div></CardContent></Card>
             </div>
           </div>
 
