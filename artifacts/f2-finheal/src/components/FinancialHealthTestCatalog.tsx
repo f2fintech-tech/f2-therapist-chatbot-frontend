@@ -253,14 +253,14 @@ export default function FinancialHealthTestCatalog({
           className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
           aria-label="Toggle sidebar"
         >
-          ☰
+          ☰k\
         </button>
 
         <div className="min-w-0 flex-1">
           <div className="text-[35px] font-bold text-gray-900 sm:text-[14px]">Financial Health Tests</div>
           <div className="text-[30px] text-gray-400 sm:text-[11px]">Choose a test to check one part of your financial health.</div>
         </div>
-
+        0
         <button
           type="button"
           onClick={onToggleInsights}

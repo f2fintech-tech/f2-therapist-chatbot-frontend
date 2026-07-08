@@ -5690,17 +5690,24 @@ ${sheetDataXml}
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Card Gradient Accent</label>
-                  <select
-                    value={testForm.accent}
-                    onChange={(e) => setTestForm({ ...testForm, accent: e.target.value })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  >
-                    <option value="from-[#3344e6] to-[#7c8cff]">Royal Blue to Purple</option>
-                    <option value="from-[#10b981] to-[#34d399]">emerald Green</option>
-                    <option value="from-[#f59e0b] to-[#fbbf24]">amber Orange</option>
-                    <option value="from-[#06b6d4] to-[#22d3ee]">cyan Blue</option>
-                    <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={testForm.accent}
+                      onChange={(e) => setTestForm({ ...testForm, accent: e.target.value })}
+                      className="flex-1 px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                    >
+                      <option value="from-[#3344e6] to-[#7c8cff]">Royal Blue to Purple</option>
+                      <option value="from-[#10b981] to-[#34d399]">emerald Green</option>
+                      <option value="from-[#f59e0b] to-[#fbbf24]">amber Orange</option>
+                      <option value="from-[#06b6d4] to-[#22d3ee]">cyan Blue</option>
+                      <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
+                    </select>
+                    {/* Live Gradient Color Ball Preview */}
+                    <div 
+                      className={`w-[28px] h-[28px] rounded-full border border-gray-200 shrink-0 shadow-inner bg-gradient-to-r ${testForm.accent}`}
+                      title="Selected Gradient Preview"
+                    />
+                  </div>
                 </div>
               </div>
 
