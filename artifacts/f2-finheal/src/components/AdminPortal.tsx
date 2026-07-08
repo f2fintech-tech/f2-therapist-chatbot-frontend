@@ -663,6 +663,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [filterBureau, setFilterBureau] = useState<string>("all");
   
+  const allDepartments = useMemo(() => {
+    return Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort() as string[];
+  }, [employees]);
+  
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
@@ -718,10 +722,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       }
     }
 
-    // 2. Filter by Role
+    // 2. Filter by Role / Department
     if (filterRole !== "all") {
-      const role = classifyEnquiryRole(enq.email, enq.name, advisors);
-      if (role !== filterRole) return false;
+      if (filterRole === "Client") {
+        if (enq.fetched_by && enq.fetched_by !== "client") return false;
+      } else {
+        const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+        if (!emp || emp.department !== filterRole) return false;
+      }
     }
 
     // 3. Filter by Loan Type
@@ -1594,7 +1602,7 @@ ${sheetDataXml}
   // Lazy load and poll advisors/employees only when needed
   useEffect(() => {
     const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
-    const shouldLoadEmployees = activeTab === "employees";
+    const shouldLoadEmployees = activeTab === "employees" || activeTab === "cibil-enquiries";
     
     let intervalIdAdvisors: any = null;
     let intervalIdEmployees: any = null;
@@ -3488,112 +3496,124 @@ ${sheetDataXml}
                     )}
                   </div>
 
-                  {/* Row 2: Filters & Export */}
-                  <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
-                    {/* Search Input */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
-                      <input
-                        type="text"
-                        placeholder="Search Name, Email, PAN..."
-                        value={filterSearch}
-                        onChange={(e) => setFilterSearch(e.target.value)}
-                        className="h-[32px] px-[12px] w-[200px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
-                      />
+                  {/* Row 2 & 3: Filters & Export (Split into two rows to utilize space) */}
+                  <div className="flex flex-col gap-3 pt-1 w-full overflow-x-auto pb-1">
+                    {/* Top Filters Row */}
+                    <div className="flex items-center justify-between gap-3 min-w-max">
+                      <div className="flex items-center gap-3">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                          <input
+                            type="text"
+                            placeholder="Search Name, Email, PAN..."
+                            value={filterSearch}
+                            onChange={(e) => setFilterSearch(e.target.value)}
+                            className="h-[32px] px-[12px] w-[150px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                          />
+                        </div>
+
+                        {/* Bureau Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
+                          <select
+                            value={filterBureau}
+                            onChange={(e) => setFilterBureau(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Bureaus</option>
+                            <option value="cibil">CIBIL</option>
+                            <option value="experian">Experian</option>
+                          </select>
+                        </div>
+
+                        {/* Department Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
+                          <select
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Enquirers</option>
+                            <option value="Client">Users (Leads)</option>
+                            {allDepartments.map(dept => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Active Loan Type Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                          <select
+                            value={filterLoanType}
+                            onChange={(e) => setFilterLoanType(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Loan Types</option>
+                            <option value="home">Home Loan</option>
+                            <option value="personal">Personal Loan</option>
+                            <option value="professional">Professional Loan</option>
+                            <option value="creditcard">Credit Card</option>
+                            <option value="auto">Auto / Vehicle Loan</option>
+                            <option value="business">Business Loan</option>
+                            <option value="gold">Gold Loan</option>
+                            <option value="education">Education Loan</option>
+                            <option value="property">Loan Against Property (LAP)</option>
+                            <option value="other">Other Loans</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Bureau Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
-                      <select
-                        value={filterBureau}
-                        onChange={(e) => setFilterBureau(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Bureaus</option>
-                        <option value="cibil">CIBIL</option>
-                        <option value="experian">Experian</option>
-                      </select>
+                    {/* Bottom Filters Row */}
+                    <div className="flex items-center justify-between gap-3 min-w-max">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                          <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                          <input
+                            type="date"
+                            value={filterEndDate}
+                            onChange={(e) => setFilterEndDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
+                          <button
+                            onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                          >
+                            Reset Filters
+                          </button>
+                        )}
+
+                        {filteredEnquiries.length > 0 && (
+                          <button
+                            onClick={handleExportExcel}
+                            className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                            title="Export leads to Excel workbook (.xlsx)"
+                          >
+                            📥 Export Leads
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Role Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
-                      <select
-                        value={filterRole}
-                        onChange={(e) => setFilterRole(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Enquirers</option>
-                        <option value="User">Users (Leads)</option>
-                        <option value="Admin">Admins</option>
-                        <option value="Manager">Managers</option>
-                        <option value="Senior Leadership">Senior Leadership</option>
-                      </select>
-                    </div>
-
-                    {/* Active Loan Type Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
-                      <select
-                        value={filterLoanType}
-                        onChange={(e) => setFilterLoanType(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Loan Types</option>
-                        <option value="home">Home Loan</option>
-                        <option value="personal">Personal Loan</option>
-                        <option value="professional">Professional Loan</option>
-                        <option value="creditcard">Credit Card</option>
-                        <option value="auto">Auto / Vehicle Loan</option>
-                        <option value="business">Business Loan</option>
-                        <option value="gold">Gold Loan</option>
-                        <option value="education">Education Loan</option>
-                        <option value="property">Loan Against Property (LAP)</option>
-                        <option value="other">Other Loans</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
-                      <input
-                        type="date"
-                        value={filterDate}
-                        onChange={(e) => setFilterDate(e.target.value)}
-                        max={todayStr}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
-                      <input
-                        type="date"
-                        value={filterEndDate}
-                        onChange={(e) => setFilterEndDate(e.target.value)}
-                        max={todayStr}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                      />
-                    </div>
-
-                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
-                      <button
-                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                      >
-                        Reset Filters
-                      </button>
-                    )}
-
-                    {filteredEnquiries.length > 0 && (
-                      <button
-                        onClick={handleExportExcel}
-                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                        title="Export leads to Excel workbook (.xlsx)"
-                      >
-                        📥 Export Leads
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -3654,7 +3674,14 @@ ${sheetDataXml}
                                         ? "bg-blue-50 text-blue-700 border-blue-200"
                                         : "bg-emerald-50 text-emerald-700 border-emerald-250"
                                     }`}>
-                                    {role === "User" ? "User (Lead)" : role}
+                                    {(() => {
+                                      if (role !== "User") return role;
+                                      
+                                      if (!enq.fetched_by || enq.fetched_by === "client") return "User (Lead)";
+                                      if (enq.fetched_by === "admin") return "System Admin";
+                                      const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+                                      return emp ? emp.name : "User (Lead)";
+                                    })()}
                                   </span>
                                 </div>
                               </td>
