@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   Calculator,
   Scale,
   Coins,
@@ -133,6 +134,7 @@ export default function CibilAnalyzerView({
   const [bsaVerified, setBsaVerified] = useState<boolean>(false);
   const [bsaPassword, setBsaPassword] = useState<string>("");
   const [bsaError, setBsaError] = useState<string | null>(null);
+  const [bsaExcelUrl, setBsaExcelUrl] = useState<string | null>(null);
 
   const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,11 +157,14 @@ export default function CibilAnalyzerView({
         body: formData,
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Failed to analyze bank statement");
+        throw new Error(data.detail || "Failed to analyze bank statement");
       }
 
+      if (data.excel_report_url) {
+        setBsaExcelUrl(data.excel_report_url);
+      }
       setBsaVerified(true);
       toast({
         title: "Bank Statement Analyzed",
@@ -186,6 +191,21 @@ export default function CibilAnalyzerView({
         setStoredReport(overrideReport);
         setReport(overrideReport);
         setIsLoading(false);
+        
+        // Fetch the consolidated profile separately to get the BSA data without hanging the leads query
+        try {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+          const res = await fetch(`${apiBase}/profile/consolidated/${userId}`);
+          if (res.ok) {
+            const profileData = await res.json();
+            if (profileData.bsa_analysis?.excel_report_url) {
+              setBsaExcelUrl(profileData.bsa_analysis.excel_report_url);
+              setBsaVerified(true);
+            }
+          }
+        } catch(err) {
+          console.error("Failed to fetch profile for BSA data", err);
+        }
         
         try {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -1137,6 +1157,20 @@ export default function CibilAnalyzerView({
                   </a>
                 )}
                 
+                {!bsaVerified && (
+                  <div className="mt-2.5 w-full relative cibil-print-hide">
+                    <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Statement Password (if any)"
+                      value={bsaPassword}
+                      onChange={(e) => setBsaPassword(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                      disabled={bsaUploading || bsaVerified}
+                    />
+                  </div>
+                )}
+
                 <label className={`mt-[8px] flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : bsaVerified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}>
                   {bsaUploading ? (
                     <span>Analyzing Bank Statement...</span>
@@ -1163,6 +1197,17 @@ export default function CibilAnalyzerView({
                   <div className="mt-1 flex items-center gap-1 text-[10.5px] text-rose-500 font-medium text-center justify-center w-full">
                     <AlertTriangle className="h-3 w-3 shrink-0" /> {bsaError}
                   </div>
+                )}
+
+                {bsaExcelUrl && (
+                  <a
+                    href={bsaExcelUrl}
+                    download
+                    className="mt-[8px] flex items-center justify-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
+                  >
+                    <FileText className="w-[14px] h-[14px] shrink-0" />
+                    <span>Download Excel Report 📥</span>
+                  </a>
                 )}
                 
                 <button
@@ -1281,17 +1326,6 @@ export default function CibilAnalyzerView({
                             {openAccounts.length} open · {closedCount} closed · {report.accounts.length} total accounts on file
                           </p>
                         </div>
-                        {report.pdf_url && (
-                          <a
-                            href={report.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-[10px] py-[4px] rounded-[8px] font-bold flex items-center gap-[4px] hover:bg-primary/20 transition-all cursor-pointer shrink-0 cibil-print-hide"
-                          >
-                            <FileText className="w-[12px] h-[12px]" />
-                            <span>PDF Report</span>
-                          </a>
-                        )}
                       </div>
 
                       {/* Category chips / filter row */}
