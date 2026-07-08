@@ -128,6 +128,57 @@ export default function CibilAnalyzerView({
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
   const [activeTermsTab, setActiveTermsTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("credit-consent");
 
+  // BSA States
+  const [bsaUploading, setBsaUploading] = useState<boolean>(false);
+  const [bsaVerified, setBsaVerified] = useState<boolean>(false);
+  const [bsaPassword, setBsaPassword] = useState<string>("");
+  const [bsaError, setBsaError] = useState<string | null>(null);
+
+  const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBsaUploading(true);
+    setBsaError(null);
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("file", file);
+    if (bsaPassword) {
+      formData.append("password", bsaPassword);
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to analyze bank statement");
+      }
+
+      setBsaVerified(true);
+      toast({
+        title: "Bank Statement Analyzed",
+        description: "Your bank statement has been successfully processed and metrics updated.",
+        variant: "default",
+      });
+    } catch (err: any) {
+      console.error("BSA Upload Error:", err);
+      setBsaError(err.message || "An error occurred while uploading");
+      toast({
+        title: "Upload Failed",
+        description: err.message || "Failed to analyze statement",
+        variant: "destructive",
+      });
+    } finally {
+      setBsaUploading(false);
+    }
+  };
+
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
@@ -1084,6 +1135,34 @@ export default function CibilAnalyzerView({
                     <FileText className="w-[14px] h-[14px]" />
                     <span>Download PDF Report</span>
                   </a>
+                )}
+                
+                <label className={`mt-[8px] flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : bsaVerified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}>
+                  {bsaUploading ? (
+                    <span>Analyzing Bank Statement...</span>
+                  ) : bsaVerified ? (
+                    <>
+                      <ShieldCheck className="w-[14px] h-[14px] shrink-0" />
+                      <span>Bank Statement Ready ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-[14px] h-[14px] shrink-0" />
+                      <span>Upload Bank Statement</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept=".pdf,.xls,.xlsx,.csv"
+                    className="hidden"
+                    onChange={handleBsaUpload}
+                    disabled={bsaUploading}
+                  />
+                </label>
+                {bsaError && (
+                  <div className="mt-1 flex items-center gap-1 text-[10.5px] text-rose-500 font-medium text-center justify-center w-full">
+                    <AlertTriangle className="h-3 w-3 shrink-0" /> {bsaError}
+                  </div>
                 )}
                 
                 <button

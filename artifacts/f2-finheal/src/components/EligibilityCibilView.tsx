@@ -2064,6 +2064,35 @@ export default function EligibilityCibilView({
                         <span>Download PDF Report</span>
                       </a>
                     )}
+                    
+                    <label className={`mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : bsaVerified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}>
+                      {bsaUploading ? (
+                        <span>Analyzing Bank Statement...</span>
+                      ) : bsaVerified ? (
+                        <>
+                          <ShieldCheck className="w-4 h-4 shrink-0" />
+                          <span>Bank Statement Ready ✓</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 shrink-0" />
+                          <span>Upload Bank Statement</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,.xls,.xlsx,.csv"
+                        className="hidden"
+                        onChange={handleBsaUpload}
+                        disabled={bsaUploading}
+                      />
+                    </label>
+                    {bsaError && (
+                      <div className="mt-1 flex items-center gap-1 text-[10.5px] text-rose-500 font-medium text-center justify-center w-full">
+                        <AlertTriangle className="h-3 w-3 shrink-0" /> {bsaError}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={handleGenerateCAM}
