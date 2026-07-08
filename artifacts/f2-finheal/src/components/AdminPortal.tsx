@@ -8,6 +8,11 @@ import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Cartes
 
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
+import { creditReadinessQuestions } from "@/features/credit-readiness/creditReadinessConfig";
+import { debtBalanceQuestions } from "@/features/debt-balance/debtBalanceConfig";
+import { emergencyFundQuestions } from "@/features/emergency-fund/emergencyFundConfig";
+import { financialLiteracyQuestions } from "@/features/financial-literacy/financialLiteracyConfig";
+import { loanFitQuestions } from "@/features/loan-fit/loanFitConfig";
 import { type LenderProduct } from "./LoanCalculatorView";
 import CibilAnalyzerView from "./CibilAnalyzerView";
 interface AdminPortalProps {
@@ -472,8 +477,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     duration: "5 min",
     focus: "",
     result: "",
-    accent: "from-[#3344e6] to-[#7c8cff]"
+    accent: "from-[#3344e6] to-[#7c8cff]",
+    questions: [] as any[]
   });
+
+  const [selectedEditLevel, setSelectedEditLevel] = useState<number>(1);
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
@@ -1582,13 +1592,39 @@ ${sheetDataXml}
     }
 
     // 2. Tests List
-    const storedTests = localStorage.getItem("finheal_health_tests_list");
-    if (storedTests) {
-      setTestCatalog(JSON.parse(storedTests));
-    } else {
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
-      setTestCatalog(testCards);
+    setTestCatalog(testCards);
+  }, []);
+
+  const fetchCustomTests = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      const res = await fetch(`${apiBase}/custom-tests`, { headers });
+      if (res.ok) {
+        const customTestsList = await res.json();
+        const merged = [...testCards];
+        customTestsList.forEach((ct: any) => {
+          const idx = merged.findIndex(t => t.id === ct.id);
+          if (idx !== -1) {
+            merged[idx] = ct;
+          } else {
+            merged.push(ct);
+          }
+        });
+        setTestCatalog(merged);
+      }
+    } catch (err) {
+      console.error("Error loading custom tests:", err);
     }
+  };
+
+  useEffect(() => {
+    fetchCustomTests();
   }, []);
 
   // Lazy load and poll advisors/employees only when needed
@@ -2067,25 +2103,80 @@ ${sheetDataXml}
       duration: "5 min",
       focus: "",
       result: "",
-      accent: "from-[#3344e6] to-[#7c8cff]"
+      accent: "from-[#3344e6] to-[#7c8cff]",
+      questions: []
     });
     setTestModalOpen(true);
   };
 
   const handleOpenEditTest = (test: TestCard) => {
     setEditingTest(test);
+    setSelectedEditLevel(1);
+    
+    let initialQuestions = test.questions || [];
+    if (test.id === "financial-literacy") {
+      initialQuestions = (test.questions && test.questions.length > 0 ? test.questions : []).map((q, idx) => {
+        const defaultQ = financialLiteracyQuestions.find(dq => dq.id === q.id);
+        const level = q.level || defaultQ?.level || (idx < 20 ? 1 : idx < 40 ? 2 : 3);
+        return {
+          ...q,
+          level
+        };
+      });
+      if (initialQuestions.length === 0) {
+        initialQuestions = financialLiteracyQuestions.map(q => ({
+          id: q.id,
+          level: q.level,
+          questionText: q.prompt,
+          options: q.options,
+          correctOptionIndex: q.correctAnswer === "A" ? 0 : q.correctAnswer === "B" ? 1 : q.correctAnswer === "C" ? 2 : 3
+        }));
+      }
+    } else if (initialQuestions.length === 0) {
+      if (test.id === "credit-readiness") {
+        initialQuestions = creditReadinessQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "emergency-fund") {
+        initialQuestions = emergencyFundQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "debt-balance") {
+        initialQuestions = debtBalanceQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "loan-fit") {
+        initialQuestions = loanFitQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      }
+    }
+
     setTestForm({
       title: test.title,
       description: test.description,
       duration: test.duration,
       focus: test.focus,
       result: test.result,
-      accent: test.accent
+      accent: test.accent,
+      questions: initialQuestions
     });
     setTestModalOpen(true);
   };
 
-  const handleSaveTest = () => {
+  const handleSaveTest = async () => {
     if (!testForm.title.trim() || !testForm.description.trim()) {
       alert("Title and description are required!");
       return;
@@ -2098,7 +2189,8 @@ ${sheetDataXml}
       duration: testForm.duration.trim() || "5 min",
       focus: testForm.focus.trim() || "Affordability analysis",
       result: testForm.result.trim() || "Instant diagnostic score",
-      accent: testForm.accent.trim()
+      accent: testForm.accent.trim(),
+      questions: testForm.questions
     };
 
     let updatedList;
@@ -2109,17 +2201,54 @@ ${sheetDataXml}
     }
 
     setTestCatalog(updatedList);
-    localStorage.setItem("finheal_health_tests_list", JSON.stringify(updatedList));
     dispatchUpdateEvent("finheal:tests_update");
     setTestModalOpen(false);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      const res = await fetch(`${apiBase}/custom-tests`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(item)
+      });
+      if (res.ok) {
+        fetchCustomTests();
+      }
+    } catch (err) {
+      console.error("Error syncing custom test to DB:", err);
+    }
   };
 
-  const handleDeleteTest = (id: string) => {
+  const handleDeleteTest = async (id: string) => {
     if (confirm("Are you sure you want to retire this health test?")) {
       const updatedList = testCatalog.filter(t => t.id !== id);
       setTestCatalog(updatedList);
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(updatedList));
       dispatchUpdateEvent("finheal:tests_update");
+
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+        const headers: Record<string, string> = {};
+        if (configuredApiKey) {
+          headers["Authorization"] = `Bearer ${configuredApiKey}`;
+          headers["X-API-Key"] = configuredApiKey;
+        }
+        await fetch(`${apiBase}/custom-tests/${id}`, {
+          method: "DELETE",
+          headers
+        });
+        fetchCustomTests();
+      } catch (err) {
+        console.error("Error deleting custom test from DB:", err);
+      }
     }
   };
 
@@ -5524,8 +5653,8 @@ ${sheetDataXml}
       {/* ===================== TESTS ADD/EDIT POPUP MODAL ======================== */}
       {/* ========================================================================= */}
       {testModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
-          <div className="bg-white rounded-[24px] max-w-[500px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[650px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
 
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
@@ -5536,7 +5665,7 @@ ${sheetDataXml}
               </button>
             </div>
 
-            <div className="p-[20px] space-y-[12px] overflow-y-auto max-h-[60vh] scrollbar-thin">
+            <div className="p-[20px] space-y-[16px] overflow-y-auto max-h-[70vh] scrollbar-thin">
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Test Card Title</label>
                 <input
@@ -5606,6 +5735,224 @@ ${sheetDataXml}
                   rows={3}
                   className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              {/* ===================== QUESTIONS SECTION (Google Forms Style) ===================== */}
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.8px]">Questions ({testForm.questions?.length || 0})</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newQ = {
+                        id: `q-${Date.now()}-${testForm.questions?.length || 0}`,
+                        level: editingTest?.id === "financial-literacy" ? selectedEditLevel : undefined,
+                        questionText: "",
+                        options: ["Option 1", "Option 2"],
+                        correctOptionIndex: 0
+                      };
+                      setTestForm({ ...testForm, questions: [...(testForm.questions || []), newQ] });
+                    }}
+                    className="px-[12px] py-[6px] bg-primary text-white rounded-[10px] text-[11px] font-bold cursor-pointer hover:opacity-95 transition flex items-center gap-[4px]"
+                  >
+                    + Add Question
+                  </button>
+                </div>
+
+                {editingTest?.id === "financial-literacy" && (
+                  <div className="mb-4 p-3 bg-indigo-50/40 border border-indigo-100 rounded-[14px] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-indigo-950 uppercase tracking-[0.5px]">Filter by Test Level:</span>
+                      <select
+                        value={selectedEditLevel}
+                        onChange={(e) => setSelectedEditLevel(Number(e.target.value))}
+                        className="px-[12px] py-[6px] border border-indigo-200 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer font-semibold text-indigo-900"
+                      >
+                        <option value={1}>Beginner (Level 1)</option>
+                        <option value={2}>Intermediate (Level 2)</option>
+                        <option value={3}>Advanced (Level 3)</option>
+                      </select>
+                    </div>
+                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
+                      Showing {testForm.questions.filter((q: any) => q.level === selectedEditLevel).length} of {testForm.questions.length} questions
+                    </span>
+                  </div>
+                )}
+
+                {(!testForm.questions || testForm.questions.length === 0) ? (
+                  <div className="text-center py-8 border border-dashed border-gray-200 rounded-[16px] text-gray-400 text-[11px]">
+                    No questions added yet. Click "+ Add Question" to start building your quiz.
+                  </div>
+                ) : editingTest?.id === "financial-literacy" && testForm.questions.filter((q: any) => q.level === selectedEditLevel).length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-indigo-200 rounded-[16px] text-indigo-400/80 text-[11px] bg-indigo-50/10">
+                    No questions added yet for Level {selectedEditLevel}. Click "+ Add Question" to add one to this level.
+                  </div>
+                ) : (
+                  <div className="space-y-[16px]">
+                    {testForm.questions.map((q, qIndex) => {
+                      if (editingTest?.id === "financial-literacy" && q.level !== selectedEditLevel) {
+                        return null;
+                      }
+                      return (
+                        <div
+                          key={q.id || qIndex}
+                          draggable
+                          onDragStart={(e) => {
+                            const target = e.currentTarget;
+                            target.classList.add("shadow-[0_25px_50px_-12px_rgba(50,68,230,0.25)]", "scale-[1.03]", "border-primary/60", "bg-white", "rotate-[1.5deg]", "z-50");
+                            e.dataTransfer.effectAllowed = "move";
+                            setTimeout(() => {
+                              target.classList.remove("shadow-[0_25px_50px_-12px_rgba(50,68,230,0.25)]", "scale-[1.03]", "border-primary/60", "bg-white", "rotate-[1.5deg]", "z-50");
+                              setDraggedIndex(qIndex);
+                            }, 0);
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDragEnter={() => {
+                            if (draggedIndex !== null && draggedIndex !== qIndex) {
+                              const updated = [...testForm.questions];
+                              const draggedItem = updated[draggedIndex];
+                              updated.splice(draggedIndex, 1);
+                              updated.splice(qIndex, 0, draggedItem);
+                              setDraggedIndex(qIndex);
+                              setTestForm({ ...testForm, questions: updated });
+                            }
+                          }}
+                          onDragEnd={() => setDraggedIndex(null)}
+                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${
+                            draggedIndex === qIndex 
+                              ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]" 
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          
+                          {/* Question Input */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-[6px]">
+                              <div className="flex items-center gap-[6px]">
+                                {/* Drag Handle Dot Pattern */}
+                                <div 
+                                  className="text-gray-400 cursor-grab active:cursor-grabbing font-bold text-[14px] select-none hover:text-gray-600 px-[4px] py-[2px] rounded hover:bg-gray-200/50 flex items-center justify-center transition"
+                                  title="Drag to reorder question"
+                                >
+                                  ⠿
+                                </div>
+                                <span className="text-[11px] font-bold text-gray-700">Question {qIndex + 1}</span>
+                              </div>
+                              <div className="flex items-center gap-[12px]">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = testForm.questions.filter((_, idx) => idx !== qIndex);
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={q.questionText}
+                              onChange={(e) => {
+                                const updated = [...testForm.questions];
+                                updated[qIndex] = { ...q, questionText: e.target.value };
+                                setTestForm({ ...testForm, questions: updated });
+                              }}
+                              placeholder="e.g. What is the recommended emergency fund size?"
+                              className="w-full px-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                            />
+                          </div>
+
+                          {/* Options Input List */}
+                          <div className="space-y-[8px]">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Options (Select radio for correct answer)</span>
+                            {q.options.map((opt: string, oIndex: number) => (
+                              <div key={oIndex} className="flex items-center gap-[8px]">
+                                <input
+                                  type="radio"
+                                  name={`correct-${q.id || qIndex}`}
+                                  checked={q.correctOptionIndex === oIndex}
+                                  onChange={() => {
+                                    const updated = [...testForm.questions];
+                                    updated[qIndex] = { ...q, correctOptionIndex: oIndex };
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  className="h-[16px] w-[16px] text-primary border-gray-300 focus:ring-primary cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const updated = [...testForm.questions];
+                                    const newOpts = [...q.options];
+                                    newOpts[oIndex] = e.target.value;
+                                    updated[qIndex] = { ...q, options: newOpts };
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  placeholder={`Option ${oIndex + 1}`}
+                                  className="flex-1 px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11px] focus:outline-none focus:border-primary bg-white"
+                                />
+                                {q.options.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...testForm.questions];
+                                      const newOpts = q.options.filter((_: string, idx: number) => idx !== oIndex);
+                                      let nextCorrect = q.correctOptionIndex;
+                                      if (q.correctOptionIndex === oIndex) {
+                                        nextCorrect = 0;
+                                      } else if (q.correctOptionIndex > oIndex) {
+                                        nextCorrect -= 1;
+                                      }
+                                      updated[qIndex] = { ...q, options: newOpts, correctOptionIndex: nextCorrect };
+                                      setTestForm({ ...testForm, questions: updated });
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 text-[14px] cursor-pointer font-bold px-[4px]"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...testForm.questions];
+                                updated[qIndex] = { ...q, options: [...q.options, `Option ${q.options.length + 1}`] };
+                                setTestForm({ ...testForm, questions: updated });
+                              }}
+                              className="text-primary hover:opacity-90 font-bold text-[10px] cursor-pointer"
+                            >
+                              + Add Option
+                            </button>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+
+                    {/* Append-only Add Question button at the very bottom of the list */}
+                    <div className="flex justify-center pt-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQ = {
+                            id: `q-${Date.now()}-${testForm.questions?.length || 0}`,
+                            level: editingTest?.id === "financial-literacy" ? selectedEditLevel : undefined,
+                            questionText: "",
+                            options: ["Option 1", "Option 2"],
+                            correctOptionIndex: 0
+                          };
+                          setTestForm({ ...testForm, questions: [...(testForm.questions || []), newQ] });
+                        }}
+                        className="px-[14px] py-[8px] bg-primary text-white rounded-[10px] text-[12px] font-bold cursor-pointer hover:opacity-95 transition flex items-center gap-[4px]"
+                      >
+                        + Add Question
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

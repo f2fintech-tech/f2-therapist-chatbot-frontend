@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { fetchTestResults } from "@/lib/backendAuth";
 
 interface FinancialHealthTestCatalogProps {
-  userId?: string;
+  userId: string;
   isGuest?: boolean;
   onLoginRequired?: () => void;
   onToggleSidebar: () => void;
@@ -14,6 +14,14 @@ interface FinancialHealthTestCatalogProps {
   onOpenDebtBalanceReview: () => void;
   onOpenCreditReadiness?: () => void;
   onViewPastResult?: (testId: string) => void;
+  onOpenCustomTest?: (testId: string) => void;
+}
+
+export interface TestQuestion {
+  id: string;
+  questionText: string;
+  options: string[];
+  correctOptionIndex: number;
 }
 
 export type TestCard = {
@@ -24,6 +32,7 @@ export type TestCard = {
   focus: string;
   result: string;
   accent: string;
+  questions?: TestQuestion[];
 };
 
 type PastResult = {
@@ -95,7 +104,7 @@ export const testCards: TestCard[] = [
 
 export default function FinancialHealthTestCatalog({
   userId,
-  isGuest = false,
+  isGuest = true,
   onLoginRequired,
   onToggleSidebar,
   onToggleInsights,
@@ -105,35 +114,50 @@ export default function FinancialHealthTestCatalog({
   onOpenDebtBalanceReview,
   onOpenCreditReadiness,
   onViewPastResult,
+  onOpenCustomTest,
 }: FinancialHealthTestCatalogProps) {
   const [pastResults, setPastResults] = useState<PastResult[]>([]);
   const [showPastResults, setShowPastResults] = useState(false);
   const [showLoginGate, setShowLoginGate] = useState(false);
   const [tests, setTests] = useState<TestCard[]>([]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("finheal_health_tests_list");
-    if (stored) {
-      try {
-        setTests(JSON.parse(stored));
-      } catch (e) {
-        setTests(testCards);
+  const fetchCustomTests = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
       }
-    } else {
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
-      setTests(testCards);
+      const res = await fetch(`${apiBase}/custom-tests`, { headers });
+      if (res.ok) {
+        const customTestsList = await res.json();
+        const merged = [...testCards];
+        customTestsList.forEach((ct: any) => {
+          const idx = merged.findIndex(t => t.id === ct.id);
+          if (idx !== -1) {
+            merged[idx] = ct;
+          } else {
+            merged.push(ct);
+          }
+        });
+        setTests(merged);
+      }
+    } catch (err) {
+      console.error("Error loading custom tests:", err);
     }
+  };
+
+  useEffect(() => {
+    setTests(testCards);
+    fetchCustomTests();
 
     const handleUpdate = () => {
-      const nextStored = localStorage.getItem("finheal_health_tests_list");
-      if (nextStored) {
-        try { setTests(JSON.parse(nextStored)); } catch {}
-      }
+      fetchCustomTests();
     };
-    window.addEventListener("storage", handleUpdate);
     window.addEventListener("finheal:tests_update", handleUpdate);
     return () => {
-      window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("finheal:tests_update", handleUpdate);
     };
   }, []);
@@ -421,10 +445,22 @@ export default function FinancialHealthTestCatalog({
                         else if (test.id === "loan-fit") onOpenLoanFitTest?.();
                         else if (test.id === "debt-balance") onOpenDebtBalanceReview?.();
                         else if (test.id === "credit-readiness") onOpenCreditReadiness?.();
+                        else if (test.questions && test.questions.length > 0) {
+                          if (onOpenCustomTest) {
+                            onOpenCustomTest(test.id);
+                          } else {
+                            if (typeof window !== "undefined") {
+                              const nextUrl = new URL(window.location.href);
+                              nextUrl.pathname = `/tests/${test.id}`;
+                              nextUrl.search = "";
+                              window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                            }
+                          }
+                        }
                       }}
                       className="rounded-[999px] bg-primary px-[12px] py-[6px] text-[11px] cursor-pointer font-semibold text-white shadow-[0_8px_20px_rgba(50,68,230,0.18)]"
                     >
-                        {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : "Open"}
+                        {test.id === "financial-literacy" ? "Start test" : test.id === "credit-readiness" || test.id === "emergency-fund" || test.id === "loan-fit" || test.id === "debt-balance" ? "Start test" : (test.questions && test.questions.length > 0) ? "Start test" : "Open"}
                     </button>
                   </div>
                 </CardContent>
@@ -457,6 +493,8 @@ export default function FinancialHealthTestCatalog({
           </div>
         </div>
       )}
+
+      {/* Dynamic quiz runner modal removed */}
     </main>
   );
 }
