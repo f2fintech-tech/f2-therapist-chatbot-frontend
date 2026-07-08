@@ -2068,6 +2068,19 @@ export default function EligibilityCibilView({
                       </a>
                     )}
                     
+                    {!bsaVerified && (
+                      <div className="mt-2.5 w-full relative cibil-print-hide">
+                        <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Statement Password (if any)"
+                          value={bsaPassword}
+                          onChange={(e) => setBsaPassword(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          disabled={bsaUploading || bsaVerified}
+                        />
+                      </div>
+                    )}
                     <label className={`mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : bsaVerified ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'}`}>
                       {bsaUploading ? (
                         <span>Analyzing Bank Statement...</span>
