@@ -2548,7 +2548,7 @@ ${sheetDataXml}
                       sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
                       color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
                       delay={0}
-                      onClick={() => onNavigate("Eligibility & CIBIL Checker")}
+                      onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
                     />
 
                     {/* Advisor Call Card */}

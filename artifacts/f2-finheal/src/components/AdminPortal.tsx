@@ -4,6 +4,7 @@ import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
@@ -568,7 +569,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   
   const foundAdvisor = currentExpertId ? advisors.find(a => (a.id === currentExpertId || a.f2FintechId === currentExpertId)) : null;
   
-  // Construct a fallback expert profile from session if they are an employee but not in the public advisors list
   const activeExpert = foundAdvisor || (isEmployeeId ? (() => {
     try {
       const sessionStr = localStorage.getItem("finheal-auth-session");
@@ -583,8 +583,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
           expertise: [],
           designation: "Staff",
           avatarUrl: "",
-          rating: 0
-        };
+          rating: 0,
+          availability: "available",
+          reviewsCount: 0,
+          nextSlot: "",
+          category: "Advisor",
+          strength: "Financial planning",
+          bio: "Certified staff member",
+          fee: 899
+        } as Advisor;
       }
     } catch (e) {}
     return null;
@@ -2464,6 +2471,31 @@ ${sheetDataXml}
     return filteredSubmissions.slice(startIndex, startIndex + submissionsPerPage);
   }, [filteredSubmissions, safeSubPage]);
 
+  const testAttemptCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    
+    // Add default values from testCatalog
+    testCatalog.forEach((test) => {
+      counts[test.title] = 0;
+    });
+
+    // Count attempts from testSubmissions
+    testSubmissions.forEach((sub) => {
+      const friendlyName = TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ");
+      const normalizedFriendlyName = testCatalog.find(
+        (t) => t.title.toLowerCase().trim() === friendlyName.toLowerCase().trim()
+      )?.title || friendlyName;
+
+      counts[normalizedFriendlyName] = (counts[normalizedFriendlyName] || 0) + 1;
+    });
+
+    // Format for Recharts
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      count,
+    })).sort((a, b) => b.count - a.count);
+  }, [testSubmissions, testCatalog]);
+
   const filteredLenders = lenderList.filter((l) => {
     if (filterLenderSearch.trim() !== "") {
       const query = filterLenderSearch.toLowerCase().trim();
@@ -2493,7 +2525,7 @@ ${sheetDataXml}
 
   const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
     hasSessionPermission || 
-    (activeExpert?.permissions || []).some(p => p === "cibil_view" || p === "cibil_view_all")
+    (activeExpert?.permissions || []).some((p: string) => p === "cibil_view" || p === "cibil_view_all")
   ));
   console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
   if (!isAdmin && !isEmployeeId) {
@@ -2928,6 +2960,82 @@ ${sheetDataXml}
                           </div>
                         )}
                       </div>
+
+                      {/* Submissions Analytics Chart Dashboard */}
+                      {testSubmissions.length > 0 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-[16px] border border-gray-150/70 mt-2">
+                          {/* Column 1 & 2: Bar Chart showing Demand */}
+                          <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex flex-col gap-3">
+                            <div>
+                              <h4 className="text-[12px] font-bold text-gray-805">Test Demand Analytics</h4>
+                              <p className="text-[10px] text-gray-400 mt-[2px]">Real-time count of quiz attempts by test template to measure platform demand.</p>
+                            </div>
+                            <div className="h-[180px] w-full flex items-center justify-center">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={testAttemptCounts}
+                                  layout="vertical"
+                                  margin={{ top: 5, right: 15, left: 35, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                                  <XAxis type="number" stroke="#9ca3af" fontSize={9} tickLine={false} axisLine={false} />
+                                  <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    stroke="#4b5563"
+                                    fontSize={9}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={90}
+                                    tickFormatter={(val) => val.length > 15 ? `${val.substring(0, 12)}...` : val}
+                                  />
+                                  <Tooltip
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.04)' }}
+                                    contentStyle={{
+                                      background: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: '8px',
+                                      fontSize: '10px',
+                                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    }}
+                                  />
+                                  <Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={12}>
+                                    {testAttemptCounts.map((entry, index) => {
+                                      const colors = ["#4f46e5", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+                                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                                    })}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Column 3: Summary Cards */}
+                          <div className="flex flex-col gap-3">
+                            {/* Card 1: Total attempts */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex-1 flex flex-col justify-center">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Attempts</span>
+                              <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-[24px] font-extrabold text-gray-900">{testSubmissions.length}</span>
+                                <span className="text-[10px] text-emerald-600 font-semibold">Total completed</span>
+                              </div>
+                            </div>
+
+                            {/* Card 2: Highest demand */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex-1 flex flex-col justify-center">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Most Popular Test</span>
+                              <div className="mt-1">
+                                <div className="text-[13px] font-extrabold text-gray-800 truncate">
+                                  {testAttemptCounts[0]?.count > 0 ? testAttemptCounts[0]?.name : "No attempts yet"}
+                                </div>
+                                <div className="text-[10.5px] text-gray-400 mt-0.5">
+                                  {testAttemptCounts[0]?.count > 0 ? `${testAttemptCounts[0]?.count} attempts (${Math.round((testAttemptCounts[0]?.count / testSubmissions.length) * 100)}%)` : "Start taking tests to see trends"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Row 2: Filters */}
                       <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
