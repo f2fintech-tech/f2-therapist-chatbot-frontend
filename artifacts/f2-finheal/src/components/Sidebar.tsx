@@ -328,7 +328,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   };
 
   const handleOpenEligibilityCibil = () => {
-    setActiveNav("Eligibility & CIBIL Checker");
+    setActiveNav("Eligibility, CIBIL & BSA");
     onOpenEligibilityCibil?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
@@ -653,7 +653,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
             {hasPermission("cibil_fetch") && (
-              <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
+              <NavBtn icon="🛡️" label="Eligibility, CIBIL & BSA" active={activeNav === "Eligibility, CIBIL & BSA"} onClick={handleOpenEligibilityCibil} />
             )}
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
