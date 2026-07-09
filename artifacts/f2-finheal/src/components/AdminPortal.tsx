@@ -478,7 +478,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     focus: "",
     result: "",
     accent: "from-[#3344e6] to-[#7c8cff]",
-    questions: [] as any[]
+    questions: [] as any[],
+    pillar: "money_iq"
   });
 
   const [selectedEditLevel, setSelectedEditLevel] = useState<number>(1);
@@ -2112,7 +2113,8 @@ ${sheetDataXml}
       focus: "",
       result: "",
       accent: "from-[#3344e6] to-[#7c8cff]",
-      questions: []
+      questions: [],
+      pillar: "money_iq"
     });
     setTestModalOpen(true);
   };
@@ -2179,7 +2181,8 @@ ${sheetDataXml}
       focus: test.focus,
       result: test.result,
       accent: test.accent,
-      questions: initialQuestions
+      questions: initialQuestions,
+      pillar: test.pillar || "money_iq"
     });
     setTestModalOpen(true);
   };
@@ -2198,7 +2201,8 @@ ${sheetDataXml}
       focus: testForm.focus.trim() || "Affordability analysis",
       result: testForm.result.trim() || "Instant diagnostic score",
       accent: testForm.accent.trim(),
-      questions: testForm.questions
+      questions: testForm.questions,
+      pillar: testForm.pillar
     };
 
     let updatedList;
@@ -5758,6 +5762,21 @@ ${sheetDataXml}
                   placeholder="e.g. Diagnostic Safety score + buffer tips"
                   className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Target Wellness Pillar</label>
+                <select
+                  value={testForm.pillar}
+                  onChange={(e) => setTestForm({ ...testForm, pillar: e.target.value })}
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                >
+                  <option value="money_iq">Money IQ</option>
+                  <option value="debt_health">Debt Health</option>
+                  <option value="financial_safety">Financial Safety</option>
+                  <option value="credit_health">Credit Health</option>
+                  <option value="loan_comfort">Loan Comfort</option>
+                </select>
               </div>
 
               <div>

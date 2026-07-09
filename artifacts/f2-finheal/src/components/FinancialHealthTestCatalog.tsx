@@ -34,6 +34,7 @@ export type TestCard = {
   result: string;
   accent: string;
   questions?: TestQuestion[];
+  pillar?: string;
 };
 
 type PastResult = {
