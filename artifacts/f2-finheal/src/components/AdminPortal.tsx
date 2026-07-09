@@ -665,6 +665,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // CIBIL Enquiries State and Fetcher
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
+  const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
+  const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
+  const [viewingCibilReportUserId, setViewingCibilReportUserId] = useState<string | null>(null);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterEndDate, setFilterEndDate] = useState<string>("");
@@ -679,8 +682,6 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
-  const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
-  const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
 
   const todayStr = (() => {
     const today = new Date();
@@ -3849,6 +3850,7 @@ ${sheetDataXml}
                                     onClick={() => {
                                       setViewingCibilReport(enq.report_data);
                                       setViewingCibilReportId(enq.id);
+                                      setViewingCibilReportUserId(enq.user_id);
                                     }}
                                     className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
                                   >
@@ -6328,7 +6330,11 @@ ${sheetDataXml}
                 </p>
               </div>
               <button 
-                onClick={() => setViewingCibilReport(null)} 
+                onClick={() => {
+                  setViewingCibilReport(null);
+                  setViewingCibilReportId(null);
+                  setViewingCibilReportUserId(null);
+                }} 
                 className="text-[22px] text-gray-400 hover:text-gray-600 cursor-pointer border-none bg-transparent transition font-bold leading-none p-1"
                 title="Close Report"
               >
@@ -6337,7 +6343,7 @@ ${sheetDataXml}
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
               <CibilAnalyzerView 
-                userId={cibilEnquiries.find((e: any) => e.id === viewingCibilReportId)?.user_id || userId || "admin"}
+                userId={viewingCibilReportUserId || "anonymous"}
                 overrideReport={viewingCibilReport} 
                 reportId={viewingCibilReportId || undefined}
                 onToggleSidebar={() => {}} 
