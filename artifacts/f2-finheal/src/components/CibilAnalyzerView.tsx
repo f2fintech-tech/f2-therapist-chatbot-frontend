@@ -21,7 +21,6 @@ import {
   Lock,
   ArrowRight,
   Info,
-  AlertTriangle,
   X
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount } from "../services/cibil";

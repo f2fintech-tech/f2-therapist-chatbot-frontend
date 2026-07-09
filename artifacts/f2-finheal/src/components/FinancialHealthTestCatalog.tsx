@@ -22,6 +22,7 @@ export interface TestQuestion {
   questionText: string;
   options: string[];
   correctOptionIndex: number;
+  level?: number;
 }
 
 export type TestCard = {
