@@ -558,15 +558,13 @@ export default function EligibilityCibilView({
     }
   };
 
-  const submitBsaAnalysis = async () => {
-    if (!selectedBsaFile) return;
-
+  const performBsaUpload = async (file: File) => {
     setBsaUploading(true);
     setBsaError(null);
 
     const formData = new FormData();
     formData.append("user_id", userId);
-    formData.append("file", selectedBsaFile);
+    formData.append("file", file);
     if (bsaPassword) {
       formData.append("password", bsaPassword);
     }
@@ -615,6 +613,17 @@ export default function EligibilityCibilView({
     } finally {
       setBsaUploading(false);
     }
+  };
+
+  const submitBsaAnalysis = async () => {
+    if (!selectedBsaFile) return;
+    await performBsaUpload(selectedBsaFile);
+  };
+
+  const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await performBsaUpload(file);
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
