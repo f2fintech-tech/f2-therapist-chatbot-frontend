@@ -1145,7 +1145,7 @@ export default function EligibilityCibilView({
     <div className="eligibility-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200">
       
       {/* Header */}
-      <header className="flex flex-col gap-[14px] border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-[14px] border-b border-gray-100 bg-white py-[16px] pl-[20px] pr-[96px] sm:pr-[96px] 2xl:pr-[20px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-[10px]">
           <button
             onClick={onToggleSidebar}

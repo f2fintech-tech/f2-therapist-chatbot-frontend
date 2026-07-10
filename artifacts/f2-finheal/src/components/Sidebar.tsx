@@ -379,12 +379,12 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-[55] lg:hidden"
           onClick={onClose}
         />
       )}
       {/* Mobile Drawer */}
-      <aside className={`fixed left-0 top-0 bottom-0 w-[clamp(260px,85vw,268px)] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed left-0 top-0 bottom-0 w-[clamp(260px,85vw,268px)] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-[60] transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       <button
         type="button"
         onClick={handleOpenTalkToFinHeal}

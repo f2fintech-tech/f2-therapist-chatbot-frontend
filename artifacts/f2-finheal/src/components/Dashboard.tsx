@@ -1745,19 +1745,8 @@ ${sheetDataXml}
       {onToggleSidebar && !isSidebarOpen && (
         <button
           onClick={onToggleSidebar}
-          className="fixed left-[12px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden z-50 shadow-sm"
+          className="absolute left-[12px] top-[32px] sm:top-[40px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden z-50 shadow-sm"
           aria-label="Toggle Navigation"
-        >
-          ☰
-        </button>
-      )}
-
-      {/* Fixed Insights Toggle Button (shows on screen < 2xl, overlays open insights panel) */}
-      {onToggleInsights && !isInsightsOpen && (
-        <button
-          onClick={onToggleInsights}
-          className="fixed right-[64px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden z-50 shadow-sm"
-          aria-label="Toggle Insights"
         >
           ☰
         </button>
@@ -1770,7 +1759,7 @@ ${sheetDataXml}
         <div className="absolute -bottom-10 left-1/3 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute top-4 right-1/4 w-20 h-20 rounded-full bg-white/8 pointer-events-none" />
 
-        <div className="relative pl-[64px] pr-[64px] py-6 sm:pl-[76px] sm:pr-[64px] sm:py-7 lg:px-8 lg:pr-[64px] flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+        <div className="relative pl-[64px] pr-[96px] 2xl:pr-[64px] py-6 sm:pl-[76px] sm:py-7 lg:pl-8 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           {/* Profile Details Group */}
           <div className="flex items-center gap-4 sm:gap-6 w-full xl:w-auto">
 

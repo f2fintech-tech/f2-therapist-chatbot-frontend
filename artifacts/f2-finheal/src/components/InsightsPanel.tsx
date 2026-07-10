@@ -659,11 +659,14 @@ export default function InsightsPanel({
       />
 
       {/* Mobile Overlay */}
-      {isOpen && <div className="fixed inset-0 bg-black/40 z-30 2xl:hidden" onClick={onClose} />}
+      {isOpen && <div className="fixed inset-0 bg-black/40 z-[55] 2xl:hidden" onClick={onClose} />}
 
       {/* Sidebar - Mobile */}
-      <aside className={`fixed right-0 top-0 bottom-0 w-[clamp(260px,85vw,280px)] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-40 transition-transform duration-300 px-[12px] py-[16px] 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <button onClick={onClose} className="absolute top-3 right-3 h-6 w-6 rounded-md flex items-center justify-center text-red-400 z-50">✕</button>
+      <aside className={`fixed right-0 top-0 bottom-0 w-[clamp(260px,85vw,280px)] bg-white rounded-[20px_0_0_20px] flex flex-col overflow-y-auto shadow-lg border-l border-gray-200 z-[60] transition-transform duration-300 px-[12px] pb-[16px] pt-[48px] 2xl:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="absolute top-[16px] left-[16px] text-[11px] font-bold text-gray-400 uppercase tracking-[0.15em] select-none">Insights</div>
+        <button onClick={onClose} className="absolute top-[12px] right-[12px] h-[28px] w-[28px] rounded-full bg-gray-50 border border-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all duration-300 z-50 focus:outline-none focus:ring-2 focus:ring-rose-500/20" aria-label="Close insights panel">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
         {panelContent}
       </aside>
 

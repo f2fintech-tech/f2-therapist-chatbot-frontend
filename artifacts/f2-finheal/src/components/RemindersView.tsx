@@ -564,7 +564,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       
       {/* View Header */}
       <div className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-950/95 shrink-0">
-        <div className="flex items-center gap-3 px-[16px] py-[14px] sm:px-[20px] sm:py-[12px]">
+        <div className="flex items-center gap-3 py-[14px] sm:py-[12px] pl-[16px] pr-[96px] sm:pl-[20px] sm:pr-[96px] 2xl:pr-[20px]">
           <button 
             type="button" 
             onClick={onToggleSidebar} 
@@ -588,15 +588,6 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
             className="h-[32px] px-[12px] bg-primary text-white text-[12px] font-semibold rounded-[8px] flex items-center gap-[6px] cursor-pointer shadow-sm hover:bg-[#1e2db8] transition-colors shrink-0"
           >
             <Plus size={14} /> Add Reminder
-          </button>
-
-          <button 
-            type="button" 
-            onClick={onToggleInsights} 
-            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0 dark:bg-slate-800 dark:text-slate-200" 
-            aria-label="Toggle insights panel"
-          >
-            ☰
           </button>
         </div>
       </div>

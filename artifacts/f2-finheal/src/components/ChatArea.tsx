@@ -345,8 +345,8 @@ export default function ChatArea({
           }
         }
       `}</style>
-      <div className="flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white dark:bg-slate-950 dark:border-slate-800 rounded-t-[20px] sm:px-[20px] sm:py-[12px] pl-[72px] sm:pl-[84px] lg:pl-0 pt-[12px] lg:pt-0">
-        <div className="flex items-start gap-[10px] sm:items-center w-full">
+      <div className="relative flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[12px] shrink-0 bg-white dark:bg-slate-950 dark:border-slate-800 rounded-t-[20px] sm:px-[20px] pl-[54px] sm:pl-[84px] lg:pl-0">
+        <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center w-full gap-y-3">
           {!isSidebarOpen && (
             <button
               onClick={onToggleSidebar}
@@ -356,13 +356,18 @@ export default function ChatArea({
               ☰
             </button>
           )}
-          <div className="flex-1 min-w-3 lg:pl-5">
+          <div className="w-full sm:flex-1 min-w-3 sm:pr-0 lg:pl-5 block">
+            {/* Invisible float to perfectly carve out space for the absolute Profile Avatar on mobile */}
+            <div className="float-right w-[86px] h-[38px] sm:hidden" />
+            
             <div className="text-[18px] font-bold text-gray-900 dark:text-slate-100 pt-[8px] sm:text-[14px]">Financial Wellness Chat</div>
-            <div className="text-[10px] text-gray-400 dark:text-slate-400 flex flex-wrap items-center gap-x-[5px] gap-y-[2px] mt-[1px] sm:text-[11px]">
+            <div className="text-[10px] text-gray-400 dark:text-slate-400 flex items-center gap-[5px] mt-[1px] sm:text-[11px] w-full">
               <span
-                className={`w-[6px] h-[6px] rounded-full shadow-[0_0_0_2px_#ecfdf5] dark:shadow-[0_0_0_2px_rgba(16,185,129,0.1)] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
+                className={`w-[6px] h-[6px] shrink-0 rounded-full shadow-[0_0_0_2px_#ecfdf5] dark:shadow-[0_0_0_2px_rgba(16,185,129,0.1)] ${isHealthy === false ? "bg-[#ef4444]" : isLoading ? "bg-[#f59e0b]" : "bg-[#10b981]"}`}
               />
-              FinHeal AI · {latestConversation} · {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
+              <span className="truncate">
+                FinHeal AI · {latestConversation} · {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
+              </span>
             </div>
 
             {typeof remainingHearts === "number" && (
@@ -403,10 +408,12 @@ export default function ChatArea({
               </div>
             )}
           </div>
-          {showAd && (
-            <div 
-              onClick={onOpenEligibilityCibil}
-              className="hidden sm:flex items-center gap-[8px] h-[30px] px-[12px] rounded-full border border-cyan-500/20 dark:border-cyan-500/30 bg-cyan-50/10 backdrop-blur-md text-[11px] font-semibold cursor-pointer transition-all duration-300 hover:border-cyan-500/40 dark:hover:border-cyan-500/50 hover:bg-cyan-50/20 ad-header-glow shrink-0 text-left relative"
+          {/* Action controls container */}
+          <div className="flex flex-wrap items-center w-full sm:w-auto justify-start sm:justify-end gap-[8px] sm:ml-auto sm:mr-[96px] 2xl:mr-0 z-20 pt-[2px] sm:pt-0">
+            {showAd && (
+              <div 
+                onClick={onOpenEligibilityCibil}
+                className="flex items-center gap-[8px] h-[30px] px-[14px] rounded-full border border-cyan-500/20 dark:border-cyan-500/30 bg-cyan-50/10 backdrop-blur-md text-[11px] font-semibold cursor-pointer transition-all duration-300 hover:border-cyan-500/40 dark:hover:border-cyan-500/50 hover:bg-cyan-50/20 ad-header-glow shrink-0 text-left relative shadow-[0_2px_10px_rgba(6,182,212,0.06)]"
             >
               <style>{`
                 @keyframes neonGlow {
@@ -431,7 +438,8 @@ export default function ChatArea({
               </span>
               
               <span className="text-slate-600 dark:text-slate-300 tracking-wide font-sans font-medium hover:text-slate-900 dark:hover:text-white transition-colors">
-                Check CIBIL & Loan Eligibility
+                <span className="hidden sm:inline">Check CIBIL & Loan Eligibility</span>
+                <span className="sm:hidden">Check CIBIL</span>
               </span>
                           
               <button 
@@ -442,17 +450,16 @@ export default function ChatArea({
                 ✕
               </button>
             </div>
-          )}
-
-          {/* Action controls container */}
-          <div className="ml-auto flex items-center gap-3 shrink-0">
+            )}
+            
             {/* Clear Button */}
             <button
               onClick={handleClearDraft}
-              className="h-[32px] px-[10px] rounded-[6px] border-[1.5px] border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 font-sans text-[11px] font-semibold flex items-center gap-[5px] transition-all hover:border-[#d4d8fa] dark:hover:border-slate-700 hover:bg-[#f6f7fe] dark:hover:bg-slate-800 hover:text-primary dark:hover:text-indigo-400 cursor-pointer shadow-sm"
+              className="h-[30px] px-[14px] rounded-full border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-gray-600 dark:text-slate-300 font-sans text-[11px] font-semibold flex items-center gap-[6px] transition-all duration-300 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 dark:hover:border-rose-900 dark:hover:bg-rose-900/20 dark:hover:text-rose-400 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.04)] group"
               title="Clear draft text"
             >
-              🗑 Clear
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:opacity-100 transition-opacity"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+              Clear
             </button>
 
             {/* Insights Panel Toggle Button */}
