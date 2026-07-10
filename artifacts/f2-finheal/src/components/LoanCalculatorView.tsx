@@ -1738,7 +1738,7 @@ export default function LoanCalculatorView({
   return (
     <main className="loan-calculator-view relative flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 border-b border-gray-100 py-[14px] shrink-0 bg-white rounded-t-[20px] sm:py-[12px] pl-[16px] pr-[96px] sm:pl-[20px] sm:pr-[96px] 2xl:pr-[20px]">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             type="button"
@@ -1778,14 +1778,6 @@ export default function LoanCalculatorView({
               ))}
             </select>
           </div>
-          <button
-            type="button"
-            onClick={onToggleInsights}
-            className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0"
-            aria-label="Toggle insights panel"
-          >
-            ☰
-          </button>
         </div>
       </div>
 
