@@ -157,6 +157,9 @@ export default function CibilAnalyzerView({
     if (bsaPassword) {
       formData.append("password", bsaPassword);
     }
+    if (report?.id) {
+      formData.append("report_id", report.id);
+    }
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -192,6 +195,19 @@ export default function CibilAnalyzerView({
     }
   };
 
+  // Synchronize BSA state from the CIBIL report
+  useEffect(() => {
+    if (report?.bsa_analysis) {
+      setBsaVerified(true);
+      if (report.bsa_analysis.excel_report_url) {
+        setBsaExcelUrl(report.bsa_analysis.excel_report_url);
+      }
+    } else {
+      setBsaVerified(false);
+      setBsaExcelUrl(null);
+    }
+  }, [report]);
+
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
@@ -200,20 +216,6 @@ export default function CibilAnalyzerView({
         setReport(overrideReport);
         setIsLoading(false);
         
-        // Fetch the consolidated profile separately to get the BSA data without hanging the leads query
-        try {
-          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-          const res = await fetch(`${apiBase}/profile/consolidated/${userId}`);
-          if (res.ok) {
-            const profileData = await res.json();
-            if (profileData.bsa_analysis?.excel_report_url) {
-              setBsaExcelUrl(profileData.bsa_analysis.excel_report_url);
-              setBsaVerified(true);
-            }
-          }
-        } catch(err) {
-          console.error("Failed to fetch profile for BSA data", err);
-        }
         
         try {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";

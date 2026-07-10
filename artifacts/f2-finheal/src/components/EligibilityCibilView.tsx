@@ -558,7 +558,7 @@ export default function EligibilityCibilView({
     }
   };
 
-  const performBsaUpload = async (file: File) => {
+  const performBsaUpload = async (file: File, isCibilContext: boolean = false) => {
     setBsaUploading(true);
     setBsaError(null);
 
@@ -567,6 +567,9 @@ export default function EligibilityCibilView({
     formData.append("file", file);
     if (bsaPassword) {
       formData.append("password", bsaPassword);
+    }
+    if (isCibilContext && cibilReport?.id) {
+      formData.append("report_id", cibilReport.id);
     }
 
     try {
@@ -583,22 +586,33 @@ export default function EligibilityCibilView({
 
       const data = await res.json();
       
-      // Auto-fill states
-      if (data.metrics) {
-        setEligIncome(String(Math.round(data.metrics.verified_monthly_salary)));
-        setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi)));
+      if (isCibilContext && cibilReport) {
+        setCibilReport({
+          ...cibilReport,
+          bsa_analysis: data
+        });
+        toast({
+          title: "Statement Attached",
+          description: "Bank statement analysis successfully attached to this CIBIL report.",
+        });
+      } else {
+        // Auto-fill states for generic standalone tab
+        if (data.metrics) {
+          setEligIncome(String(Math.round(data.metrics.verified_monthly_salary)));
+          setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi)));
+        }
+        if (data.excel_report_url) {
+          setBsaExcelUrl(data.excel_report_url);
+        }
+        setBsaBankName(data.bank_name || "Verified Bank");
+        setBsaPeriod(data.metrics?.statement_period || "");
+        setBsaVerified(true);
+        
+        toast({
+          title: "Bank Statement Verified!",
+          description: `Income: ${formatCurrency(data.metrics.verified_monthly_salary)}, EMI: ${formatCurrency(data.metrics.total_existing_monthly_emi)}`,
+        });
       }
-      if (data.excel_report_url) {
-        setBsaExcelUrl(data.excel_report_url);
-      }
-      setBsaBankName(data.bank_name || "Verified Bank");
-      setBsaPeriod(data.metrics?.statement_period || "");
-      setBsaVerified(true);
-      
-      toast({
-        title: "Bank Statement Verified!",
-        description: `Income: ${formatCurrency(data.metrics.verified_monthly_salary)}, EMI: ${formatCurrency(data.metrics.total_existing_monthly_emi)}`,
-      });
       
       // Dispatch update to sync other components
       window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
@@ -617,7 +631,7 @@ export default function EligibilityCibilView({
 
   const submitBsaAnalysis = async () => {
     if (!selectedBsaFile) return;
-    await performBsaUpload(selectedBsaFile);
+    await performBsaUpload(selectedBsaFile, false);
   };
 
   const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2111,7 +2125,7 @@ export default function EligibilityCibilView({
                       </a>
                     )}
                     
-                    {!bsaVerified && (
+                    {!cibilReport.bsa_analysis && (
                       <div className="mt-2.5 w-full relative cibil-print-hide">
                         <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
                         <input
@@ -2120,11 +2134,11 @@ export default function EligibilityCibilView({
                           value={bsaPassword}
                           onChange={(e) => setBsaPassword(e.target.value)}
                           className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
-                          disabled={bsaUploading || bsaVerified}
+                          disabled={bsaUploading || !!cibilReport.bsa_analysis}
                         />
                       </div>
                     )}
-                    {bsaVerified ? (
+                    {cibilReport.bsa_analysis ? (
                       <div className="mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm cibil-print-hide bg-emerald-50 text-emerald-600 border border-emerald-200">
                         <ShieldCheck className="w-4 h-4 shrink-0" />
                         <span>Bank Statement Ready ✓</span>
@@ -2136,7 +2150,7 @@ export default function EligibilityCibilView({
                           <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
                         </div>
                         <button 
-                          onClick={submitBsaAnalysis}
+                          onClick={() => performBsaUpload(selectedBsaFile, true)}
                           disabled={bsaUploading}
                           className={`w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
                         >
@@ -2666,19 +2680,42 @@ export default function EligibilityCibilView({
                   />
                 </div>
                 
-                <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
-                  <FileText className="h-4.5 w-4.5 text-indigo-500" />
-                  <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
-                    {bsaUploading ? "Analyzing statement..." : "Upload Bank Statement (PDF/Excel)"}
-                  </span>
-                  <input
-                    type="file"
-                    accept=".pdf,.xls,.xlsx,.csv"
-                    className="hidden"
-                    onChange={handleBsaUpload}
-                    disabled={bsaUploading}
-                  />
-                </label>
+                {selectedBsaFile ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+                      <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
+                      <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
+                    </div>
+                    <button 
+                      onClick={submitBsaAnalysis}
+                      disabled={bsaUploading}
+                      className={`w-full font-bold py-3 rounded-[14px] text-[12.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                    >
+                      {bsaUploading ? (
+                        <span>Analyzing Bank Statement...</span>
+                      ) : (
+                        <>
+                          <FileText className="w-4.5 h-4.5 shrink-0" />
+                          <span>Start Bank Statement Analysis</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
+                    <FileText className="h-4.5 w-4.5 text-indigo-500" />
+                    <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
+                      Upload Bank Statement (PDF/Excel)
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.xls,.xlsx,.csv"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      disabled={bsaUploading}
+                    />
+                  </label>
+                )}
                 {bsaError && (
                   <div className="flex items-center gap-1.5 text-[11px] text-rose-500 font-medium text-center justify-center w-full">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {bsaError}

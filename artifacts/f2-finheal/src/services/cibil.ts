@@ -40,6 +40,7 @@ export interface CibilAccount {
 }
 
 export interface CibilReport {
+  id?: string;
   score: number;
   band: string;
   pan: string;
@@ -50,6 +51,7 @@ export interface CibilReport {
   tips: string[];
   pdf_url?: string;
   fetched_at: string;
+  bsa_analysis?: any;
 }
 
 export async function fetchCibilReport(
