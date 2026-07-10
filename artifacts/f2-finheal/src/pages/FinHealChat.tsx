@@ -1144,7 +1144,7 @@ export default function FinHealChat() {
 
         {/* Global Pinned Profile Dropdown */}
         {userProfile && (
-          <div className="global-profile-dropdown absolute right-[12px] z-50">
+          <div className="global-profile-dropdown absolute right-[12px] z-50 flex items-center gap-[10px]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="global-profile-avatar relative flex items-center justify-center w-10 h-10 rounded-full cursor-pointer focus:outline-none transition-all duration-300 hover:scale-105 hover:rotate-3 select-none bg-gradient-to-tr from-primary via-indigo-600 to-violet-500 text-white shadow-md border-2 border-white/90 dark:border-slate-800">
@@ -1212,6 +1212,17 @@ export default function FinHealChat() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Global Insights Panel Toggle Button */}
+            {!insightsOpen && (
+              <button
+                onClick={() => setInsightsOpen(true)}
+                className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 dark:hover:bg-slate-700 shrink-0 shadow-sm 2xl:hidden"
+                aria-label="Toggle insights panel"
+              >
+                ☰
+              </button>
+            )}
           </div>
         )}
         </div>
