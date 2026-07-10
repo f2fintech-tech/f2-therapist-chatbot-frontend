@@ -248,29 +248,20 @@ export default function FinancialHealthTestCatalog({
 
   return (
     <main className="test-catalog-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
-      <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+      <div className="flex items-center gap-3 border-b border-gray-100 py-[14px] shrink-0 bg-white rounded-t-[20px] sm:py-[12px] pl-[16px] pr-[96px] sm:pl-[20px] sm:pr-[96px] 2xl:pr-[20px]">
         <button
           type="button"
           onClick={onToggleSidebar}
           className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 xl:hidden shrink-0"
           aria-label="Toggle sidebar"
         >
-          ☰k\
+          ☰
         </button>
 
         <div className="min-w-0 flex-1">
           <div className="text-[35px] font-bold text-gray-900 sm:text-[14px]">Financial Health Tests</div>
           <div className="text-[30px] text-gray-400 sm:text-[11px]">Choose a test to check one part of your financial health.</div>
         </div>
-        0
-        <button
-          type="button"
-          onClick={onToggleInsights}
-          className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0"
-          aria-label="Toggle insights panel"
-        >
-          ☰
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
