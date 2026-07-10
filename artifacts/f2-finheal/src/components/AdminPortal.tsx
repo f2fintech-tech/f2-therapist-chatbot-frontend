@@ -2614,29 +2614,32 @@ ${sheetDataXml}
   }, [filteredSubmissions, safeSubPage]);
 
   const testAttemptCounts = useMemo(() => {
+    const standardNames = [
+      "Money IQ Arena",
+      "Debt Pressure Analysis",
+      "Financial Safety Score",
+      "Credit Health Analyzer",
+      "Loan Comfort Analysis"
+    ];
+
     const counts: Record<string, number> = {};
-    
-    // Add default values from testCatalog
-    testCatalog.forEach((test) => {
-      counts[test.title] = 0;
+    // Initialize standard tests with 0
+    standardNames.forEach((name) => {
+      counts[name] = 0;
     });
 
-    // Count attempts from testSubmissions
+    // Count attempts dynamically for all submissions in the database
     testSubmissions.forEach((sub) => {
       const friendlyName = TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ");
-      const normalizedFriendlyName = testCatalog.find(
-        (t) => t.title.toLowerCase().trim() === friendlyName.toLowerCase().trim()
-      )?.title || friendlyName;
-
-      counts[normalizedFriendlyName] = (counts[normalizedFriendlyName] || 0) + 1;
+      counts[friendlyName] = (counts[friendlyName] || 0) + 1;
     });
 
-    // Format for Recharts
+    // Format for Recharts and sort by attempt count
     return Object.entries(counts).map(([name, count]) => ({
       name,
       count,
     })).sort((a, b) => b.count - a.count);
-  }, [testSubmissions, testCatalog]);
+  }, [testSubmissions]);
 
   const filteredLenders = lenderList.filter((l) => {
     if (filterLenderSearch.trim() !== "") {
@@ -3112,38 +3115,50 @@ ${sheetDataXml}
                               <h4 className="text-[12px] font-bold text-gray-805">Test Demand Analytics</h4>
                               <p className="text-[10px] text-gray-400 mt-[2px]">Real-time count of quiz attempts by test template to measure platform demand.</p>
                             </div>
-                            <div className="h-[180px] w-full flex items-center justify-center">
+                            <div className="h-[230px] w-full flex items-center justify-center">
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                   data={testAttemptCounts}
                                   layout="vertical"
-                                  margin={{ top: 5, right: 15, left: 35, bottom: 5 }}
+                                  margin={{ top: 10, right: 15, left: 10, bottom: 5 }}
                                 >
                                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                                  <XAxis type="number" stroke="#9ca3af" fontSize={9} tickLine={false} axisLine={false} />
+                                  <XAxis type="number" stroke="#9ca3af" fontSize={9.5} tickLine={false} axisLine={false} />
                                   <YAxis
                                     dataKey="name"
                                     type="category"
                                     stroke="#4b5563"
-                                    fontSize={9}
+                                    fontSize={10.5}
                                     tickLine={false}
                                     axisLine={false}
-                                    width={90}
-                                    tickFormatter={(val) => val.length > 15 ? `${val.substring(0, 12)}...` : val}
+                                    width={115}
+                                    interval={0}
+                                    tickFormatter={(val) => val.length > 20 ? `${val.substring(0, 17)}...` : val}
                                   />
                                   <Tooltip
                                     cursor={{ fill: 'rgba(99, 102, 241, 0.04)' }}
                                     contentStyle={{
                                       background: '#ffffff',
                                       border: '1px solid #e5e7eb',
-                                      borderRadius: '8px',
-                                      fontSize: '10px',
-                                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                      borderRadius: '12px',
+                                      fontSize: '11px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                      padding: '8px 12px',
+                                      fontFamily: 'inherit'
+                                    }}
+                                    itemStyle={{
+                                      color: '#1f2937',
+                                      fontWeight: '600'
+                                    }}
+                                    labelStyle={{
+                                      color: '#6b7280',
+                                      fontWeight: '500',
+                                      marginBottom: '4px'
                                     }}
                                   />
-                                  <Bar dataKey="count" fill="#4f46e5" radius={[0, 4, 4, 0]} barSize={12}>
+                                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={16}>
                                     {testAttemptCounts.map((entry, index) => {
-                                      const colors = ["#4f46e5", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+                                      const colors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
                                       return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                                     })}
                                   </Bar>
