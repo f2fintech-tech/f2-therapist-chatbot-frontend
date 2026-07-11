@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -1743,6 +1743,17 @@ ${sheetDataXml}
     }
   };
 
+  const handleDeleteTestLog = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this test log?")) return;
+    try {
+      await deleteAdminTestResult(id);
+      setTestSubmissions((prev) => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete log.");
+    }
+  };
+
   useEffect(() => {
     if (!expertNextSlot) {
       const today = new Date();
@@ -3247,16 +3258,17 @@ ${sheetDataXml}
                             <th className="p-[12px]">Calculated Score</th>
                             <th className="p-[12px]">Assessment Outcome</th>
                             <th className="p-[12px]">Date Completed</th>
+                            <th className="p-[12px] text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {submissionsLoading ? (
                             <tr>
-                              <td colSpan={5} className="text-center p-6 text-gray-400">Loading user submissions...</td>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">Loading user submissions...</td>
                             </tr>
                           ) : filteredSubmissions.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="text-center p-6 text-gray-400">No submissions found matching filter criteria.</td>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">No submissions found matching filter criteria.</td>
                             </tr>
                           ) : (
                             paginatedSubmissions.map((sub) => {
@@ -3318,6 +3330,15 @@ ${sheetDataXml}
                                       minute: "2-digit",
                                       hour12: true
                                     })}
+                                  </td>
+                                  <td className="p-[12px] text-right">
+                                    <button
+                                      onClick={() => handleDeleteTestLog(sub.id)}
+                                      className="text-rose-600 hover:text-white font-medium bg-rose-50 hover:bg-rose-500 px-[12px] py-[6px] rounded-[6px] transition-all border border-rose-200 hover:border-rose-500 text-[11px]"
+                                      title="Delete Log"
+                                    >
+                                      Delete
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -3798,6 +3819,29 @@ ${sheetDataXml}
                           }
 
                           const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+                          
+                          let displayRole = role;
+                          if (role === "User") {
+                            if (!enq.fetched_by || enq.fetched_by === "client") {
+                              displayRole = "User (Lead)";
+                            } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
+                              displayRole = "System Admin";
+                            } else {
+                              const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+                              displayRole = emp ? emp.name : "User (Lead)";
+                            }
+                          }
+
+                          let roleColorClass = "bg-emerald-50 text-emerald-700 border-emerald-250";
+                          if (displayRole === "Admin" || displayRole === "System Admin") {
+                            roleColorClass = "bg-rose-50 text-rose-700 border-rose-200";
+                          } else if (displayRole === "Senior Leadership") {
+                            roleColorClass = "bg-amber-50 text-amber-800 border-amber-200";
+                          } else if (displayRole === "Manager") {
+                            roleColorClass = "bg-blue-50 text-blue-700 border-blue-200";
+                          } else if (displayRole !== "User (Lead)") {
+                            roleColorClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                          }
 
                           return (
                             <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
@@ -3806,22 +3850,8 @@ ${sheetDataXml}
                                 {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
                                 {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
                                 <div className="mt-[4px]">
-                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
-                                    ? "bg-rose-50 text-rose-700 border-rose-200"
-                                    : role === "Senior Leadership"
-                                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                                      : role === "Manager"
-                                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-250"
-                                    }`}>
-                                    {(() => {
-                                      if (role !== "User") return role;
-                                      
-                                      if (!enq.fetched_by || enq.fetched_by === "client") return "User (Lead)";
-                                      if (enq.fetched_by === "admin") return "System Admin";
-                                      const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
-                                      return emp ? emp.name : "User (Lead)";
-                                    })()}
+                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${roleColorClass}`}>
+                                    {displayRole}
                                   </span>
                                 </div>
                               </td>

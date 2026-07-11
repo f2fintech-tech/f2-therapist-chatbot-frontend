@@ -25,7 +25,7 @@ import type { MoodDimensions } from "@/lib/backendChat";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
 import { createUserProfile } from "@/utils/user";
 import { getStoredAuthSession, setStoredAuthSession, clearStoredAuthSession } from "@/utils/authSession";
-import { fetchHearts, fetchUserProfile, authRequest } from "@/lib/backendAuth";
+import { fetchHearts, fetchUserProfile, authRequest, fetchAdvisorProfile } from "@/lib/backendAuth";
 import { syncGoalsFromBackend } from "@/utils/localGoals";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
@@ -83,6 +83,31 @@ export default function FinHealChat() {
       }
     }
   }, [authSession, location, setLocation]);
+
+  // Proactive Session Validation: Force logout if user is deleted or deactivated
+  useEffect(() => {
+    if (!authSession) return;
+    
+    const validateSession = async () => {
+      try {
+        if (authSession.isAdvisor && authSession.userId) {
+          const profile = await fetchAdvisorProfile(authSession.userId);
+          if (!profile || profile.isActive === false) {
+            throw new Error("Account deactivated or deleted.");
+          }
+        } else if (authSession.userId && !authSession.isGuest) {
+          await fetchUserProfile(authSession.userId);
+        }
+      } catch (err) {
+        console.warn("Session validation failed. Forcing logout:", err);
+        clearStoredAuthSession();
+        setAuthSession(null);
+        setLocation("/login", { replace: true });
+      }
+    };
+    
+    validateSession();
+  }, [authSession?.userId, authSession?.isAdvisor, setLocation]);
 
   const customTestId = useMemo(() => {
     if (location.startsWith("/tests/") && !["financial-literacy", "emergency-fund", "loan-fit", "credit-readiness", "debt-balance"].includes(location.split("/tests/")[1] || "")) {

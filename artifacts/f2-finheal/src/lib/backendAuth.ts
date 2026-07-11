@@ -254,6 +254,10 @@ export async function fetchAllTestResults(): Promise<AdminTestResult[]> {
   return authRequest("test-results/", { method: "GET" });
 }
 
+export async function deleteAdminTestResult(testId: string): Promise<void> {
+  return authRequest(`test-results/${encodeURIComponent(testId)}`, { method: "DELETE" });
+}
+
 export async function fetchUserProfile(userId: string): Promise<BackendUserProfile> {
   return authRequest(`auth/profile/${encodeURIComponent(userId)}`, { method: "GET" });
 }
