@@ -188,6 +188,12 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
       return;
     }
 
+    const completedTs = new Date(state.completedAt ?? state.updatedAt).getTime();
+    if (Date.now() - completedTs > 10000) {
+      // Prevent resubmitting old tests when navigating back to the view
+      return;
+    }
+
     const attemptKey = `${userId}:${state.completedAt ?? state.updatedAt}:${currentResult.rawScore}`;
     if (submittedAttemptKey === attemptKey) {
       return;
