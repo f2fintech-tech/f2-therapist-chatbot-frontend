@@ -232,27 +232,25 @@ function EmployeeDirectory({
                     <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
                   </div>
                   {emp.isAdvisor && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Rating</span>
-                        <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Status</span>
-                        <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {emp.isActive !== false ? 'Active' : 'Deactivated'}
-                        </span>
-                      </div>
-                      {emp.isActive === false && emp.deactivationReason && (
-                         <div className="flex justify-between text-[10px]">
-                           <span className="text-gray-400">Reason</span>
-                           <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
-                             {emp.deactivationReason}
-                           </span>
-                         </div>
-                       )}
-                    </>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Rating</span>
+                      <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                    </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Status</span>
+                    <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                    </span>
+                  </div>
+                  {emp.isActive === false && emp.deactivationReason && (
+                     <div className="flex justify-between text-[10px]">
+                       <span className="text-gray-400">Reason</span>
+                       <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                         {emp.deactivationReason}
+                       </span>
+                     </div>
+                   )}
                 </div>
 
                 <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
@@ -266,14 +264,12 @@ function EmployeeDirectory({
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {emp.isAdvisor && (
-                      <button
-                        onClick={() => handleToggleActive(emp)}
-                        className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
-                      >
-                        {emp.isActive !== false ? "Deactivate" : "Activate"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleToggleActive(emp)}
+                      className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                    >
+                      {emp.isActive !== false ? "Deactivate" : "Activate"}
+                    </button>
                     <button
                       onClick={() => handleOpenEditExpert(emp)}
                       className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
@@ -1926,7 +1922,9 @@ ${sheetDataXml}
       testRating: expertForm.testRating || 5,
       department: (expertForm.department && expertForm.department.trim() !== "General") ? expertForm.department.trim() : "Founder's Office",
       isAdvisor: expertForm.isAdvisor,
-      permissions: expertForm.permissions
+      permissions: expertForm.permissions,
+      isActive: editingExpert ? editingExpert.isActive : true,
+      deactivationReason: editingExpert ? editingExpert.deactivationReason : undefined
     };
 
     if (savingExpert) return;
@@ -1983,16 +1981,17 @@ ${sheetDataXml}
 
   const handleToggleActive = async (adv: any) => {
     const nextStatus = adv.isActive !== false ? false : true;
+    const label = adv.isAdvisor ? "Advisor" : "Employee";
     if (nextStatus) {
       // Activating: clear deactivation reason automatically
       try {
         await updateAdvisorActiveStatus(adv.f2FintechId || adv.id, true);
-        alert(`Advisor ${adv.name} has been activated successfully.`);
+        alert(`${label} ${adv.name} has been activated successfully.`);
         await loadAdvisors();
         await loadEmployees();
       } catch (err) {
-        console.error("Failed to activate advisor:", err);
-        alert("Error activating advisor.");
+        console.error(`Failed to activate ${label.toLowerCase()}:`, err);
+        alert(`Error activating ${label.toLowerCase()}.`);
       }
     } else {
       // Deactivating: prompt for reason
@@ -2004,18 +2003,19 @@ ${sheetDataXml}
 
   const handleConfirmDeactivate = async () => {
     if (!deactivateTarget) return;
+    const label = deactivateTarget.isAdvisor ? "Advisor" : "Employee";
     setIsDeactivating(true);
     try {
       await updateAdvisorActiveStatus(deactivateTarget.f2FintechId || deactivateTarget.id, false, deactivateReason);
-      alert(`Advisor ${deactivateTarget.name} has been deactivated.`);
+      alert(`${label} ${deactivateTarget.name} has been deactivated.`);
       setDeactivateConfirmOpen(false);
       setDeactivateTarget(null);
       setDeactivateReason("");
       await loadAdvisors();
       await loadEmployees();
     } catch (err) {
-      console.error("Failed to deactivate advisor:", err);
-      alert("Error deactivating advisor.");
+      console.error(`Failed to deactivate ${label.toLowerCase()}:`, err);
+      alert(`Error deactivating ${label.toLowerCase()}.`);
     } finally {
       setIsDeactivating(false);
     }
@@ -5485,7 +5485,7 @@ ${sheetDataXml}
             
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
               <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
-                🚫 Deactivate Advisor Profile
+                🚫 Deactivate {deactivateTarget?.isAdvisor ? "Advisor" : "Employee"} Profile
               </h3>
               <button 
                 onClick={() => setDeactivateConfirmOpen(false)} 

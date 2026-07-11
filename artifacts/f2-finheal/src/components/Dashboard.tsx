@@ -15,7 +15,7 @@ import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
-
+import { CONTENT } from "@/components/FinancialEducation";
 
 export interface DashboardProps {
   userId: string;
@@ -927,6 +927,30 @@ export default function Dashboard({
 
   // Admin stats states
   const [backendStats, setBackendStats] = useState<any>(null);
+  const [activeCounts, setActiveCounts] = useState({ articles: 8, videos: 4, tests: 5 });
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    // Read local education items managed by Admin
+    const storedContent = localStorage.getItem("finheal_education_content");
+    const eduList = storedContent ? JSON.parse(storedContent) : null;
+    const articlesActive = eduList 
+      ? eduList.filter((c: any) => c.type === "article").length 
+      : CONTENT.filter(c => c.type === "article").length;
+    const videosActive = eduList 
+      ? eduList.filter((c: any) => c.type === "video").length 
+      : CONTENT.filter(c => c.type === "video").length;
+
+    // Read tests count dynamically from backend stats
+    const testsActive = backendStats?.active_tests_count ?? 5;
+
+    setActiveCounts({
+      articles: articlesActive,
+      videos: videosActive,
+      tests: testsActive
+    });
+  }, [backendStats, isAdmin]);
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [lenderList, setLenderList] = useState<any[]>([]);
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
@@ -2039,16 +2063,103 @@ ${sheetDataXml}
                     <div className="space-y-[10px]">
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">📄 Educational Articles</span>
-                        <span className="font-bold text-gray-800">8 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.articles} active</span>
                       </div>
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">🎥 Educational Videos</span>
-                        <span className="font-bold text-gray-800">4 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.videos} active</span>
                       </div>
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">📋 Financial Health Tests</span>
-                        <span className="font-bold text-gray-800">5 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.tests} active</span>
                       </div>
+                    </div>
+
+                    {/* Divider and Consumption Pie Chart */}
+                    <div className="mt-6 pt-5 border-t border-gray-100">
+                      <h4 className="text-[12px] font-bold text-gray-800 mb-1">
+                        📊 User Consumption Analytics
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mb-3">
+                        Distribution of educational content and tests consumed by users.
+                      </p>
+
+                      {/* Render Pie Chart if there is consumption data */}
+                      {(() => {
+                        const articlesConsumed = backendStats?.consumption?.articles ?? 0;
+                        const videosConsumed = backendStats?.consumption?.videos ?? 0;
+                        const testsConsumed = backendStats?.consumption?.tests ?? 0;
+                        const total = articlesConsumed + videosConsumed + testsConsumed;
+
+                        if (total === 0) {
+                          return (
+                            <div className="h-[140px] flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50 p-3">
+                              <span className="text-[18px]">📈</span>
+                              <span className="text-[10.5px] font-medium text-gray-400 mt-1">No user consumption recorded yet</span>
+                            </div>
+                          );
+                        }
+
+                        const data = [
+                          { name: "Articles Read", value: articlesConsumed, color: "#6366f1" },
+                          { name: "Videos Watched", value: videosConsumed, color: "#10b981" },
+                          { name: "Tests Completed", value: testsConsumed, color: "#f59e0b" }
+                        ];
+
+                        return (
+                          <div className="h-[140px] w-full flex items-center justify-between">
+                            <div className="w-[50%] h-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={data}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={28}
+                                    outerRadius={45}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                  >
+                                    {data.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip
+                                    contentStyle={{
+                                      background: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: '8px',
+                                      fontSize: '9.5px',
+                                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    }}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                            
+                            {/* Legend Panel */}
+                            <div className="w-[48%] space-y-1.5 text-[10.5px]">
+                              {data.map((item, idx) => {
+                                const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                                return (
+                                  <div key={idx} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                                      <span 
+                                        className="h-2 w-2 rounded-full shrink-0" 
+                                        style={{ backgroundColor: item.color }}
+                                      />
+                                      <span className="truncate max-w-[70px]">{item.name.split(" ")[0]}</span>
+                                    </div>
+                                    <span className="font-bold text-gray-700">
+                                      {item.value} ({percentage}%)
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
