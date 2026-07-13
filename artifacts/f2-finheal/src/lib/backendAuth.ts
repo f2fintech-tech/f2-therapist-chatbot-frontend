@@ -274,6 +274,14 @@ export interface BackendStats {
   registered_users: number;
   guest_users: number;
   total_conversations: number;
+  average_wellness_score?: number;
+  top_category?: string;
+  risk_mix_pct?: number;
+  consumption?: {
+    articles: number;
+    videos: number;
+    tests: number;
+  };
 }
 
 export async function fetchAdminStats(): Promise<BackendStats> {
