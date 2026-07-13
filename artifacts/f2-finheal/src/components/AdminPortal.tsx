@@ -3827,7 +3827,7 @@ ${sheetDataXml}
                             } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
                               displayRole = "System Admin";
                             } else {
-                              const emp = advisors.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+                              const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
                               displayRole = emp ? emp.name : "User (Lead)";
                             }
                           }
