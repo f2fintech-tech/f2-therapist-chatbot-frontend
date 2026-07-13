@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   Calculator,
   Scale,
   Coins,
@@ -128,6 +129,85 @@ export default function CibilAnalyzerView({
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
   const [activeTermsTab, setActiveTermsTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("credit-consent");
 
+  // BSA States
+  const [bsaUploading, setBsaUploading] = useState<boolean>(false);
+  const [bsaVerified, setBsaVerified] = useState<boolean>(false);
+  const [bsaPassword, setBsaPassword] = useState<string>("");
+  const [bsaError, setBsaError] = useState<string | null>(null);
+  const [bsaExcelUrl, setBsaExcelUrl] = useState<string | null>(null);
+  const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedBsaFile(file);
+      setBsaError(null);
+    }
+  };
+
+  const submitBsaAnalysis = async () => {
+    if (!selectedBsaFile) return;
+
+    setBsaUploading(true);
+    setBsaError(null);
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("file", selectedBsaFile);
+    if (bsaPassword) {
+      formData.append("password", bsaPassword);
+    }
+    if (report?.id) {
+      formData.append("report_id", report.id);
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to analyze bank statement");
+      }
+
+      if (data.excel_report_url) {
+        setBsaExcelUrl(data.excel_report_url);
+      }
+      setBsaVerified(true);
+      toast({
+        title: "Bank Statement Analyzed",
+        description: "Your bank statement has been successfully processed and metrics updated.",
+        variant: "default",
+      });
+    } catch (err: any) {
+      console.error("BSA Upload Error:", err);
+      setBsaError(err.message || "An error occurred while uploading");
+      toast({
+        title: "Upload Failed",
+        description: err.message || "Failed to analyze statement",
+        variant: "destructive",
+      });
+    } finally {
+      setBsaUploading(false);
+    }
+  };
+
+  // Synchronize BSA state from the CIBIL report
+  useEffect(() => {
+    if (report?.bsa_analysis) {
+      setBsaVerified(true);
+      if (report.bsa_analysis.excel_report_url) {
+        setBsaExcelUrl(report.bsa_analysis.excel_report_url);
+      }
+    } else {
+      setBsaVerified(false);
+      setBsaExcelUrl(null);
+    }
+  }, [report]);
+
   // Fetch initial stored CIBIL report and lenders catalog on mount
   useEffect(() => {
     async function init() {
@@ -135,6 +215,7 @@ export default function CibilAnalyzerView({
         setStoredReport(overrideReport);
         setReport(overrideReport);
         setIsLoading(false);
+        
         
         try {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -778,7 +859,7 @@ export default function CibilAnalyzerView({
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
+      <div className="flex-1 overflow-y-auto no-scrollbar p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
           // State A: Form to retrieve CIBIL Report
           <div className="mx-auto max-w-[520px] my-[24px]">
             <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">
@@ -1086,6 +1167,76 @@ export default function CibilAnalyzerView({
                   </a>
                 )}
                 
+                {!bsaVerified && (
+                  <div className="mt-2.5 w-full relative cibil-print-hide">
+                    <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Statement Password (if any)"
+                      value={bsaPassword}
+                      onChange={(e) => setBsaPassword(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                      disabled={bsaUploading || bsaVerified}
+                    />
+                  </div>
+                )}
+
+                {bsaVerified ? (
+                  <div className="mt-[8px] flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm w-full cibil-print-hide bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    <ShieldCheck className="w-[14px] h-[14px] shrink-0" />
+                    <span>Bank Statement Ready ✓</span>
+                  </div>
+                ) : selectedBsaFile ? (
+                  <div className="mt-[8px] flex flex-col gap-2 w-full cibil-print-hide">
+                    <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+                      <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
+                      <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
+                    </div>
+                    <button 
+                      onClick={submitBsaAnalysis}
+                      disabled={bsaUploading}
+                      className={`flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all w-full ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                    >
+                      {bsaUploading ? (
+                        <span>Analyzing Bank Statement...</span>
+                      ) : (
+                        <>
+                          <FileText className="w-[14px] h-[14px] shrink-0" />
+                          <span>Start Bank Statement Analysis</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="mt-[8px] flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200">
+                    <FileText className="w-[14px] h-[14px] shrink-0" />
+                    <span>Upload Bank Statement</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.xls,.xlsx,.csv"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      disabled={bsaUploading}
+                    />
+                  </label>
+                )}
+                {bsaError && (
+                  <div className="mt-1 flex items-center gap-1 text-[10.5px] text-rose-500 font-medium text-center justify-center w-full">
+                    <AlertTriangle className="h-3 w-3 shrink-0" /> {bsaError}
+                  </div>
+                )}
+
+                {bsaExcelUrl && (
+                  <a
+                    href={bsaExcelUrl}
+                    download
+                    className="mt-[8px] flex items-center justify-center gap-[6px] bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
+                  >
+                    <FileText className="w-[14px] h-[14px] shrink-0" />
+                    <span>Download Excel Report 📥</span>
+                  </a>
+                )}
+                
                 <button
                   onClick={handleGenerateCAM}
                   disabled={isGeneratingCAM}
@@ -1202,17 +1353,6 @@ export default function CibilAnalyzerView({
                             {openAccounts.length} open · {closedCount} closed · {report.accounts.length} total accounts on file
                           </p>
                         </div>
-                        {report.pdf_url && (
-                          <a
-                            href={report.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] bg-primary/10 text-primary border border-primary/20 px-[10px] py-[4px] rounded-[8px] font-bold flex items-center gap-[4px] hover:bg-primary/20 transition-all cursor-pointer shrink-0 cibil-print-hide"
-                          >
-                            <FileText className="w-[12px] h-[12px]" />
-                            <span>PDF Report</span>
-                          </a>
-                        )}
                       </div>
 
                       {/* Category chips / filter row */}

@@ -237,6 +237,27 @@ export async function fetchTestResults(userId: string): Promise<{
   return authRequest(`test-results/${encodeURIComponent(userId)}`, { method: "GET" });
 }
 
+export interface AdminTestResult {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  test_type: string;
+  score: number | null;
+  percentage_score: number | null;
+  risk_level: string | null;
+  category: string | null;
+  completed_at: string;
+}
+
+export async function fetchAllTestResults(): Promise<AdminTestResult[]> {
+  return authRequest("test-results/", { method: "GET" });
+}
+
+export async function deleteAdminTestResult(testId: string): Promise<void> {
+  return authRequest(`test-results/${encodeURIComponent(testId)}`, { method: "DELETE" });
+}
+
 export async function fetchUserProfile(userId: string): Promise<BackendUserProfile> {
   return authRequest(`auth/profile/${encodeURIComponent(userId)}`, { method: "GET" });
 }
@@ -253,6 +274,14 @@ export interface BackendStats {
   registered_users: number;
   guest_users: number;
   total_conversations: number;
+  average_wellness_score?: number;
+  top_category?: string;
+  risk_mix_pct?: number;
+  consumption?: {
+    articles: number;
+    videos: number;
+    tests: number;
+  };
 }
 
 export async function fetchAdminStats(): Promise<BackendStats> {
@@ -393,6 +422,11 @@ export async function fetchAdvisors(userId?: string, allEmployees: boolean = fal
   const url = queryParams.length > 0 ? `advisors?${queryParams.join("&")}` : "advisors";
   const list = await authRequest<BackendAdvisor[]>(url, { method: "GET" });
   return list.map(mapBackendAdvisorToFrontend);
+}
+
+export async function fetchAdvisorProfile(f2FintechId: string): Promise<any> {
+  const result = await authRequest<BackendAdvisor>(`advisors/profile/${encodeURIComponent(f2FintechId)}`, { method: "GET" });
+  return mapBackendAdvisorToFrontend(result);
 }
 
 export async function saveAdvisor(advisor: any): Promise<any> {

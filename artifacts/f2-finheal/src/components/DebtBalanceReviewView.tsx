@@ -586,10 +586,10 @@ export default function DebtBalanceReviewView({
           <button
             type="button"
             onClick={onBackToCatalog}
-            className="h-[32px] w-[32px] rounded-[6px] border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] transition-all hover:bg-gray-50 shrink-0"
+            className="h-[32px] w-[32px] rounded-[8px] border border-amber-200 bg-amber-50/50 text-amber-700 flex items-center justify-center shadow-sm transition-all duration-200 hover:scale-105 hover:bg-amber-100 active:scale-95 shrink-0 cursor-pointer dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/50"
             aria-label="Back to test catalog"
           >
-            ←
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
           </button>
 
           <div className="min-w-0 flex-1">

@@ -23,8 +23,10 @@ import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 
-export function getLenderLogoUrl(name: string): string | null {
+
+function getLenderLogoUrl(name: string): string | null {
   const clean = name.toLowerCase();
   if (clean.includes("icici")) return "/icici_bank.png";
   if (clean.includes("axis")) return "/axis_bank.png";
@@ -81,6 +83,7 @@ interface EligibilityCibilViewProps {
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
+  onOpenAdmin?: (tab?: string) => void;
 }
 
 export interface LenderProduct {
@@ -287,10 +290,106 @@ export default function EligibilityCibilView({
   onToggleInsights,
   onApplyNow,
   onTalkToAdvisor,
+  onOpenAdmin,
 }: EligibilityCibilViewProps) {
-  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil">("eligibility");
+  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa">("eligibility");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const { toast } = useToast();
+
+  const isUserAdvisor = (email?: string) => {
+    if (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) return false;
+    try {
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed?.isAdvisor) return true;
+      }
+    } catch (e) {}
+
+    if (!email) return false;
+    const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
+    if (defaultEmails.includes(email.toLowerCase())) return true;
+
+    const stored = localStorage.getItem("finheal_advisors_list");
+    if (stored) {
+      try {
+        const list = JSON.parse(stored);
+        return list.some((a: any) => 
+          a.f2FintechId && (
+            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
+          ) && a.isAdvisor === true
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
+  const isStaff = useMemo(() => {
+    const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    return isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
+  }, [userId, userEmail]);
+
+  const isSuperAdmin = useMemo(() => {
+    return userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
+  }, [userEmail]);
+
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const isSuperAdmin = userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase());
+
+    const loadPermissions = async () => {
+      if (isSuperAdmin) {
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
+        return;
+      }
+
+       // If userId looks like an Employee ID (not a UUID), fetch fresh from backend
+      const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (isEmployeeId) {
+        try {
+          // Temporarily use any since the function isn't perfectly mapped in scope without importing
+          // We will restore the import as well
+          const { fetchAdvisorProfile } = await import('@/lib/backendAuth');
+          const data = await fetchAdvisorProfile(userId);
+          setUserPermissions(data.permissions || []);
+          return;
+        } catch (e) {
+          // fall through to localStorage
+        }
+      }
+
+      // Fallback: read from cached session
+      try {
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          setUserPermissions(parsed?.permissions || []);
+        } else {
+          setUserPermissions([]);
+        }
+      } catch (e) {
+        setUserPermissions([]);
+      }
+    };
+
+    void loadPermissions();
+    window.addEventListener("finheal:advisors_update", () => void loadPermissions());
+    return () => window.removeEventListener("finheal:advisors_update", () => void loadPermissions());
+  }, [userId, userEmail]);
+
+  const hasCibilFetchPermission = useMemo(() => {
+    if (isSuperAdmin) return true;
+    if (!isStaff) return true;
+    return userPermissions.includes("cibil_fetch");
+  }, [isStaff, isSuperAdmin, userPermissions]);
+
+  const hasCibilViewPermission = useMemo(() => {
+    if (isSuperAdmin) return true;
+    if (!isStaff) return false;
+    return userPermissions.includes("cibil_view") || userPermissions.includes("cibil_view_all");
+  }, [isStaff, isSuperAdmin, userPermissions]);
 
   // CIBIL Score States
   const [cibilReport, setCibilReport] = useState<CibilReport | null>(null);
@@ -298,6 +397,8 @@ export default function EligibilityCibilView({
   const [cibilLoading, setCibilLoading] = useState<boolean>(true);
   const [cibilFetching, setCibilFetching] = useState<boolean>(false);
   const [isGeneratingCAM, setIsGeneratingCAM] = useState<boolean>(false);
+
+
   const [cibilError, setCibilError] = useState<string | null>(null);
   const [cibilName, setCibilName] = useState<string>("");
   const [cibilFirstName, setCibilFirstName] = useState<string>("");
@@ -323,6 +424,16 @@ export default function EligibilityCibilView({
   const [eligDegree, setEligDegree] = useState<string>("MBBS");
   const [eligExperience, setEligExperience] = useState<string>("3");
 
+  // BSA States
+  const [bsaUploading, setBsaUploading] = useState<boolean>(false);
+  const [bsaPassword, setBsaPassword] = useState<string>("");
+  const [bsaVerified, setBsaVerified] = useState<boolean>(false);
+  const [bsaExcelUrl, setBsaExcelUrl] = useState<string>("");
+  const [bsaBankName, setBsaBankName] = useState<string>("");
+  const [bsaPeriod, setBsaPeriod] = useState<string>("");
+  const [bsaError, setBsaError] = useState<string | null>(null);
+  const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
+
   // Lenders Catalog State
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
@@ -338,10 +449,9 @@ export default function EligibilityCibilView({
       case "USD":
       case "EUR":
       case "GBP":
-        return 0.0125;
+        return 80;
       case "JPY":
-        return 1.5;
-      case "INR":
+        return 0.5;
       default:
         return 1;
     }
@@ -362,26 +472,53 @@ export default function EligibilityCibilView({
     }
   }, [eligIncome, eligEmi]);
 
-  // Load CIBIL score from local storage / API
+  // Fetch User's Consolidated Profile & Stored Reports
   useEffect(() => {
-    async function loadStoredReport() {
+    async function init() {
       try {
-        setCibilLoading(true);
-        // Do not auto-load stored report on mount/refresh to ensure a blank checker page
-        /*
-        const report = await getStoredCibilReport(userId);
-        if (report) {
-          setStoredCibilReport(report);
-          setCibilReport(report);
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        
+        // 1. Fetch Consolidated Profile
+        const profileRes = await fetch(`${apiBase}/profile/consolidated/${userId}`);
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          const profileInfo = profileData.profile_info || {};
+          
+          if (!cibilName && profileInfo.name) setCibilName(profileInfo.name);
+          if (!cibilPhone && profileInfo.phone) setCibilPhone(profileInfo.phone);
+
+          // Restore CIBIL from profile
+          if (profileData.cibil_report && Object.keys(profileData.cibil_report).length > 0) {
+             setCibilReport(profileData.cibil_report);
+             setStoredCibilReport(profileData.cibil_report);
+             if (profileData.cibil_report.pan) {
+               setCibilPan(profileData.cibil_report.pan);
+             }
+          }
+          
+          // Restore BSA from profile
+          if (profileData.bsa_analysis) {
+            setBsaVerified(true);
+            if (profileData.bsa_analysis.excel_report_url) {
+              setBsaExcelUrl(profileData.bsa_analysis.excel_report_url);
+            }
+            if (profileData.bsa_analysis.bank_name) {
+              setBsaBankName(profileData.bsa_analysis.bank_name);
+            }
+            if (profileData.bsa_analysis.metrics) {
+               setEligIncome(String(Math.round(profileData.bsa_analysis.metrics.verified_monthly_salary)));
+               setEligEmi(String(Math.round(profileData.bsa_analysis.metrics.total_existing_monthly_emi)));
+               setBsaPeriod(profileData.bsa_analysis.metrics.statement_period || "");
+            }
+          }
         }
-        */
       } catch (err) {
-        console.log("No stored CIBIL report found on mount:", err);
+        console.error("Failed to load initial data", err);
       } finally {
         setCibilLoading(false);
       }
     }
-    loadStoredReport();
+    init();
   }, [userId]);
 
   // Load lenders catalog on mount
@@ -412,6 +549,96 @@ export default function EligibilityCibilView({
       window.removeEventListener("finheal:lenders_update", handleUpdate);
     };
   }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedBsaFile(file);
+      setBsaError(null);
+    }
+  };
+
+  const performBsaUpload = async (file: File, isCibilContext: boolean = false) => {
+    setBsaUploading(true);
+    setBsaError(null);
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("file", file);
+    if (bsaPassword) {
+      formData.append("password", bsaPassword);
+    }
+    if (isCibilContext && cibilReport?.id) {
+      formData.append("report_id", cibilReport.id);
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || "Failed to analyze bank statement");
+      }
+
+      const data = await res.json();
+      
+      if (isCibilContext && cibilReport) {
+        setCibilReport({
+          ...cibilReport,
+          bsa_analysis: data
+        });
+        toast({
+          title: "Statement Attached",
+          description: "Bank statement analysis successfully attached to this CIBIL report.",
+        });
+      } else {
+        // Auto-fill states for generic standalone tab
+        if (data.metrics) {
+          setEligIncome(String(Math.round(data.metrics.verified_monthly_salary)));
+          setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi)));
+        }
+        if (data.excel_report_url) {
+          setBsaExcelUrl(data.excel_report_url);
+        }
+        setBsaBankName(data.bank_name || "Verified Bank");
+        setBsaPeriod(data.metrics?.statement_period || "");
+        setBsaVerified(true);
+        
+        toast({
+          title: "Bank Statement Verified!",
+          description: `Income: ${formatCurrency(data.metrics.verified_monthly_salary)}, EMI: ${formatCurrency(data.metrics.total_existing_monthly_emi)}`,
+        });
+      }
+      
+      // Dispatch update to sync other components
+      window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+    } catch (err: any) {
+      console.error(err);
+      setBsaError(err.message || "Failed to process file");
+      toast({
+        title: "Analysis Failed",
+        description: err.message || "Failed to process bank statement",
+        variant: "destructive",
+      });
+    } finally {
+      setBsaUploading(false);
+    }
+  };
+
+  const submitBsaAnalysis = async () => {
+    if (!selectedBsaFile) return;
+    await performBsaUpload(selectedBsaFile, false);
+  };
+
+  const handleBsaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await performBsaUpload(file);
+  };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -512,8 +739,6 @@ export default function EligibilityCibilView({
   };
 
   const handleGenerateCAM = async () => {
-    const report = cibilReport || storedCibilReport;
-    if (!report) return;
     setIsGeneratingCAM(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -533,7 +758,8 @@ export default function EligibilityCibilView({
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const cleanName = report.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      const report = cibilReport || storedCibilReport;
+      const cleanName = report?.name ? report.name.replace(/[^a-zA-Z0-9_]/g, "_") : "User";
       link.setAttribute("href", url);
       link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
       link.style.visibility = "hidden";
@@ -919,11 +1145,11 @@ export default function EligibilityCibilView({
     <div className="eligibility-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200">
       
       {/* Header */}
-      <header className="flex flex-col gap-[14px] border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-[14px] border-b border-gray-100 bg-white py-[16px] pl-[20px] pr-[96px] sm:pr-[96px] 2xl:pr-[20px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-[10px]">
           <button
             onClick={onToggleSidebar}
-            className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-gray-50 hover:bg-gray-100 lg:hidden cursor-pointer"
+            className="flex h-[32px] w-[32px] items-center justify-center rounded-[8px] bg-gray-50 hover:bg-gray-100 lg:hidden cursor-pointer cibil-print-hide"
             aria-label="Toggle Navigation"
           >
             ☰
@@ -939,7 +1165,7 @@ export default function EligibilityCibilView({
         
         {/* Currency & Database Indicators */}
         <div className="flex flex-wrap items-center gap-[12px] shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cibil-print-hide">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.5px]">Currency:</span>
             <div className="relative">
               <select
@@ -958,14 +1184,15 @@ export default function EligibilityCibilView({
               </div>
             </div>
           </div>
+
         </div>
       </header>
 
       {/* Main Content Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
         
         {/* CIBIL / Eligibility Tab Switcher */}
-        <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5">
+        <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5 cibil-print-hide">
           <button
             type="button"
             onClick={() => setCibilSubTab("eligibility")}
@@ -989,6 +1216,28 @@ export default function EligibilityCibilView({
           >
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>CIBIL Score Checker</span>
+          </button>
+          {hasCibilViewPermission && (
+            <button
+              type="button"
+              onClick={() => onOpenAdmin?.("cibil-enquiries")}
+              className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>Past Reports fetched</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setCibilSubTab("bsa")}
+            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              cibilSubTab === "bsa"
+                ? "bg-primary text-white shadow-md"
+                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span>Bank Statement Analyzer</span>
           </button>
         </div>
 
@@ -1018,10 +1267,19 @@ export default function EligibilityCibilView({
                 </div>
               </div>
 
+
+
               {/* Monthly Income */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[13px] font-semibold text-gray-700">Gross Monthly Income</label>
+                    {bsaVerified && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-150">
+                        <Check className="h-2.5 w-2.5" /> Verified
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligIncome) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
@@ -1053,7 +1311,14 @@ export default function EligibilityCibilView({
               {/* Existing EMIs */}
               <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[13px] font-semibold text-gray-700">Existing Monthly Debt (EMIs)</label>
+                    {bsaVerified && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-150">
+                        <Check className="h-2.5 w-2.5" /> Verified
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] font-bold text-primary">{formatCurrency(Number(eligEmi) || 0)}</span>
                 </div>
                 <div className="flex items-center gap-2 mb-3">
@@ -1401,7 +1666,31 @@ export default function EligibilityCibilView({
                 <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
                   
-                  {storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
+                  {!hasCibilFetchPermission ? (
+                    <div className="text-center py-4">
+                      <div className="mx-auto w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 mb-3">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-[16px] font-bold text-gray-900">
+                        Credit Check Locked
+                      </h2>
+                      <p className="text-[11px] text-gray-400 mt-[2px] font-semibold">Access Denied</p>
+                      <div className="my-4 p-4 rounded-[14px] bg-rose-550 border border-rose-100 text-rose-900 text-left" style={{ backgroundColor: "#fef2f2" }}>
+                        <p className="text-[12px] leading-normal text-rose-700 font-medium">
+                          You do not have permission to fetch credit score reports. Please contact your Super Admin to adjust your Role-Based Access controls (RBA).
+                        </p>
+                      </div>
+                      {storedCibilReport && (
+                        <button
+                          type="button"
+                          onClick={() => setCibilReport(storedCibilReport)}
+                          className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                        >
+                          View Stored Report
+                        </button>
+                      )}
+                    </div>
+                  ) : storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
                     <div className="text-center py-4">
                       <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
                         <Lock className="w-5 h-5" />
@@ -1829,17 +2118,109 @@ export default function EligibilityCibilView({
                         href={cibilReport.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
                       >
                         <Download className="w-4 h-4 shrink-0" />
                         <span>Download PDF Report</span>
                       </a>
                     )}
+                    
+                    {!cibilReport.bsa_analysis && (
+                      <div className="mt-2.5 w-full relative cibil-print-hide">
+                        <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Statement Password (if any)"
+                          value={bsaPassword}
+                          onChange={(e) => setBsaPassword(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          disabled={bsaUploading || !!cibilReport.bsa_analysis}
+                        />
+                      </div>
+                    )}
+                    {cibilReport.bsa_analysis ? (
+                      <div className="mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm cibil-print-hide bg-emerald-50 text-emerald-600 border border-emerald-200">
+                        <ShieldCheck className="w-4 h-4 shrink-0" />
+                        <span>Bank Statement Ready ✓</span>
+                      </div>
+                    ) : selectedBsaFile ? (
+                      <div className="mt-2 flex flex-col gap-2 w-full cibil-print-hide">
+                        <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+                          <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
+                          <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
+                        </div>
+                        <button 
+                          onClick={() => performBsaUpload(selectedBsaFile, true)}
+                          disabled={bsaUploading}
+                          className={`w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                        >
+                          {bsaUploading ? (
+                            <span>Analyzing Bank Statement...</span>
+                          ) : (
+                            <>
+                              <FileText className="w-4 h-4 shrink-0" />
+                              <span>Start Bank Statement Analysis</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200">
+                        <FileText className="w-4 h-4 shrink-0" />
+                        <span>Upload Bank Statement</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.xls,.xlsx,.csv"
+                          className="hidden"
+                          onChange={handleFileSelect}
+                          disabled={bsaUploading}
+                        />
+                      </label>
+                    )}
+                    {bsaError && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-rose-50 border border-rose-100 flex items-start gap-2 text-rose-700 text-left w-full shadow-xs">
+                        <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                        <div className="flex-1 text-[10.5px] leading-relaxed">
+                          <span className="font-semibold text-rose-800">Error:</span>{" "}
+                          {(() => {
+                            if (bsaError.includes("{")) {
+                              const parts = bsaError.split("{");
+                              const prefix = parts[0].trim();
+                              const jsonStr = "{" + parts.slice(1).join("{");
+                              try {
+                                const parsed = JSON.parse(jsonStr);
+                                const errMsg = parsed.message || parsed.detail || "Details in JSON log below";
+                                return (
+                                  <>
+                                    <span>{prefix.replace("Here is exactly what FinEye sent back:", "")}</span>
+                                    <div className="mt-1 font-semibold text-rose-900">
+                                      Reason: {errMsg}
+                                    </div>
+                                    <details className="mt-1.5 cursor-pointer">
+                                      <summary className="text-[9.5px] font-bold text-rose-500 hover:text-rose-600 select-none">
+                                        View details
+                                      </summary>
+                                      <pre className="mt-1 bg-white/70 p-1.5 rounded border border-rose-100/80 overflow-x-auto font-mono text-[8.5px] text-rose-600 leading-normal max-h-[80px]">
+                                        {JSON.stringify(parsed, null, 2)}
+                                      </pre>
+                                    </details>
+                                  </>
+                                );
+                              } catch (e) {
+                                return <span>{bsaError}</span>;
+                              }
+                            }
+                            return <span>{bsaError}</span>;
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={handleGenerateCAM}
                       disabled={isGeneratingCAM}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
                       <Sparkles className="w-4 h-4 shrink-0" />
                       <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
@@ -1847,7 +2228,7 @@ export default function EligibilityCibilView({
                     <button
                       type="button"
                       onClick={() => setCibilReport(null)}
-                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
                     >
                       Check Different PAN
                     </button>
@@ -1877,9 +2258,9 @@ export default function EligibilityCibilView({
                       />
                       <FactorCard
                         label="Recent Queries"
-                        value={String(cibilReport.metrics.enquiries_l3m)}
-                        subtext="Enquiries (3M)"
-                        status={cibilReport.metrics.enquiries_l3m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
+                        value={String(cibilReport.metrics.enquiries_l6m)}
+                        subtext="Enquiries (6M)"
+                        status={cibilReport.metrics.enquiries_l6m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l6m <= 2 ? "Good" : "Poor"}
                       />
                     </div>
                     <div className="mt-4 bg-gray-50 rounded-[12px] p-3 flex items-start gap-2 text-[11px] text-gray-500 border border-gray-100">
@@ -2037,7 +2418,7 @@ export default function EligibilityCibilView({
       </div>
 
       {/* Floating Comparison Bar */}
-      {selectedLenderIds.length > 0 && (
+      {cibilSubTab === "eligibility" && selectedLenderIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-[600px] animate-fade-up">
           <div className="bg-white rounded-[20px] border border-gray-250 shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -2277,6 +2658,173 @@ export default function EligibilityCibilView({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- BANK STATEMENT ANALYZER (BSA) SUBTAB ----------------- */}
+      {cibilSubTab === "bsa" && (
+        <div className="animate-fade-up max-w-[500px] mx-auto my-6 flex flex-col gap-6">
+          
+          {/* Card 1: Upload Box */}
+          <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
+            
+            <div className="flex items-center justify-center gap-2 text-center w-full">
+              <Sparkles className="h-4.5 w-4.5 text-indigo-600 animate-pulse shrink-0" />
+              <span className="text-[14.5px] font-extrabold text-indigo-950">Verify instantly with Bank Statement Analyzer</span>
+            </div>
+            <p className="text-[12px] text-gray-500 leading-normal text-center w-full">
+              Upload your 6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
+            </p>
+            
+            {bsaVerified ? (
+              <div className="bg-white border border-emerald-100 rounded-[10px] p-3.5 flex flex-col items-center justify-center gap-2 shadow-sm text-center">
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span className="text-[12.5px] font-bold text-gray-850">{bsaBankName} Verified</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 font-semibold">Period: {bsaPeriod}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBsaVerified(false);
+                    setBsaExcelUrl("");
+                    setBsaBankName("");
+                    setBsaPeriod("");
+                    setBsaError(null);
+                  }}
+                  className="text-[11px] text-rose-500 font-extrabold hover:underline cursor-pointer bg-transparent border-none p-0 mt-1"
+                >
+                  Reset Statement
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="Enter statement password (if any)"
+                    value={bsaPassword}
+                    onChange={(e) => setBsaPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-[10px] text-[12px] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium shadow-inner"
+                  />
+                </div>
+                
+                {selectedBsaFile ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+                      <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
+                      <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
+                    </div>
+                    <button 
+                      onClick={submitBsaAnalysis}
+                      disabled={bsaUploading}
+                      className={`w-full font-bold py-3 rounded-[14px] text-[12.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                    >
+                      {bsaUploading ? (
+                        <span>Analyzing Bank Statement...</span>
+                      ) : (
+                        <>
+                          <FileText className="w-4.5 h-4.5 shrink-0" />
+                          <span>Start Bank Statement Analysis</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
+                    <FileText className="h-4.5 w-4.5 text-indigo-500" />
+                    <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
+                      Upload Bank Statement (PDF/Excel)
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.xls,.xlsx,.csv"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                      disabled={bsaUploading}
+                    />
+                  </label>
+                )}
+                {bsaError && (
+                  <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-2.5 text-rose-700 text-left w-full shadow-xs">
+                    <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-[11px] leading-relaxed">
+                      <span className="font-bold">Analysis Error:</span>{" "}
+                      {(() => {
+                        if (bsaError.includes("{")) {
+                          const parts = bsaError.split("{");
+                          const prefix = parts[0].trim();
+                          const jsonStr = "{" + parts.slice(1).join("{");
+                          try {
+                            const parsed = JSON.parse(jsonStr);
+                            const errMsg = parsed.message || parsed.detail || "Details in JSON log below";
+                            return (
+                              <>
+                                <span>{prefix.replace("Here is exactly what FinEye sent back:", "")}</span>
+                                <div className="mt-1 font-bold text-rose-800">
+                                  Reason: {errMsg}
+                                </div>
+                                <details className="mt-1.5 cursor-pointer">
+                                  <summary className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 select-none">
+                                    Show technical logs
+                                  </summary>
+                                  <pre className="mt-1.5 bg-white/70 p-2 rounded-lg border border-rose-100/80 overflow-x-auto font-mono text-[9px] text-rose-600 leading-normal max-h-[100px]">
+                                    {JSON.stringify(parsed, null, 2)}
+                                  </pre>
+                                </details>
+                              </>
+                            );
+                          } catch (e) {
+                            return <span>{bsaError}</span>;
+                          }
+                        }
+                        return <span>{bsaError}</span>;
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: Results Dashboard / Empty State */}
+          <div className="w-full">
+            {bsaVerified ? (
+              <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden flex flex-col items-center justify-center gap-4 text-center animate-fade-up">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500" />
+                
+                <h3 className="text-[15px] font-extrabold text-gray-800">Bank Statement Analyzed Successfully</h3>
+                
+                {bsaExcelUrl ? (
+                  <a
+                    href={bsaExcelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-6 py-3 rounded-[12px] bg-indigo-600 text-white text-[13px] font-bold border border-indigo-700 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-md cursor-pointer font-sans"
+                  >
+                    <Download className="h-4 w-4" /> Download BSA Excel Report
+                  </a>
+                ) : (
+                  <p className="text-[12px] text-gray-500">Retrieving secure Excel link...</p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-700">No Statement Uploaded Yet</h3>
+                  <p className="text-[11.5px] text-gray-400 mt-1 max-w-[340px] leading-normal font-medium font-sans">
+                    Please upload your bank e-statement above. The system will process your cashflows and show a detailed dashboard of your verified financial indicators here.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

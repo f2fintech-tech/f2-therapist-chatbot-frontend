@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGetWellnessScore, useGetUserGoals } from "@workspace/api-client-react";
 import type { UserProfile } from "@/utils/user";
+import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { listUserGoals, createGoal, deleteGoal, updateGoal } from "@/utils/localGoals";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -61,17 +62,44 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
 
   useEffect(() => {
-    try {
-      const storedSession = localStorage.getItem("finheal-auth-session");
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        setUserPermissions(parsed?.permissions || []);
-      } else {
+    const isSuperAdmin = userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase());
+
+    const loadPermissions = async () => {
+      // Super admins have all permissions — no need to check
+      if (isSuperAdmin) {
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
+        return;
+      }
+
+      // Check if userId is an Employee ID (F2-XXX-XXX), not a UUID
+      const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (isEmployeeId) {
+        try {
+          const data = await fetchAdvisorProfile(userId);
+          setUserPermissions(data.permissions || []);
+          return;
+        } catch (e) {
+          // fall through to localStorage
+        }
+      }
+
+      // Fallback: read from cached session in localStorage
+      try {
+        const storedSession = localStorage.getItem("finheal-auth-session");
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          setUserPermissions(parsed?.permissions || []);
+        } else {
+          setUserPermissions([]);
+        }
+      } catch (e) {
         setUserPermissions([]);
       }
-    } catch (e) {
-      setUserPermissions([]);
-    }
+    };
+
+    void loadPermissions();
+    window.addEventListener("finheal:advisors_update", () => void loadPermissions());
+    return () => window.removeEventListener("finheal:advisors_update", () => void loadPermissions());
   }, [userId, userEmail]);
 
   useEffect(() => {
@@ -271,26 +299,18 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     return false;
   };
 
-  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
 
   const hasPermission = (perm: string) => {
     if (isSuperAdmin) return true;
     if (!isStaff) return true;
-    try {
-      const storedSession = localStorage.getItem("finheal-auth-session");
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed && !("permissions" in parsed)) {
-          return true;
-        }
-      }
-    } catch (e) {}
     return userPermissions.includes(perm);
   };
 
   const handleOpenAdmin = () => {
-    setActiveNav(isUserAdvisor(userEmail) ? "Advisor Workspace" : "Admin Portal");
+    setActiveNav(isStaff && !isSuperAdmin ? "Advisor Workspace" : "Admin Portal");
     onOpenAdmin?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
@@ -308,7 +328,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   };
 
   const handleOpenEligibilityCibil = () => {
-    setActiveNav("Eligibility & CIBIL Checker");
+    setActiveNav("Eligibility, CIBIL & BSA");
     onOpenEligibilityCibil?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
@@ -359,12 +379,12 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-[55] lg:hidden"
           onClick={onClose}
         />
       )}
       {/* Mobile Drawer */}
-      <aside className={`fixed left-0 top-0 bottom-0 w-[clamp(260px,85vw,268px)] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-40 transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+      <aside className={`fixed left-0 top-0 bottom-0 w-[clamp(260px,85vw,268px)] bg-white rounded-[0_20px_20px_0] flex flex-col overflow-hidden shadow-lg border-r border-gray-200 z-[60] transition-transform duration-300 lg:static lg:rounded-[20px] lg:w-[clamp(240px,18vw,280px)] lg:min-w-[240px] lg:max-w-[280px] lg:h-full lg:min-h-0 lg:shadow-sm lg:border lg:border-gray-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       <button
         type="button"
         onClick={handleOpenTalkToFinHeal}
@@ -633,7 +653,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
             <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
             {hasPermission("cibil_fetch") && (
-              <NavBtn icon="🛡️" label="Eligibility & CIBIL Checker" active={activeNav === "Eligibility & CIBIL Checker"} onClick={handleOpenEligibilityCibil} />
+              <NavBtn icon="🛡️" label="Eligibility, CIBIL & BSA" active={activeNav === "Eligibility, CIBIL & BSA"} onClick={handleOpenEligibilityCibil} />
             )}
             <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
@@ -643,8 +663,8 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               <NavBtn icon="🔑" label="Admin Portal" active={activeNav === "Admin Portal"} onClick={handleOpenAdmin} />
             )}
 
-            {/* If Expert/Advisor */}
-            {isUserAdvisor(userEmail) && (
+            {/* If Expert/Advisor/Staff — show Workspace if they are a front-facing advisor */}
+            {isUserAdvisor(userEmail) && !isSuperAdmin && (
               <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
             )}
 

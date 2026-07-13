@@ -15,7 +15,7 @@ import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
 import { getStoredCibilReport, type CibilReport, type CibilAccount } from "../services/cibil";
-
+import { CONTENT } from "@/components/FinancialEducation";
 
 export interface DashboardProps {
   userId: string;
@@ -110,7 +110,7 @@ function LoanCard({ icon, name, emi, remaining, total, rate, months, color, dela
 
       <div className="bg-gray-50 rounded-[10px] p-3">
         <div className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Remaining</div>
-        <div className="text-[16px] font-bold" style={{ color }}>₹{remaining.toLocaleString()}</div>
+        <div className="text-[16px] font-extrabold" style={{ color }}>₹{remaining.toLocaleString("en-IN")}</div>
       </div>
     </div>
   );
@@ -927,6 +927,30 @@ export default function Dashboard({
 
   // Admin stats states
   const [backendStats, setBackendStats] = useState<any>(null);
+  const [activeCounts, setActiveCounts] = useState({ articles: 8, videos: 4, tests: 5 });
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    // Read local education items managed by Admin
+    const storedContent = localStorage.getItem("finheal_education_content");
+    const eduList = storedContent ? JSON.parse(storedContent) : null;
+    const articlesActive = eduList 
+      ? eduList.filter((c: any) => c.type === "article").length 
+      : CONTENT.filter(c => c.type === "article").length;
+    const videosActive = eduList 
+      ? eduList.filter((c: any) => c.type === "video").length 
+      : CONTENT.filter(c => c.type === "video").length;
+
+    // Read tests count dynamically from backend stats
+    const testsActive = backendStats?.active_tests_count ?? 5;
+
+    setActiveCounts({
+      articles: articlesActive,
+      videos: videosActive,
+      tests: testsActive
+    });
+  }, [backendStats, isAdmin]);
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [lenderList, setLenderList] = useState<any[]>([]);
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
@@ -1446,9 +1470,294 @@ export default function Dashboard({
   });
   const userRows = Object.values(userGroups).sort((a, b) => b.count - a.count);
 
+  const handleExportSummaryExcel = () => {
+    // 1. Helper function for CRC32 calculation
+    const makeCRCTable = () => {
+      let c;
+      const crcTable = [];
+      for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+          c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+        }
+        crcTable[n] = c;
+      }
+      return crcTable;
+    };
+
+    const crcTable = makeCRCTable();
+
+    const calculateCrc32 = (bytes: Uint8Array) => {
+      let crc = 0 ^ (-1);
+      for (let i = 0; i < bytes.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ bytes[i]) & 0xFF];
+      }
+      return (crc ^ (-1)) >>> 0;
+    };
+
+    const createZipBlob = (files: { name: string; content: string }[]) => {
+      const encoder = new TextEncoder();
+      const zipData: { nameBytes: Uint8Array; contentBytes: Uint8Array; crc: number; offset: number }[] = [];
+      let currentOffset = 0;
+      const parts: BlobPart[] = [];
+
+      files.forEach((file) => {
+        const nameBytes = encoder.encode(file.name);
+        const contentBytes = encoder.encode(file.content);
+        const crc = calculateCrc32(contentBytes);
+
+        const header = new Uint8Array(30 + nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x04034b50, true); // Local file header signature
+        view.setUint16(4, 10, true);         // Version needed to extract
+        view.setUint16(6, 0, true);          // General purpose bit flag
+        view.setUint16(8, 0, true);          // Compression method (0 = Store)
+        view.setUint32(10, 0, true);         // Last mod time / date
+        view.setUint32(14, crc, true);       // CRC-32
+        view.setUint32(18, contentBytes.length, true); // Compressed size
+        view.setUint32(22, contentBytes.length, true); // Uncompressed size
+        view.setUint16(26, nameBytes.length, true);    // File name length
+        view.setUint16(28, 0, true);         // Extra field length
+
+        header.set(nameBytes, 30);
+
+        zipData.push({
+          nameBytes,
+          contentBytes,
+          crc,
+          offset: currentOffset
+        });
+
+        parts.push(header);
+        parts.push(contentBytes);
+
+        currentOffset += header.length + contentBytes.length;
+      });
+
+      const centralDirectoryOffset = currentOffset;
+      let centralDirectorySize = 0;
+
+      zipData.forEach((file) => {
+        const header = new Uint8Array(46 + file.nameBytes.length);
+        const view = new DataView(header.buffer);
+
+        view.setUint32(0, 0x02014b50, true); // Central file header signature
+        view.setUint16(4, 20, true);         // Version made by
+        view.setUint16(6, 10, true);         // Version needed to extract
+        view.setUint16(8, 0, true);          // General purpose bit flag
+        view.setUint16(10, 0, true);         // Compression method (Store)
+        view.setUint32(12, 0, true);         // Last mod time / date
+        view.setUint32(16, file.crc, true);  // CRC-32
+        view.setUint32(20, file.contentBytes.length, true); // Compressed size
+        view.setUint32(24, file.contentBytes.length, true); // Uncompressed size
+        view.setUint16(28, file.nameBytes.length, true);    // File name length
+        view.setUint16(30, 0, true);         // Extra field length
+        view.setUint16(32, 0, true);         // File comment length
+        view.setUint16(34, 0, true);         // Disk number start
+        view.setUint16(36, 0, true);         // Internal file attributes
+        view.setUint32(38, 0, true);         // External file attributes
+        view.setUint32(42, file.offset, true); // Local header offset
+
+        header.set(file.nameBytes, 46);
+        parts.push(header);
+
+        centralDirectorySize += header.length;
+        currentOffset += header.length;
+      });
+
+      const eocd = new Uint8Array(22);
+      const view = new DataView(eocd.buffer);
+
+      view.setUint32(0, 0x06054b50, true); // End of central dir signature
+      view.setUint16(4, 0, true);          // Number of this disk
+      view.setUint16(6, 0, true);          // Disk where central dir starts
+      view.setUint16(8, files.length, true); // Directory records on this disk
+      view.setUint16(10, files.length, true); // Total directory records
+      view.setUint32(12, centralDirectorySize, true); // Size of central dir
+      view.setUint32(16, centralDirectoryOffset, true); // Offset of central dir
+      view.setUint16(20, 0, true);         // Comment length
+      parts.push(eocd);
+
+      return new Blob(parts, { type: "application/zip" });
+    };
+
+    const getColumnLetter = (colIndex: number) => {
+      let temp = colIndex;
+      let letter = "";
+      while (temp > 0) {
+        let modulo = (temp - 1) % 26;
+        letter = String.fromCharCode(65 + modulo) + letter;
+        temp = Math.floor((temp - modulo) / 26);
+      }
+      return letter;
+    };
+
+    const escapeXml = (unsafe: string) => {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+    };
+
+    // Construct the data: Admin first, then all employees
+    const exportData = [
+      {
+        name: "System Admin",
+        designation: "Platform Administrator",
+        department: "Founder's Office",
+        count: adminFetchCount
+      },
+      ...employees.map(emp => ({
+        name: emp.name,
+        designation: emp.designation || "Employee",
+        department: emp.department || "General",
+        count: getEmployeeReportCount(emp)
+      }))
+    ];
+
+    const generateWorksheetXml = (dataList: typeof exportData) => {
+      let sheetDataXml = "";
+      
+      // Header row
+      sheetDataXml += `    <row r="1" spans="1:4">\n`;
+      const headers = ["Employee Name", "Designation", "Department", "Reports Fetched"];
+      headers.forEach((h, idx) => {
+        const r = `${getColumnLetter(idx + 1)}1`;
+        sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
+      });
+      sheetDataXml += `    </row>\n`;
+      
+      // Data rows
+      dataList.forEach((row, rowIdx) => {
+        const rowIndex = rowIdx + 2;
+        sheetDataXml += `    <row r="${rowIndex}" spans="1:4">\n`;
+        
+        const fields = [
+          row.name,
+          row.designation,
+          row.department,
+          String(row.count)
+        ];
+        
+        fields.forEach((val, colIdx) => {
+          const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
+          const isNumber = colIdx === 3 && !isNaN(Number(val));
+          if (isNumber) {
+            sheetDataXml += `      <c r="${r}" s="2" t="n"><v>${val}</v></c>\n`;
+          } else {
+            sheetDataXml += `      <c r="${r}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>\n`;
+          }
+        });
+        
+        sheetDataXml += `    </row>\n`;
+      });
+      
+      let colsXml = "  <cols>\n";
+      colsXml += `    <col min="1" max="1" width="25" customWidth="1"/>\n`; // Name
+      colsXml += `    <col min="2" max="2" width="25" customWidth="1"/>\n`; // Designation
+      colsXml += `    <col min="3" max="3" width="22" customWidth="1"/>\n`; // Department
+      colsXml += `    <col min="4" max="4" width="18" customWidth="1"/>\n`; // Reports Fetched
+      colsXml += "  </cols>\n";
+      
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:D${dataList.length + 1}"/>
+${colsXml}
+  <sheetData>
+${sheetDataXml}
+  </sheetData>
+</worksheet>`;
+    };
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+    const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="CIBIL Fetch Summary" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><name val="Segoe UI"/><family val="2"/></font>
+    <font><b/><sz val="11"/><name val="Segoe UI"/><family val="2"/><color rgb="FFFFFFFF"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF2563EB"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border/>
+    <border>
+      <left style="thin"><color rgb="FFD1D5DB"/></left>
+      <right style="thin"><color rgb="FFD1D5DB"/></right>
+      <top style="thin"><color rgb="FFD1D5DB"/></top>
+      <bottom style="thin"><color rgb="FFD1D5DB"/></bottom>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="3">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="center" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1"/>
+  </cellXfs>
+</styleSheet>`;
+
+    const sheet1Xml = generateWorksheetXml(exportData);
+
+    const files = [
+      { name: "[Content_Types].xml", content: contentTypesXml },
+      { name: "_rels/.rels", content: relsXml },
+      { name: "xl/workbook.xml", content: workbookXml },
+      { name: "xl/_rels/workbook.xml.rels", content: workbookRelsXml },
+      { name: "xl/styles.xml", content: stylesXml },
+      { name: "xl/worksheets/sheet1.xml", content: sheet1Xml }
+    ];
+
+    const blob = createZipBlob(files);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", `CIBIL_Report_Fetch_Summary_${dateStr}.xlsx`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
-    { key: "loans", label: "Loans", icon: "💳" },
+    ...(!isAdmin ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "reports", label: "Reports", icon: "📈" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
@@ -1460,19 +1769,8 @@ export default function Dashboard({
       {onToggleSidebar && !isSidebarOpen && (
         <button
           onClick={onToggleSidebar}
-          className="fixed left-[12px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden z-50 shadow-sm"
+          className="absolute left-[12px] top-[32px] sm:top-[40px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 lg:hidden z-50 shadow-sm"
           aria-label="Toggle Navigation"
-        >
-          ☰
-        </button>
-      )}
-
-      {/* Fixed Insights Toggle Button (shows on screen < 2xl, overlays open insights panel) */}
-      {onToggleInsights && !isInsightsOpen && (
-        <button
-          onClick={onToggleInsights}
-          className="fixed right-[64px] top-[12px] flex h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 text-gray-600 items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden z-50 shadow-sm"
-          aria-label="Toggle Insights"
         >
           ☰
         </button>
@@ -1485,7 +1783,7 @@ export default function Dashboard({
         <div className="absolute -bottom-10 left-1/3 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute top-4 right-1/4 w-20 h-20 rounded-full bg-white/8 pointer-events-none" />
 
-        <div className="relative pl-[64px] pr-[64px] py-6 sm:pl-[76px] sm:pr-[64px] sm:py-7 lg:px-8 lg:pr-[64px] flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+        <div className="relative pl-[64px] pr-[96px] 2xl:pr-[64px] py-6 sm:pl-[76px] sm:py-7 lg:pl-8 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
           {/* Profile Details Group */}
           <div className="flex items-center gap-4 sm:gap-6 w-full xl:w-auto">
 
@@ -1555,31 +1853,33 @@ export default function Dashboard({
 
 
         {/* Tabs */}
-        <div className="flex px-4 sm:px-8 pb-0 gap-1 mt-1 relative z-10 overflow-x-auto no-scrollbar max-w-full">
-          <style>{`
-            .no-scrollbar::-webkit-scrollbar {
-              display: none;
-            }
-            .no-scrollbar {
-              -ms-overflow-style: none;
-              scrollbar-width: none;
-            }
-          `}</style>
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              data-testid={`tab-${t.key}`}
-              onClick={() => setActiveTab(t.key as any)}
-              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all shrink-0 whitespace-nowrap ${activeTab === t.key
-                ? "bg-white text-primary"
-                : "text-white/70 hover:text-white hover:bg-white/10"
-                }`}
-            >
-              <span>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {tabs.length > 1 && (
+          <div className="flex px-4 sm:px-8 pb-0 gap-1 mt-1 relative z-10 overflow-x-auto no-scrollbar max-w-full">
+            <style>{`
+              .no-scrollbar::-webkit-scrollbar {
+                display: none;
+              }
+              .no-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+            `}</style>
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                data-testid={`tab-${t.key}`}
+                onClick={() => setActiveTab(t.key as any)}
+                className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all shrink-0 whitespace-nowrap ${activeTab === t.key
+                  ? "bg-white text-primary"
+                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+              >
+                <span>{t.icon}</span>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {/* ══ OVERVIEW TAB ══ */}
@@ -1603,41 +1903,68 @@ export default function Dashboard({
               {/* Additional Visual Panel */}
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
-                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                      🏆 Platform Wellness Average
-                    </h3>
-                    <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                    
-                    <div className="flex items-end gap-[10px] mb-[12px]">
-                      <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
-                      <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
-                      <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
-                        Good Health
-                      </span>
-                    </div>
+                {(() => {
+                  const avgScore = backendStats?.average_wellness_score ?? 68;
+                  const testsCount = backendStats?.consumption?.tests ?? 16;
+                  const topCategory = backendStats?.top_category ?? "Money IQ";
+                  const riskMixPct = backendStats?.risk_mix_pct ?? 12;
+                  
+                  let tierLabel = "Good Health";
+                  let tierColorClass = "bg-emerald-100 text-emerald-800";
+                  if (avgScore >= 81) {
+                    tierLabel = "Thriving";
+                    tierColorClass = "bg-emerald-100 text-emerald-800";
+                  } else if (avgScore >= 61) {
+                    tierLabel = "Good Health";
+                    tierColorClass = "bg-emerald-100 text-emerald-800";
+                  } else if (avgScore >= 41) {
+                    tierLabel = "Fair Health";
+                    tierColorClass = "bg-amber-100 text-amber-800";
+                  } else {
+                    tierLabel = "Attention Required";
+                    tierColorClass = "bg-rose-100 text-rose-800";
+                  }
 
-                    <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
-                      <div className="h-full bg-primary" style={{ width: "68%" }} />
-                    </div>
-                  </div>
+                  const riskLabel = riskMixPct < 25 ? `Low (${riskMixPct}%)` : riskMixPct < 50 ? `Moderate (${riskMixPct}%)` : `High (${riskMixPct}%)`;
 
-                  <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Tests Done</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">34 active</div>
+                  return (
+                    <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                          🏆 Platform Wellness Average
+                        </h3>
+                        <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
+                        
+                        <div className="flex items-end gap-[10px] mb-[12px]">
+                          <div className="text-[54px] font-serif font-bold text-primary leading-none">{avgScore}</div>
+                          <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
+                          <span className={`mb-[6px] ml-[8px] text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider ${tierColorClass}`}>
+                            {tierLabel}
+                          </span>
+                        </div>
+
+                        <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
+                          <div className="h-full bg-primary" style={{ width: `${avgScore}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Tests Done</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{testsCount} active</div>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Top Category</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{topCategory}</div>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Risk Mix</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{riskLabel}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Top Category</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">Money IQ</div>
-                    </div>
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Risk Mix</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">Low (12%)</div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Bureau Score Band Distribution (Donut Chart with Toggle) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
@@ -1765,16 +2092,103 @@ export default function Dashboard({
                     <div className="space-y-[10px]">
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">📄 Educational Articles</span>
-                        <span className="font-bold text-gray-800">8 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.articles} active</span>
                       </div>
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">🎥 Educational Videos</span>
-                        <span className="font-bold text-gray-800">4 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.videos} active</span>
                       </div>
                       <div className="flex items-center justify-between text-[13px] border-b border-gray-50 pb-[8px]">
                         <span className="text-gray-600 flex items-center gap-[6px]">📋 Financial Health Tests</span>
-                        <span className="font-bold text-gray-800">5 active</span>
+                        <span className="font-bold text-gray-800">{activeCounts.tests} active</span>
                       </div>
+                    </div>
+
+                    {/* Divider and Consumption Pie Chart */}
+                    <div className="mt-6 pt-5 border-t border-gray-100">
+                      <h4 className="text-[12px] font-bold text-gray-800 mb-1">
+                        📊 User Consumption Analytics
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mb-3">
+                        Distribution of educational content and tests consumed by users.
+                      </p>
+
+                      {/* Render Pie Chart if there is consumption data */}
+                      {(() => {
+                        const articlesConsumed = backendStats?.consumption?.articles ?? 0;
+                        const videosConsumed = backendStats?.consumption?.videos ?? 0;
+                        const testsConsumed = backendStats?.consumption?.tests ?? 0;
+                        const total = articlesConsumed + videosConsumed + testsConsumed;
+
+                        if (total === 0) {
+                          return (
+                            <div className="h-[140px] flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50 p-3">
+                              <span className="text-[18px]">📈</span>
+                              <span className="text-[10.5px] font-medium text-gray-400 mt-1">No user consumption recorded yet</span>
+                            </div>
+                          );
+                        }
+
+                        const data = [
+                          { name: "Articles Read", value: articlesConsumed, color: "#6366f1" },
+                          { name: "Videos Watched", value: videosConsumed, color: "#10b981" },
+                          { name: "Tests Completed", value: testsConsumed, color: "#f59e0b" }
+                        ];
+
+                        return (
+                          <div className="h-[140px] w-full flex items-center justify-between">
+                            <div className="w-[50%] h-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={data}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={28}
+                                    outerRadius={45}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                  >
+                                    {data.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip
+                                    contentStyle={{
+                                      background: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: '8px',
+                                      fontSize: '9.5px',
+                                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                                    }}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                            
+                            {/* Legend Panel */}
+                            <div className="w-[48%] space-y-1.5 text-[10.5px]">
+                              {data.map((item, idx) => {
+                                const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                                return (
+                                  <div key={idx} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                                      <span 
+                                        className="h-2 w-2 rounded-full shrink-0" 
+                                        style={{ backgroundColor: item.color }}
+                                      />
+                                      <span className="truncate max-w-[70px]">{item.name.split(" ")[0]}</span>
+                                    </div>
+                                    <span className="font-bold text-gray-700">
+                                      {item.value} ({percentage}%)
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1909,7 +2323,7 @@ export default function Dashboard({
                   </div>
 
                   {/* Department Dropdown Filter */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
                     <select
                       value={summaryDeptFilter}
@@ -1922,6 +2336,13 @@ export default function Dashboard({
                         <option key={dept} value={dept}>{dept}</option>
                       ))}
                     </select>
+                    <button
+                      onClick={handleExportSummaryExcel}
+                      className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1 shrink-0 ml-1"
+                      title="Export CIBIL Fetch Summary to Excel (.xlsx)"
+                    >
+                      📥 Export Excel
+                    </button>
                   </div>
                 </div>
 
@@ -2256,7 +2677,7 @@ export default function Dashboard({
                       sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
                       color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
                       delay={0}
-                      onClick={() => onNavigate("Eligibility & CIBIL Checker")}
+                      onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
                     />
 
                     {/* Advisor Call Card */}
@@ -2748,7 +3169,7 @@ export default function Dashboard({
             )}
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <StatCard icon="💰" label="Total Outstanding" value={`₹${(totalDebtVal / 100000).toFixed(1)}L`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
+              <StatCard icon="💰" label="Total Outstanding" value={`₹${totalDebtVal.toLocaleString("en-IN")}`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
               <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub="Sync'd from credit report" color="#f59e0b" delay={80} />
             </div>
 

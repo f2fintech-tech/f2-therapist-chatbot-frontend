@@ -380,17 +380,34 @@
   display: inline-block !important;
 }
 
-/* Pad all page view headers on the right to accommodate the global pinned profile avatar */
+/* Pad all page view headers on the right to accommodate the global pinned profile avatar and new insights drawer button */
 main > div.border-b:not(.sticky),
 main > header.border-b,
 div.flex-col > header.border-b,
+div.flex-col > div.border-b,
 main > div.sticky > div:first-child {
-  padding-right: 64px !important;
+  padding-right: 110px !important;
+}
+
+@media (min-width: 1536px) {
+  /* On 2xl screens, the insights drawer button is hidden, so we only need padding for the profile avatar */
+  main > div.border-b:not(.sticky),
+  main > header.border-b,
+  div.flex-col > header.border-b,
+  div.flex-col > div.border-b,
+  main > div.sticky > div:first-child {
+    padding-right: 64px !important;
+  }
+}
+
+/* Hide all old Insights Panel toggle buttons (hamburger menus) since we moved it globally next to the profile button */
+button[aria-label="Toggle insights panel"]:not(.global-profile-dropdown button) {
+  display: none !important;
 }
 
 /* Position and center the global profile dropdown avatar vertically in a straight line */
 .global-profile-dropdown {
-  top: 10px; /* Standard vertical alignment for w-10 h-10 avatar in standard headers */
+  top: 8px; /* Standard vertical alignment for w-10 h-10 avatar in standard 56px headers */
 }
 
 /* Center in taller headers (height: ~72px, avatar: 40px) */
@@ -575,12 +592,21 @@ main > div.sticky > div:first-child {
   display: inline-block !important;
 }
 
-/* Pad all page view headers on the right to accommodate the global pinned profile avatar */
+/* Pad all page view headers on the right to accommodate the global pinned profile avatar and insights toggle */
 main > div.border-b:not(.sticky),
 main > header.border-b,
 div.flex-col > header.border-b,
 main > div.sticky > div:first-child {
-  padding-right: 64px !important;
+  padding-right: 96px !important;
+}
+
+@media (min-width: 1536px) {
+  main > div.border-b:not(.sticky),
+  main > header.border-b,
+  div.flex-col > header.border-b,
+  main > div.sticky > div:first-child {
+    padding-right: 64px !important;
+  }
 }
 
 /* Position and center the global profile dropdown avatar vertically in a straight line */
@@ -740,6 +766,15 @@ main > div.sticky > div:first-child {
   border-color: #10b981 !important;
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.4) !important;
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+/* Hide scrollbars but keep scrolling functional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
 }
 
 

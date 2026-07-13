@@ -2,11 +2,17 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { CONTENT, type ContentItem } from "@/components/FinancialEducation";
 import { testCards, type TestCard } from "@/components/FinancialHealthTestCatalog";
+import { creditReadinessQuestions } from "@/features/credit-readiness/creditReadinessConfig";
+import { debtBalanceQuestions } from "@/features/debt-balance/debtBalanceConfig";
+import { emergencyFundQuestions } from "@/features/emergency-fund/emergencyFundConfig";
+import { financialLiteracyQuestions } from "@/features/financial-literacy/financialLiteracyConfig";
+import { loanFitQuestions } from "@/features/loan-fit/loanFitConfig";
 import { type LenderProduct } from "./LoanCalculatorView";
 import CibilAnalyzerView from "./CibilAnalyzerView";
 interface AdminPortalProps {
@@ -14,6 +20,7 @@ interface AdminPortalProps {
   userEmail: string;
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
+  initialTab?: string;
 }
 
 interface Appointment {
@@ -225,27 +232,25 @@ function EmployeeDirectory({
                     <span className="font-mono font-bold text-gray-700">{emp.f2FintechId || emp.id}</span>
                   </div>
                   {emp.isAdvisor && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Rating</span>
-                        <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Status</span>
-                        <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {emp.isActive !== false ? 'Active' : 'Deactivated'}
-                        </span>
-                      </div>
-                      {emp.isActive === false && emp.deactivationReason && (
-                         <div className="flex justify-between text-[10px]">
-                           <span className="text-gray-400">Reason</span>
-                           <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
-                             {emp.deactivationReason}
-                           </span>
-                         </div>
-                       )}
-                    </>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Rating</span>
+                      <span className="font-bold text-amber-500">⭐ {emp.rating}</span>
+                    </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Status</span>
+                    <span className={`font-bold ${emp.isActive !== false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {emp.isActive !== false ? 'Active' : 'Deactivated'}
+                    </span>
+                  </div>
+                  {emp.isActive === false && emp.deactivationReason && (
+                     <div className="flex justify-between text-[10px]">
+                       <span className="text-gray-400">Reason</span>
+                       <span className="text-amber-600 font-medium italic max-w-[150px] truncate" title={emp.deactivationReason}>
+                         {emp.deactivationReason}
+                       </span>
+                     </div>
+                   )}
                 </div>
 
                 <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
@@ -259,14 +264,12 @@ function EmployeeDirectory({
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {emp.isAdvisor && (
-                      <button
-                        onClick={() => handleToggleActive(emp)}
-                        className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
-                      >
-                        {emp.isActive !== false ? "Deactivate" : "Activate"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleToggleActive(emp)}
+                      className={`${emp.isActive !== false ? 'text-amber-600' : 'text-emerald-600'} hover:underline text-[11px] font-bold cursor-pointer transition`}
+                    >
+                      {emp.isActive !== false ? "Deactivate" : "Activate"}
+                    </button>
                     <button
                       onClick={() => handleOpenEditExpert(emp)}
                       className="text-primary hover:underline text-[11px] font-bold cursor-pointer transition"
@@ -290,21 +293,46 @@ function EmployeeDirectory({
   );
 }
 
-export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights }: AdminPortalProps) {
+const TEST_NAMES: Record<string, string> = {
+  "financial-literacy": "Money IQ Arena",
+  "financial_literacy": "Money IQ Arena",
+  "debt-balance": "Debt Pressure Analysis",
+  "debt_balance": "Debt Pressure Analysis",
+  "emergency-fund": "Financial Safety Score",
+  "emergency_fund": "Financial Safety Score",
+  "credit-readiness": "Credit Health Analyzer",
+  "credit_readiness": "Credit Health Analyzer",
+  "loan-fit": "Loan Comfort Analysis",
+  "loan_fit": "Loan Comfort Analysis"
+};
+
+
+export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
 
 
   // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries
   // Dynamic URL Routing for admin tabs (replacing local useState to support URLs like /admin/tests)
-  const [match, params] = useRoute("/admin/:tab");
+  const [matchAdmin, paramsAdmin] = useRoute("/admin/:tab");
+  const [matchWorkspace, paramsWorkspace] = useRoute("/advisor-workspace/:tab");
+  const match = matchAdmin || matchWorkspace;
+  const params = matchAdmin ? paramsAdmin : paramsWorkspace;
+  
   const [_, setLocation] = useLocation();
-  const activeTab = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
+  
+  const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
     ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees")
-    : "experts";
+    : null;
+    
+  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(initialTab) 
+    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") 
+    : null;
+    
+  const activeTab = activeTabUrl || validInitialTab || "experts";
 
   const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") => {
-    setLocation(`/admin/${newTab}`);
+    setLocation(isAdmin ? `/admin/${newTab}` : `/advisor-workspace/${newTab}`);
   };
 
   // State Management
@@ -319,6 +347,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterTestName, setFilterTestName] = useState<string>("all");
   const [filterLenderSearch, setFilterLenderSearch] = useState<string>("");
   const [filterEduType, setFilterEduType] = useState<string>("all");
+  const [filterApptStatus, setFilterApptStatus] = useState<string>("all");
+  const [filterApptStartDate, setFilterApptStartDate] = useState<string>("");
+  const [filterApptEndDate, setFilterApptEndDate] = useState<string>("");
+
+  // Manage Tests Submissions States
+  const [testSubTab, setTestSubTab] = useState<"templates" | "logs">("templates");
+  const [testSubmissions, setTestSubmissions] = useState<AdminTestResult[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState<boolean>(false);
+  const [submissionsSearch, setSubmissionsSearch] = useState<string>("");
+  const [submissionsPage, setSubmissionsPage] = useState<number>(1);
 
   // Lenders Catalog States
   const [lenderList, setLenderList] = useState<LenderProduct[]>([]);
@@ -409,7 +447,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
   });
 
   // Education form state
@@ -435,8 +473,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     duration: "5 min",
     focus: "",
     result: "",
-    accent: "from-[#3344e6] to-[#7c8cff]"
+    accent: "from-[#3344e6] to-[#7c8cff]",
+    questions: [] as any[],
+    pillar: "money_iq"
   });
+
+  const [selectedEditLevel, setSelectedEditLevel] = useState<number>(1);
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
@@ -527,7 +571,38 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return found ? found.id : null;
   };
 
-  const currentExpertId = getExpertIdFromEmail(userEmail);
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  const currentExpertId = isEmployeeId ? userId : getExpertIdFromEmail(userEmail);
+  
+  const foundAdvisor = currentExpertId ? advisors.find(a => (a.id === currentExpertId || a.f2FintechId === currentExpertId)) : null;
+  
+  const activeExpert = foundAdvisor || (isEmployeeId ? (() => {
+    try {
+      const sessionStr = localStorage.getItem("finheal-auth-session");
+      if (sessionStr) {
+        const parsed = JSON.parse(sessionStr);
+        return {
+          id: userId,
+          f2FintechId: userId,
+          name: parsed.displayName || userEmail,
+          isAdvisor: parsed.isAdvisor || false,
+          permissions: parsed.permissions || [],
+          expertise: [],
+          designation: "Staff",
+          avatarUrl: "",
+          rating: 0,
+          availability: "available",
+          reviewsCount: 0,
+          nextSlot: "",
+          category: "Advisor",
+          strength: "Financial planning",
+          bio: "Certified staff member",
+          fee: 899
+        } as Advisor;
+      }
+    } catch (e) {}
+    return null;
+  })() : null);
 
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [limitFetchCount, setLimitFetchCount] = useState(0);
@@ -587,6 +662,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // CIBIL Enquiries State and Fetcher
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
+  const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
+  const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
+  const [viewingCibilReportUserId, setViewingCibilReportUserId] = useState<string | null>(null);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterEndDate, setFilterEndDate] = useState<string>("");
@@ -595,10 +673,12 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [filterBureau, setFilterBureau] = useState<string>("all");
   
+  const allDepartments = useMemo(() => {
+    return Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort() as string[];
+  }, [employees]);
+  
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
-  const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
-  const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
 
   const todayStr = (() => {
     const today = new Date();
@@ -615,8 +695,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
 
   const filteredEnquiries = cibilEnquiries.filter((enq) => {
-    // 0. Filter by Manager ownership (if logged-in user is not Super Admin)
-    if (!isAdmin) {
+    // 0. Filter by Manager ownership (if logged-in user is not Super Admin and does not have cibil_view_all permission)
+    const hasViewAllPerm = activeExpert?.permissions?.includes("cibil_view_all");
+    if (!isAdmin && !hasViewAllPerm) {
       const cleanUserEmail = (userEmail || "").toLowerCase().trim();
       const cleanEnqEmail = (enq.email || "").toLowerCase().trim();
       const cleanExpertId = (currentExpertId || "").toLowerCase().trim();
@@ -649,10 +730,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       }
     }
 
-    // 2. Filter by Role
+    // 2. Filter by Role / Department
     if (filterRole !== "all") {
-      const role = classifyEnquiryRole(enq.email, enq.name, advisors);
-      if (role !== filterRole) return false;
+      if (filterRole === "Client") {
+        if (enq.fetched_by && enq.fetched_by !== "client") return false;
+      } else {
+        const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+        if (!emp || emp.department !== filterRole) return false;
+      }
     }
 
     // 3. Filter by Loan Type
@@ -1513,19 +1598,45 @@ ${sheetDataXml}
     }
 
     // 2. Tests List
-    const storedTests = localStorage.getItem("finheal_health_tests_list");
-    if (storedTests) {
-      setTestCatalog(JSON.parse(storedTests));
-    } else {
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(testCards));
-      setTestCatalog(testCards);
+    setTestCatalog(testCards);
+  }, []);
+
+  const fetchCustomTests = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      const res = await fetch(`${apiBase}/custom-tests`, { headers });
+      if (res.ok) {
+        const customTestsList = await res.json();
+        const merged = [...testCards];
+        customTestsList.forEach((ct: any) => {
+          const idx = merged.findIndex(t => t.id === ct.id);
+          if (idx !== -1) {
+            merged[idx] = ct;
+          } else {
+            merged.push(ct);
+          }
+        });
+        setTestCatalog(merged);
+      }
+    } catch (err) {
+      console.error("Error loading custom tests:", err);
     }
+  };
+
+  useEffect(() => {
+    fetchCustomTests();
   }, []);
 
   // Lazy load and poll advisors/employees only when needed
   useEffect(() => {
     const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
-    const shouldLoadEmployees = activeTab === "employees";
+    const shouldLoadEmployees = activeTab === "employees" || activeTab === "cibil-enquiries";
     
     let intervalIdAdvisors: any = null;
     let intervalIdEmployees: any = null;
@@ -1612,6 +1723,36 @@ ${sheetDataXml}
         .finally(() => setReferralsLoading(false));
     }
   }, [currentExpertId, isAdmin]);
+
+  // Load test submissions
+  useEffect(() => {
+    if (isAdmin && activeTab === "tests") {
+      loadTestSubmissions();
+    }
+  }, [isAdmin, activeTab]);
+
+  const loadTestSubmissions = async () => {
+    setSubmissionsLoading(true);
+    try {
+      const data = await fetchAllTestResults();
+      setTestSubmissions(data);
+    } catch (err) {
+      console.error("Error loading test submissions:", err);
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  };
+
+  const handleDeleteTestLog = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this test log?")) return;
+    try {
+      await deleteAdminTestResult(id);
+      setTestSubmissions((prev) => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete log.");
+    }
+  };
 
   useEffect(() => {
     if (!expertNextSlot) {
@@ -1712,7 +1853,7 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -1739,7 +1880,7 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -1792,7 +1933,9 @@ ${sheetDataXml}
       testRating: expertForm.testRating || 5,
       department: (expertForm.department && expertForm.department.trim() !== "General") ? expertForm.department.trim() : "Founder's Office",
       isAdvisor: expertForm.isAdvisor,
-      permissions: expertForm.permissions
+      permissions: expertForm.permissions,
+      isActive: editingExpert ? editingExpert.isActive : true,
+      deactivationReason: editingExpert ? editingExpert.deactivationReason : undefined
     };
 
     if (savingExpert) return;
@@ -1849,16 +1992,17 @@ ${sheetDataXml}
 
   const handleToggleActive = async (adv: any) => {
     const nextStatus = adv.isActive !== false ? false : true;
+    const label = adv.isAdvisor ? "Advisor" : "Employee";
     if (nextStatus) {
       // Activating: clear deactivation reason automatically
       try {
         await updateAdvisorActiveStatus(adv.f2FintechId || adv.id, true);
-        alert(`Advisor ${adv.name} has been activated successfully.`);
+        alert(`${label} ${adv.name} has been activated successfully.`);
         await loadAdvisors();
         await loadEmployees();
       } catch (err) {
-        console.error("Failed to activate advisor:", err);
-        alert("Error activating advisor.");
+        console.error(`Failed to activate ${label.toLowerCase()}:`, err);
+        alert(`Error activating ${label.toLowerCase()}.`);
       }
     } else {
       // Deactivating: prompt for reason
@@ -1870,18 +2014,19 @@ ${sheetDataXml}
 
   const handleConfirmDeactivate = async () => {
     if (!deactivateTarget) return;
+    const label = deactivateTarget.isAdvisor ? "Advisor" : "Employee";
     setIsDeactivating(true);
     try {
       await updateAdvisorActiveStatus(deactivateTarget.f2FintechId || deactivateTarget.id, false, deactivateReason);
-      alert(`Advisor ${deactivateTarget.name} has been deactivated.`);
+      alert(`${label} ${deactivateTarget.name} has been deactivated.`);
       setDeactivateConfirmOpen(false);
       setDeactivateTarget(null);
       setDeactivateReason("");
       await loadAdvisors();
       await loadEmployees();
     } catch (err) {
-      console.error("Failed to deactivate advisor:", err);
-      alert("Error deactivating advisor.");
+      console.error(`Failed to deactivate ${label.toLowerCase()}:`, err);
+      alert(`Error deactivating ${label.toLowerCase()}.`);
     } finally {
       setIsDeactivating(false);
     }
@@ -1979,25 +2124,82 @@ ${sheetDataXml}
       duration: "5 min",
       focus: "",
       result: "",
-      accent: "from-[#3344e6] to-[#7c8cff]"
+      accent: "from-[#3344e6] to-[#7c8cff]",
+      questions: [],
+      pillar: "money_iq"
     });
     setTestModalOpen(true);
   };
 
   const handleOpenEditTest = (test: TestCard) => {
     setEditingTest(test);
+    setSelectedEditLevel(1);
+    
+    let initialQuestions = test.questions || [];
+    if (test.id === "financial-literacy") {
+      initialQuestions = (test.questions && test.questions.length > 0 ? test.questions : []).map((q, idx) => {
+        const defaultQ = financialLiteracyQuestions.find(dq => dq.id === q.id);
+        const level = q.level || defaultQ?.level || (idx < 20 ? 1 : idx < 40 ? 2 : 3);
+        return {
+          ...q,
+          level
+        };
+      });
+      if (initialQuestions.length === 0) {
+        initialQuestions = financialLiteracyQuestions.map(q => ({
+          id: q.id,
+          level: q.level,
+          questionText: q.prompt,
+          options: q.options,
+          correctOptionIndex: q.correctAnswer === "A" ? 0 : q.correctAnswer === "B" ? 1 : q.correctAnswer === "C" ? 2 : 3
+        }));
+      }
+    } else if (initialQuestions.length === 0) {
+      if (test.id === "credit-readiness") {
+        initialQuestions = creditReadinessQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "emergency-fund") {
+        initialQuestions = emergencyFundQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "debt-balance") {
+        initialQuestions = debtBalanceQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      } else if (test.id === "loan-fit") {
+        initialQuestions = loanFitQuestions.map(q => ({
+          id: q.id,
+          questionText: q.prompt,
+          options: q.options.map(opt => opt.label),
+          correctOptionIndex: 0
+        }));
+      }
+    }
+
     setTestForm({
       title: test.title,
       description: test.description,
       duration: test.duration,
       focus: test.focus,
       result: test.result,
-      accent: test.accent
+      accent: test.accent,
+      questions: initialQuestions,
+      pillar: test.pillar || "money_iq"
     });
     setTestModalOpen(true);
   };
 
-  const handleSaveTest = () => {
+  const handleSaveTest = async () => {
     if (!testForm.title.trim() || !testForm.description.trim()) {
       alert("Title and description are required!");
       return;
@@ -2010,7 +2212,9 @@ ${sheetDataXml}
       duration: testForm.duration.trim() || "5 min",
       focus: testForm.focus.trim() || "Affordability analysis",
       result: testForm.result.trim() || "Instant diagnostic score",
-      accent: testForm.accent.trim()
+      accent: testForm.accent.trim(),
+      questions: testForm.questions,
+      pillar: testForm.pillar
     };
 
     let updatedList;
@@ -2021,17 +2225,54 @@ ${sheetDataXml}
     }
 
     setTestCatalog(updatedList);
-    localStorage.setItem("finheal_health_tests_list", JSON.stringify(updatedList));
     dispatchUpdateEvent("finheal:tests_update");
     setTestModalOpen(false);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      const res = await fetch(`${apiBase}/custom-tests`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(item)
+      });
+      if (res.ok) {
+        fetchCustomTests();
+      }
+    } catch (err) {
+      console.error("Error syncing custom test to DB:", err);
+    }
   };
 
-  const handleDeleteTest = (id: string) => {
+  const handleDeleteTest = async (id: string) => {
     if (confirm("Are you sure you want to retire this health test?")) {
       const updatedList = testCatalog.filter(t => t.id !== id);
       setTestCatalog(updatedList);
-      localStorage.setItem("finheal_health_tests_list", JSON.stringify(updatedList));
       dispatchUpdateEvent("finheal:tests_update");
+
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+        const headers: Record<string, string> = {};
+        if (configuredApiKey) {
+          headers["Authorization"] = `Bearer ${configuredApiKey}`;
+          headers["X-API-Key"] = configuredApiKey;
+        }
+        await fetch(`${apiBase}/custom-tests/${id}`, {
+          method: "DELETE",
+          headers
+        });
+        fetchCustomTests();
+      } catch (err) {
+        console.error("Error deleting custom test from DB:", err);
+      }
     }
   };
 
@@ -2300,7 +2541,6 @@ ${sheetDataXml}
     setReschedulingApptId(null);
   };
 
-  const activeExpert = currentExpertId ? advisors.find(a => a.id === currentExpertId) : null;
   const activeExpertAppointments = allAppointments.filter(a => a.advisorId === currentExpertId);
   const expertUpcomingAppointments = activeExpertAppointments.filter(a => !a.completed && !a.cancelled && !hasSessionEnded(a.date, a.time));
   const expertPastAppointments = activeExpertAppointments.filter(a => a.completed || a.cancelled || hasSessionEnded(a.date, a.time));
@@ -2325,6 +2565,26 @@ ${sheetDataXml}
         }
       }
     }
+    
+    // Status Filter
+    if (filterApptStatus !== "all") {
+      const isCompleted = appt.completed || hasSessionEnded(appt.date, appt.time);
+      const isCancelled = appt.cancelled;
+      const isPending = !appt.completed && !appt.cancelled && !hasSessionEnded(appt.date, appt.time);
+      
+      if (filterApptStatus === "completed" && !isCompleted) return false;
+      if (filterApptStatus === "cancelled" && !isCancelled) return false;
+      if (filterApptStatus === "pending" && !isPending) return false;
+    }
+    
+    // Date Range Filter
+    if (filterApptStartDate) {
+      if (appt.date < filterApptStartDate) return false;
+    }
+    if (filterApptEndDate) {
+      if (appt.date > filterApptEndDate) return false;
+    }
+    
     return true;
   });
 
@@ -2334,6 +2594,63 @@ ${sheetDataXml}
     }
     return true;
   });
+
+  const filteredSubmissions = useMemo(() => {
+    return testSubmissions.filter((sub) => {
+      // 1. Filter by Test Name
+      if (filterTestName !== "all") {
+        const subFriendlyName = TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ");
+        if (filterTestName.toLowerCase().trim() !== subFriendlyName.toLowerCase().trim()) {
+          return false;
+        }
+      }
+      // 2. Filter by search query (user name, email)
+      if (submissionsSearch.trim() !== "") {
+        const query = submissionsSearch.toLowerCase().trim();
+        const nameMatch = (sub.user_name || "").toLowerCase().includes(query);
+        const emailMatch = (sub.user_email || "").toLowerCase().includes(query);
+        if (!nameMatch && !emailMatch) return false;
+      }
+      return true;
+    });
+  }, [testSubmissions, filterTestName, submissionsSearch]);
+
+  // Submissions pagination parameters
+  const submissionsPerPage = 8;
+  const totalSubPages = Math.ceil(filteredSubmissions.length / submissionsPerPage) || 1;
+  const safeSubPage = Math.min(submissionsPage, totalSubPages);
+  const paginatedSubmissions = useMemo(() => {
+    const startIndex = (safeSubPage - 1) * submissionsPerPage;
+    return filteredSubmissions.slice(startIndex, startIndex + submissionsPerPage);
+  }, [filteredSubmissions, safeSubPage]);
+
+  const testAttemptCounts = useMemo(() => {
+    const standardNames = [
+      "Money IQ Arena",
+      "Debt Pressure Analysis",
+      "Financial Safety Score",
+      "Credit Health Analyzer",
+      "Loan Comfort Analysis"
+    ];
+
+    const counts: Record<string, number> = {};
+    // Initialize standard tests with 0
+    standardNames.forEach((name) => {
+      counts[name] = 0;
+    });
+
+    // Count attempts dynamically for all submissions in the database
+    testSubmissions.forEach((sub) => {
+      const friendlyName = TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ");
+      counts[friendlyName] = (counts[friendlyName] || 0) + 1;
+    });
+
+    // Format for Recharts and sort by attempt count
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      count,
+    })).sort((a, b) => b.count - a.count);
+  }, [testSubmissions]);
 
   const filteredLenders = lenderList.filter((l) => {
     if (filterLenderSearch.trim() !== "") {
@@ -2356,7 +2673,18 @@ ${sheetDataXml}
   });
 
   // ==================== RENDERING WORKSPACE ====================
-  if (!isAdmin && (!activeExpert || !activeExpert.isAdvisor)) {
+  let hasSessionPermission = false;
+  try {
+    const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
+    hasSessionPermission = (session?.permissions || []).includes("cibil_view") || (session?.permissions || []).includes("cibil_view_all");
+  } catch (e) {}
+
+  const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
+    hasSessionPermission || 
+    (activeExpert?.permissions || []).some((p: string) => p === "cibil_view" || p === "cibil_view_all")
+  ));
+  console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
+  if (!isAdmin && !isEmployeeId) {
     return (
       <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
         <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
@@ -2374,7 +2702,7 @@ ${sheetDataXml}
     <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 animate-fade-up delay-100">
 
       {/* HEADER SECTION */}
-      <div className="flex items-center gap-3 border-b border-gray-100 px-[16px] py-[14px] shrink-0 bg-white rounded-t-[20px] sm:px-[20px] sm:py-[12px]">
+      <div className="flex items-center gap-3 border-b border-gray-100 py-[14px] shrink-0 bg-white rounded-t-[20px] sm:py-[12px] pl-[16px] pr-[96px] sm:pl-[20px] sm:pr-[96px] 2xl:pr-[20px]">
         <button
           type="button"
           onClick={onToggleSidebar}
@@ -2394,15 +2722,6 @@ ${sheetDataXml}
               : `Managing professional logs and live availability for ${activeExpert?.name || "Expert"}.`}
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={onToggleInsights}
-          className="h-[32px] w-[32px] rounded-[6px] bg-gray-100 text-gray-600 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 2xl:hidden shrink-0"
-          aria-label="Toggle insights panel"
-        >
-          ☰
-        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-[16px] py-[18px] sm:px-[20px] sm:py-[22px] scrollbar-thin">
@@ -2410,35 +2729,37 @@ ${sheetDataXml}
         {/* ========================================================================= */}
         {/* ===================== SUPER ADMIN VIEW RENDER =========================== */}
         {/* ========================================================================= */}
-        {isAdmin ? (
+        {showAdminView ? (
           <div className="space-y-[24px]">
 
             {/* TABS MENU */}
-            <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", overflowX: "auto", maxWidth: "100%", scrollbarWidth: "none" }} className="no-scrollbar">
-              <style>{`
-                .no-scrollbar::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
-              {[
-                { id: "experts", label: "🧑‍💼 Manage Experts" },
-                { id: "education", label: "📚 Manage Education" },
-                { id: "tests", label: "🧭 Manage Tests" },
-                { id: "appointments", label: "📅 Scheduled Calls" },
-                { id: "lenders", label: "🏦 Lenders Catalog" },
-                { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
-                { id: "employees", label: "👥 Employees Directory" }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
-                  className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
-                    }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            {isAdmin && (
+              <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", overflowX: "auto", maxWidth: "100%", scrollbarWidth: "none" }} className="no-scrollbar">
+                <style>{`
+                  .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
+                {[
+                  { id: "experts", label: "🧑‍💼 Manage Experts" },
+                  { id: "education", label: "📚 Manage Education" },
+                  { id: "tests", label: "🧭 Manage Tests" },
+                  { id: "appointments", label: "📅 Scheduled Calls" },
+                  { id: "lenders", label: "🏦 Lenders Catalog" },
+                  { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
+                  { id: "employees", label: "👥 Employees Directory" }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id as any)}
+                    className={`padding px-[16px] py-[8px] rounded-t-[12px] border-none text-[12px] font-bold cursor-pointer transition ${activeTab === t.id ? "bg-primary text-white" : "background-transparent text-gray-500 hover:bg-gray-50"
+                      }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
 
 
@@ -2638,117 +2959,479 @@ ${sheetDataXml}
               </div>
             )}
 
-            {/* TAB: MANAGE TESTS */}
+            {/* TAB: MANAGE HEALTH TESTS */}
             {activeTab === "tests" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Test Title Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
-                      <select
-                        value={filterTestName}
-                        onChange={(e) => setFilterTestName(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Tests</option>
-                        {testCatalog.map((test) => (
-                          <option key={test.id} value={test.title}>
-                            {test.title}
-                          </option>
-                        ))}
-                      </select>
+                {/* Secondary Sub-Tabs Toggle */}
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <button
+                    onClick={() => setTestSubTab("templates")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition border-none cursor-pointer ${
+                      testSubTab === "templates"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-transparent text-gray-400 hover:text-gray-650"
+                    }`}
+                  >
+                    📋 Test Templates
+                  </button>
+                  <button
+                    onClick={() => setTestSubTab("logs")}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition border-none cursor-pointer ${
+                      testSubTab === "logs"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-transparent text-gray-400 hover:text-gray-650"
+                    }`}
+                  >
+                    📝 User Submissions Log
+                  </button>
+                </div>
+
+                {testSubTab === "templates" && (
+                  <>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900">Manage Health Tests ({filteredTests.length})</h3>
+                        <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize financial therapy platform health tests.</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Test Title Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Filter by Title:</span>
+                          <select
+                            value={filterTestName}
+                            onChange={(e) => setFilterTestName(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Tests</option>
+                            {testCatalog.map((test) => (
+                              <option key={test.id} value={test.title}>
+                                {test.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          onClick={handleOpenAddTest}
+                          className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+                        >
+                          + Add New Test
+                        </button>
+                      </div>
                     </div>
 
-                    <button
-                      onClick={handleOpenAddTest}
-                      className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
-                    >
-                      + Add New Test
-                    </button>
-                  </div>
-                </div>
+                    <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                            <th className="p-[12px]">Test Title</th>
+                            <th className="p-[12px]">Duration</th>
+                            <th className="p-[12px]">Primary Focus</th>
+                            <th className="p-[12px]">Score output</th>
+                            <th className="p-[12px] text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredTests.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center p-6 text-gray-400">
+                                No health tests match the selected filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredTests.map((test) => (
+                            <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                              <td className="p-[12px] max-w-[200px]">
+                                <strong className="text-gray-900 block truncate">{test.title}</strong>
+                                <span className="text-[10px] text-gray-400 block truncate">{test.description}</span>
+                              </td>
+                              <td className="p-[12px] font-semibold text-gray-600">{test.duration}</td>
+                              <td className="p-[12px] text-gray-500">{test.focus}</td>
+                              <td className="p-[12px] text-gray-400">{test.result}</td>
+                              <td className="p-[12px] text-right space-x-[6px]">
+                                <button
+                                  onClick={() => handleOpenEditTest(test)}
+                                  className="text-primary hover:underline font-bold cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTest(test.id)}
+                                  className="text-rose-500 hover:underline font-bold cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
 
-                <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
-                  <table className="w-full min-w-[700px] text-left text-[12px] border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
-                        <th className="p-[12px]">Test Title</th>
-                        <th className="p-[12px]">Duration</th>
-                        <th className="p-[12px]">Primary Focus</th>
-                        <th className="p-[12px]">Score output</th>
-                        <th className="p-[12px] text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTests.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-center p-6 text-gray-400">
-                            No health tests match the selected filter.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredTests.map((test) => (
-                        <tr key={test.id} className="border-b border-gray-100 hover:bg-gray-50/50">
-                          <td className="p-[12px] max-w-[200px]">
-                            <strong className="text-gray-900 block truncate">{test.title}</strong>
-                            <span className="text-[10px] text-gray-400 block truncate">{test.description}</span>
-                          </td>
-                          <td className="p-[12px] font-semibold text-gray-600">{test.duration}</td>
-                          <td className="p-[12px] text-gray-500">{test.focus}</td>
-                          <td className="p-[12px] text-gray-400">{test.result}</td>
-                          <td className="p-[12px] text-right space-x-[6px]">
+                {testSubTab === "logs" && (
+                  <>
+                    <div className="border-b border-gray-100 pb-3 space-y-3">
+                      {/* Row 1: Title and pagination */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-[14px] font-bold text-gray-900">User Submissions Log ({filteredSubmissions.length})</h3>
+                          <p className="text-[10px] text-gray-400 mt-[2px]">View and search scores for financial wellness tests taken by platform users.</p>
+                        </div>
+                        
+                        {/* Compact Pagination Controls in top right corner */}
+                        {filteredSubmissions.length > 0 && (
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
-                              onClick={() => handleOpenEditTest(test)}
-                              className="text-primary hover:underline font-bold cursor-pointer"
+                              disabled={safeSubPage === 1}
+                              onClick={() => setSubmissionsPage(prev => Math.max(prev - 1, 1))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-650 transition flex items-center justify-center cursor-pointer"
+                              title="Previous Page"
                             >
-                              Edit
+                              ←
                             </button>
+                            <span className="text-[11px] font-semibold text-gray-500 px-1 min-w-[36px] text-center">
+                              {safeSubPage} / {totalSubPages}
+                            </span>
                             <button
-                              onClick={() => handleDeleteTest(test.id)}
-                              className="text-rose-500 hover:underline font-bold cursor-pointer"
+                              disabled={safeSubPage === totalSubPages}
+                              onClick={() => setSubmissionsPage(prev => Math.min(prev + 1, totalSubPages))}
+                              className="h-[32px] w-[32px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold text-gray-655 transition flex items-center justify-center cursor-pointer"
+                              title="Next Page"
                             >
-                              Delete
+                              →
                             </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Submissions Analytics Chart Dashboard */}
+                      {testSubmissions.length > 0 && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-[16px] border border-gray-150/70 mt-2">
+                          {/* Column 1 & 2: Bar Chart showing Demand */}
+                          <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex flex-col gap-3">
+                            <div>
+                              <h4 className="text-[12px] font-bold text-gray-805">Test Demand Analytics</h4>
+                              <p className="text-[10px] text-gray-400 mt-[2px]">Real-time count of quiz attempts by test template to measure platform demand.</p>
+                            </div>
+                            <div className="h-[230px] w-full flex items-center justify-center">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={testAttemptCounts}
+                                  layout="vertical"
+                                  margin={{ top: 10, right: 15, left: 10, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                                  <XAxis type="number" stroke="#9ca3af" fontSize={9.5} tickLine={false} axisLine={false} />
+                                  <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    stroke="#4b5563"
+                                    fontSize={10.5}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={115}
+                                    interval={0}
+                                    tickFormatter={(val) => val.length > 20 ? `${val.substring(0, 17)}...` : val}
+                                  />
+                                  <Tooltip
+                                    cursor={{ fill: 'rgba(99, 102, 241, 0.04)' }}
+                                    contentStyle={{
+                                      background: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: '12px',
+                                      fontSize: '11px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                      padding: '8px 12px',
+                                      fontFamily: 'inherit'
+                                    }}
+                                    itemStyle={{
+                                      color: '#1f2937',
+                                      fontWeight: '600'
+                                    }}
+                                    labelStyle={{
+                                      color: '#6b7280',
+                                      fontWeight: '500',
+                                      marginBottom: '4px'
+                                    }}
+                                  />
+                                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={16}>
+                                    {testAttemptCounts.map((entry, index) => {
+                                      const colors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+                                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                                    })}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Column 3: Summary Cards */}
+                          <div className="flex flex-col gap-3">
+                            {/* Card 1: Total attempts */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex-1 flex flex-col justify-center">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Attempts</span>
+                              <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-[24px] font-extrabold text-gray-900">{testSubmissions.length}</span>
+                                <span className="text-[10px] text-emerald-600 font-semibold">Total completed</span>
+                              </div>
+                            </div>
+
+                            {/* Card 2: Highest demand */}
+                            <div className="bg-white p-4 rounded-xl border border-gray-205 shadow-xs flex-1 flex flex-col justify-center">
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Most Popular Test</span>
+                              <div className="mt-1">
+                                <div className="text-[13px] font-extrabold text-gray-800 truncate">
+                                  {testAttemptCounts[0]?.count > 0 ? testAttemptCounts[0]?.name : "No attempts yet"}
+                                </div>
+                                <div className="text-[10.5px] text-gray-400 mt-0.5">
+                                  {testAttemptCounts[0]?.count > 0 ? `${testAttemptCounts[0]?.count} attempts (${Math.round((testAttemptCounts[0]?.count / testSubmissions.length) * 100)}%)` : "Start taking tests to see trends"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Row 2: Filters */}
+                      <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                          <input
+                            type="text"
+                            placeholder="Search Name or Email..."
+                            value={submissionsSearch}
+                            onChange={(e) => {
+                              setSubmissionsSearch(e.target.value);
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[12px] w-[180px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                          />
+                        </div>
+
+                        {/* Test Title Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Test Taken:</span>
+                          <select
+                            value={filterTestName}
+                            onChange={(e) => {
+                              setFilterTestName(e.target.value);
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Tests</option>
+                            {testCatalog.map((test) => (
+                              <option key={test.id} value={test.title}>
+                                {test.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reset Filters */}
+                        {(submissionsSearch !== "" || filterTestName !== "all") && (
+                          <button
+                            onClick={() => {
+                              setSubmissionsSearch("");
+                              setFilterTestName("all");
+                              setSubmissionsPage(1);
+                            }}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-150 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-[16px] overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full min-w-[750px] text-left text-[12px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold">
+                            <th className="p-[12px]">User Identity</th>
+                            <th className="p-[12px]">Test Title</th>
+                            <th className="p-[12px]">Calculated Score</th>
+                            <th className="p-[12px]">Assessment Outcome</th>
+                            <th className="p-[12px]">Date Completed</th>
+                            <th className="p-[12px] text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {submissionsLoading ? (
+                            <tr>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">Loading user submissions...</td>
+                            </tr>
+                          ) : filteredSubmissions.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">No submissions found matching filter criteria.</td>
+                            </tr>
+                          ) : (
+                            paginatedSubmissions.map((sub) => {
+                              let riskColor = "text-gray-600 bg-gray-50 border-gray-200";
+                              if (sub.risk_level) {
+                                const r = sub.risk_level.toLowerCase();
+                                if (r.includes("high") || r.includes("severe")) {
+                                  riskColor = "text-rose-700 bg-rose-50 border-rose-200";
+                                } else if (r.includes("mod") || r.includes("medium")) {
+                                  riskColor = "text-amber-700 bg-amber-50 border-amber-250";
+                                } else if (r.includes("low") || r.includes("minimal")) {
+                                  riskColor = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                                }
+                              }
+                              
+                              return (
+                                <tr key={sub.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                  <td className="p-[12px]">
+                                    <strong className="text-gray-900 block">{sub.user_name || "Guest User"}</strong>
+                                    {sub.user_email && <span className="text-[10px] text-gray-400 block">{sub.user_email}</span>}
+                                    <span className="text-[9px] text-gray-400 block font-mono">UID: {sub.user_id}</span>
+                                  </td>
+                                  <td className="p-[12px] font-semibold text-gray-700 capitalize">
+                                    {sub.test_type ? (TEST_NAMES[sub.test_type] || sub.test_type.replace(/_|-/g, " ")) : "-"}
+                                  </td>
+                                  <td className="p-[12px]">
+                                    {sub.score !== null ? (
+                                      <div className="space-y-[2px]">
+                                        <span className="text-[13px] font-extrabold text-gray-900">{sub.score} points</span>
+                                        {sub.percentage_score !== null && (
+                                          <span className="text-[10px] text-gray-400 block">Percentage: {sub.percentage_score}%</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-[12px]">
+                                    <div className="space-y-[4px]">
+                                      {sub.category && (
+                                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-150 uppercase">
+                                          {sub.category}
+                                        </span>
+                                      )}
+                                      {sub.risk_level && (
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-extrabold uppercase border ml-1 ${riskColor}`}>
+                                          {sub.risk_level}
+                                        </span>
+                                      )}
+                                      {!sub.category && !sub.risk_level && <span className="text-gray-400">-</span>}
+                                    </div>
+                                  </td>
+                                  <td className="p-[12px] text-gray-500">
+                                    {new Date(sub.completed_at && !sub.completed_at.endsWith("Z") && !sub.completed_at.includes("+") ? `${sub.completed_at}Z` : sub.completed_at).toLocaleString("en-IN", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      hour12: true
+                                    })}
+                                  </td>
+                                  <td className="p-[12px] text-right">
+                                    <button
+                                      onClick={() => handleDeleteTestLog(sub.id)}
+                                      className="text-rose-600 hover:text-white font-medium bg-rose-50 hover:bg-rose-500 px-[12px] py-[6px] rounded-[6px] transition-all border border-rose-200 hover:border-rose-500 text-[11px]"
+                                      title="Delete Log"
+                                    >
+                                      Delete
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
             {/* TAB: SCHEDULED CALLS FEED */}
             {activeTab === "appointments" && (
               <div className="space-y-[16px] animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
-                    <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                <div className="border-b border-gray-100 pb-3 space-y-3">
+                  {/* Row 1: Title */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-gray-900">Platform Scheduled Consultations Feed ({filteredAppointments.length})</h3>
+                      <p className="text-[10px] text-gray-400 mt-[2px]">Exclusively managing advisors scheduled consultations feed.</p>
+                    </div>
                   </div>
                   
-                  {/* Advisor Filter Dropdown */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-gray-500 font-semibold">Filter by Advisor:</span>
-                    <select
-                      value={filterAdvisor}
-                      onChange={(e) => setFilterAdvisor(e.target.value)}
-                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                    >
-                      <option value="all">All Advisors</option>
-                      {advisors.map((adv) => (
-                        <option key={adv.id} value={adv.f2FintechId || adv.id}>
-                          {adv.name} ({adv.f2FintechId || adv.id})
-                        </option>
-                      ))}
-                    </select>
+                  {/* Row 2: Filters Grid/Flex */}
+                  <div className="flex flex-wrap items-center justify-start gap-3 pt-1">
+                    {/* Advisor Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Advisor:</span>
+                      <select
+                        value={filterAdvisor}
+                        onChange={(e) => setFilterAdvisor(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Advisors</option>
+                        {advisors.map((adv) => (
+                          <option key={adv.id} value={adv.f2FintechId || adv.id}>
+                            {adv.name} ({adv.f2FintechId || adv.id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status Filter Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Status:</span>
+                      <select
+                        value={filterApptStatus}
+                        onChange={(e) => setFilterApptStatus(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Active / Booked</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    {/* Date Filters */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                      <input
+                        type="date"
+                        value={filterApptStartDate}
+                        onChange={(e) => setFilterApptStartDate(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                      <input
+                        type="date"
+                        value={filterApptEndDate}
+                        onChange={(e) => setFilterApptEndDate(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Reset Button */}
+                    {(filterAdvisor !== "all" || filterApptStatus !== "all" || filterApptStartDate !== "" || filterApptEndDate !== "") && (
+                      <button
+                        onClick={() => {
+                          setFilterAdvisor("all");
+                          setFilterApptStatus("all");
+                          setFilterApptStartDate("");
+                          setFilterApptEndDate("");
+                        }}
+                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                      >
+                        Reset
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2756,8 +3439,8 @@ ${sheetDataXml}
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
                     <div className="text-[12px] text-gray-400 mt-[6px]">
-                      {filterAdvisor !== "all" 
-                        ? "No scheduled calls found for this particular advisor." 
+                      {(filterAdvisor !== "all" || filterApptStatus !== "all" || filterApptStartDate !== "" || filterApptEndDate !== "") 
+                        ? "No scheduled calls match the selected filter criteria." 
                         : "No scheduled calls have been booked on the platform yet."}
                     </div>
                   </div>
@@ -2974,112 +3657,124 @@ ${sheetDataXml}
                     )}
                   </div>
 
-                  {/* Row 2: Filters & Export */}
-                  <div className="flex flex-wrap items-center justify-start sm:justify-end gap-3 pt-1">
-                    {/* Search Input */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
-                      <input
-                        type="text"
-                        placeholder="Search Name, Email, PAN..."
-                        value={filterSearch}
-                        onChange={(e) => setFilterSearch(e.target.value)}
-                        className="h-[32px] px-[12px] w-[200px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
-                      />
+                  {/* Row 2 & 3: Filters & Export (Split into two rows to utilize space) */}
+                  <div className="flex flex-col gap-3 pt-1 w-full overflow-x-auto pb-1">
+                    {/* Top Filters Row */}
+                    <div className="flex items-center justify-between gap-3 min-w-max">
+                      <div className="flex items-center gap-3">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+                          <input
+                            type="text"
+                            placeholder="Search Name, Email, PAN..."
+                            value={filterSearch}
+                            onChange={(e) => setFilterSearch(e.target.value)}
+                            className="h-[32px] px-[12px] w-[150px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                          />
+                        </div>
+
+                        {/* Bureau Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
+                          <select
+                            value={filterBureau}
+                            onChange={(e) => setFilterBureau(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Bureaus</option>
+                            <option value="cibil">CIBIL</option>
+                            <option value="experian">Experian</option>
+                          </select>
+                        </div>
+
+                        {/* Department Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
+                          <select
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Enquirers</option>
+                            <option value="Client">Users (Leads)</option>
+                            {allDepartments.map(dept => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Active Loan Type Filter Selector */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
+                          <select
+                            value={filterLoanType}
+                            onChange={(e) => setFilterLoanType(e.target.value)}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Loan Types</option>
+                            <option value="home">Home Loan</option>
+                            <option value="personal">Personal Loan</option>
+                            <option value="professional">Professional Loan</option>
+                            <option value="creditcard">Credit Card</option>
+                            <option value="auto">Auto / Vehicle Loan</option>
+                            <option value="business">Business Loan</option>
+                            <option value="gold">Gold Loan</option>
+                            <option value="education">Education Loan</option>
+                            <option value="property">Loan Against Property (LAP)</option>
+                            <option value="other">Other Loans</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Bureau Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Bureau:</span>
-                      <select
-                        value={filterBureau}
-                        onChange={(e) => setFilterBureau(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Bureaus</option>
-                        <option value="cibil">CIBIL</option>
-                        <option value="experian">Experian</option>
-                      </select>
+                    {/* Bottom Filters Row */}
+                    <div className="flex items-center justify-between gap-3 min-w-max">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                          <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                          <input
+                            type="date"
+                            value={filterEndDate}
+                            onChange={(e) => setFilterEndDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
+                          <button
+                            onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
+                            className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                          >
+                            Reset Filters
+                          </button>
+                        )}
+
+                        {filteredEnquiries.length > 0 && (
+                          <button
+                            onClick={handleExportExcel}
+                            className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
+                            title="Export leads to Excel workbook (.xlsx)"
+                          >
+                            📥 Export Leads
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Role Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
-                      <select
-                        value={filterRole}
-                        onChange={(e) => setFilterRole(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Enquirers</option>
-                        <option value="User">Users (Leads)</option>
-                        <option value="Admin">Admins</option>
-                        <option value="Manager">Managers</option>
-                        <option value="Senior Leadership">Senior Leadership</option>
-                      </select>
-                    </div>
-
-                    {/* Active Loan Type Filter Selector */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
-                      <select
-                        value={filterLoanType}
-                        onChange={(e) => setFilterLoanType(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Loan Types</option>
-                        <option value="home">Home Loan</option>
-                        <option value="personal">Personal Loan</option>
-                        <option value="professional">Professional Loan</option>
-                        <option value="creditcard">Credit Card</option>
-                        <option value="auto">Auto / Vehicle Loan</option>
-                        <option value="business">Business Loan</option>
-                        <option value="gold">Gold Loan</option>
-                        <option value="education">Education Loan</option>
-                        <option value="property">Loan Against Property (LAP)</option>
-                        <option value="other">Other Loans</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">From:</span>
-                      <input
-                        type="date"
-                        value={filterDate}
-                        onChange={(e) => setFilterDate(e.target.value)}
-                        max={todayStr}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-gray-500 font-semibold">To:</span>
-                      <input
-                        type="date"
-                        value={filterEndDate}
-                        onChange={(e) => setFilterEndDate(e.target.value)}
-                        max={todayStr}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                      />
-                    </div>
-
-                    {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all") && (
-                      <button
-                        onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
-                        className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                      >
-                        Reset Filters
-                      </button>
-                    )}
-
-                    {filteredEnquiries.length > 0 && (
-                      <button
-                        onClick={handleExportExcel}
-                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
-                        title="Export leads to Excel workbook (.xlsx)"
-                      >
-                        📥 Export Leads
-                      </button>
-                    )}
                   </div>
                 </div>
 
@@ -3124,6 +3819,29 @@ ${sheetDataXml}
                           }
 
                           const role = classifyEnquiryRole(enq.email, enq.name, advisors);
+                          
+                          let displayRole: string = role;
+                          if (role === "User") {
+                            if (!enq.fetched_by || enq.fetched_by === "client") {
+                              displayRole = "User (Lead)";
+                            } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
+                              displayRole = "System Admin";
+                            } else {
+                              const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+                              displayRole = emp ? emp.name : "User (Lead)";
+                            }
+                          }
+
+                          let roleColorClass = "bg-emerald-50 text-emerald-700 border-emerald-250";
+                          if (displayRole === "Admin" || displayRole === "System Admin") {
+                            roleColorClass = "bg-rose-50 text-rose-700 border-rose-200";
+                          } else if (displayRole === "Senior Leadership") {
+                            roleColorClass = "bg-amber-50 text-amber-800 border-amber-200";
+                          } else if (displayRole === "Manager") {
+                            roleColorClass = "bg-blue-50 text-blue-700 border-blue-200";
+                          } else if (displayRole !== "User (Lead)") {
+                            roleColorClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                          }
 
                           return (
                             <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
@@ -3132,15 +3850,8 @@ ${sheetDataXml}
                                 {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
                                 {enq.phone && <span className="text-[10px] text-gray-400 block">📞 {enq.phone}</span>}
                                 <div className="mt-[4px]">
-                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${role === "Admin"
-                                    ? "bg-rose-50 text-rose-700 border-rose-200"
-                                    : role === "Senior Leadership"
-                                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                                      : role === "Manager"
-                                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-250"
-                                    }`}>
-                                    {role === "User" ? "User (Lead)" : role}
+                                  <span className={`inline-flex items-center px-[6px] py-[1.5px] rounded-full text-[8.5px] font-extrabold uppercase border ${roleColorClass}`}>
+                                    {displayRole}
                                   </span>
                                 </div>
                               </td>
@@ -3179,6 +3890,7 @@ ${sheetDataXml}
                                     onClick={() => {
                                       setViewingCibilReport(enq.report_data);
                                       setViewingCibilReportId(enq.id);
+                                      setViewingCibilReportUserId(enq.user_id);
                                     }}
                                     className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
                                   >
@@ -4005,7 +4717,7 @@ ${sheetDataXml}
                 </div>
 
                 {/* Section: CIBIL Enquiries */}
-                {activeExpert?.permissions?.includes("cibil_view") && (
+                {(activeExpert?.permissions?.includes("cibil_view") || activeExpert?.permissions?.includes("cibil_view_all")) && (
                   <div className="border border-gray-200 rounded-[20px] p-[20px] bg-white shadow-sm space-y-[16px] text-left animate-fade-in mt-[20px]">
                     <div className="border-b border-gray-100 pb-3 space-y-3">
                       {/* Row 1: Title & Pagination */}
@@ -4377,6 +5089,7 @@ ${sheetDataXml}
                   {[
                     { key: "cibil_fetch", label: "Credit Report Fetching" },
                     { key: "cibil_view", label: "View Credit Records" },
+                    { key: "cibil_view_all", label: "View All Credit Reports" },
                     { key: "scheduled_calls", label: "Manage Call Calendars" },
                     { key: "lenders_edit", label: "Edit Lenders Catalog" },
                     { key: "education_edit", label: "Edit Education Content" },
@@ -4802,7 +5515,7 @@ ${sheetDataXml}
             
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
               <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
-                🚫 Deactivate Advisor Profile
+                🚫 Deactivate {deactivateTarget?.isAdvisor ? "Advisor" : "Employee"} Profile
               </h3>
               <button 
                 onClick={() => setDeactivateConfirmOpen(false)} 
@@ -5009,8 +5722,8 @@ ${sheetDataXml}
       {/* ===================== TESTS ADD/EDIT POPUP MODAL ======================== */}
       {/* ========================================================================= */}
       {testModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
-          <div className="bg-white rounded-[24px] max-w-[500px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[650px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
 
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-[#f9faff]">
               <h3 className="text-[14px] font-bold text-gray-900">
@@ -5021,7 +5734,7 @@ ${sheetDataXml}
               </button>
             </div>
 
-            <div className="p-[20px] space-y-[12px] overflow-y-auto max-h-[60vh] scrollbar-thin">
+            <div className="p-[20px] space-y-[16px] overflow-y-auto max-h-[70vh] scrollbar-thin">
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Test Card Title</label>
                 <input
@@ -5046,17 +5759,24 @@ ${sheetDataXml}
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Card Gradient Accent</label>
-                  <select
-                    value={testForm.accent}
-                    onChange={(e) => setTestForm({ ...testForm, accent: e.target.value })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  >
-                    <option value="from-[#3344e6] to-[#7c8cff]">Royal Blue to Purple</option>
-                    <option value="from-[#10b981] to-[#34d399]">emerald Green</option>
-                    <option value="from-[#f59e0b] to-[#fbbf24]">amber Orange</option>
-                    <option value="from-[#06b6d4] to-[#22d3ee]">cyan Blue</option>
-                    <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={testForm.accent}
+                      onChange={(e) => setTestForm({ ...testForm, accent: e.target.value })}
+                      className="flex-1 px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                    >
+                      <option value="from-[#3344e6] to-[#7c8cff]">Royal Blue to Purple</option>
+                      <option value="from-[#10b981] to-[#34d399]">emerald Green</option>
+                      <option value="from-[#f59e0b] to-[#fbbf24]">amber Orange</option>
+                      <option value="from-[#06b6d4] to-[#22d3ee]">cyan Blue</option>
+                      <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
+                    </select>
+                    {/* Live Gradient Color Ball Preview */}
+                    <div 
+                      className={`w-[28px] h-[28px] rounded-full border border-gray-200 shrink-0 shadow-inner bg-gradient-to-r ${testForm.accent}`}
+                      title="Selected Gradient Preview"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -5083,6 +5803,21 @@ ${sheetDataXml}
               </div>
 
               <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Target Wellness Pillar</label>
+                <select
+                  value={testForm.pillar}
+                  onChange={(e) => setTestForm({ ...testForm, pillar: e.target.value })}
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                >
+                  <option value="money_iq">Money IQ</option>
+                  <option value="debt_health">Debt Health</option>
+                  <option value="financial_safety">Financial Safety</option>
+                  <option value="credit_health">Credit Health</option>
+                  <option value="loan_comfort">Loan Comfort</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Card Description Summary</label>
                 <textarea
                   value={testForm.description}
@@ -5091,6 +5826,224 @@ ${sheetDataXml}
                   rows={3}
                   className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              {/* ===================== QUESTIONS SECTION (Google Forms Style) ===================== */}
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.8px]">Questions ({testForm.questions?.length || 0})</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newQ = {
+                        id: `q-${Date.now()}-${testForm.questions?.length || 0}`,
+                        level: editingTest?.id === "financial-literacy" ? selectedEditLevel : undefined,
+                        questionText: "",
+                        options: ["Option 1", "Option 2"],
+                        correctOptionIndex: 0
+                      };
+                      setTestForm({ ...testForm, questions: [...(testForm.questions || []), newQ] });
+                    }}
+                    className="px-[12px] py-[6px] bg-primary text-white rounded-[10px] text-[11px] font-bold cursor-pointer hover:opacity-95 transition flex items-center gap-[4px]"
+                  >
+                    + Add Question
+                  </button>
+                </div>
+
+                {editingTest?.id === "financial-literacy" && (
+                  <div className="mb-4 p-3 bg-indigo-50/40 border border-indigo-100 rounded-[14px] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-indigo-950 uppercase tracking-[0.5px]">Filter by Test Level:</span>
+                      <select
+                        value={selectedEditLevel}
+                        onChange={(e) => setSelectedEditLevel(Number(e.target.value))}
+                        className="px-[12px] py-[6px] border border-indigo-200 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer font-semibold text-indigo-900"
+                      >
+                        <option value={1}>Beginner (Level 1)</option>
+                        <option value={2}>Intermediate (Level 2)</option>
+                        <option value={3}>Advanced (Level 3)</option>
+                      </select>
+                    </div>
+                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
+                      Showing {testForm.questions.filter((q: any) => q.level === selectedEditLevel).length} of {testForm.questions.length} questions
+                    </span>
+                  </div>
+                )}
+
+                {(!testForm.questions || testForm.questions.length === 0) ? (
+                  <div className="text-center py-8 border border-dashed border-gray-200 rounded-[16px] text-gray-400 text-[11px]">
+                    No questions added yet. Click "+ Add Question" to start building your quiz.
+                  </div>
+                ) : editingTest?.id === "financial-literacy" && testForm.questions.filter((q: any) => q.level === selectedEditLevel).length === 0 ? (
+                  <div className="text-center py-8 border border-dashed border-indigo-200 rounded-[16px] text-indigo-400/80 text-[11px] bg-indigo-50/10">
+                    No questions added yet for Level {selectedEditLevel}. Click "+ Add Question" to add one to this level.
+                  </div>
+                ) : (
+                  <div className="space-y-[16px]">
+                    {testForm.questions.map((q, qIndex) => {
+                      if (editingTest?.id === "financial-literacy" && q.level !== selectedEditLevel) {
+                        return null;
+                      }
+                      return (
+                        <div
+                          key={q.id || qIndex}
+                          draggable
+                          onDragStart={(e) => {
+                            const target = e.currentTarget;
+                            target.classList.add("shadow-[0_25px_50px_-12px_rgba(50,68,230,0.25)]", "scale-[1.03]", "border-primary/60", "bg-white", "rotate-[1.5deg]", "z-50");
+                            e.dataTransfer.effectAllowed = "move";
+                            setTimeout(() => {
+                              target.classList.remove("shadow-[0_25px_50px_-12px_rgba(50,68,230,0.25)]", "scale-[1.03]", "border-primary/60", "bg-white", "rotate-[1.5deg]", "z-50");
+                              setDraggedIndex(qIndex);
+                            }, 0);
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDragEnter={() => {
+                            if (draggedIndex !== null && draggedIndex !== qIndex) {
+                              const updated = [...testForm.questions];
+                              const draggedItem = updated[draggedIndex];
+                              updated.splice(draggedIndex, 1);
+                              updated.splice(qIndex, 0, draggedItem);
+                              setDraggedIndex(qIndex);
+                              setTestForm({ ...testForm, questions: updated });
+                            }
+                          }}
+                          onDragEnd={() => setDraggedIndex(null)}
+                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${
+                            draggedIndex === qIndex 
+                              ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]" 
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          
+                          {/* Question Input */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-[6px]">
+                              <div className="flex items-center gap-[6px]">
+                                {/* Drag Handle Dot Pattern */}
+                                <div 
+                                  className="text-gray-400 cursor-grab active:cursor-grabbing font-bold text-[14px] select-none hover:text-gray-600 px-[4px] py-[2px] rounded hover:bg-gray-200/50 flex items-center justify-center transition"
+                                  title="Drag to reorder question"
+                                >
+                                  ⠿
+                                </div>
+                                <span className="text-[11px] font-bold text-gray-700">Question {qIndex + 1}</span>
+                              </div>
+                              <div className="flex items-center gap-[12px]">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = testForm.questions.filter((_, idx) => idx !== qIndex);
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-[11px] font-semibold cursor-pointer"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={q.questionText}
+                              onChange={(e) => {
+                                const updated = [...testForm.questions];
+                                updated[qIndex] = { ...q, questionText: e.target.value };
+                                setTestForm({ ...testForm, questions: updated });
+                              }}
+                              placeholder="e.g. What is the recommended emergency fund size?"
+                              className="w-full px-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                            />
+                          </div>
+
+                          {/* Options Input List */}
+                          <div className="space-y-[8px]">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.5px] block">Options (Select radio for correct answer)</span>
+                            {q.options.map((opt: string, oIndex: number) => (
+                              <div key={oIndex} className="flex items-center gap-[8px]">
+                                <input
+                                  type="radio"
+                                  name={`correct-${q.id || qIndex}`}
+                                  checked={q.correctOptionIndex === oIndex}
+                                  onChange={() => {
+                                    const updated = [...testForm.questions];
+                                    updated[qIndex] = { ...q, correctOptionIndex: oIndex };
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  className="h-[16px] w-[16px] text-primary border-gray-300 focus:ring-primary cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => {
+                                    const updated = [...testForm.questions];
+                                    const newOpts = [...q.options];
+                                    newOpts[oIndex] = e.target.value;
+                                    updated[qIndex] = { ...q, options: newOpts };
+                                    setTestForm({ ...testForm, questions: updated });
+                                  }}
+                                  placeholder={`Option ${oIndex + 1}`}
+                                  className="flex-1 px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[11px] focus:outline-none focus:border-primary bg-white"
+                                />
+                                {q.options.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...testForm.questions];
+                                      const newOpts = q.options.filter((_: string, idx: number) => idx !== oIndex);
+                                      let nextCorrect = q.correctOptionIndex;
+                                      if (q.correctOptionIndex === oIndex) {
+                                        nextCorrect = 0;
+                                      } else if (q.correctOptionIndex > oIndex) {
+                                        nextCorrect -= 1;
+                                      }
+                                      updated[qIndex] = { ...q, options: newOpts, correctOptionIndex: nextCorrect };
+                                      setTestForm({ ...testForm, questions: updated });
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 text-[14px] cursor-pointer font-bold px-[4px]"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...testForm.questions];
+                                updated[qIndex] = { ...q, options: [...q.options, `Option ${q.options.length + 1}`] };
+                                setTestForm({ ...testForm, questions: updated });
+                              }}
+                              className="text-primary hover:opacity-90 font-bold text-[10px] cursor-pointer"
+                            >
+                              + Add Option
+                            </button>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+
+                    {/* Append-only Add Question button at the very bottom of the list */}
+                    <div className="flex justify-center pt-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQ = {
+                            id: `q-${Date.now()}-${testForm.questions?.length || 0}`,
+                            level: editingTest?.id === "financial-literacy" ? selectedEditLevel : undefined,
+                            questionText: "",
+                            options: ["Option 1", "Option 2"],
+                            correctOptionIndex: 0
+                          };
+                          setTestForm({ ...testForm, questions: [...(testForm.questions || []), newQ] });
+                        }}
+                        className="px-[14px] py-[8px] bg-primary text-white rounded-[10px] text-[12px] font-bold cursor-pointer hover:opacity-95 transition flex items-center gap-[4px]"
+                      >
+                        + Add Question
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5432,7 +6385,11 @@ ${sheetDataXml}
                 </p>
               </div>
               <button 
-                onClick={() => setViewingCibilReport(null)} 
+                onClick={() => {
+                  setViewingCibilReport(null);
+                  setViewingCibilReportId(null);
+                  setViewingCibilReportUserId(null);
+                }} 
                 className="text-[22px] text-gray-400 hover:text-gray-600 cursor-pointer border-none bg-transparent transition font-bold leading-none p-1"
                 title="Close Report"
               >
@@ -5441,7 +6398,7 @@ ${sheetDataXml}
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
               <CibilAnalyzerView 
-                userId={userId || "admin"} 
+                userId={viewingCibilReportUserId || "anonymous"}
                 overrideReport={viewingCibilReport} 
                 reportId={viewingCibilReportId || undefined}
                 onToggleSidebar={() => {}} 

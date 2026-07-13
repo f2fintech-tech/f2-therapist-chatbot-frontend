@@ -500,8 +500,8 @@ export default function LoanFitTestView({
     return (
       <div className="space-y-[16px]">
         <div className="flex items-center gap-3 rounded-[16px] border border-gray-200 bg-white px-[14px] py-[10px] shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded border border-gray-200 bg-white text-gray-700 flex items-center justify-center text-[16px] hover:bg-gray-50" aria-label="Back to test catalog">
-            ←
+          <button type="button" onClick={onBackToCatalog} className="h-8 w-8 rounded-[8px] border border-blue-200 bg-blue-50/50 text-blue-700 flex items-center justify-center shadow-sm transition-all duration-200 hover:scale-105 hover:bg-blue-100 active:scale-95 cursor-pointer dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/50" aria-label="Back to test catalog">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
           </button>
           <div>
             <div className="text-[13px] font-bold text-gray-900">Loan Comfort Analysis Results</div>
