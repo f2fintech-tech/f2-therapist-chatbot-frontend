@@ -1757,7 +1757,7 @@ ${sheetDataXml}
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
-    { key: "loans", label: "Loans", icon: "💳" },
+    ...(!isAdmin ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "reports", label: "Reports", icon: "📈" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
@@ -1853,31 +1853,33 @@ ${sheetDataXml}
 
 
         {/* Tabs */}
-        <div className="flex px-4 sm:px-8 pb-0 gap-1 mt-1 relative z-10 overflow-x-auto no-scrollbar max-w-full">
-          <style>{`
-            .no-scrollbar::-webkit-scrollbar {
-              display: none;
-            }
-            .no-scrollbar {
-              -ms-overflow-style: none;
-              scrollbar-width: none;
-            }
-          `}</style>
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              data-testid={`tab-${t.key}`}
-              onClick={() => setActiveTab(t.key as any)}
-              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all shrink-0 whitespace-nowrap ${activeTab === t.key
-                ? "bg-white text-primary"
-                : "text-white/70 hover:text-white hover:bg-white/10"
-                }`}
-            >
-              <span>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {tabs.length > 1 && (
+          <div className="flex px-4 sm:px-8 pb-0 gap-1 mt-1 relative z-10 overflow-x-auto no-scrollbar max-w-full">
+            <style>{`
+              .no-scrollbar::-webkit-scrollbar {
+                display: none;
+              }
+              .no-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+            `}</style>
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                data-testid={`tab-${t.key}`}
+                onClick={() => setActiveTab(t.key as any)}
+                className={`flex items-center gap-2 px-5 py-2.5 text-[12px] font-semibold rounded-t-[10px] transition-all shrink-0 whitespace-nowrap ${activeTab === t.key
+                  ? "bg-white text-primary"
+                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+              >
+                <span>{t.icon}</span>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {/* ══ OVERVIEW TAB ══ */}
