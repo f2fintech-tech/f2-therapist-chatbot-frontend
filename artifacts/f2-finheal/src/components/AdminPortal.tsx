@@ -733,9 +733,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     // 2. Filter by Role / Department
     if (filterRole !== "all") {
       if (filterRole === "Client") {
-        if (enq.fetched_by && enq.fetched_by !== "client") return false;
+        if (enq.fetched_by && enq.fetched_by !== "client" && enq.fetched_by !== enq.user_id) return false;
       } else {
-        const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+        const fb = (enq.fetched_by || "").toLowerCase();
+        const emp = employees.find((a: any) => 
+          (a.id || "").toLowerCase() === fb || 
+          (a.f2FintechId || "").toLowerCase() === fb
+        );
         if (!emp || emp.department !== filterRole) return false;
       }
     }
@@ -3827,8 +3831,18 @@ ${sheetDataXml}
                             } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
                               displayRole = "System Admin";
                             } else {
-                              const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
-                              displayRole = emp ? emp.name : "System Admin";
+                              const fb = (enq.fetched_by || "").toLowerCase();
+                              const emp = employees.find((a: any) => 
+                                (a.id || "").toLowerCase() === fb || 
+                                (a.f2FintechId || "").toLowerCase() === fb
+                              );
+                              if (emp) {
+                                displayRole = emp.name;
+                              } else if (enq.fetched_by === enq.user_id) {
+                                displayRole = "User (Lead)";
+                              } else {
+                                displayRole = "System Admin";
+                              }
                             }
                           }
 
