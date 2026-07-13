@@ -1901,41 +1901,68 @@ ${sheetDataXml}
               {/* Additional Visual Panel */}
               <div className="grid gap-[18px] md:grid-cols-2">
                 {/* Platform Wellness Summary Card */}
-                <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                      🏆 Platform Wellness Average
-                    </h3>
-                    <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                    
-                    <div className="flex items-end gap-[10px] mb-[12px]">
-                      <div className="text-[54px] font-serif font-bold text-primary leading-none">68</div>
-                      <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
-                      <span className="mb-[6px] ml-[8px] bg-emerald-100 text-emerald-800 text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider">
-                        Good Health
-                      </span>
-                    </div>
+                {(() => {
+                  const avgScore = backendStats?.average_wellness_score ?? 68;
+                  const testsCount = backendStats?.consumption?.tests ?? 16;
+                  const topCategory = backendStats?.top_category ?? "Money IQ";
+                  const riskMixPct = backendStats?.risk_mix_pct ?? 12;
+                  
+                  let tierLabel = "Good Health";
+                  let tierColorClass = "bg-emerald-100 text-emerald-800";
+                  if (avgScore >= 81) {
+                    tierLabel = "Thriving";
+                    tierColorClass = "bg-emerald-100 text-emerald-800";
+                  } else if (avgScore >= 61) {
+                    tierLabel = "Good Health";
+                    tierColorClass = "bg-emerald-100 text-emerald-800";
+                  } else if (avgScore >= 41) {
+                    tierLabel = "Fair Health";
+                    tierColorClass = "bg-amber-100 text-amber-800";
+                  } else {
+                    tierLabel = "Attention Required";
+                    tierColorClass = "bg-rose-100 text-rose-800";
+                  }
 
-                    <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
-                      <div className="h-full bg-primary" style={{ width: "68%" }} />
-                    </div>
-                  </div>
+                  const riskLabel = riskMixPct < 25 ? `Low (${riskMixPct}%)` : riskMixPct < 50 ? `Moderate (${riskMixPct}%)` : `High (${riskMixPct}%)`;
 
-                  <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Tests Done</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">34 active</div>
+                  return (
+                    <div className="border border-[#d4d8fa] bg-gradient-to-br from-[#f8f9ff] to-[#f0f2ff] rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "100ms" }}>
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                          🏆 Platform Wellness Average
+                        </h3>
+                        <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
+                        
+                        <div className="flex items-end gap-[10px] mb-[12px]">
+                          <div className="text-[54px] font-serif font-bold text-primary leading-none">{avgScore}</div>
+                          <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
+                          <span className={`mb-[6px] ml-[8px] text-[10px] font-bold px-[8px] py-[3px] rounded-full uppercase tracking-wider ${tierColorClass}`}>
+                            {tierLabel}
+                          </span>
+                        </div>
+
+                        <div className="h-[6px] bg-gray-200 rounded-[6px] overflow-hidden mb-[16px]">
+                          <div className="h-full bg-primary" style={{ width: `${avgScore}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-[10px] text-[11px] text-gray-600 text-center">
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Tests Done</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{testsCount} active</div>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Top Category</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{topCategory}</div>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
+                          <div className="text-gray-400 font-medium">Risk Mix</div>
+                          <div className="text-gray-800 font-bold mt-[2px]">{riskLabel}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Top Category</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">Money IQ</div>
-                    </div>
-                    <div className="bg-white border border-gray-100 rounded-[10px] p-[8px]">
-                      <div className="text-gray-400 font-medium">Risk Mix</div>
-                      <div className="text-gray-800 font-bold mt-[2px]">Low (12%)</div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Bureau Score Band Distribution (Donut Chart with Toggle) */}
                 <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up" style={{ animationDelay: "150ms" }}>
