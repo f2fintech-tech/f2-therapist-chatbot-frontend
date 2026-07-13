@@ -3322,7 +3322,7 @@ ${sheetDataXml}
                                     </div>
                                   </td>
                                   <td className="p-[12px] text-gray-500">
-                                    {new Date(sub.completed_at).toLocaleString("en-IN", {
+                                    {new Date(sub.completed_at && !sub.completed_at.endsWith("Z") && !sub.completed_at.includes("+") ? `${sub.completed_at}Z` : sub.completed_at).toLocaleString("en-IN", {
                                       day: "2-digit",
                                       month: "short",
                                       year: "numeric",
@@ -3820,14 +3820,14 @@ ${sheetDataXml}
 
                           const role = classifyEnquiryRole(enq.email, enq.name, advisors);
                           
-                          let displayRole = role;
+                          let displayRole: string = role;
                           if (role === "User") {
                             if (!enq.fetched_by || enq.fetched_by === "client") {
                               displayRole = "User (Lead)";
                             } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
                               displayRole = "System Admin";
                             } else {
-                              const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
+                              const emp = advisors.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
                               displayRole = emp ? emp.name : "User (Lead)";
                             }
                           }
