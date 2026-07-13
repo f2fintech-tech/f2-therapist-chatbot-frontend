@@ -3828,7 +3828,7 @@ ${sheetDataXml}
                               displayRole = "System Admin";
                             } else {
                               const emp = employees.find((a: any) => a.id === enq.fetched_by || a.f2FintechId === enq.fetched_by);
-                              displayRole = emp ? emp.name : "User (Lead)";
+                              displayRole = emp ? emp.name : "System Admin";
                             }
                           }
 
