@@ -807,7 +807,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   };
 
   const handleExportExcel = () => {
-    if (filteredEnquiries.length === 0) return;
+    if (cibilEnquiries.length === 0) return;
 
     // 1. Helper function for CRC32 calculation
     const makeCRCTable = () => {
@@ -1530,9 +1530,14 @@ ${sheetDataXml}
         const idB = (b.f2FintechId || b.id || "").toLowerCase();
         return idA.localeCompare(idB);
       });
+      const newListStr = JSON.stringify(sortedList);
+      const oldListStr = localStorage.getItem("finheal_advisors_list");
+      
       setAdvisors(sortedList);
-      localStorage.setItem("finheal_advisors_list", JSON.stringify(sortedList));
-      dispatchUpdateEvent("finheal:advisors_update");
+      if (newListStr !== oldListStr) {
+        localStorage.setItem("finheal_advisors_list", newListStr);
+        dispatchUpdateEvent("finheal:advisors_update");
+      }
     } catch (err) {
       console.error("Error loading advisors from backend:", err);
       const stored = localStorage.getItem("finheal_advisors_list");
@@ -1634,11 +1639,11 @@ ${sheetDataXml}
 
     if (shouldLoadAdvisors) {
       loadAdvisors();
-      intervalIdAdvisors = setInterval(loadAdvisors, 15000); // Less aggressive polling (every 15s instead of 8s)
+      intervalIdAdvisors = setInterval(loadAdvisors, 300000); // 5 minutes polling
     }
     if (shouldLoadEmployees) {
       loadEmployees(true); // Initial load with spinner
-      intervalIdEmployees = setInterval(() => loadEmployees(false), 15000); // Silent background updates
+      intervalIdEmployees = setInterval(() => loadEmployees(false), 300000); // Silent background updates
     }
 
     const handleUpdate = () => {
@@ -4869,7 +4874,7 @@ ${sheetDataXml}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                            📋 CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                            📋 CIBIL Credit Score Enquiries ({cibilEnquiries.length})
                           </h3>
                           <p className="text-[10px] text-gray-400 mt-[2px]">
                             {getDateFilterDescription()}
@@ -4877,7 +4882,7 @@ ${sheetDataXml}
                         </div>
 
                         {/* Compact Pagination Controls */}
-                        {filteredEnquiries.length > 0 && (
+                        {cibilEnquiries.length > 0 && (
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               disabled={safeCibilPage === 1}
@@ -4951,7 +4956,7 @@ ${sheetDataXml}
                                 Reset Filters
                               </button>
                             )}
-                          {filteredEnquiries.length > 0 && (
+                          {cibilEnquiries.length > 0 && (
                             <button
                               onClick={handleExportExcel}
                               className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
@@ -4981,7 +4986,7 @@ ${sheetDataXml}
                             <tr>
                               <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
                             </tr>
-                          ) : filteredEnquiries.length === 0 ? (
+                          ) : cibilEnquiries.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="text-center p-6 text-gray-400">
                                 {filterDate
@@ -5098,7 +5103,7 @@ ${sheetDataXml}
                       </table>
                     </div>
                     {/* Bottom Pagination Controls */}
-                    {filteredEnquiries.length > 0 && (
+                    {cibilEnquiries.length > 0 && (
                       <div className="flex items-center justify-end gap-1.5 pt-2">
                         <button
                           disabled={safeCibilPage === 1}

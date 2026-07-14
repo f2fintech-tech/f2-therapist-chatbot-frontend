@@ -27,6 +27,7 @@ export interface Advisor {
   isActive?: boolean;
   deactivationReason?: string;
   permissions?: string[];
+  deleted_at?: string;
 }
 
 const DiscountTimer = ({ expiresAt }: { expiresAt: string }) => {
