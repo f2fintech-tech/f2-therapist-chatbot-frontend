@@ -726,6 +726,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // CIBIL Enquiries State and Fetcher
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
+  const [cibilTotal, setCibilTotal] = useState<number>(0);
   const [viewingCibilReport, setViewingCibilReport] = useState<any | null>(null);
   const [viewingCibilReportId, setViewingCibilReportId] = useState<string | null>(null);
   const [viewingCibilReportUserId, setViewingCibilReportUserId] = useState<string | null>(null);
@@ -752,106 +753,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return `${year}-${month}-${day}`;
   })();
 
-  // Reset page when filters change
+  // Reset page when filters change (handled implicitly by backend if page exceeds total)
   useEffect(() => {
     setCibilPage(1);
   }, [filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
 
 
-  const filteredEnquiries = cibilEnquiries.filter((enq) => {
-    // 0. Filter by Manager ownership (if logged-in user is not Super Admin and does not have cibil_view_all permission)
-    const hasViewAllPerm = activeExpert?.permissions?.includes("cibil_view_all");
-    if (!isAdmin && !hasViewAllPerm) {
-      const cleanUserEmail = (userEmail || "").toLowerCase().trim();
-      const cleanEnqEmail = (enq.email || "").toLowerCase().trim();
-      const cleanExpertId = (currentExpertId || "").toLowerCase().trim();
-      const cleanEnqUserId = (enq.user_id || "").toLowerCase().trim();
 
-      const isFetchedByMe = 
-        (cleanUserEmail && cleanEnqEmail === cleanUserEmail) ||
-        (cleanExpertId && cleanEnqUserId === cleanExpertId) ||
-        (cleanExpertId && cleanEnqEmail.startsWith(cleanExpertId + "@"));
-      
-      if (!isFetchedByMe) return false;
-    }
-
-    // 1. Filter by Date (Start & End Date range)
-    if (filterDate || filterEndDate) {
-      if (!enq.fetched_at) return false;
-      const utcStr = enq.fetched_at.endsWith("Z") || enq.fetched_at.includes("+") ? enq.fetched_at : `${enq.fetched_at}Z`;
-      const localDate = new Date(utcStr);
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getDate()).padStart(2, '0');
-      const localDateStr = `${year}-${month}-${day}`;
-      
-      if (filterDate && filterEndDate) {
-        if (localDateStr < filterDate || localDateStr > filterEndDate) return false;
-      } else if (filterDate) {
-        if (localDateStr !== filterDate) return false;
-      } else if (filterEndDate) {
-        if (localDateStr > filterEndDate) return false;
-      }
-    }
-
-    // 2. Filter by Role / Department
-    if (filterRole !== "all") {
-      if (filterRole === "Client") {
-        if (enq.fetched_by && enq.fetched_by !== "client" && enq.fetched_by !== enq.user_id) return false;
-      } else {
-        const fb = (enq.fetched_by || "").toLowerCase();
-        const emp = employees.find((a: any) => 
-          (a.id || "").toLowerCase() === fb || 
-          (a.f2FintechId || "").toLowerCase() === fb
-        );
-        if (!emp || emp.department !== filterRole) return false;
-      }
-    }
-
-    // 3. Filter by Loan Type
-    if (filterLoanType !== "all") {
-      const activeAccounts = (enq.accounts || []).filter(
-        (acc: any) => acc.is_active === true || acc.is_active === "true" || acc.is_active === 1
-      );
-      const hasMatchingLoan = activeAccounts.some((acc: any) => {
-        const typeClean = (acc.type || "").toLowerCase();
-        if (filterLoanType === "home") return typeClean.includes("home") || typeClean.includes("housing");
-        if (filterLoanType === "personal") return typeClean.includes("personal");
-        if (filterLoanType === "professional") return typeClean.includes("professional");
-        if (filterLoanType === "creditcard") return typeClean.includes("card") || typeClean.includes("cc");
-        if (filterLoanType === "auto") return typeClean.includes("auto") || typeClean.includes("car") || typeClean.includes("vehicle") || typeClean.includes("wheeler");
-        if (filterLoanType === "business") return typeClean.includes("business");
-        if (filterLoanType === "gold") return typeClean.includes("gold");
-        if (filterLoanType === "education") return typeClean.includes("education") || typeClean.includes("student");
-        if (filterLoanType === "property") return typeClean.includes("property") || typeClean.includes("lap");
-        if (filterLoanType === "other") {
-          const isMatchedByAnyKnown = ["home", "housing", "personal", "professional", "card", "cc", "auto", "car", "vehicle", "wheeler", "business", "gold", "education", "student", "property", "lap"].some(
-            keyword => typeClean.includes(keyword)
-          );
-          return !isMatchedByAnyKnown;
-        }
-        return false;
-      });
-      if (!hasMatchingLoan) return false;
-    }
-
-    // 4. Filter by Search Query
-    if (filterSearch.trim() !== "") {
-      const query = filterSearch.toLowerCase().trim();
-      const nameMatch = (enq.name || "").toLowerCase().includes(query);
-      const emailMatch = (enq.email || "").toLowerCase().includes(query);
-      const panMatch = (enq.pan || "").toLowerCase().includes(query);
-      if (!nameMatch && !emailMatch && !panMatch) return false;
-    }
-
-    // 5. Filter by Bureau
-    if (filterBureau !== "all") {
-      const bureauClean = (enq.bureau || "").toLowerCase().trim();
-      if (bureauClean !== filterBureau.toLowerCase().trim()) return false;
-    }
-
-    return true;
-  });
 
   const getDateFilterDescription = () => {
     if (filterDate && filterEndDate) {
@@ -869,12 +777,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     return "Showing all credit score fetches across the platform.";
   };
 
-  const totalPages = Math.ceil(filteredEnquiries.length / cibilPageSize) || 1;
+  const totalPages = Math.ceil(cibilTotal / cibilPageSize) || 1;
   const safeCibilPage = Math.min(cibilPage, totalPages);
-  const paginatedEnquiries = filteredEnquiries.slice(
-    (safeCibilPage - 1) * cibilPageSize,
-    safeCibilPage * cibilPageSize
-  );
+  const paginatedEnquiries = cibilEnquiries;
 
   const escapeXml = (unsafe: string) => {
     if (!unsafe) return "";
@@ -1018,11 +923,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     };
 
     // 3. Split data
-    const under700 = filteredEnquiries.filter(enq => {
+    const under700 = cibilEnquiries.filter(enq => {
       const scoreVal = Number(enq.score);
       return isNaN(scoreVal) || scoreVal < 700;
     });
-    const above700 = filteredEnquiries.filter(enq => {
+    const above700 = cibilEnquiries.filter(enq => {
       const scoreVal = Number(enq.score);
       return !isNaN(scoreVal) && scoreVal >= 700;
     });
@@ -1042,7 +947,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const maxLoanCounts: Record<string, number> = {};
     loanTypesConfig.forEach(cfg => {
       let maxCount = 0;
-      filteredEnquiries.forEach(enq => {
+      cibilEnquiries.forEach(enq => {
         const val = enq[cfg.key];
         if (val) {
           const count = val.split("; ").filter(Boolean).length;
@@ -1287,10 +1192,28 @@ ${sheetDataXml}
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      const res = await fetch(`${apiBase}/cibil/leads`, { headers });
+      
+      const queryParams = new URLSearchParams({
+        page: cibilPage.toString(),
+        limit: cibilPageSize.toString()
+      });
+      if (filterSearch) queryParams.append("search", filterSearch);
+      if (filterRole !== "all") queryParams.append("role", filterRole);
+      if (filterLoanType !== "all") queryParams.append("loan_type", filterLoanType);
+      if (filterBureau !== "all") queryParams.append("bureau", filterBureau);
+      if (filterDate) queryParams.append("start_date", filterDate);
+      if (filterEndDate) queryParams.append("end_date", filterEndDate);
+
+      const res = await fetch(`${apiBase}/cibil/leads?${queryParams.toString()}`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setCibilEnquiries(data);
+        if (Array.isArray(data)) {
+          setCibilEnquiries(data);
+          setCibilTotal(data.length);
+        } else {
+          setCibilEnquiries(data.data || []);
+          setCibilTotal(data.total || 0);
+        }
       }
     } catch (err) {
       console.error("Error loading CIBIL enquiries:", err);
@@ -1343,7 +1266,7 @@ ${sheetDataXml}
         checkCibilFetchThreshold();
       }
     }
-  }, [isAdmin, activeTab, currentExpertId]);
+  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
 
   // Lenders CRUD Handlers
   const getProductPrefix = (category: string, productType: string): string => {
@@ -3694,7 +3617,7 @@ ${sheetDataXml}
                     <div className="flex items-center gap-3">
                       <div>
                         <h3 className="text-[14px] font-bold text-gray-900">
-                          CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                          CIBIL Credit Score Enquiries ({cibilTotal})
                         </h3>
                         <p className="text-[10px] text-gray-400 mt-[2px]">
                           {getDateFilterDescription()}
@@ -3712,7 +3635,7 @@ ${sheetDataXml}
                     </div>
 
                     {/* Compact Pagination Controls */}
-                    {filteredEnquiries.length > 0 && (
+                    {cibilTotal > 0 && (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           disabled={safeCibilPage === 1}
@@ -3844,7 +3767,7 @@ ${sheetDataXml}
                           </button>
                         )}
 
-                        {filteredEnquiries.length > 0 && (
+                        {cibilTotal > 0 && (
                           <button
                             onClick={handleExportExcel}
                             className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1"
@@ -3875,7 +3798,7 @@ ${sheetDataXml}
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
                         </tr>
-                      ) : filteredEnquiries.length === 0 ? (
+                      ) : cibilEnquiries.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">
                             {filterDate
@@ -4026,7 +3949,7 @@ ${sheetDataXml}
                   </table>
                 </div>
                 {/* Bottom Pagination Controls */}
-                {filteredEnquiries.length > 0 && (
+                {cibilTotal > 0 && (
                   <div className="flex items-center justify-end gap-1.5 pt-2">
                     <button
                       disabled={safeCibilPage === 1}
