@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -100,6 +100,7 @@ interface EmployeeDirectoryProps {
   handleOpenEditExpert: (adv: Advisor) => void;
   handleDeleteExpert: (id: string) => void;
   onRenameDeptClick: (deptName: string) => void;
+  onOpenTrash?: () => void;
 }
 
 function EmployeeDirectory({
@@ -110,7 +111,8 @@ function EmployeeDirectory({
   handleToggleActive,
   handleOpenEditExpert,
   handleDeleteExpert,
-  onRenameDeptClick
+  onRenameDeptClick,
+  onOpenTrash
 }: EmployeeDirectoryProps) {
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
@@ -140,9 +142,20 @@ function EmployeeDirectory({
     <div className="space-y-[16px] animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
         <div>
-          <h3 className="text-[14px] font-bold text-gray-900">
-            Employees Directory ({filteredEmployees.length})
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-[14px] font-bold text-gray-900">
+              Employees Directory ({filteredEmployees.length})
+            </h3>
+            {onOpenTrash && (
+              <button
+                onClick={onOpenTrash}
+                className="h-[24px] px-[8px] rounded-[6px] bg-rose-50 hover:bg-rose-100 text-rose-800 text-[9px] font-bold border border-rose-200 transition cursor-pointer flex items-center gap-1 shrink-0"
+                title="View soft-deleted employees in Trash"
+              >
+                🗑️ View Trash
+              </button>
+            )}
+          </div>
           <p className="text-[10px] text-gray-400 mt-[2px]">
             Manage company employee records and toggle active client-facing advisors.
           </p>
@@ -312,7 +325,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
 
 
-  // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries
+  // Active Admin Tabs: experts, education, tests, appointments, lenders, cibil-enquiries, employees, trash
   // Dynamic URL Routing for admin tabs (replacing local useState to support URLs like /admin/tests)
   const [matchAdmin, paramsAdmin] = useRoute("/admin/:tab");
   const [matchWorkspace, paramsWorkspace] = useRoute("/advisor-workspace/:tab");
@@ -321,17 +334,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   
   const [_, setLocation] = useLocation();
   
-  const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(params.tab))
-    ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees")
+  const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(params.tab))
+    ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash")
     : null;
     
-  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees"].includes(initialTab) 
-    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") 
+  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(initialTab) 
+    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") 
     : null;
     
   const activeTab = activeTabUrl || validInitialTab || "experts";
 
-  const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees") => {
+  const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") => {
     setLocation(isAdmin ? `/admin/${newTab}` : `/advisor-workspace/${newTab}`);
   };
 
@@ -659,6 +672,57 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       fetchLenders();
     }
   }, [isAdmin, activeTab]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === "trash") {
+      fetchTrashData();
+    }
+  }, [isAdmin, activeTab]);
+
+  // Trash State & Fetchers
+  const [cibilTrash, setCibilTrash] = useState<any[]>([]);
+  const [advisorsTrash, setAdvisorsTrash] = useState<Advisor[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+
+  const fetchTrashData = async () => {
+    try {
+      setTrashLoading(true);
+      const [cibilRes, advisorsRes] = await Promise.all([
+        fetchCibilTrash(userId).catch(() => []),
+        fetchAdvisorsTrash().catch(() => [])
+      ]);
+      setCibilTrash(cibilRes);
+      setAdvisorsTrash(advisorsRes);
+    } catch (err) {
+      console.error("Error loading trash data:", err);
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleRestoreCibil = async (reportId: string) => {
+    try {
+      await restoreCibilEnquiry(reportId, userId);
+      alert("CIBIL Enquiry record successfully restored.");
+      fetchTrashData();
+      fetchCibilEnquiries(); // Refresh active list as well
+    } catch (err: any) {
+      console.error("Error restoring CIBIL enquiry:", err);
+      alert(err.message || "Failed to restore enquiry.");
+    }
+  };
+
+  const handleRestoreAdvisor = async (f2FintechId: string) => {
+    try {
+      await restoreAdvisor(f2FintechId);
+      alert("Employee/Advisor profile successfully restored.");
+      fetchTrashData();
+      fetchAdvisors(); // Refresh active advisors list
+    } catch (err: any) {
+      console.error("Error restoring employee:", err);
+      alert(err.message || "Failed to restore employee.");
+    }
+  };
 
   // CIBIL Enquiries State and Fetcher
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
@@ -1236,7 +1300,7 @@ ${sheetDataXml}
   };
 
   const handleDeleteEnquiry = async (reportId: string) => {
-    if (!window.confirm("Are you sure you want to delete this enquiry? This action cannot be undone and will remove it from the database.")) {
+    if (!window.confirm("Are you sure you want to move this enquiry to trash? It can be restored within 3 days before it is permanently deleted.")) {
       return;
     }
 
@@ -2751,7 +2815,8 @@ ${sheetDataXml}
                   { id: "appointments", label: "📅 Scheduled Calls" },
                   { id: "lenders", label: "🏦 Lenders Catalog" },
                   { id: "cibil-enquiries", label: "📋 CIBIL Enquiries" },
-                  { id: "employees", label: "👥 Employees Directory" }
+                  { id: "employees", label: "👥 Employees Directory" },
+                  { id: "trash", label: "🗑️ Trash Manager" }
                 ].map(t => (
                   <button
                     key={t.id}
@@ -3626,13 +3691,24 @@ ${sheetDataXml}
                 <div className="border-b border-gray-100 pb-3 space-y-3">
                   {/* Row 1: Title & Pagination */}
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-[14px] font-bold text-gray-900">
-                        CIBIL Credit Score Enquiries ({filteredEnquiries.length})
-                      </h3>
-                      <p className="text-[10px] text-gray-400 mt-[2px]">
-                        {getDateFilterDescription()}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900">
+                          CIBIL Credit Score Enquiries ({filteredEnquiries.length})
+                        </h3>
+                        <p className="text-[10px] text-gray-400 mt-[2px]">
+                          {getDateFilterDescription()}
+                        </p>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setActiveTab("trash")}
+                          className="h-[24px] px-[8px] rounded-[6px] bg-rose-50 hover:bg-rose-100 text-rose-800 text-[9px] font-bold border border-rose-200 transition cursor-pointer flex items-center gap-1 shrink-0"
+                          title="View soft-deleted enquiries in Trash"
+                        >
+                          🗑️ View Trash
+                        </button>
+                      )}
                     </div>
 
                     {/* Compact Pagination Controls */}
@@ -3928,12 +4004,14 @@ ${sheetDataXml}
                                 >
                                   Generate CAM 📊
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteEnquiry(enq.id)}
-                                  className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
-                                >
-                                  Delete Inquiry 🗑️
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleDeleteEnquiry(enq.id)}
+                                    className="text-rose-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                                  >
+                                    Delete Inquiry 🗑️
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );
@@ -3985,7 +4063,132 @@ ${sheetDataXml}
                   setRenameNewDept("");
                   setRenameDeptModalOpen(true);
                 }}
+                onOpenTrash={() => setActiveTab("trash")}
               />
+            )}
+
+            {/* TAB: TRASH MANAGER */}
+            {activeTab === "trash" && (
+              <div className="space-y-[24px] animate-fade-in">
+                <div>
+                  <h3 className="text-[14px] font-bold text-gray-900">
+                    🗑️ Trash Manager
+                  </h3>
+                  <p className="text-[12px] text-gray-500 mt-[4px]">
+                    Inspect and restore items moved to Trash. Trashed records are permanently purged after 3 days.
+                  </p>
+                </div>
+
+                {trashLoading ? (
+                  <div className="text-center py-[48px] text-gray-400">Loading trash bins...</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-[24px]">
+                    {/* Bins: CIBIL Enquiries */}
+                    <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
+                      <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
+                        📋 Deleted CIBIL Enquiries ({cibilTrash.length})
+                      </h4>
+                      <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+                        <table className="w-full text-left text-[11.5px] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-150 text-gray-500 font-bold">
+                              <th className="p-[10px]">Subject Name</th>
+                              <th className="p-[10px]">PAN / Bureau</th>
+                              <th className="p-[10px]">Score</th>
+                              <th className="p-[10px]">Deleted At</th>
+                              <th className="p-[10px] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cibilTrash.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-[24px] text-gray-450 italic">
+                                  No deleted CIBIL enquiries in Trash.
+                                </td>
+                              </tr>
+                            ) : (
+                              cibilTrash.map((enq) => {
+                                const delDate = enq.deleted_at 
+                                  ? new Date(enq.deleted_at).toLocaleString("en-IN") 
+                                  : "-";
+                                return (
+                                  <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                    <td className="p-[10px] font-semibold text-gray-850">{enq.name || "Guest"}</td>
+                                    <td className="p-[10px] text-gray-500">{enq.pan || "-"} ({enq.bureau || "CIBIL"})</td>
+                                    <td className="p-[10px]">
+                                      <span className="font-bold text-gray-700">{enq.score}</span>
+                                    </td>
+                                    <td className="p-[10px] text-gray-450">{delDate}</td>
+                                    <td className="p-[10px] text-right">
+                                      <button
+                                        onClick={() => handleRestoreCibil(enq.id)}
+                                        className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                                      >
+                                        Restore ↺
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Bins: Employees & Advisors */}
+                    <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
+                      <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
+                        👥 Deleted Employees & Advisors ({advisorsTrash.length})
+                      </h4>
+                      <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+                        <table className="w-full text-left text-[11.5px] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-150 text-gray-500 font-bold">
+                              <th className="p-[10px]">Employee Name</th>
+                              <th className="p-[10px]">Fintech ID</th>
+                              <th className="p-[10px]">Designation / Dept</th>
+                              <th className="p-[10px]">Deleted At</th>
+                              <th className="p-[10px] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {advisorsTrash.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-[24px] text-gray-450 italic">
+                                  No deleted employees/advisors in Trash.
+                                </td>
+                              </tr>
+                            ) : (
+                              advisorsTrash.map((adv) => {
+                                const delDate = adv.deleted_at 
+                                  ? new Date(adv.deleted_at).toLocaleString("en-IN") 
+                                  : "-";
+                                return (
+                                  <tr key={adv.f2FintechId || adv.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                    <td className="p-[10px] font-semibold text-gray-850">{adv.name}</td>
+                                    <td className="p-[10px] text-gray-500">{adv.f2FintechId || adv.id}</td>
+                                    <td className="p-[10px] text-gray-650">{adv.designation} ({adv.department || "General"})</td>
+                                    <td className="p-[10px] text-gray-450">{delDate}</td>
+                                    <td className="p-[10px] text-right">
+                                      <button
+                                        onClick={() => handleRestoreAdvisor(adv.f2FintechId || adv.id)}
+                                        className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                                      >
+                                        Restore ↺
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ) : (

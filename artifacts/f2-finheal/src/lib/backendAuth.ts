@@ -807,4 +807,34 @@ export async function checkAdvisorCibilLimit(advisorId: string): Promise<{
   });
 }
 
+export async function fetchCibilTrash(userId: string): Promise<any[]> {
+  const headers: Record<string, string> = {};
+  if (userId) {
+    headers["X-Requester-ID"] = userId;
+  }
+  return authRequest<any[]>("cibil/leads/trash", { 
+    method: "GET",
+    headers
+  });
+}
+
+export async function restoreCibilEnquiry(reportId: string, userId: string): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (userId) {
+    headers["X-Requester-ID"] = userId;
+  }
+  return authRequest<any>(`cibil/leads/${encodeURIComponent(reportId)}/restore`, { 
+    method: "POST",
+    headers
+  });
+}
+
+export async function fetchAdvisorsTrash(): Promise<Advisor[]> {
+  return authRequest<Advisor[]>("advisors/trash", { method: "GET" });
+}
+
+export async function restoreAdvisor(f2FintechId: string): Promise<any> {
+  return authRequest<any>(`advisors/${encodeURIComponent(f2FintechId)}/restore`, { method: "POST" });
+}
+
 
