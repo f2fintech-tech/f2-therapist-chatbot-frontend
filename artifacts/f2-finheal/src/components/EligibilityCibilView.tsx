@@ -484,16 +484,9 @@ export default function EligibilityCibilView({
           const profileData = await profileRes.json();
           const profileInfo = profileData.profile_info || {};
           
-          if (!cibilName && profileInfo.name) setCibilName(profileInfo.name);
-          if (!cibilPhone && profileInfo.phone) setCibilPhone(profileInfo.phone);
-
           // Restore CIBIL from profile
           if (profileData.cibil_report && Object.keys(profileData.cibil_report).length > 0) {
-             setCibilReport(profileData.cibil_report);
              setStoredCibilReport(profileData.cibil_report);
-             if (profileData.cibil_report.pan) {
-               setCibilPan(profileData.cibil_report.pan);
-             }
           }
           
           // Restore BSA from profile
@@ -710,6 +703,7 @@ export default function EligibilityCibilView({
 
     setCibilFetching(true);
     setCibilError(null);
+    setCibilReport(null);
     try {
       const result = await fetchCibilReport(
         userId, 
@@ -749,7 +743,12 @@ export default function EligibilityCibilView({
         headers["X-API-Key"] = configuredApiKey;
       }
       
-      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      const report = cibilReport || storedCibilReport;
+      const fetchUrl = report?.id 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${report.id}`
+        : `${apiBase}/cibil/cam/generate/${userId}`;
+        
+      const res = await fetch(fetchUrl, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
@@ -758,7 +757,6 @@ export default function EligibilityCibilView({
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const report = cibilReport || storedCibilReport;
       const cleanName = report?.name ? report.name.replace(/[^a-zA-Z0-9_]/g, "_") : "User";
       link.setAttribute("href", url);
       link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
@@ -1135,7 +1133,7 @@ export default function EligibilityCibilView({
       <div className="flex h-full w-full items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-[12px]">
           <div className="h-[48px] w-[48px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-[14px] font-medium text-gray-500">Checking stored credit profile...</p>
+          <p className="text-[14px] font-medium text-gray-500">Initializing...</p>
         </div>
       </div>
     );
