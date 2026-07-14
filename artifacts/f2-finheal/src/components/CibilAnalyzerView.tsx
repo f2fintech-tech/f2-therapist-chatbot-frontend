@@ -808,7 +808,7 @@ export default function CibilAnalyzerView({
       <div className="flex h-full w-full items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-[12px]">
           <div className="h-[48px] w-[48px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-[14px] font-medium text-gray-500">Checking stored credit profile...</p>
+          <p className="text-[14px] font-medium text-gray-500">Initializing...</p>
         </div>
       </div>
     );
