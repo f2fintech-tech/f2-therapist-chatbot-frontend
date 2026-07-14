@@ -3902,19 +3902,24 @@ ${sheetDataXml}
                           
                           let displayRole: string = role;
                           if (role === "User") {
-                            if (!enq.fetched_by || enq.fetched_by === "client") {
+                            const fb = enq.fetched_by || "";
+                            const fbLower = fb.toLowerCase().trim();
+                            
+                            if (!fb || fbLower === "client" || fbLower === "user lead") {
                               displayRole = "User (Lead)";
-                            } else if (enq.fetched_by === "admin" || (isAdmin && enq.fetched_by === userId)) {
+                            } else if (fbLower === "admin") {
                               displayRole = "System Admin";
+                            } else if (fb.includes("(") && fb.includes(")")) {
+                              // Extract the name part before parenthetical (e.g. "Puneet Gautam")
+                              displayRole = fb.split(" (")[0];
                             } else {
-                              const fb = (enq.fetched_by || "").toLowerCase();
                               const emp = employees.find((a: any) => 
-                                (a.id || "").toLowerCase() === fb || 
-                                (a.f2FintechId || "").toLowerCase() === fb
+                                (a.id || "").toLowerCase() === fbLower || 
+                                (a.f2FintechId || "").toLowerCase() === fbLower
                               );
                               if (emp) {
                                 displayRole = emp.name;
-                              } else if (enq.fetched_by === enq.user_id) {
+                              } else if (fbLower === enq.user_id.toLowerCase()) {
                                 displayRole = "User (Lead)";
                               } else {
                                 displayRole = "System Admin";
