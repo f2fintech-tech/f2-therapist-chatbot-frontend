@@ -318,6 +318,7 @@ export default function CibilAnalyzerView({
     }
 
     setIsFetching(true);
+    setReport(null);
     try {
       const result = await fetchCibilReport(userId, formName, formPhone, formPan.toUpperCase());
       setReport(result);

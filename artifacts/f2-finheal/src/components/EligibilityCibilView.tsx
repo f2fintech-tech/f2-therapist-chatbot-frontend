@@ -703,6 +703,7 @@ export default function EligibilityCibilView({
 
     setCibilFetching(true);
     setCibilError(null);
+    setCibilReport(null);
     try {
       const result = await fetchCibilReport(
         userId, 
