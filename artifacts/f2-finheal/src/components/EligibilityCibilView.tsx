@@ -742,7 +742,12 @@ export default function EligibilityCibilView({
         headers["X-API-Key"] = configuredApiKey;
       }
       
-      const res = await fetch(`${apiBase}/cibil/cam/generate/${userId}`, { headers });
+      const report = cibilReport || storedCibilReport;
+      const fetchUrl = report?.id 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${report.id}`
+        : `${apiBase}/cibil/cam/generate/${userId}`;
+        
+      const res = await fetch(fetchUrl, { headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
@@ -751,7 +756,6 @@ export default function EligibilityCibilView({
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const report = cibilReport || storedCibilReport;
       const cleanName = report?.name ? report.name.replace(/[^a-zA-Z0-9_]/g, "_") : "User";
       link.setAttribute("href", url);
       link.setAttribute("download", `CAM_Report_${cleanName}.xlsx`);
