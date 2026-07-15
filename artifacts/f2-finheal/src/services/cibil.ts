@@ -3,7 +3,7 @@ import { getStoredAuthSession } from "../utils/authSession";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 const API_KEY = import.meta.env.VITE_API_KEY || "";
 
-function getHeaders(): Record<string, string> {
+function getHeaders(userId?: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -11,8 +11,9 @@ function getHeaders(): Record<string, string> {
     headers["Authorization"] = `Bearer ${API_KEY}`;
   }
   const session = getStoredAuthSession();
-  if (session?.userId) {
-    headers["X-Requester-ID"] = session.userId;
+  const activeUserId = userId || session?.userId;
+  if (activeUserId) {
+    headers["X-Requester-ID"] = activeUserId;
   }
   return headers;
 }
@@ -64,7 +65,7 @@ export async function fetchCibilReport(
 ): Promise<CibilReport> {
   const response = await fetch(`${API_BASE_URL}/cibil/fetch`, {
     method: "POST",
-    headers: getHeaders(),
+    headers: getHeaders(userId),
     body: JSON.stringify({
       user_id: userId,
       name,
@@ -94,7 +95,7 @@ export async function fetchCibilReport(
 export async function getStoredCibilReport(userId: string): Promise<CibilReport> {
   const response = await fetch(`${API_BASE_URL}/cibil/report/${userId}`, {
     method: "GET",
-    headers: getHeaders(),
+    headers: getHeaders(userId),
   });
 
   if (!response.ok) {
