@@ -918,10 +918,11 @@ export default function Dashboard({
     return false;
   };
 
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
   const authSession = getStoredAuthSession();
   const userEmail = authSession?.email;
   const isAdvisor = isUserAdvisor(userEmail);
-  const isStaff = isAdvisor || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+  const isStaff = isAdvisor || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
   // Admin stats states
@@ -1756,7 +1757,7 @@ ${sheetDataXml}
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
-    ...(!isAdmin ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
+    ...(!isStaff ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "reports", label: "Reports", icon: "📈" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
@@ -3137,7 +3138,7 @@ ${sheetDataXml}
         )}
 
         {/* ══ LOANS TAB ══ */}
-        {activeTab === "loans" && (
+        {activeTab === "loans" && !isStaff && (
           <div className="flex flex-col gap-6">
             {cibilReport && (
               <div className="bg-blue-50/50 dark:bg-slate-900/40 border border-blue-100 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mb-2 animate-fade-up">
