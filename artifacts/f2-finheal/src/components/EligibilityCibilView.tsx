@@ -1190,53 +1190,55 @@ export default function EligibilityCibilView({
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-[16px] py-[18px] sm:px-[20px] sm:py-[22px]">
         
         {/* CIBIL / Eligibility Tab Switcher */}
-        <div className="flex gap-2 border-b border-gray-150 pb-3 mb-5 cibil-print-hide">
-          <button
-            type="button"
-            onClick={() => setCibilSubTab("eligibility")}
-            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              cibilSubTab === "eligibility"
-                ? "bg-primary text-white shadow-md"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            <span>Eligibility Checker</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCibilSubTab("cibil")}
-            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              cibilSubTab === "cibil"
-                ? "bg-primary text-white shadow-md"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <ShieldCheck className="h-4 w-4 shrink-0" />
-            <span>CIBIL Score Checker</span>
-          </button>
-          {hasCibilViewPermission && (
+        <div className="border-b border-gray-150 pb-3 mb-6 cibil-print-hide">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
             <button
               type="button"
-              onClick={() => onOpenAdmin?.("cibil-enquiries")}
-              className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+              onClick={() => setCibilSubTab("eligibility")}
+              className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                cibilSubTab === "eligibility"
+                  ? "bg-primary text-white shadow-md border border-transparent"
+                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+              }`}
             >
-              <FileText className="h-4 w-4 shrink-0" />
-              <span>Past Reports fetched</span>
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              <span>Eligibility Checker</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setCibilSubTab("bsa")}
-            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              cibilSubTab === "bsa"
-                ? "bg-primary text-white shadow-md"
-                : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span>Bank Statement Analyzer</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setCibilSubTab("cibil")}
+              className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                cibilSubTab === "cibil"
+                  ? "bg-primary text-white shadow-md border border-transparent"
+                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <span>CIBIL Score Checker</span>
+            </button>
+            {hasCibilViewPermission && (
+              <button
+                type="button"
+                onClick={() => onOpenAdmin?.("cibil-enquiries")}
+                className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+              >
+                <FileText className="h-4 w-4 shrink-0" />
+                <span>Past Reports fetched</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCibilSubTab("bsa")}
+              className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                cibilSubTab === "bsa"
+                  ? "bg-primary text-white shadow-md border border-transparent"
+                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>Bank Statement Analyzer</span>
+            </button>
+          </div>
         </div>
 
         {/* ----------------- ELIGIBILITY CHECKER SUBTAB ----------------- */}
@@ -2662,7 +2664,7 @@ export default function EligibilityCibilView({
 
       {/* ----------------- BANK STATEMENT ANALYZER (BSA) SUBTAB ----------------- */}
       {cibilSubTab === "bsa" && (
-        <div className="animate-fade-up max-w-[500px] mx-auto my-6 flex flex-col gap-6">
+        <div className="animate-fade-up max-w-[500px] mx-auto mt-0 mb-6 h-fit flex flex-col gap-6">
           
           {/* Card 1: Upload Box */}
           <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center">
@@ -2810,6 +2812,19 @@ export default function EligibilityCibilView({
                   <p className="text-[12px] text-gray-500">Retrieving secure Excel link...</p>
                 )}
               </div>
+            ) : bsaUploading ? (
+              <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                <div>
+                  <h3 className="text-[14px] font-extrabold text-indigo-900">Analysis In Progress</h3>
+                  <p className="text-[11.5px] text-indigo-500 mt-1.5 max-w-[340px] leading-normal font-medium font-sans">
+                    FinEye is parsing transaction records, verifying salary income, and compiling your cashflow indicators. This may take up to 15 minutes for larger statements.
+                  </p>
+                </div>
+              </div>
+            ) : selectedBsaFile ? (
+              // Hide the card completely when a statement is selected but not yet analyzed
+              null
             ) : (
               <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
                 <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">

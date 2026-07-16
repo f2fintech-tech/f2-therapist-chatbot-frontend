@@ -355,8 +355,9 @@ export default function CibilAnalyzerView({
         headers["X-API-Key"] = configuredApiKey;
       }
       
-      const requestUrl = reportId 
-        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
+      const activeReportId = (report && report.id) ? report.id : reportId;
+      const requestUrl = activeReportId 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${activeReportId}`
         : `${apiBase}/cibil/cam/generate/${userId}`;
 
       const res = await fetch(requestUrl, { headers });
@@ -1222,8 +1223,41 @@ export default function CibilAnalyzerView({
                   </label>
                 )}
                 {bsaError && (
-                  <div className="mt-1 flex items-center gap-1 text-[10.5px] text-rose-500 font-medium text-center justify-center w-full">
-                    <AlertTriangle className="h-3 w-3 shrink-0" /> {bsaError}
+                  <div className="mt-3 p-2.5 rounded-lg bg-rose-50 border border-rose-100 flex items-start gap-2 text-rose-700 text-left w-full shadow-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 text-[10.5px] leading-relaxed">
+                      <span className="font-semibold text-rose-800">Error:</span>{" "}
+                      {(() => {
+                        if (bsaError.includes("{")) {
+                          const parts = bsaError.split("{");
+                          const prefix = parts[0].trim();
+                          const jsonStr = "{" + parts.slice(1).join("{");
+                          try {
+                            const parsed = JSON.parse(jsonStr);
+                            const errMsg = parsed.message || parsed.detail || "Details in JSON log below";
+                            return (
+                              <>
+                                <span>{prefix.replace("Here is exactly what FinEye sent back:", "")}</span>
+                                <div className="mt-1 font-semibold text-rose-900">
+                                  Reason: {errMsg}
+                                </div>
+                                <details className="mt-1.5 cursor-pointer">
+                                  <summary className="text-[9.5px] font-bold text-rose-500 hover:text-rose-600 select-none">
+                                    View details
+                                  </summary>
+                                  <pre className="mt-1 bg-white/70 p-1.5 rounded border border-rose-100/80 overflow-x-auto font-mono text-[8.5px] text-rose-600 leading-normal max-h-[80px]">
+                                    {JSON.stringify(parsed, null, 2)}
+                                  </pre>
+                                </details>
+                              </>
+                            );
+                          } catch (e) {
+                            return <span>{bsaError}</span>;
+                          }
+                        }
+                        return <span>{bsaError}</span>;
+                      })()}
+                    </div>
                   </div>
                 )}
 

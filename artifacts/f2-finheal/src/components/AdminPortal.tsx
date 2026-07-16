@@ -420,6 +420,13 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
   
+  // CIBIL Enquiry Deletion Modal States
+  const [cibilDeleteConfirmOpen, setCibilDeleteConfirmOpen] = useState(false);
+  const [cibilToDelete, setCibilToDelete] = useState<string | null>(null);
+  const [isDeletingCibil, setIsDeletingCibil] = useState(false);
+  const [cibilDeleteResult, setCibilDeleteResult] = useState<string | null>(null);
+  const [animatingCibilRows, setAnimatingCibilRows] = useState<string[]>([]);
+  
   // Department Renaming Modal States
   const [renameDeptModalOpen, setRenameDeptModalOpen] = useState(false);
   const [renameOldDept, setRenameOldDept] = useState("");
@@ -1222,11 +1229,15 @@ ${sheetDataXml}
     }
   };
 
-  const handleDeleteEnquiry = async (reportId: string) => {
-    if (!window.confirm("Are you sure you want to move this enquiry to trash? It can be restored within 3 days before it is permanently deleted.")) {
-      return;
-    }
+  const handleDeleteEnquiry = (reportId: string) => {
+    setCibilToDelete(reportId);
+    setCibilDeleteConfirmOpen(true);
+  };
 
+  const executeDeleteCibil = async () => {
+    if (!cibilToDelete) return;
+    setIsDeletingCibil(true);
+    
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
       const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
@@ -1241,21 +1252,23 @@ ${sheetDataXml}
         headers["X-Requester-ID"] = userId;
       }
 
-      const res = await fetch(`${apiBase}/cibil/leads/${reportId}`, {
+      const res = await fetch(`${apiBase}/cibil/leads/${cibilToDelete}`, {
         method: "DELETE",
         headers,
       });
 
       if (res.ok) {
-        alert("Enquiry deleted successfully.");
-        fetchCibilEnquiries(); // Refresh the table
+        setCibilDeleteResult("Enquiry moved to trash.");
+        // We will fetchCibilEnquiries after the user clicks OK to allow the animation to play
       } else {
         const errData = await res.json();
-        alert(errData.detail || "Failed to delete the credit report.");
+        setCibilDeleteResult(errData.detail || "Failed to delete the credit report.");
       }
     } catch (err: any) {
       console.error("Error deleting enquiry:", err);
-      alert("Error: " + (err.message || "An unexpected error occurred."));
+      setCibilDeleteResult("Error: " + (err.message || "An unexpected error occurred."));
+    } finally {
+      setIsDeletingCibil(false);
     }
   };
 
@@ -3867,7 +3880,7 @@ ${sheetDataXml}
                           }
 
                           return (
-                            <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                            <tr key={enq.id} className={`border-b border-gray-100 hover:bg-gray-50/50 transition-all duration-500 ease-in-out ${animatingCibilRows.includes(enq.id) ? "opacity-0 -translate-x-full scale-95" : ""}`}>
                               <td className="p-[12px] max-w-[220px] break-words">
                                 <strong className="text-gray-900 block">{enq.name}</strong>
                                 {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
@@ -4041,8 +4054,9 @@ ${sheetDataXml}
                               </tr>
                             ) : (
                               cibilTrash.map((enq) => {
-                                const delDate = enq.deleted_at 
-                                  ? new Date(enq.deleted_at).toLocaleString("en-IN") 
+                                const utcStr = enq.deleted_at ? (enq.deleted_at.endsWith("Z") || enq.deleted_at.includes("+") ? enq.deleted_at : `${enq.deleted_at}Z`) : "";
+                                const delDate = utcStr 
+                                  ? new Date(utcStr).toLocaleString("en-IN") 
                                   : "-";
                                 return (
                                   <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
@@ -4094,8 +4108,9 @@ ${sheetDataXml}
                               </tr>
                             ) : (
                               advisorsTrash.map((adv) => {
-                                const delDate = adv.deleted_at 
-                                  ? new Date(adv.deleted_at).toLocaleString("en-IN") 
+                                const utcStr = adv.deleted_at ? (adv.deleted_at.endsWith("Z") || adv.deleted_at.includes("+") ? adv.deleted_at : `${adv.deleted_at}Z`) : "";
+                                const delDate = utcStr 
+                                  ? new Date(utcStr).toLocaleString("en-IN") 
                                   : "-";
                                 return (
                                   <tr key={adv.f2FintechId || adv.id} className="border-b border-gray-100 hover:bg-gray-50/50">
@@ -5012,7 +5027,7 @@ ${sheetDataXml}
                               const role = classifyEnquiryRole(enq.email, enq.name, advisors);
 
                               return (
-                                <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                <tr key={enq.id} className={`border-b border-gray-100 hover:bg-gray-50/50 transition-all duration-500 ease-in-out ${animatingCibilRows.includes(enq.id) ? "opacity-0 -translate-x-full scale-95" : ""}`}>
                                   <td className="p-[12px] max-w-[220px] break-words">
                                     <strong className="text-gray-900 block">{enq.name}</strong>
                                     {enq.email && <span className="text-[10px] text-gray-400 block">{enq.email}</span>}
@@ -6554,6 +6569,95 @@ ${sheetDataXml}
                 onToggleSidebar={() => {}} 
                 onToggleInsights={() => {}} 
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DELETE CIBIL ENQUIRY CONFIRMATION MODAL ============ */}
+      {cibilDeleteConfirmOpen && cibilToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[420px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col animate-scale-up transition-all duration-500">
+
+            <div className={`flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] transition-colors duration-500 ${cibilDeleteResult ? (cibilDeleteResult.includes("Error") || cibilDeleteResult.includes("Failed") ? 'bg-rose-50/50' : 'bg-emerald-50/50') : 'bg-amber-50/50'}`}>
+              <h3 className={`text-[14px] font-bold flex items-center gap-[8px] transition-colors duration-500 ${cibilDeleteResult ? (cibilDeleteResult.includes("Error") || cibilDeleteResult.includes("Failed") ? 'text-rose-950' : 'text-emerald-950') : 'text-amber-950'}`}>
+                {cibilDeleteResult ? (
+                  <span className="animate-scale-up inline-flex items-center gap-2">
+                    {cibilDeleteResult.includes("Error") || cibilDeleteResult.includes("Failed") ? '❌ Error' : '✅ Success'}
+                  </span>
+                ) : '⚠️ Move to Trash'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setCibilDeleteConfirmOpen(false);
+                  setCibilToDelete(null);
+                  setCibilDeleteResult(null);
+                }} 
+                className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-[22px] space-y-[14px]">
+              <p className="text-[13px] leading-relaxed text-gray-700 min-h-[40px] flex items-center relative overflow-hidden">
+                {cibilDeleteResult ? (
+                  <span className="block animate-fade-in absolute w-full">{cibilDeleteResult}</span>
+                ) : (
+                  <span className="block transition-opacity duration-300">Are you sure you want to move this enquiry to trash? It can be restored within 3 days before it is permanently deleted.</span>
+                )}
+              </p>
+            </div>
+
+            <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px] transition-all duration-500">
+              {cibilDeleteResult ? (
+                <button
+                  onClick={() => {
+                    const idToAnimate = cibilToDelete;
+                    setCibilDeleteConfirmOpen(false);
+                    setCibilToDelete(null);
+                    setCibilDeleteResult(null);
+                    
+                    if (idToAnimate && !cibilDeleteResult.includes("Error") && !cibilDeleteResult.includes("Failed")) {
+                      setAnimatingCibilRows(prev => [...prev, idToAnimate]);
+                      setTimeout(() => {
+                        fetchCibilEnquiries();
+                        setAnimatingCibilRows(prev => prev.filter(id => id !== idToAnimate));
+                      }, 400);
+                    } else {
+                      fetchCibilEnquiries();
+                    }
+                  }}
+                  className="flex-1 py-[11px] bg-gray-900 text-white font-bold rounded-[12px] text-[13px] hover:bg-gray-800 transition-all active:scale-[0.98] cursor-pointer shadow-md animate-fade-in"
+                >
+                  OK
+                </button>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => {
+                      setCibilDeleteConfirmOpen(false);
+                      setCibilToDelete(null);
+                    }} 
+                    className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[13px] font-bold text-gray-700 hover:bg-gray-100 transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={executeDeleteCibil}
+                    disabled={isDeletingCibil}
+                    className="flex-1 py-[11px] bg-amber-500 text-white font-bold rounded-[12px] text-[13px] hover:bg-amber-600 disabled:opacity-80 disabled:cursor-not-allowed transition-all active:scale-[0.98] cursor-pointer shadow-md flex items-center justify-center gap-[8px]"
+                  >
+                    {isDeletingCibil && (
+                      <svg className="animate-spin h-[14px] w-[14px] text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                    {isDeletingCibil ? "Moving..." : "OK"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

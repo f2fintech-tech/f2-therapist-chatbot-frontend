@@ -79,9 +79,8 @@ function StatCard({ icon, label, value, sub, color, delay = 0, onClick, classNam
         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right flex-1 min-w-0">{label}</span>
       </div>
       <div>
-        <div className={`font-sans font-bold text-gray-900 leading-tight tracking-tight ${
-          value && value.length > 15 ? 'text-[18px]' : value && value.length > 8 ? 'text-[21px]' : 'text-[24px]'
-        }`}>{value}</div>
+        <div className={`font-sans font-bold text-gray-900 leading-tight tracking-tight ${value && value.length > 15 ? 'text-[18px]' : value && value.length > 8 ? 'text-[21px]' : 'text-[24px]'
+          }`}>{value}</div>
         {sub && <div className="text-[10.5px] text-gray-400 mt-1">{sub}</div>}
       </div>
     </div>
@@ -551,13 +550,13 @@ export default function Dashboard({
   try {
     const rawRead = localStorage.getItem(`finheal_edu_read:${userId}`);
     if (rawRead) articlesCount = Math.max(articlesCount, JSON.parse(rawRead).length);
-  } catch {}
+  } catch { }
 
   let videosCount = dashboardSummary?.education?.videos_watched_count ?? 0;
   try {
     const rawWatched = localStorage.getItem(`finheal_watched:${userId}`);
     if (rawWatched) videosCount = Math.max(videosCount, JSON.parse(rawWatched).length);
-  } catch {}
+  } catch { }
 
   let shortsCount = 0;
   try {
@@ -567,7 +566,7 @@ export default function Dashboard({
     } else {
       shortsCount = (articlesCount > 0 || videosCount > 0) ? 2 : 0;
     }
-  } catch {}
+  } catch { }
 
   useEffect(() => {
     let active = true;
@@ -919,10 +918,11 @@ export default function Dashboard({
     return false;
   };
 
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
   const authSession = getStoredAuthSession();
   const userEmail = authSession?.email;
   const isAdvisor = isUserAdvisor(userEmail);
-  const isStaff = isAdvisor || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()));
+  const isStaff = isAdvisor || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
 
   // Admin stats states
@@ -935,11 +935,11 @@ export default function Dashboard({
     // Read local education items managed by Admin
     const storedContent = localStorage.getItem("finheal_education_content");
     const eduList = storedContent ? JSON.parse(storedContent) : null;
-    const articlesActive = eduList 
-      ? eduList.filter((c: any) => c.type === "article").length 
+    const articlesActive = eduList
+      ? eduList.filter((c: any) => c.type === "article").length
       : CONTENT.filter(c => c.type === "article").length;
-    const videosActive = eduList 
-      ? eduList.filter((c: any) => c.type === "video").length 
+    const videosActive = eduList
+      ? eduList.filter((c: any) => c.type === "video").length
       : CONTENT.filter(c => c.type === "video").length;
 
     // Read tests count dynamically from backend stats
@@ -1442,7 +1442,7 @@ export default function Dashboard({
 
   // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
   const userEnquiries = cibilEnquiries.filter(enq => {
-    const isFetchedByStaff = 
+    const isFetchedByStaff =
       (enq.fetched_by && (
         enq.fetched_by === "admin" ||
         enq.fetched_by === "superadmin" ||
@@ -1451,7 +1451,7 @@ export default function Dashboard({
       )) ||
       isUserAdvisor(enq.email) ||
       (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"));
-    
+
     return !isFetchedByStaff;
   });
 
@@ -1620,7 +1620,7 @@ export default function Dashboard({
 
     const generateWorksheetXml = (dataList: typeof exportData) => {
       let sheetDataXml = "";
-      
+
       // Header row
       sheetDataXml += `    <row r="1" spans="1:4">\n`;
       const headers = ["Employee Name", "Designation", "Department", "Reports Fetched"];
@@ -1629,19 +1629,19 @@ export default function Dashboard({
         sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
       });
       sheetDataXml += `    </row>\n`;
-      
+
       // Data rows
       dataList.forEach((row, rowIdx) => {
         const rowIndex = rowIdx + 2;
         sheetDataXml += `    <row r="${rowIndex}" spans="1:4">\n`;
-        
+
         const fields = [
           row.name,
           row.designation,
           row.department,
           String(row.count)
         ];
-        
+
         fields.forEach((val, colIdx) => {
           const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
           const isNumber = colIdx === 3 && !isNaN(Number(val));
@@ -1651,17 +1651,17 @@ export default function Dashboard({
             sheetDataXml += `      <c r="${r}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>\n`;
           }
         });
-        
+
         sheetDataXml += `    </row>\n`;
       });
-      
+
       let colsXml = "  <cols>\n";
       colsXml += `    <col min="1" max="1" width="25" customWidth="1"/>\n`; // Name
       colsXml += `    <col min="2" max="2" width="25" customWidth="1"/>\n`; // Designation
       colsXml += `    <col min="3" max="3" width="22" customWidth="1"/>\n`; // Department
       colsXml += `    <col min="4" max="4" width="18" customWidth="1"/>\n`; // Reports Fetched
       colsXml += "  </cols>\n";
-      
+
       return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <dimension ref="A1:D${dataList.length + 1}"/>
@@ -1757,7 +1757,7 @@ ${sheetDataXml}
 
   const tabs = [
     { key: "overview", label: "Overview", icon: "📊" },
-    ...(!isAdmin ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
+    ...(!isStaff ? [{ key: "loans", label: "Loans", icon: "💳" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "reports", label: "Reports", icon: "📈" }] : []),
     ...(!isAdvisor && !isAdmin ? [{ key: "advisor", label: "Advisors", icon: "🧑‍💼" }] : []),
   ];
@@ -1908,7 +1908,7 @@ ${sheetDataXml}
                   const testsCount = backendStats?.consumption?.tests ?? 16;
                   const topCategory = backendStats?.top_category ?? "Money IQ";
                   const riskMixPct = backendStats?.risk_mix_pct ?? 12;
-                  
+
                   let tierLabel = "Good Health";
                   let tierColorClass = "bg-emerald-100 text-emerald-800";
                   if (avgScore >= 81) {
@@ -1934,7 +1934,7 @@ ${sheetDataXml}
                           🏆 Platform Wellness Average
                         </h3>
                         <p className="text-[12px] text-gray-500 mb-[16px]">Current aggregated score based on all registered user tests.</p>
-                        
+
                         <div className="flex items-end gap-[10px] mb-[12px]">
                           <div className="text-[54px] font-serif font-bold text-primary leading-none">{avgScore}</div>
                           <div className="text-[16px] text-gray-400 pb-[6px]">/ 100</div>
@@ -1973,28 +1973,26 @@ ${sheetDataXml}
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
                         📊 {selectedBureauTab === "cibil" ? "CIBIL" : "Experian"} Score Band Distribution
                       </h3>
-                      
+
                       {/* Premium Tab Toggles */}
                       <div className="flex bg-gray-100 p-0.5 rounded-[8px] border border-gray-150 shrink-0">
                         <button
                           type="button"
                           onClick={() => setSelectedBureauTab("cibil")}
-                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
-                            selectedBureauTab === "cibil"
-                              ? "bg-white text-gray-900 shadow-xs"
-                              : "text-gray-500 hover:text-gray-800"
-                          }`}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${selectedBureauTab === "cibil"
+                            ? "bg-white text-gray-900 shadow-xs"
+                            : "text-gray-500 hover:text-gray-800"
+                            }`}
                         >
                           CIBIL ({cibilOnlyEnquiries.length})
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedBureauTab("experian")}
-                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${
-                            selectedBureauTab === "experian"
-                              ? "bg-white text-gray-900 shadow-xs"
-                              : "text-gray-500 hover:text-gray-800"
-                          }`}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${selectedBureauTab === "experian"
+                            ? "bg-white text-gray-900 shadow-xs"
+                            : "text-gray-500 hover:text-gray-800"
+                            }`}
                         >
                           Experian ({experianOnlyEnquiries.length})
                         </button>
@@ -2165,7 +2163,7 @@ ${sheetDataXml}
                                 </PieChart>
                               </ResponsiveContainer>
                             </div>
-                            
+
                             {/* Legend Panel */}
                             <div className="w-[48%] space-y-1.5 text-[10.5px]">
                               {data.map((item, idx) => {
@@ -2173,8 +2171,8 @@ ${sheetDataXml}
                                 return (
                                   <div key={idx} className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5 text-gray-500 font-medium">
-                                      <span 
-                                        className="h-2 w-2 rounded-full shrink-0" 
+                                      <span
+                                        className="h-2 w-2 rounded-full shrink-0"
                                         style={{ backgroundColor: item.color }}
                                       />
                                       <span className="truncate max-w-[70px]">{item.name.split(" ")[0]}</span>
@@ -2311,138 +2309,138 @@ ${sheetDataXml}
                 </div>
               </div>
 
-            {/* CIBIL Report Fetch Summary Card */}
-            <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[16px]">
-                  <div>
-                    <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
-                      📋 CIBIL Report Fetch Summary
-                    </h3>
-                    <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
+              {/* CIBIL Report Fetch Summary Card */}
+              <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
+                <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[16px]">
+                    <div>
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                        📋 CIBIL Report Fetch Summary
+                      </h3>
+                      <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
+                    </div>
+
+                    {/* Department Dropdown Filter */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
+                      <select
+                        value={summaryDeptFilter}
+                        onChange={(e) => setSummaryDeptFilter(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Departments</option>
+                        <option value="users">Users</option>
+                        {uniqueDepartments.map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleExportSummaryExcel}
+                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1 shrink-0 ml-1"
+                        title="Export CIBIL Fetch Summary to Excel (.xlsx)"
+                      >
+                        📥 Export Excel
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Department Dropdown Filter */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
-                    <select
-                      value={summaryDeptFilter}
-                      onChange={(e) => setSummaryDeptFilter(e.target.value)}
-                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                    >
-                      <option value="all">All Departments</option>
-                      <option value="users">Users</option>
-                      {uniqueDepartments.map((dept) => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleExportSummaryExcel}
-                      className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1 shrink-0 ml-1"
-                      title="Export CIBIL Fetch Summary to Excel (.xlsx)"
-                    >
-                      📥 Export Excel
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[12px] text-left text-gray-500 border-collapse">
-                    <thead className="text-[10px] text-gray-450 uppercase bg-gray-50/50 rounded-lg">
-                      <tr>
-                        <th scope="col" className="px-3 py-2 font-bold rounded-l-lg">
-                          {summaryDeptFilter === "users" ? "User" : "Employee"}
-                        </th>
-                        <th scope="col" className="px-3 py-2 font-bold">Designation</th>
-                        <th scope="col" className="px-3 py-2 font-bold">Department</th>
-                        <th scope="col" className="px-3 py-2 font-bold text-right rounded-r-lg">Reports Fetched</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {summaryDeptFilter === "users" ? (
-                        userRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="text-center p-6 text-gray-400">
-                              No user CIBIL enquiries found.
-                            </td>
-                          </tr>
-                        ) : (
-                          userRows.map((user) => (
-                            <tr key={user.email || user.phone} className="hover:bg-gray-50/60 transition-colors">
-                              <td className="px-3 py-2.5">
-                                <div className="font-semibold text-gray-900">{user.name}</div>
-                                {user.email && <div className="text-[10px] text-gray-400 font-medium">{user.email}</div>}
-                              </td>
-                              <td className="px-3 py-2.5 text-gray-600 font-medium">
-                                Client
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
-                                  User Base
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-right font-bold text-gray-950">
-                                {user.count}
-                              </td>
-                            </tr>
-                          ))
-                        )
-                      ) : (
-                        <>
-                          {summaryDeptFilter === "all" && (
-                            <tr className="bg-primary/5 hover:bg-primary/10 transition-colors font-semibold border-b border-primary/10">
-                              <td className="px-3 py-2.5">
-                                <div className="font-bold text-primary">System Admin 📌</div>
-                              </td>
-                              <td className="px-3 py-2.5 text-primary font-bold">
-                                Platform Administrator
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className="bg-primary text-white px-2 py-0.5 rounded text-[10.5px] font-bold">
-                                  Founder's Office
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-right font-bold text-primary">
-                                {adminFetchCount}
-                              </td>
-                            </tr>
-                          )}
-                          {filteredEmployeesSummary.length === 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[12px] text-left text-gray-500 border-collapse">
+                      <thead className="text-[10px] text-gray-450 uppercase bg-gray-50/50 rounded-lg">
+                        <tr>
+                          <th scope="col" className="px-3 py-2 font-bold rounded-l-lg">
+                            {summaryDeptFilter === "users" ? "User" : "Employee"}
+                          </th>
+                          <th scope="col" className="px-3 py-2 font-bold">Designation</th>
+                          <th scope="col" className="px-3 py-2 font-bold">Department</th>
+                          <th scope="col" className="px-3 py-2 font-bold text-right rounded-r-lg">Reports Fetched</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {summaryDeptFilter === "users" ? (
+                          userRows.length === 0 ? (
                             <tr>
                               <td colSpan={4} className="text-center p-6 text-gray-400">
-                                No employees found in this department.
+                                No user CIBIL enquiries found.
                               </td>
                             </tr>
                           ) : (
-                            filteredEmployeesSummary.map((emp) => (
-                              <tr key={emp.id || emp.f2FintechId || emp.name} className="hover:bg-gray-50/60 transition-colors">
+                            userRows.map((user) => (
+                              <tr key={user.email || user.phone} className="hover:bg-gray-50/60 transition-colors">
                                 <td className="px-3 py-2.5">
-                                  <div className="font-semibold text-gray-900">{emp.name}</div>
+                                  <div className="font-semibold text-gray-900">{user.name}</div>
+                                  {user.email && <div className="text-[10px] text-gray-400 font-medium">{user.email}</div>}
                                 </td>
                                 <td className="px-3 py-2.5 text-gray-600 font-medium">
-                                  {emp.designation || "Employee"}
+                                  Client
                                 </td>
                                 <td className="px-3 py-2.5">
-                                  <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
-                                    {emp.department}
+                                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                    User Base
                                   </span>
                                 </td>
                                 <td className="px-3 py-2.5 text-right font-bold text-gray-950">
-                                  {getEmployeeReportCount(emp)}
+                                  {user.count}
                                 </td>
                               </tr>
                             ))
-                          )}
-                        </>
-                      )}
-                    </tbody>
-                  </table>
+                          )
+                        ) : (
+                          <>
+                            {summaryDeptFilter === "all" && (
+                              <tr className="bg-primary/5 hover:bg-primary/10 transition-colors font-semibold border-b border-primary/10">
+                                <td className="px-3 py-2.5">
+                                  <div className="font-bold text-primary">System Admin 📌</div>
+                                </td>
+                                <td className="px-3 py-2.5 text-primary font-bold">
+                                  Platform Administrator
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className="bg-primary text-white px-2 py-0.5 rounded text-[10.5px] font-bold">
+                                    Founder's Office
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-right font-bold text-primary">
+                                  {adminFetchCount}
+                                </td>
+                              </tr>
+                            )}
+                            {filteredEmployeesSummary.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="text-center p-6 text-gray-400">
+                                  No employees found in this department.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredEmployeesSummary.map((emp) => (
+                                <tr key={emp.id || emp.f2FintechId || emp.name} className="hover:bg-gray-50/60 transition-colors">
+                                  <td className="px-3 py-2.5">
+                                    <div className="font-semibold text-gray-900">{emp.name}</div>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-gray-600 font-medium">
+                                    {emp.designation || "Employee"}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
+                                      {emp.department}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right font-bold text-gray-950">
+                                    {getEmployeeReportCount(emp)}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
 
-          </div>
-        ) : isAdvisor ? (
+            </div>
+          ) : isAdvisor ? (
             <div className="flex flex-col gap-6">
               {/* Advisor KPI row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2817,7 +2815,7 @@ ${sheetDataXml}
                           };
                           const testId = dashboardSummary.tests.recommended_test_id;
                           const testName = TEST_NAMES[testId] || testId.replace(/_|-/g, " ");
-                          
+
                           const handleLaunchTest = () => {
                             if (typeof window === "undefined") return;
                             const nextUrl = new URL(window.location.href);
@@ -3140,7 +3138,7 @@ ${sheetDataXml}
         )}
 
         {/* ══ LOANS TAB ══ */}
-        {activeTab === "loans" && (
+        {activeTab === "loans" && !isStaff && (
           <div className="flex flex-col gap-6">
             {cibilReport && (
               <div className="bg-blue-50/50 dark:bg-slate-900/40 border border-blue-100 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mb-2 animate-fade-up">
@@ -3347,11 +3345,10 @@ ${sheetDataXml}
                           <button
                             onClick={handleGenerate}
                             disabled={generatingReport}
-                            className={`w-full md:w-auto text-[11px] font-bold px-5 py-2.5 rounded-xl text-white shadow-md transition-all cursor-pointer ${
-                              generatingReport
-                                ? "bg-primary/50 cursor-wait"
-                                : "bg-primary hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]"
-                            }`}
+                            className={`w-full md:w-auto text-[11px] font-bold px-5 py-2.5 rounded-xl text-white shadow-md transition-all cursor-pointer ${generatingReport
+                              ? "bg-primary/50 cursor-wait"
+                              : "bg-primary hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98]"
+                              }`}
                           >
                             {generatingReport ? "🔮 Generating..." : "⚙️ Generate Fresh Report"}
                           </button>
@@ -3403,13 +3400,13 @@ ${sheetDataXml}
                           try {
                             const html2canvas = (await import("html2canvas-pro")).default;
                             const { jsPDF } = await import("jspdf");
-                            
+
                             const page1El = document.getElementById("therapy-report-page-1");
                             const page2El = document.getElementById("therapy-report-page-2");
                             if (!page1El || !page2El) return;
-                            
+
                             const pdf = new jsPDF("p", "mm", "a4");
-                            
+
                             // Render Page 1
                             const originalWidth1 = page1El.style.width;
                             const originalMaxWidth1 = page1El.style.maxWidth;
@@ -3417,18 +3414,18 @@ ${sheetDataXml}
                             page1El.style.width = "794px";
                             page1El.style.maxWidth = "794px";
                             page1El.style.padding = "30px";
-                            
+
                             const canvas1 = await html2canvas(page1El, {
                               scale: 2,
                               useCORS: true,
                               allowTaint: true,
                               backgroundColor: "#ffffff"
                             });
-                            
+
                             page1El.style.width = originalWidth1;
                             page1El.style.maxWidth = originalMaxWidth1;
                             page1El.style.padding = originalPadding1;
-                            
+
                             // Render Page 2
                             const originalWidth2 = page2El.style.width;
                             const originalMaxWidth2 = page2El.style.maxWidth;
@@ -3436,29 +3433,29 @@ ${sheetDataXml}
                             page2El.style.width = "794px";
                             page2El.style.maxWidth = "794px";
                             page2El.style.padding = "30px";
-                            
+
                             const canvas2 = await html2canvas(page2El, {
                               scale: 2,
                               useCORS: true,
                               allowTaint: true,
                               backgroundColor: "#ffffff"
                             });
-                            
+
                             page2El.style.width = originalWidth2;
                             page2El.style.maxWidth = originalMaxWidth2;
                             page2El.style.padding = originalPadding2;
-                            
+
                             const imgWidth = 210;
-                            
+
                             // Add Page 1
                             const imgHeight1 = (canvas1.height * imgWidth) / canvas1.width;
                             pdf.addImage(canvas1.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight1);
-                            
+
                             // Add Page 2
                             pdf.addPage();
                             const imgHeight2 = (canvas2.height * imgWidth) / canvas2.width;
                             pdf.addImage(canvas2.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight2);
-                            
+
                             pdf.save(`FinHeal_Therapy_Report_${new Date(activeReport.startDate).toLocaleDateString().replace(/\//g, "-")}.pdf`);
                           } catch (err) {
                             console.error("PDF export failed:", err);
@@ -3476,7 +3473,7 @@ ${sheetDataXml}
 
                     {/* PDF Export Wrapper */}
                     <div id="therapy-report-document-body" className="bg-white border border-gray-100 rounded-2xl overflow-hidden text-left">
-                      
+
                       {/* PAGE 1: Header, Analysis, Activity Log, Strengths & Weaknesses */}
                       <div id="therapy-report-page-1" className="p-5 space-y-5">
                         <div className="border-b border-gray-100 pb-3 flex justify-between items-end">
@@ -3512,7 +3509,7 @@ ${sheetDataXml}
                               <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
                                 Period Activity Log
                               </span>
-                              
+
                               {(() => {
                                 const chartData = [
                                   { name: "Chats", value: activeReport.activitySummary?.msg_count || 0, color: "#8b5cf6" },
@@ -3667,7 +3664,7 @@ ${sheetDataXml}
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-3 block">
                             📈 Historical Progress & Report Timeline
                           </span>
-                          
+
                           {(() => {
                             const dateCounts: { [key: string]: number } = {};
                             reportsList.forEach(r => {
