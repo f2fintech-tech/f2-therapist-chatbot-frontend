@@ -355,8 +355,9 @@ export default function CibilAnalyzerView({
         headers["X-API-Key"] = configuredApiKey;
       }
       
-      const requestUrl = reportId 
-        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
+      const activeReportId = (report && report.id) ? report.id : reportId;
+      const requestUrl = activeReportId 
+        ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${activeReportId}`
         : `${apiBase}/cibil/cam/generate/${userId}`;
 
       const res = await fetch(requestUrl, { headers });
