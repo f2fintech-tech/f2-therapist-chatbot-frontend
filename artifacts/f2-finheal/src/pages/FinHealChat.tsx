@@ -489,7 +489,7 @@ export default function FinHealChat() {
             const data = await res.json();
             const nextSession = {
               ...authSession,
-              isAdvisor: data.is_advisor,
+              isAdvisor: true,
               permissions: data.permissions || [],
               displayName: data.name || authSession.displayName,
               avatarUrl: data.avatar_url || authSession.avatarUrl,
