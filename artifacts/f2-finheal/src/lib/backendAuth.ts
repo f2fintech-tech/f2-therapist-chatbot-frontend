@@ -173,7 +173,8 @@ export async function signUpAdvisor(payload: AdvisorSignupPayload): Promise<Auth
     displayName: result.name || payload.f2_fintech_id,
     hearts: result.hearts ?? null,
     isGuest: false,
-    isAdvisor: true,
+    isAdvisor: result.is_advisor ?? false,
+    isStaff: true,
     permissions: result.permissions || [],
     authenticatedAt: new Date().toISOString(),
   };
@@ -192,7 +193,8 @@ export async function signInAdvisor(payload: AdvisorLoginPayload): Promise<AuthS
     displayName: result.name || payload.f2_fintech_id,
     hearts: result.hearts ?? null,
     isGuest: false,
-    isAdvisor: true,
+    isAdvisor: result.is_advisor ?? false,
+    isStaff: true,
     permissions: result.permissions || [],
     authenticatedAt: new Date().toISOString(),
   };

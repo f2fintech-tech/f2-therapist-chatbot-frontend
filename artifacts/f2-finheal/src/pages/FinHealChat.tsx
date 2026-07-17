@@ -91,7 +91,7 @@ export default function FinHealChat() {
     const validateSession = async () => {
       try {
         const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-        if ((authSession.isAdvisor || isEmployeeId) && authSession.userId) {
+        if ((authSession.isAdvisor || authSession.isStaff || isEmployeeId) && authSession.userId) {
           const profile = await fetchAdvisorProfile(authSession.userId);
           if (!profile || profile.isActive === false) {
             throw new Error("Account deactivated or deleted.");
@@ -108,7 +108,7 @@ export default function FinHealChat() {
     };
     
     validateSession();
-  }, [authSession?.userId, authSession?.isAdvisor, setLocation]);
+  }, [authSession?.userId, authSession?.isAdvisor, authSession?.isStaff, setLocation]);
 
   const customTestId = useMemo(() => {
     if (location.startsWith("/tests/") && !["financial-literacy", "emergency-fund", "loan-fit", "credit-readiness", "debt-balance"].includes(location.split("/tests/")[1] || "")) {
@@ -453,7 +453,7 @@ export default function FinHealChat() {
         if (isSuperAdmin) return;
 
         const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-        const isStaff = authSession.isAdvisor || isUserAdvisor(email) || isEmployeeId;
+        const isStaff = authSession.isAdvisor || authSession.isStaff || isUserAdvisor(email) || isEmployeeId;
         
         if (isStaff) {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -492,12 +492,14 @@ export default function FinHealChat() {
             const nextSession = {
               ...authSession,
               isAdvisor: data.is_advisor,
+              isStaff: true,
               permissions: data.permissions || [],
               displayName: data.name || authSession.displayName,
               avatarUrl: data.avatar_url || authSession.avatarUrl,
             };
              if (
               authSession.isAdvisor !== nextSession.isAdvisor ||
+              authSession.isStaff !== nextSession.isStaff ||
               JSON.stringify(authSession.permissions) !== JSON.stringify(nextSession.permissions) ||
               authSession.displayName !== nextSession.displayName ||
               authSession.avatarUrl !== nextSession.avatarUrl
@@ -544,14 +546,36 @@ export default function FinHealChat() {
     };
   }, [authSession]);
 
-  // Redirect staff users away from goals page
+  // Route guards and redirection checks
   useEffect(() => {
     if (authSession) {
       const email = authSession.email;
       const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-      const isStaff = authSession.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
+      const isStaff = authSession.isAdvisor || authSession.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
+      const isSuperAdmin = email ? ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase()) : false;
+      const isAdvisor = isUserAdvisor(email);
+
+      // 1. Redirect staff users away from goals page
       if (isStaff && mainView === "goals") {
         setLocation("/chat", { replace: true });
+        return;
+      }
+
+      // 2. Secure Admin Portal route
+      if (mainView.startsWith("admin") && !isSuperAdmin) {
+        setLocation("/chat", { replace: true });
+        return;
+      }
+
+      // 3. Secure Advisor Workspace route
+      if (mainView.startsWith("advisor-workspace") && !isAdvisor) {
+        setLocation("/chat", { replace: true });
+        return;
+      }
+    } else {
+      // If not logged in, prevent access to restricted pages
+      if (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) {
+        setLocation("/login", { replace: true });
       }
     }
   }, [authSession, mainView, setLocation]);
@@ -1118,7 +1142,7 @@ export default function FinHealChat() {
               } else if (page === "Financial Goals") {
                 const email = authSession?.email;
                 const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-                const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
+                const isStaff = authSession?.isAdvisor || authSession?.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
                 if (!isStaff) {
                   setMainView("goals");
                 }

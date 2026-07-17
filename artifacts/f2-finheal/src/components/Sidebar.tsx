@@ -276,9 +276,10 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
       const storedSession = localStorage.getItem("finheal-auth-session");
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        if (parsed?.isAdvisor) return true;
+        if (parsed?.isAdvisor === true) return true;
+        if (parsed?.isAdvisor === false) return false;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (!email) return false;
     const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
@@ -288,19 +289,28 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     if (stored) {
       try {
         const list = JSON.parse(stored);
-        return list.some((a: any) => 
+        return list.some((a: any) =>
           a.f2FintechId && (
-            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.toLowerCase() === a.f2FintechId.toLowerCase() ||
             email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
           ) && a.isAdvisor === true
         );
-      } catch (e) {}
+      } catch (e) { }
     }
     return false;
   };
 
   const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
-  const isStaff = isUserAdvisor(userEmail) || (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || isEmployeeId;
+  const isStaff = isUserAdvisor(userEmail) || 
+                  (userEmail && ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase())) || 
+                  isEmployeeId ||
+                  (() => {
+                    try {
+                      const stored = localStorage.getItem("finheal-auth-session");
+                      if (stored) return JSON.parse(stored)?.isStaff === true;
+                    } catch (e) {}
+                    return false;
+                  })();
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
 
   const hasPermission = (perm: string) => {
