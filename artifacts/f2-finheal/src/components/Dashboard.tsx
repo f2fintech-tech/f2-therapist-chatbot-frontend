@@ -956,7 +956,7 @@ export default function Dashboard({
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [cibilLoading, setCibilLoading] = useState(false);
-  const [selectedBureauTab, setSelectedBureauTab] = useState<"cibil" | "experian">("cibil");
+  const [selectedBureauTab, setSelectedBureauTab] = useState<"cibil" | "experian" | "bsa">("cibil");
 
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [loadingAdvisorAppts, setLoadingAdvisorAppts] = useState(false);
@@ -1388,6 +1388,36 @@ export default function Dashboard({
     { name: "Fair (600-699)", value: finalExpFair, color: "#f59e0b", percent: finalExpTotal > 0 ? Math.round((finalExpFair / finalExpTotal) * 100) : 0 },
     { name: "Poor (< 600)", value: finalExpPoor, color: "#ef4444", percent: finalExpTotal > 0 ? Math.round((finalExpPoor / finalExpTotal) * 100) : 0 }
   ];
+
+  // Calculate BSA statement distribution
+  const bsaOnlyEnquiries = cibilEnquiries.filter(enq => enq.bsa_excel_url);
+  const totalBsaFetched = bsaOnlyEnquiries.length;
+  
+  const bsaDistributionData = (() => {
+    if (totalBsaFetched === 0) {
+      // Mock data when no statement exists yet
+      return [
+        { name: "YES Bank", value: 2, color: "#10b981", percent: 40 },
+        { name: "HDFC Bank", value: 1, color: "#3b82f6", percent: 20 },
+        { name: "ICICI Bank", value: 1, color: "#f59e0b", percent: 20 },
+        { name: "State Bank of India", value: 1, color: "#a855f7", percent: 20 },
+      ];
+    }
+    
+    const counts: Record<string, number> = {};
+    bsaOnlyEnquiries.forEach(enq => {
+      const bankName = enq.bsa_json_data?.bank_name || "Unknown Bank";
+      counts[bankName] = (counts[bankName] || 0) + 1;
+    });
+    
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
+    return Object.entries(counts).map(([name, val], idx) => ({
+      name,
+      value: val,
+      color: colors[idx % colors.length],
+      percent: Math.round((val / totalBsaFetched) * 100)
+    }));
+  })();
 
   // Calculate sorted advisors list for Super Admin
   const sortedAdvisorsForAdmin = [...(advisors.length > 0 ? advisors : DEFAULT_ADVISORS)]
@@ -1971,7 +2001,7 @@ ${sheetDataXml}
                   <div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-[4px]">
                       <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-[6px]">
-                        📊 {selectedBureauTab === "cibil" ? "CIBIL" : "Experian"} Score Band Distribution
+                        📊 {selectedBureauTab === "cibil" ? "CIBIL Score Band" : selectedBureauTab === "experian" ? "Experian Score Band" : "BSA Statement Bank"} Distribution
                       </h3>
 
                       {/* Premium Tab Toggles */}
@@ -1996,10 +2026,22 @@ ${sheetDataXml}
                         >
                           Experian ({experianOnlyEnquiries.length})
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBureauTab("bsa")}
+                          className={`px-3 py-1 text-[10.5px] font-bold rounded-[6px] transition cursor-pointer ${selectedBureauTab === "bsa"
+                            ? "bg-white text-gray-900 shadow-xs"
+                            : "text-gray-500 hover:text-gray-800"
+                            }`}
+                        >
+                          BSA ({totalBsaFetched})
+                        </button>
                       </div>
                     </div>
                     <p className="text-[12px] text-gray-500 mb-[12px]">
-                      Credit health breakdown of platform user base ({selectedBureauTab === "cibil" ? "CIBIL" : "Experian"}).
+                      {selectedBureauTab === "bsa"
+                        ? "Breakdown of statement uploads by Bank Name."
+                        : `Credit health breakdown of platform user base (${selectedBureauTab === "cibil" ? "CIBIL" : "Experian"}).`}
                     </p>
                   </div>
 
@@ -2009,7 +2051,7 @@ ${sheetDataXml}
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData}
+                            data={selectedBureauTab === "cibil" ? cibilDistributionData : selectedBureauTab === "experian" ? experianDistributionData : bsaDistributionData}
                             cx="50%"
                             cy="50%"
                             innerRadius={42}
@@ -2017,7 +2059,7 @@ ${sheetDataXml}
                             paddingAngle={3}
                             dataKey="value"
                           >
-                            {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((entry, index) => (
+                            {(selectedBureauTab === "cibil" ? cibilDistributionData : selectedBureauTab === "experian" ? experianDistributionData : bsaDistributionData).map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
@@ -2029,7 +2071,7 @@ ${sheetDataXml}
                                   <div className="bg-white border border-gray-150 rounded-[10px] p-2.5 shadow-md text-[10.5px]">
                                     <div className="font-bold" style={{ color: data.color }}>{data.name}</div>
                                     <div className="text-gray-500 mt-0.5">
-                                      Reports: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
+                                      {selectedBureauTab === "bsa" ? "Statements" : "Reports"}: <span className="text-gray-900 font-bold">{data.value}</span> ({data.percent}%)
                                     </div>
                                   </div>
                                 );
@@ -2041,15 +2083,17 @@ ${sheetDataXml}
                       </ResponsiveContainer>
                       <div className="absolute flex flex-col items-center justify-center text-center">
                         <span className="text-[18px] font-bold text-gray-900 leading-none">
-                          {selectedBureauTab === "cibil" ? totalCibilValidScores : totalExpValidScores}
+                          {selectedBureauTab === "cibil" ? totalCibilValidScores : selectedBureauTab === "experian" ? totalExpValidScores : (totalBsaFetched === 0 ? 5 : totalBsaFetched)}
                         </span>
-                        <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5">Reports</span>
+                        <span className="text-[8px] text-gray-400 font-extrabold uppercase tracking-wide mt-0.5 font-bold">
+                          {selectedBureauTab === "bsa" ? "Stats" : "Reports"}
+                        </span>
                       </div>
                     </div>
 
                     {/* Legend */}
                     <div className="flex-1 w-full space-y-1.5">
-                      {(selectedBureauTab === "cibil" ? cibilDistributionData : experianDistributionData).map((item) => (
+                      {(selectedBureauTab === "cibil" ? cibilDistributionData : selectedBureauTab === "experian" ? experianDistributionData : bsaDistributionData).map((item) => (
                         <div key={item.name} className="flex items-center justify-between text-[11px] border-b border-gray-50 pb-1.5 last:border-b-0 last:pb-0">
                           <span className="flex items-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: item.color }} />
@@ -2068,10 +2112,14 @@ ${sheetDataXml}
                       isCibilDemoData
                         ? "Score distribution will update automatically as platform users check their CIBIL score."
                         : "Aggregated score stats from database (CIBIL bureau only)."
-                    ) : (
+                    ) : selectedBureauTab === "experian" ? (
                       isExpDemoData
                         ? "Score distribution will update automatically as platform users check their Experian score."
                         : "Aggregated score stats from database (Experian bureau only)."
+                    ) : (
+                      totalBsaFetched === 0
+                        ? "Bank distribution will update automatically as platform users upload statement files."
+                        : "Aggregated statement stats from database (BSA uploads only)."
                     )}
                   </div>
                 </div>
