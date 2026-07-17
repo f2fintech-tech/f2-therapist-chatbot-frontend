@@ -90,7 +90,8 @@ export default function FinHealChat() {
     
     const validateSession = async () => {
       try {
-        if (authSession.isAdvisor && authSession.userId) {
+        const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+        if ((authSession.isAdvisor || isEmployeeId) && authSession.userId) {
           const profile = await fetchAdvisorProfile(authSession.userId);
           if (!profile || profile.isActive === false) {
             throw new Error("Account deactivated or deleted.");
@@ -451,7 +452,8 @@ export default function FinHealChat() {
         const isSuperAdmin = email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase());
         if (isSuperAdmin) return;
 
-        const isStaff = authSession.isAdvisor || isUserAdvisor(email);
+        const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+        const isStaff = authSession.isAdvisor || isUserAdvisor(email) || isEmployeeId;
         
         if (isStaff) {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -546,7 +548,8 @@ export default function FinHealChat() {
   useEffect(() => {
     if (authSession) {
       const email = authSession.email;
-      const isStaff = authSession.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+      const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+      const isStaff = authSession.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
       if (isStaff && mainView === "goals") {
         setLocation("/chat", { replace: true });
       }
@@ -1114,7 +1117,8 @@ export default function FinHealChat() {
                 }
               } else if (page === "Financial Goals") {
                 const email = authSession?.email;
-                const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+                const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+                const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
                 if (!isStaff) {
                   setMainView("goals");
                 }
