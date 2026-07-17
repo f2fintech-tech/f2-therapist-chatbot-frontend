@@ -87,7 +87,7 @@ export default function FinHealChat() {
   // Proactive Session Validation: Force logout if user is deleted or deactivated
   useEffect(() => {
     if (!authSession) return;
-    
+
     const validateSession = async () => {
       try {
         if (authSession.isAdvisor && authSession.userId) {
@@ -105,7 +105,7 @@ export default function FinHealChat() {
         setLocation("/login", { replace: true });
       }
     };
-    
+
     validateSession();
   }, [authSession?.userId, authSession?.isAdvisor, setLocation]);
 
@@ -151,7 +151,7 @@ export default function FinHealChat() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [authPromptReason, setAuthPromptReason] = useState("");
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
-  const [prefillMessage, setPrefillMessage] = useState<{text: string; card: string} | null>(null);
+  const [prefillMessage, setPrefillMessage] = useState<{ text: string; card: string } | null>(null);
   const mainViewRef = useRef(mainView);
   const userId = authSession?.userId || "";
   const userProfile = authSession ? { ...createUserProfile(userId, authSession.displayName, authSession.avatarUrl), email: authSession.email } : null;
@@ -237,7 +237,7 @@ export default function FinHealChat() {
           if (Array.isArray(appts)) {
             const dueAppt = appts.find((a: any) => {
               if (a.completed || a.cancelled || a.joined) return false;
-              
+
               const uniqueId = a.id || `appt-${a.advisorId}-${a.date}-${a.time}`;
               if (notifiedIdsRef.current.has(uniqueId)) return false;
 
@@ -273,7 +273,7 @@ export default function FinHealChat() {
           const reminders = JSON.parse(rawReminders);
           if (Array.isArray(reminders)) {
             const currentDateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-            
+
             const dueReminder = reminders.find((r: any) => {
               if (r.completed) return false;
               if (notifiedIdsRef.current.has(r.id)) return false;
@@ -287,7 +287,7 @@ export default function FinHealChat() {
                   return true;
                 }
               }
-              
+
               // Trigger if overdue
               if (r.dueDate < currentDateStr) {
                 return true;
@@ -391,7 +391,7 @@ export default function FinHealChat() {
       const nextSession = { ...authSession, hearts };
       setStoredAuthSession(nextSession);
       setAuthSession(nextSession);
-    } catch {}
+    } catch { }
   }, [authSession]);
 
   useEffect(() => {
@@ -452,15 +452,15 @@ export default function FinHealChat() {
         if (isSuperAdmin) return;
 
         const isStaff = authSession.isAdvisor || isUserAdvisor(email);
-        
+
         if (isStaff) {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-          
+
           // For advisor sessions, authSession.userId IS their Employee ID (e.g. "F2-369-403").
           // Use it directly. Only fall back to email-prefix lookup if userId looks like a UUID.
           const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
           let f2FintechId = authSession.userId;
-          
+
           if (isUUID) {
             // Standard user UUID — try to resolve via advisors list by email
             const stored = localStorage.getItem("finheal_advisors_list");
@@ -478,7 +478,7 @@ export default function FinHealChat() {
                 } else if (email) {
                   f2FintechId = email.split("@")[0];
                 }
-              } catch (e) {}
+              } catch (e) { }
             } else if (email) {
               f2FintechId = email.split("@")[0];
             }
@@ -489,12 +489,12 @@ export default function FinHealChat() {
             const data = await res.json();
             const nextSession = {
               ...authSession,
-              isAdvisor: data.is_advisor,
+              isAdvisor: true,
               permissions: data.permissions || [],
               displayName: data.name || authSession.displayName,
               avatarUrl: data.avatar_url || authSession.avatarUrl,
             };
-             if (
+            if (
               authSession.isAdvisor !== nextSession.isAdvisor ||
               JSON.stringify(authSession.permissions) !== JSON.stringify(nextSession.permissions) ||
               authSession.displayName !== nextSession.displayName ||
@@ -611,7 +611,7 @@ export default function FinHealChat() {
     } finally {
       try {
         await chat.refreshConversations();
-      } catch {}
+      } catch { }
       if (chat.conversationId === conversationId) {
         chat.clearMessages();
       }
@@ -668,7 +668,7 @@ export default function FinHealChat() {
   const openLoanFitTest = () => openTestInNewTab("loan-fit");
   const openDebtBalanceReview = () => openTestInNewTab("debt-balance");
   const openCreditReadiness = () => openTestInNewTab("credit-readiness");
-  
+
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -694,7 +694,7 @@ export default function FinHealChat() {
         const parsed = JSON.parse(storedSession);
         if (parsed?.isAdvisor) return true;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (!email) return false;
     const defaultEmails = ["sneha@finheal.com", "aradhya@finheal.com", "vikram@finheal.com", "rohan@finheal.com", "priya@finheal.com"];
@@ -704,13 +704,13 @@ export default function FinHealChat() {
     if (stored) {
       try {
         const list = JSON.parse(stored);
-        return list.some((a: any) => 
+        return list.some((a: any) =>
           a.f2FintechId && (
-            email.toLowerCase() === a.f2FintechId.toLowerCase() || 
+            email.toLowerCase() === a.f2FintechId.toLowerCase() ||
             email.split("@")[0].toLowerCase() === a.f2FintechId.toLowerCase()
           ) && a.isAdvisor === true
         );
-      } catch (e) {}
+      } catch (e) { }
     }
     return false;
   };
@@ -720,26 +720,26 @@ export default function FinHealChat() {
     : mainView === "goals"
       ? "Financial Goals"
       : mainView === "profile"
-      ? "Settings"
-      : mainView === "advisor"
-        ? "Talk to an Advisor"
-        : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace"))
-          ? (isUserAdvisor(authSession?.email)
+        ? "Settings"
+        : mainView === "advisor"
+          ? "Talk to an Advisor"
+          : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace"))
+            ? (isUserAdvisor(authSession?.email)
               ? "Advisor Workspace"
               : "Admin Portal")
-          : mainView === "education"
-            ? "Financial Education"
-            : mainView === "loan-calculator"
-              ? "Loan Calculator"
-              : mainView === "cibil-analyzer"
-                ? "CIBIL Analyzer"
-                : mainView === "eligibility-cibil"
-                  ? "Eligibility, CIBIL & BSA"
-                  : mainView === "dashboard"
-                    ? "My Dashboard"
-                    : mainView === "reminders"
-                      ? "Reminders"
-                      : "Financial Health Test";
+            : mainView === "education"
+              ? "Financial Education"
+              : mainView === "loan-calculator"
+                ? "Loan Calculator"
+                : mainView === "cibil-analyzer"
+                  ? "CIBIL Analyzer"
+                  : mainView === "eligibility-cibil"
+                    ? "Eligibility, CIBIL & BSA"
+                    : mainView === "dashboard"
+                      ? "My Dashboard"
+                      : mainView === "reminders"
+                        ? "Reminders"
+                        : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -819,10 +819,10 @@ export default function FinHealChat() {
           <div className="fixed bottom-6 right-6 z-[100] max-w-[360px] w-[calc(100%-32px)] bg-white border border-gray-100 dark:bg-slate-900 dark:border-slate-800 rounded-[20px] shadow-[0_10px_30px_rgba(0,0,0,0.15)] p-4 flex gap-3 animate-slide-up-notification">
             <div className="text-[24px] shrink-0 mt-0.5">
               {activeNotification.isAppointment ? "📅" :
-               activeNotification.category === "EMI" ? "🏦" :
-               activeNotification.category === "Savings" ? "🐷" :
-               activeNotification.category === "Bill" ? "⚡" :
-               activeNotification.category === "Tax" ? "📄" : "🔔"}
+                activeNotification.category === "EMI" ? "🏦" :
+                  activeNotification.category === "Savings" ? "🐷" :
+                    activeNotification.category === "Bill" ? "⚡" :
+                      activeNotification.category === "Tax" ? "📄" : "🔔"}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -841,7 +841,7 @@ export default function FinHealChat() {
                 {activeNotification.title}
               </h4>
               <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
-                {activeNotification.isAppointment 
+                {activeNotification.isAppointment
                   ? `Your appointment is starting now (${activeNotification.time})`
                   : activeNotification.dueTime ? `Scheduled for today at ${activeNotification.dueTime}` : "Due today"}
                 {!activeNotification.isAppointment && activeNotification.amount && ` · Amount: ₹${activeNotification.amount.toLocaleString("en-IN")}`}
@@ -894,7 +894,7 @@ export default function FinHealChat() {
                             r.id === activeNotification.id ? { ...r, completed: true } : r
                           );
                           localStorage.setItem(storageKey, JSON.stringify(updated));
-                          
+
                           // Fire a storage event to keep views updated
                           window.dispatchEvent(new Event("storage"));
                         }
@@ -944,8 +944,8 @@ export default function FinHealChat() {
         </div>
       )}
       <div className="grid h-[100dvh] w-full min-w-0 grid-cols-1 gap-[6px] overflow-hidden bg-[#f3f4f6] p-[6px] lg:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)] 2xl:grid-cols-[clamp(240px,18vw,280px)_minmax(0,1fr)_clamp(250px,18vw,300px)]">
-        <Sidebar 
-          userId={userId} 
+        <Sidebar
+          userId={userId}
           userProfile={userProfile}
           userEmail={authSession.email}
           sessionId={chat.conversationId ?? "new-conversation"}
@@ -969,57 +969,57 @@ export default function FinHealChat() {
         <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           {mainView === "chat" || mainView === "goals" ? (
             <ChatArea
-            conversationId={chat.conversationId}
-            conversationCount={chat.conversationCount}
-            error={chat.error}
-            isHealthy={chat.isHealthy}
-            isLoading={chat.isLoading}
-            isSendingMessage={chat.isSendingMessage}
-            messages={chat.messages}
-            userProfile={userProfile}
-            remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
-            onClearChat={chat.clearMessages}
-            onMoodUpdate={handleMoodUpdate}
-            onSendMessage={handleSendMessage}
-            onEditMessage={chat.editMessage}
-            onStopSendingMessage={chat.stopSendingMessage}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            isSidebarOpen={sidebarOpen}
-            isInsightsOpen={insightsOpen}
-            prefillMessage={prefillMessage ?? undefined}
-            onClearPrefill={() => setPrefillMessage(null)}
-            onSignupPrompt={() => {
-              clearStoredAuthSession();
-              setAuthSession(null);
-            }}
-            onOpenEligibilityCibil={openEligibilityCibil}
-            onOpenProfile={openProfilePage}
-            onLogout={handleLogout}
-          />
-        ) : mainView === "tests" ? (
-          <FinancialHealthTestCatalog
-            userId={userId}
-            isGuest={authSession?.isGuest ?? true}
-            onLoginRequired={() => { clearStoredAuthSession(); setAuthSession(null); }}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
-            onOpenEmergencyFundCheck={openEmergencyFundCheck}
-            onOpenLoanFitTest={openLoanFitTest}
-            onOpenDebtBalanceReview={openDebtBalanceReview}
-            onOpenCreditReadiness={openCreditReadiness}
-          />
-        ) : mainView === "emergency-fund" ? (
-          <EmergencyFundCheckView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : mainView === "education" ? (
-          <FinancialEducation
+              conversationId={chat.conversationId}
+              conversationCount={chat.conversationCount}
+              error={chat.error}
+              isHealthy={chat.isHealthy}
+              isLoading={chat.isLoading}
+              isSendingMessage={chat.isSendingMessage}
+              messages={chat.messages}
+              userProfile={userProfile}
+              remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
+              onClearChat={chat.clearMessages}
+              onMoodUpdate={handleMoodUpdate}
+              onSendMessage={handleSendMessage}
+              onEditMessage={chat.editMessage}
+              onStopSendingMessage={chat.stopSendingMessage}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              isSidebarOpen={sidebarOpen}
+              isInsightsOpen={insightsOpen}
+              prefillMessage={prefillMessage ?? undefined}
+              onClearPrefill={() => setPrefillMessage(null)}
+              onSignupPrompt={() => {
+                clearStoredAuthSession();
+                setAuthSession(null);
+              }}
+              onOpenEligibilityCibil={openEligibilityCibil}
+              onOpenProfile={openProfilePage}
+              onLogout={handleLogout}
+            />
+          ) : mainView === "tests" ? (
+            <FinancialHealthTestCatalog
+              userId={userId}
+              isGuest={authSession?.isGuest ?? true}
+              onLoginRequired={() => { clearStoredAuthSession(); setAuthSession(null); }}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+              onOpenEmergencyFundCheck={openEmergencyFundCheck}
+              onOpenLoanFitTest={openLoanFitTest}
+              onOpenDebtBalanceReview={openDebtBalanceReview}
+              onOpenCreditReadiness={openCreditReadiness}
+            />
+          ) : mainView === "emergency-fund" ? (
+            <EmergencyFundCheckView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onBackToCatalog={openTestCatalog}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          ) : mainView === "education" ? (
+            <FinancialEducation
               userId={userId}
               onToggleSidebar={() => setSidebarOpen((open) => !open)}
               onAskAboutContent={(payload) => {
@@ -1032,224 +1032,224 @@ export default function FinHealChat() {
                 }, 200);
               }}
             />
-        ) : mainView === "financial-literacy" ? (
-          <FinancialLiteracyTestView
-            userId={userId}
-            isGuest={authSession?.isGuest ?? true}
-            onLoginRequired={handleLogout}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-          />
-        ) : mainView === "loan-fit" ? (
-          <LoanFitTestView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : mainView === "credit-readiness" ? (
-          <CreditReadinessReviewView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : mainView === "custom-test" ? (
-          <DynamicTestView
-            userId={userId}
-            testId={customTestId || ""}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : mainView === "profile" ? (
-          <ProfilePage
-            userId={userId}
-            userProfile={userProfile}
-            email={authSession.email}
-            isAdvisor={isUserAdvisor(authSession.email)}
-            onBackToChat={openChatView}
-            onSaveProfile={handleProfileSave}
-          />
-        ) : mainView === "advisor" ? (
-          <AdvisorPanel
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            isGuest={authSession?.isGuest ?? true}
-            onLoginRequired={handleLogout}
-          />
-        ) : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) ? (
-          <AdminPortal
-            userId={userId}
-            userEmail={authSession.email || ""}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            initialTab={mainView.split("/")[1] || "experts"}
-          />
-        ) : mainView === "loan-calculator" ? (
-          <LoanCalculatorView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onApplyNow={handleApplyLoan}
-            onTalkToAdvisor={() => setMainView("advisor")}
-            isGuest={authSession?.isGuest ?? true}
-            onLoginRequired={handleLogout}
-          />
-        ) : mainView === "dashboard" ? (
-          <Dashboard
-            userId={userId}
-            userProfile={userProfile}
-            isSidebarOpen={sidebarOpen}
-            isInsightsOpen={insightsOpen}
-            onNavigate={(page, conversationId) => {
-              if (page === "Talk to FinHeal") {
-                if (conversationId) {
-                  handleConversationSelect(conversationId);
-                } else {
-                  openFreshChat();
+          ) : mainView === "financial-literacy" ? (
+            <FinancialLiteracyTestView
+              userId={userId}
+              isGuest={authSession?.isGuest ?? true}
+              onLoginRequired={handleLogout}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onBackToCatalog={openTestCatalog}
+            />
+          ) : mainView === "loan-fit" ? (
+            <LoanFitTestView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onBackToCatalog={openTestCatalog}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          ) : mainView === "credit-readiness" ? (
+            <CreditReadinessReviewView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onBackToCatalog={openTestCatalog}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          ) : mainView === "custom-test" ? (
+            <DynamicTestView
+              userId={userId}
+              testId={customTestId || ""}
+              onBackToCatalog={openTestCatalog}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          ) : mainView === "profile" ? (
+            <ProfilePage
+              userId={userId}
+              userProfile={userProfile}
+              email={authSession.email}
+              isAdvisor={isUserAdvisor(authSession.email)}
+              onBackToChat={openChatView}
+              onSaveProfile={handleProfileSave}
+            />
+          ) : mainView === "advisor" ? (
+            <AdvisorPanel
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              isGuest={authSession?.isGuest ?? true}
+              onLoginRequired={handleLogout}
+            />
+          ) : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) ? (
+            <AdminPortal
+              userId={userId}
+              userEmail={authSession.email || ""}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              initialTab={mainView.split("/")[1] || "experts"}
+            />
+          ) : mainView === "loan-calculator" ? (
+            <LoanCalculatorView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onApplyNow={handleApplyLoan}
+              onTalkToAdvisor={() => setMainView("advisor")}
+              isGuest={authSession?.isGuest ?? true}
+              onLoginRequired={handleLogout}
+            />
+          ) : mainView === "dashboard" ? (
+            <Dashboard
+              userId={userId}
+              userProfile={userProfile}
+              isSidebarOpen={sidebarOpen}
+              isInsightsOpen={insightsOpen}
+              onNavigate={(page, conversationId) => {
+                if (page === "Talk to FinHeal") {
+                  if (conversationId) {
+                    handleConversationSelect(conversationId);
+                  } else {
+                    openFreshChat();
+                  }
+                } else if (page === "Financial Goals") {
+                  const email = authSession?.email;
+                  const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
+                  if (!isStaff) {
+                    setMainView("goals");
+                  }
+                } else if (page === "Financial Health Test") {
+                  setMainView("tests");
+                } else if (page === "Talk to an Advisor") {
+                  setMainView("advisor");
+                } else if (page === "Financial Education") {
+                  setMainView("education");
+                } else if (page === "Eligibility, CIBIL & BSA") {
+                  setMainView("eligibility-cibil");
                 }
-              } else if (page === "Financial Goals") {
-                const email = authSession?.email;
-                const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email);
-                if (!isStaff) {
-                  setMainView("goals");
-                }
-              } else if (page === "Financial Health Test") {
-                setMainView("tests");
-              } else if (page === "Talk to an Advisor") {
-                setMainView("advisor");
-              } else if (page === "Financial Education") {
-                setMainView("education");
-              } else if (page === "Eligibility, CIBIL & BSA") {
-                setMainView("eligibility-cibil");
-              }
-            }}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-          />
-        ) : mainView === "eligibility-cibil" ? (
-          <EligibilityCibilView
-            userId={userId}
-            userEmail={authSession.email || ""}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onApplyNow={handleApplyLoan}
-            onTalkToAdvisor={() => setMainView("advisor")}
-            onOpenAdmin={openAdmin}
-          />
-        ) : mainView === "cibil-analyzer" ? (
-          <CibilAnalyzerView
-            userId={userId}
-            userEmail={authSession.email || ""}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onApplyNow={handleApplyLoan}
-            onTalkToAdvisor={() => setMainView("advisor")}
-          />
-        ) : mainView === "reminders" ? (
-          <RemindersView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : (
-          <DebtBalanceReviewView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        )}
+              }}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+            />
+          ) : mainView === "eligibility-cibil" ? (
+            <EligibilityCibilView
+              userId={userId}
+              userEmail={authSession.email || ""}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onApplyNow={handleApplyLoan}
+              onTalkToAdvisor={() => setMainView("advisor")}
+              onOpenAdmin={openAdmin}
+            />
+          ) : mainView === "cibil-analyzer" ? (
+            <CibilAnalyzerView
+              userId={userId}
+              userEmail={authSession.email || ""}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onApplyNow={handleApplyLoan}
+              onTalkToAdvisor={() => setMainView("advisor")}
+            />
+          ) : mainView === "reminders" ? (
+            <RemindersView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          ) : (
+            <DebtBalanceReviewView
+              userId={userId}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onToggleInsights={() => setInsightsOpen((open) => !open)}
+              onBackToCatalog={openTestCatalog}
+              onOpenFinancialWellnessAssistant={openChatView}
+            />
+          )}
 
-        {/* Global Pinned Profile Dropdown */}
-        {userProfile && (
-          <div className="global-profile-dropdown absolute right-[12px] z-50 flex items-center gap-[10px]">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="global-profile-avatar relative flex items-center justify-center w-10 h-10 rounded-full cursor-pointer focus:outline-none transition-all duration-300 hover:scale-105 hover:rotate-3 select-none bg-gradient-to-tr from-primary via-indigo-600 to-violet-500 text-white shadow-md border-2 border-white/90 dark:border-slate-800">
-                  {userProfile.avatarUrl ? (
-                    <img
-                      src={userProfile.avatarUrl}
-                      alt={userProfile.displayName}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="font-extrabold text-[14px] tracking-wide drop-shadow-sm select-none">
-                      {userProfile.initials}
-                    </span>
-                  )}
-                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full shadow-sm" />
+          {/* Global Pinned Profile Dropdown */}
+          {userProfile && (
+            <div className="global-profile-dropdown absolute right-[12px] z-50 flex items-center gap-[10px]">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="global-profile-avatar relative flex items-center justify-center w-10 h-10 rounded-full cursor-pointer focus:outline-none transition-all duration-300 hover:scale-105 hover:rotate-3 select-none bg-gradient-to-tr from-primary via-indigo-600 to-violet-500 text-white shadow-md border-2 border-white/90 dark:border-slate-800">
+                    {userProfile.avatarUrl ? (
+                      <img
+                        src={userProfile.avatarUrl}
+                        alt={userProfile.displayName}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-extrabold text-[14px] tracking-wide drop-shadow-sm select-none">
+                        {userProfile.initials}
+                      </span>
+                    )}
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full shadow-sm" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex items-center gap-3 px-1 py-1.5">
+                      <div className="relative flex w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm items-center justify-center shrink-0">
+                        {userProfile.avatarUrl ? (
+                          <img
+                            src={userProfile.avatarUrl}
+                            alt={userProfile.displayName}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <span>{userProfile.initials}</span>
+                        )}
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
+                          {userProfile.displayName}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                          {userProfile.email?.toLowerCase().endsWith("@f2fintech.com") ? "Employee" : "Standard"}
+                        </span>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={openProfilePage}
+                    className="cursor-pointer text-gray-700 dark:text-slate-200 focus:bg-gray-50 dark:focus:bg-slate-800 focus:text-gray-900 dark:focus:text-slate-100 flex items-center gap-2 px-3 py-2 rounded-md transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400">
+                      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>My Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-rose-600 dark:text-rose-400 focus:bg-rose-50 dark:focus:bg-rose-950/30 focus:text-rose-700 dark:focus:text-rose-300 flex items-center gap-2 px-3 py-2 rounded-md transition-colors font-medium"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-rose-500">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Global Insights Panel Toggle Button */}
+              {!insightsOpen && (
+                <button
+                  onClick={() => setInsightsOpen(true)}
+                  className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 dark:hover:bg-slate-700 shrink-0 shadow-sm 2xl:hidden"
+                  aria-label="Toggle insights panel"
+                >
+                  ☰
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex items-center gap-3 px-1 py-1.5">
-                    <div className="relative flex w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm items-center justify-center shrink-0">
-                      {userProfile.avatarUrl ? (
-                        <img
-                          src={userProfile.avatarUrl}
-                          alt={userProfile.displayName}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span>{userProfile.initials}</span>
-                      )}
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
-                        {userProfile.displayName}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-slate-400 truncate">
-                        {userProfile.email?.toLowerCase().endsWith("@f2fintech.com") ? "Employee" : "Standard"}
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={openProfilePage}
-                  className="cursor-pointer text-gray-700 dark:text-slate-200 focus:bg-gray-50 dark:focus:bg-slate-800 focus:text-gray-900 dark:focus:text-slate-100 flex items-center gap-2 px-3 py-2 rounded-md transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400">
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span>My Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer text-rose-600 dark:text-rose-400 focus:bg-rose-50 dark:focus:bg-rose-950/30 focus:text-rose-700 dark:focus:text-rose-300 flex items-center gap-2 px-3 py-2 rounded-md transition-colors font-medium"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-rose-500">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Global Insights Panel Toggle Button */}
-            {!insightsOpen && (
-              <button
-                onClick={() => setInsightsOpen(true)}
-                className="h-[32px] w-[32px] cursor-pointer rounded-[6px] bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-200 flex items-center justify-center text-[18px] transition-all hover:bg-gray-200 dark:hover:bg-slate-700 shrink-0 shadow-sm 2xl:hidden"
-                aria-label="Toggle insights panel"
-              >
-                ☰
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
         </div>
         <InsightsPanel
           conversationId={chat.conversationId}

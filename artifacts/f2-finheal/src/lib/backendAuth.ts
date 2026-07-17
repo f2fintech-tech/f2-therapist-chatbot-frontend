@@ -470,9 +470,9 @@ export async function updateAdvisorRole(f2FintechId: string, isAdvisor: boolean)
 export async function updateAdvisorActiveStatus(f2FintechId: string, isActive: boolean, deactivationReason?: string): Promise<any> {
   return authRequest(`advisors/${encodeURIComponent(f2FintechId)}/active-status`, {
     method: "PUT",
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       is_active: isActive,
-      deactivation_reason: deactivationReason 
+      deactivation_reason: deactivationReason
     }),
   });
 }
@@ -642,7 +642,7 @@ export function isAdvisorSlotActive(availability: string): boolean {
   if (!match) return false;
 
   const [_, startH, startM, startP, endH, endM, endP] = match;
-  
+
   const now = new Date();
   let hours = now.getHours();
   let minutes = now.getMinutes();
@@ -812,7 +812,7 @@ export async function fetchCibilTrash(userId: string): Promise<any[]> {
   if (userId) {
     headers["X-Requester-ID"] = userId;
   }
-  return authRequest<any[]>("cibil/leads/trash", { 
+  return authRequest<any[]>("cibil/leads/trash", {
     method: "GET",
     headers
   });
@@ -823,7 +823,7 @@ export async function restoreCibilEnquiry(reportId: string, userId: string): Pro
   if (userId) {
     headers["X-Requester-ID"] = userId;
   }
-  return authRequest<any>(`cibil/leads/${encodeURIComponent(reportId)}/restore`, { 
+  return authRequest<any>(`cibil/leads/${encodeURIComponent(reportId)}/restore`, {
     method: "POST",
     headers
   });
