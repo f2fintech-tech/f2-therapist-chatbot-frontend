@@ -453,13 +453,7 @@ export default function FinHealChat() {
         if (isSuperAdmin) return;
 
         const isEmployeeId = authSession.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-<<<<<<< HEAD
         const isStaff = authSession.isAdvisor || authSession.isStaff || isUserAdvisor(email) || isEmployeeId;
-        
-=======
-        const isStaff = authSession.isAdvisor || isUserAdvisor(email) || isEmployeeId;
-
->>>>>>> a6d9eeb457a4c803ea16c79a5f34f3c77848d76b
         if (isStaff) {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
@@ -496,12 +490,8 @@ export default function FinHealChat() {
             const data = await res.json();
             const nextSession = {
               ...authSession,
-<<<<<<< HEAD
               isAdvisor: data.is_advisor,
               isStaff: true,
-=======
-              isAdvisor: true,
->>>>>>> a6d9eeb457a4c803ea16c79a5f34f3c77848d76b
               permissions: data.permissions || [],
               displayName: data.name || authSession.displayName,
               avatarUrl: data.avatar_url || authSession.avatarUrl,
@@ -1151,7 +1141,7 @@ export default function FinHealChat() {
                 } else if (page === "Financial Goals") {
                   const email = authSession?.email;
                   const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-                  const isStaff = authSession?.isAdvisor || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
+                  const isStaff = authSession?.isAdvisor || authSession?.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
                   if (!isStaff) {
                     setMainView("goals");
                   }
@@ -1164,63 +1154,6 @@ export default function FinHealChat() {
                 } else if (page === "Eligibility, CIBIL & BSA") {
                   setMainView("eligibility-cibil");
                 }
-<<<<<<< HEAD
-              } else if (page === "Financial Goals") {
-                const email = authSession?.email;
-                const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-                const isStaff = authSession?.isAdvisor || authSession?.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
-                if (!isStaff) {
-                  setMainView("goals");
-                }
-              } else if (page === "Financial Health Test") {
-                setMainView("tests");
-              } else if (page === "Talk to an Advisor") {
-                setMainView("advisor");
-              } else if (page === "Financial Education") {
-                setMainView("education");
-              } else if (page === "Eligibility, CIBIL & BSA") {
-                setMainView("eligibility-cibil");
-              }
-            }}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-          />
-        ) : mainView === "eligibility-cibil" ? (
-          <EligibilityCibilView
-            userId={userId}
-            userEmail={authSession.email || ""}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onApplyNow={handleApplyLoan}
-            onTalkToAdvisor={() => setMainView("advisor")}
-            onOpenAdmin={openAdmin}
-          />
-        ) : mainView === "cibil-analyzer" ? (
-          <CibilAnalyzerView
-            userId={userId}
-            userEmail={authSession.email || ""}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onApplyNow={handleApplyLoan}
-            onTalkToAdvisor={() => setMainView("advisor")}
-          />
-        ) : mainView === "reminders" ? (
-          <RemindersView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        ) : (
-          <DebtBalanceReviewView
-            userId={userId}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleInsights={() => setInsightsOpen((open) => !open)}
-            onBackToCatalog={openTestCatalog}
-            onOpenFinancialWellnessAssistant={openChatView}
-          />
-        )}
-=======
               }}
               onToggleSidebar={() => setSidebarOpen((open) => !open)}
               onToggleInsights={() => setInsightsOpen((open) => !open)}
@@ -1260,7 +1193,6 @@ export default function FinHealChat() {
               onOpenFinancialWellnessAssistant={openChatView}
             />
           )}
->>>>>>> a6d9eeb457a4c803ea16c79a5f34f3c77848d76b
 
           {/* Global Pinned Profile Dropdown */}
           {userProfile && (
