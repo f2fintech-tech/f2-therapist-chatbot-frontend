@@ -561,9 +561,15 @@ export default function FinHealChat() {
       }
 
       // 2. Secure Admin Portal route
-      if (mainView.startsWith("admin") && !isSuperAdmin) {
-        setLocation("/chat", { replace: true });
-        return;
+      if (mainView.startsWith("admin")) {
+        if (!isSuperAdmin) {
+          if (isStaff && location === "/admin/cibil-enquiries") {
+            // Allow authorized staff to view the specific CIBIL Enquiries admin tab
+          } else {
+            setLocation("/chat", { replace: true });
+            return;
+          }
+        }
       }
 
       // 3. Secure Advisor Workspace route
@@ -655,7 +661,7 @@ export default function FinHealChat() {
   const openAdvisor = () => setMainView("advisor");
   const openAdmin = (tab?: string) => {
     const isSuperAdmin = authSession?.email ? ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase()) : false;
-    const basePath = isSuperAdmin ? "admin" : "advisor-workspace";
+    const basePath = (isSuperAdmin || tab === "cibil-enquiries") ? "admin" : "advisor-workspace";
     setMainView(tab ? `${basePath}/${tab}` : basePath);
   };
   const openLoanCalculator = () => setMainView("loan-calculator");
