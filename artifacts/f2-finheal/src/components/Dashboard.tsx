@@ -1465,19 +1465,39 @@ export default function Dashboard({
 
   const getEmployeeReportCount = (emp: any) => {
     return cibilEnquiries.filter(enq => {
+      const fb = (enq.fetched_by || "").toLowerCase().trim();
+      const empId = (emp.id || "").toLowerCase().trim();
+      const empF2Id = (emp.f2FintechId || "").toLowerCase().trim();
+      const empEmail = (emp.email || "").toLowerCase().trim();
+      const empName = (emp.name || "").toLowerCase().trim();
+
       // 1. Direct match with fetched_by
-      if (enq.fetched_by && (enq.fetched_by === emp.id || enq.fetched_by === emp.f2FintechId)) {
+      if (fb && (fb === empId || fb === empF2Id)) {
         return true;
       }
-      // 2. Fallback check for legacy fetches: if fetched_by is missing/null, check if client email/name prefix matches the employee's ID/email
-      if (!enq.fetched_by) {
-        const cleanEmail = (enq.email || "").toLowerCase().trim();
-        const cleanEmpId = (emp.f2FintechId || emp.id || "").toLowerCase().trim();
-        const cleanEmpEmail = (emp.email || "").toLowerCase().trim();
-        if (cleanEmail && (cleanEmail === cleanEmpId || cleanEmail === cleanEmpEmail || cleanEmail.startsWith(cleanEmpId + "@"))) {
+      
+      // 2. Format: "Name (ID)"
+      if (fb && fb.includes("(") && fb.includes(")")) {
+        const idPart = fb.split("(")[1].split(")")[0].trim();
+        const namePart = fb.split(" (")[0].trim();
+        if (idPart === empId || idPart === empF2Id || namePart === empName) {
           return true;
         }
       }
+      
+      // 3. Fallback: email matching
+      if (!fb || fb === (enq.user_id || "").toLowerCase() || fb === 'client' || fb === 'user lead') {
+        const cleanEmail = (enq.email || "").toLowerCase().trim();
+        if (cleanEmail && (cleanEmail === empId || cleanEmail === empEmail || cleanEmail.startsWith(empId + "@"))) {
+          return true;
+        }
+      }
+
+      // 4. Name matching fallback (if fetched_by is just the exact name)
+      if (fb && fb === empName) {
+          return true;
+      }
+
       return false;
     }).length;
   };
@@ -1494,14 +1514,35 @@ export default function Dashboard({
 
   // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
   const userEnquiries = cibilEnquiries.filter(enq => {
+    // Re-use the exact same matching logic we just built for employees
+    const isFetchedByAnyEmployee = employees.some(emp => {
+      const fb = (enq.fetched_by || "").toLowerCase().trim();
+      const empId = (emp.id || "").toLowerCase().trim();
+      const empF2Id = (emp.f2FintechId || "").toLowerCase().trim();
+      const empEmail = (emp.email || "").toLowerCase().trim();
+      const empName = (emp.name || "").toLowerCase().trim();
+
+      if (fb && (fb === empId || fb === empF2Id)) return true;
+      if (fb && fb.includes("(") && fb.includes(")")) {
+        const idPart = fb.split("(")[1].split(")")[0].trim();
+        const namePart = fb.split(" (")[0].trim();
+        if (idPart === empId || idPart === empF2Id || namePart === empName) return true;
+      }
+      if (!fb || fb === (enq.user_id || "").toLowerCase() || fb === 'client' || fb === 'user lead') {
+        const cleanEmail = (enq.email || "").toLowerCase().trim();
+        if (cleanEmail && (cleanEmail === empId || cleanEmail === empEmail || cleanEmail.startsWith(empId + "@"))) return true;
+      }
+      if (fb && fb === empName) return true;
+      return false;
+    });
+
     const isFetchedByStaff =
       (enq.fetched_by && (
         enq.fetched_by === "admin" ||
         enq.fetched_by === "superadmin" ||
-        enq.fetched_by.toLowerCase().includes("admin") ||
-        employees.some(emp => emp.id === enq.fetched_by || emp.f2FintechId === enq.fetched_by)
+        enq.fetched_by.toLowerCase().includes("admin")
       )) ||
-      isUserAdvisor(enq.email) ||
+      isFetchedByAnyEmployee ||
       (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"));
 
     return !isFetchedByStaff;
