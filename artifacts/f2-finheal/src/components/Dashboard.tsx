@@ -535,6 +535,28 @@ export default function Dashboard({
     });
   };
 
+  const formatActiveDuration = (hoursFraction: number, isShort = false) => {
+    if (!hoursFraction || hoursFraction <= 0) return isShort ? "0m" : "0 mins";
+    const totalMinutes = Math.round(hoursFraction * 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    
+    if (isShort) {
+      if (hrs > 0) {
+        return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+      }
+      return `${mins}m`;
+    } else {
+      if (hrs > 0) {
+        const hrLabel = hrs === 1 ? "hr" : "hrs";
+        const minLabel = mins === 1 ? "min" : "mins";
+        return mins > 0 ? `${hrs} ${hrLabel} ${mins} ${minLabel}` : `${hrs} ${hrLabel}`;
+      }
+      const minLabel = totalMinutes === 1 ? "min" : "mins";
+      return `${totalMinutes} ${minLabel}`;
+    }
+  };
+
   const rawFilteredUsageData = getFilteredData(dashboardSummary?.platform_usage?.history || [], usageRange);
   const filteredUsageHours = rawFilteredUsageData.reduce((sum, item) => sum + (item.hours || 0), 0);
   const filteredUsageTotalHours = parseFloat(filteredUsageHours.toFixed(1));
@@ -1863,7 +1885,7 @@ ${sheetDataXml}
                 <div>
                   <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Active Hours</div>
                   <div className="text-[15px] font-bold leading-none mt-1">
-                    {loadingSummary ? "..." : `${filteredUsageTotalHours}h`}
+                    {loadingSummary ? "..." : formatActiveDuration(filteredUsageTotalHours, true)}
                   </div>
                 </div>
               </div>
@@ -1872,7 +1894,7 @@ ${sheetDataXml}
                 <div>
                   <div className="text-[9px] font-bold text-white/65 uppercase tracking-wider leading-none">Daily Avg</div>
                   <div className="text-[15px] font-bold leading-none mt-1">
-                    {loadingSummary ? "..." : `${filteredUsageDailyAvg}h`}
+                    {loadingSummary ? "..." : formatActiveDuration(filteredUsageDailyAvg, true)}
                   </div>
                 </div>
               </div>
@@ -2763,7 +2785,7 @@ ${sheetDataXml}
                     <StatCard
                       icon="⏱️"
                       label="Active Hours"
-                      value={`${filteredUsageTotalHours} Hours`}
+                      value={formatActiveDuration(filteredUsageTotalHours)}
                       sub={`Active for ${filteredUsageDays} day(s)`}
                       color="#ec4899"
                       delay={320}
@@ -3040,7 +3062,7 @@ ${sheetDataXml}
                                   <div className="flex items-center gap-2">
                                     <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
                                     <span className="text-gray-500">Usage:</span>
-                                    <span className="font-bold text-gray-900">{payload[0].value} hours</span>
+                                    <span className="font-bold text-gray-900">{formatActiveDuration(payload[0].value)}</span>
                                   </div>
                                   <div className="text-[9.5px] text-gray-400 mt-0.5">({payload[0].payload.minutes} active minutes)</div>
                                 </div>
@@ -3062,7 +3084,7 @@ ${sheetDataXml}
                           <div className="flex items-center justify-between text-[11.5px] border-b border-gray-50 pb-2">
                             <span className="text-gray-500 font-medium">Daily Average Time</span>
                             <span className="font-bold text-gray-700">
-                              {loadingSummary ? "..." : `${filteredUsageDailyAvg} hrs/day`}
+                              {loadingSummary ? "..." : `${formatActiveDuration(filteredUsageDailyAvg)}/day`}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[11.5px] border-b border-gray-50 pb-2">
@@ -3070,7 +3092,7 @@ ${sheetDataXml}
                               {usageRange === "weekly" ? "Weekly Total Time" : usageRange === "monthly" ? "Monthly Total Time" : "6-Month Total Time"}
                             </span>
                             <span className="font-bold text-gray-700">
-                              {loadingSummary ? "..." : `${filteredUsageTotalHours} hrs`}
+                              {loadingSummary ? "..." : formatActiveDuration(filteredUsageTotalHours)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[11.5px] pb-1">
@@ -3078,7 +3100,7 @@ ${sheetDataXml}
                               {usageRange === "weekly" ? "Weekly Target Goal" : usageRange === "monthly" ? "Monthly Target Goal" : "6-Month Target Goal"}
                             </span>
                             <span className="font-bold text-emerald-600">
-                              {usageRange === "weekly" ? "3.5 hrs" : usageRange === "monthly" ? "15.0 hrs" : "90.0 hrs"} ({filteredUsageTotalHours >= (usageRange === "weekly" ? 3.5 : usageRange === "monthly" ? 15.0 : 90.0) ? "Met" : "In Progress"})
+                              {usageRange === "weekly" ? formatActiveDuration(3.5) : usageRange === "monthly" ? formatActiveDuration(15) : formatActiveDuration(90)} ({filteredUsageTotalHours >= (usageRange === "weekly" ? 3.5 : usageRange === "monthly" ? 15.0 : 90.0) ? "Met" : "In Progress"})
                             </span>
                           </div>
                         </div>
