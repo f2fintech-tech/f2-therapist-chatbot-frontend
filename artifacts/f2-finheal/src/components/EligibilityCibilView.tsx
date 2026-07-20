@@ -2943,7 +2943,7 @@ export default function EligibilityCibilView({
                 // Hide the card completely when a statement is selected but not yet analyzed
                 null
               ) : (
-                <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
+                <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[210px] gap-3">
                   <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
                     <FileText className="w-6 h-6" />
                   </div>
