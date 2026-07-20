@@ -776,6 +776,7 @@ export default function EligibilityCibilView({
         return;
       }
     }
+    
     // For Experian, combine first + last name; backend will split them
     const effectiveName = cibilBureau === "experian"
       ? `${cibilFirstName.trim()} ${cibilLastName.trim()}`.trim()
@@ -1855,7 +1856,7 @@ export default function EligibilityCibilView({
                                 : "text-gray-500 hover:text-gray-700"
                             }`}
                           >
-                            Individual CIBIL
+                            Individual {cibilBureau === "experian" ? "Experian" : "CIBIL"}
                           </button>
                           <button
                             type="button"
@@ -1871,7 +1872,7 @@ export default function EligibilityCibilView({
                                 : "text-gray-500 hover:text-gray-700"
                             }`}
                           >
-                            Company CIBIL
+                            Company {cibilBureau === "experian" ? "Experian" : "CIBIL"}
                           </button>
                         </div>
                       </>
@@ -1891,14 +1892,15 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      title=""
                                       value={cibilFirstName}
                                       onChange={(e) => setCibilFirstName(e.target.value)}
                                       placeholder="e.g. Rahul"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                     />
                                   </TooltipTrigger>
-                                  <TooltipContent>
-                                    Enter your first name as it appears in bank and ID records.
+                                  <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                    Please fill out this field.
                                   </TooltipContent>
                                 </Tooltip>
                               </div>
@@ -1912,14 +1914,15 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      title=""
                                       value={cibilLastName}
                                       onChange={(e) => setCibilLastName(e.target.value)}
                                       placeholder="e.g. Sharma"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                     />
                                   </TooltipTrigger>
-                                  <TooltipContent>
-                                    Enter your last name. If you have no last name, you can use your initials.
+                                  <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                    Please fill out this field.
                                   </TooltipContent>
                                 </Tooltip>
                               </div>
@@ -1928,7 +1931,7 @@ export default function EligibilityCibilView({
                         ) : (
                           <div className="flex flex-col">
                             <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                              {cibilReportType === "company" ? "Company Registered Name" : "Full Name"}
+                              {cibilReportType === "company" ? "Company Registered Name (As on PAN)" : "Full Name (As on PAN)"}
                             </label>
                             <div className="relative">
                               <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -1937,72 +1940,128 @@ export default function EligibilityCibilView({
                                   <input
                                     type="text"
                                     required
+                                    title=""
                                     value={cibilName}
                                     onChange={(e) => setCibilName(e.target.value)}
                                     placeholder={cibilReportType === "company" ? "e.g. F2 Fintech Private Limited" : "e.g. Rahul Sharma"}
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                   />
                                 </TooltipTrigger>
-                                <TooltipContent>
-                                  Enter the exact name as registered on PAN card/company registration certificate.
+                                <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                  Please fill out this field.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                           </div>
                         )}
 
-                        <div className="flex flex-col">
-                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                            {cibilReportType === "company" ? "Auth Signatory Mobile Number" : "Mobile Number"}
-                          </label>
-                          <div className="relative">
-                            <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <input
-                                  type="tel"
-                                  required
-                                  pattern="[0-9]{10}"
-                                  value={cibilPhone}
-                                  onChange={handlePhoneChange}
-                                  placeholder="10-digit number"
-                                  className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Provide the active mobile number linked with your bank accounts.
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-
-                        {cibilBureau !== "experian" && (
+                        {cibilBureau === "experian" ? (
                           <div className="flex flex-col">
-                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                              {cibilReportType === "company" ? "Company PAN Number" : "PAN Card Number"}
-                            </label>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Mobile Number</label>
                             <div className="relative">
-                              <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                              <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <input
-                                    type="text"
+                                    type="tel"
                                     required
-                                    value={cibilPan}
-                                    onChange={handlePanChange}
-                                    placeholder="ABCDE1234F"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
+                                    title=""
+                                    pattern="[0-9]{10}"
+                                    value={cibilPhone}
+                                    onChange={handlePhoneChange}
+                                    placeholder="e.g. 98765XXXXX"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                   />
                                 </TooltipTrigger>
-                                <TooltipContent>
-                                  Standard 10-digit Permanent Account Number (PAN). Format: ABCDE1234F.
+                                <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                  Please fill out this field.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                           </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                                {cibilReportType === "company" ? "Auth Signatory Mobile Number" : "Mobile Number"}
+                              </label>
+                              <div className="relative">
+                                <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <input
+                                      type="tel"
+                                      required
+                                      title=""
+                                      pattern="[0-9]{10}"
+                                      value={cibilPhone}
+                                      onChange={handlePhoneChange}
+                                      placeholder="e.g. 98765XXXXX"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                    Please fill out this field.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                                {cibilReportType === "company" ? "Company PAN Number" : "PAN Card Number"}
+                              </label>
+                              <div className="relative">
+                                <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <input
+                                      type="text"
+                                      required
+                                      title=""
+                                      value={cibilPan}
+                                      onChange={handlePanChange}
+                                      placeholder="e.g. AAAAA1111B"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
+                                    Please fill out this field.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
                         )}
 
-                        <div className="flex bg-gray-55/30 p-3 rounded-lg border border-gray-150">
+                        <div className="flex flex-col mb-4 mt-2">
+                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Select Credit Bureau</label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCibilBureau("cibil")}
+                              className={`flex-1 py-2 rounded-[10px] text-[13px] font-bold border transition-all cursor-pointer ${
+                                cibilBureau === "cibil"
+                                  ? "bg-primary text-white border-primary shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              CIBIL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCibilBureau("experian")}
+                              className={`flex-1 py-2 rounded-[10px] text-[13px] font-bold border transition-all cursor-pointer ${
+                                cibilBureau === "experian"
+                                  ? "bg-primary text-white border-primary shadow-sm"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              Experian
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex bg-gray-55/30 pt-2 rounded-[12px]">
                           <input
                             type="checkbox"
                             id="terms-check"
@@ -2012,7 +2071,7 @@ export default function EligibilityCibilView({
                             className="mt-0.5 shrink-0 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded cursor-pointer"
                           />
                           <label htmlFor="terms-check" className="ml-2 text-[11px] text-gray-500 leading-normal select-none">
-                            I authorize FinHeal to retrieve my credit information from CICs. I have read and agree to the{" "}
+                            By logging in, you agree to the following{" "}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2022,9 +2081,19 @@ export default function EligibilityCibilView({
                               }}
                               className="text-primary hover:underline font-bold"
                             >
-                              Consent Terms
-                            </button>{" "}
-                            and{" "}
+                              Credit Consent
+                            </button>,{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveTermsTab("terms-of-use");
+                                setIsTermsModalOpen(true);
+                              }}
+                              className="text-primary hover:underline font-bold"
+                            >
+                              Terms of Use
+                            </button>,{" "}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2035,12 +2104,33 @@ export default function EligibilityCibilView({
                               className="text-primary hover:underline font-bold"
                             >
                               Privacy Policy
+                            </button>,{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveTermsTab("dpdp-notice");
+                                setIsTermsModalOpen(true);
+                              }}
+                              className="text-primary hover:underline font-bold"
+                            >
+                              DPDP Notice
+                            </button> and{" "}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setActiveTermsTab("data-retention");
+                                setIsTermsModalOpen(true);
+                              }}
+                              className="text-primary hover:underline font-bold"
+                            >
+                              Data Retention Policy
                             </button>
-                            .
                           </label>
                         </div>
 
-                        <div className="flex flex-col gap-2 pt-2">
+                        <div className="text-[15.5px] flex flex-col gap-2 pt-1">
                           <button
                             type="submit"
                             disabled={cibilFetching || !cibilAgreed}
@@ -2048,27 +2138,21 @@ export default function EligibilityCibilView({
                           >
                             {cibilFetching ? (
                               <>
-                                <div className="animate-spin rounded-full h-4.5 w-4.5 border-b-2 border-white"></div>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                 <span>Verifying Credit Record...</span>
                               </>
                             ) : (
                               <>
                                 <ShieldCheck className="w-4.5 h-4.5" />
-                                <span>Retrieve Credit Score</span>
+                                <span>Download {cibilBureau === "experian" ? "Experian" : "CIBIL"} Credit Report</span>
                               </>
                             )}
                           </button>
                           
-                          {/* Expose link to clear cache if needed */}
-                          {storedCibilReport && (
-                            <button
-                              type="button"
-                              onClick={() => setCibilReport(storedCibilReport)}
-                              className="w-full bg-gray-50 text-gray-700 font-bold py-2.5 rounded-[12px] hover:bg-gray-100 transition-all cursor-pointer text-xs border border-gray-200 mt-1"
-                            >
-                              Open Last Retrieved Report
-                            </button>
-                          )}
+                          <div className="flex items-center justify-center gap-1.5 mt-2 pb-1">
+                            <ShieldCheck className="w-[15px] h-[15px] text-emerald-500" />
+                            <span className="text-[11px] text-gray-400 font-medium tracking-tight">Secure connection. Your credit history is safe with us.</span>
+                          </div>
                         </div>
                       </form>
                     </TooltipProvider>
