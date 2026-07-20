@@ -158,8 +158,8 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600"></span>
                     </span>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">
-                      Live Backend Processing
+                    <span className="text-[11.5px] font-extrabold tracking-wide text-indigo-600">
+                      Relax! We're analyzing your bank statement... ☕
                     </span>
                   </div>
                   <span className="text-[11px] font-bold text-slate-400">
@@ -178,36 +178,6 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
                     <span>{CREATIVE_TICKERS[tickerIndex]}</span>
                   </div>
                 )}
-              </div>
-
-              {/* Real-time Log Stream Terminal Box */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
-                    Execution Log Stream
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Real-time EC2 status</span>
-                </div>
-
-                <div
-                  ref={logContainerRef}
-                  className="bg-slate-900 rounded-[16px] p-3.5 h-[130px] overflow-y-auto font-mono text-[11px] text-slate-200 flex flex-col gap-1.5 border border-slate-800 shadow-inner scrollbar-thin scrollbar-thumb-slate-700"
-                >
-                  {logs.length === 0 ? (
-                    <div className="text-slate-500 italic text-[10px] my-auto text-center">
-                      Waiting for backend execution logs...
-                    </div>
-                  ) : (
-                    logs.map((log) => (
-                      <div key={log.id} className="flex items-start gap-2 leading-relaxed animate-fade-in">
-                        <span className="text-slate-500 shrink-0 text-[10px] font-sans">[{log.time}]</span>
-                        <span className={log.step === 6 ? "text-emerald-400 font-bold" : "text-indigo-300 font-medium"}>
-                          ➔ {log.text}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
               </div>
             </>
           )}

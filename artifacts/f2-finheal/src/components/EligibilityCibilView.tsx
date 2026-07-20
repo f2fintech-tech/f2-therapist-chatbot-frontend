@@ -681,11 +681,6 @@ export default function EligibilityCibilView({
         setBsaBankName(data.bank_name || "Verified Bank");
         setBsaPeriod(data.metrics?.statement_period || "");
         setBsaVerified(true);
-
-        toast({
-          title: "Bank Statement Verified!",
-          description: `Income: ${formatCurrency(data.metrics?.verified_monthly_salary || 0)}, EMI: ${formatCurrency(data.metrics?.total_existing_monthly_emi || 0)}`,
-        });
       }
 
       window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
