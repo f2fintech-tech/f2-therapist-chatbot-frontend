@@ -24,7 +24,7 @@ export interface UseBackendChatResult {
   isHealthy: boolean | null;
   conversations: ConversationSummary[];
   conversationCount: number;
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, docOptions?: { document_name?: string; document_text?: string }) => Promise<void>;
   editMessage: (messageId: string, message: string) => Promise<void>;
   startNewChatWithMessage: (message: string) => Promise<void>;
   stopSendingMessage: () => void;
@@ -35,7 +35,7 @@ export interface UseBackendChatResult {
   renameConversation: (conversationId: string, title: string) => Promise<void>;
 }
 
-function createUserMessage(content: string): ChatMessage {
+function createUserMessage(content: string, attachmentName?: string): ChatMessage {
   const timestamp = new Date().toISOString();
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return {
@@ -45,6 +45,7 @@ function createUserMessage(content: string): ChatMessage {
     content,
     timestamp,
     time: formatMessageTimestamp(timestamp),
+    attachmentName,
   };
 }
 
@@ -119,7 +120,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
   );
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, docOptions?: { document_name?: string; document_text?: string }) => {
       const trimmedMessage = message.trim();
       if (!trimmedMessage || !userId || isSendingMessage) {
         return;
@@ -127,7 +128,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
 
       const controller = new AbortController();
       activeSendControllerRef.current = controller;
-      const optimisticMessage = createUserMessage(trimmedMessage);
+      const optimisticMessage = createUserMessage(trimmedMessage, docOptions?.document_name);
       const assistantMessageId = `assistant-${Date.now()}`;
       const initialAssistantMessage: ChatMessage = {
         id: assistantMessageId,
@@ -150,6 +151,8 @@ export function useBackendChat(userId: string): UseBackendChatResult {
           message: trimmedMessage,
           user_id: userId,
           conversation_id: conversationId ?? undefined,
+          document_name: docOptions?.document_name,
+          document_text: docOptions?.document_text,
         }, (chunk) => {
           if (chunk.type === "token") {
             accumulatedContent += chunk.content;

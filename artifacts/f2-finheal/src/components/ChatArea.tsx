@@ -19,7 +19,7 @@ interface ChatAreaProps {
   remainingHearts?: number | null;
   onClearChat: () => void;
   onMoodUpdate: (dims: MoodDimensions | null) => void;
-  onSendMessage: (text: string) => Promise<void>;
+  onSendMessage: (text: string, docOptions?: { document_name?: string; document_text?: string }) => Promise<void>;
   onEditMessage?: (messageId: string, text: string) => Promise<void>;
   onStopSendingMessage: () => void;
   onLogout?: () => void;
@@ -67,6 +67,8 @@ export default function ChatArea({
   const [showAd, setShowAd] = useState(true);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [attachedDoc, setAttachedDoc] = useState<{ name: string; text: string } | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
   const handleStartEdit = (messageId: string, currentContent: string) => {
     setEditingMessageId(messageId);
@@ -165,101 +167,60 @@ export default function ChatArea({
   }, [aggregatedMood, onMoodUpdate]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || isLoading || isSendingMessage) return;
+    if (!text.trim() || isLoading || isSendingMessage || isUploadingDoc) return;
 
+    const currentDoc = attachedDoc;
+    setAttachedDoc(null);
     setInputValue("");
     try {
-
-      await onSendMessage(prefillMessage?.card ? prefillMessage.card + "\n\nUser question: " + text.trim() : text.trim());
-
+      const promptText = prefillMessage?.card ? prefillMessage.card + "\n\nUser question: " + text.trim() : text.trim();
+      await onSendMessage(
+        promptText,
+        currentDoc ? { document_name: currentDoc.name, document_text: currentDoc.text } : undefined
+      );
     } catch {
       // The hook already normalizes and stores the error state.
     }
   };
 
-  const handleFileSelected = async (file: File | null) => {
-    if (!file || isLoading || isSendingMessage) return;
+  const handleFileSelected = async (file: File | null, inputElement?: HTMLInputElement) => {
+    if (!file || isLoading || isSendingMessage || isUploadingDoc) return;
 
-    // Check if the file is a PDF, Excel, or CSV and ask if it's a bank statement
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const isDocType = ext && ['pdf', 'xls', 'xlsx', 'csv'].includes(ext);
+    setIsUploadingDoc(true);
+    toast({
+      title: "Attaching File",
+      description: `Reading "${file.name}"...`,
+    });
 
-    if (isDocType) {
-      const isBsa = window.confirm(
-        `Would you like to analyze "${file.name}" as a bank statement to verify your loan eligibility?`
-      );
-      
-      if (isBsa) {
-        const password = window.prompt(
-          "If this statement is password-protected, enter the password (otherwise leave blank):"
-        );
-        
-        toast({
-          title: "Analyzing Statement",
-          description: "Analyzing statement using Bank Statement Analyzer API...",
-        });
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("user_id", userProfile.userId);
 
-        const formData = new FormData();
-        formData.append("user_id", userProfile.userId);
-        formData.append("file", file);
-        if (password !== null && password !== "") {
-          formData.append("password", password);
-        }
+      const res = await fetch(`${apiBase}/chat/upload-document`, {
+        method: "POST",
+        body: formData,
+      });
 
-        try {
-          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-          const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!res.ok) {
-            const errJson = await res.json();
-            throw new Error(errJson.detail || "Failed to analyze bank statement");
-          }
-
-          const data = await res.json();
-          
-          toast({
-            title: "Bank Statement Verified!",
-            description: "Your monthly income and EMIs have been updated successfully.",
-          });
-
-          // Dispatch sync event
-          window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
-
-          // Send message to bot to react to the upload
-          const verifiedIncome = data.metrics?.verified_monthly_salary || 0;
-          const verifiedEmi = data.metrics?.total_existing_monthly_emi || 0;
-          const formattedIncome = Number(verifiedIncome).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-          const formattedEmi = Number(verifiedEmi).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-
-          await onSendMessage(
-            `I have uploaded my bank statement. It verifies my gross monthly income as ${formattedIncome} and existing EMIs as ${formattedEmi}. Please analyze my loan eligibility based on this.`
-          );
-        } catch (err: any) {
-          console.error(err);
-          toast({
-            title: "Analysis Failed",
-            description: err.message || "Failed to process bank statement",
-            variant: "destructive",
-          });
-        }
-        return;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Failed to parse document");
       }
+
+      const data = await res.json();
+      setAttachedDoc({ name: data.filename, text: data.extracted_text });
+    } catch (err: any) {
+      console.error("Document upload error:", err);
+      toast({
+        title: "Attachment Failed",
+        description: err.message || "Failed to process document",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingDoc(false);
+      if (inputElement) inputElement.value = "";
     }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string | ArrayBuffer | null;
-      if (!result) return;
-      try {
-        await onSendMessage(JSON.stringify({ type: 'file', name: file.name, mime: file.type, data: result }));
-      } catch {
-        // ignore send errors
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleClearDraft = () => {
@@ -567,6 +528,16 @@ export default function ChatArea({
                   </div>
                 ) : (
                   <>
+                    {m.attachmentName && (
+                      <div className={`inline-flex items-center gap-[6px] text-[11px] font-semibold px-[10px] py-[4px] rounded-[10px] mb-[6px] shadow-sm border ${
+                        m.role === 'user'
+                          ? 'bg-blue-600/40 text-white border-white/30 self-end'
+                          : 'bg-blue-50 text-blue-800 border-blue-200 self-start'
+                      }`}>
+                        <span>📄</span>
+                        <span className="truncate max-w-[240px]">{m.attachmentName}</span>
+                      </div>
+                    )}
                     <div className={`px-[14px] py-[12px] text-[13px] leading-relaxed sm:px-[16px] sm:py-[13px] sm:text-[13.5px] w-fit ${
                       m.role === 'bot' 
                         ? 'bg-white border-[1.5px] border-gray-100 text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.06)] rounded-[4px_14px_14px_14px] self-start'
@@ -605,7 +576,29 @@ export default function ChatArea({
           </div>
         )}
       </div>
-        <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
+      <div className="p-[12px_16px_14px] bg-white border-t border-gray-100 rounded-b-[20px] shrink-0 sm:px-[20px]">
+        {isUploadingDoc && (
+          <div className="max-w-[800px] mx-auto mb-2 flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-[12px] px-3.5 py-2 text-xs text-blue-900 font-medium shadow-sm animate-pulse">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="font-semibold">Reading document for Gemini analysis...</span>
+          </div>
+        )}
+        {attachedDoc && !isUploadingDoc && (
+          <div className="max-w-[800px] mx-auto mb-2 flex items-center justify-between bg-blue-50 border border-blue-200 rounded-[12px] px-3.5 py-2 text-xs text-blue-900 font-medium shadow-sm">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <span className="text-base shrink-0">📄</span>
+              <span className="truncate font-semibold">{attachedDoc.name}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachedDoc(null)}
+              className="text-gray-400 hover:text-red-500 font-bold ml-2 text-sm p-1 rounded hover:bg-red-50 transition-colors"
+              title="Remove attached document"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {prefillMessage?.card && (<div style={{ background: "#eef0fd", border: "1.5px solid #d4d8fa", borderRadius: "12px", padding: "10px 14px", marginBottom: "8px", maxWidth: "800px", margin: "0 auto 8px", display: "flex", alignItems: "flex-start", gap: "10px" }}><span style={{ fontSize: "18px" }}>📎</span><div style={{ flex: 1 }}><div style={{ fontSize: "11px", fontWeight: 700, color: "#3344e6", marginBottom: "2px" }}>ATTACHED CONTENT</div><div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>{prefillMessage.card}</div></div><button onClick={() => onClearPrefill?.()} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "16px", lineHeight: 1, padding: "0 0 0 8px", flexShrink: 0 }}>✕</button></div>)}
         <div className="max-w-[800px] mx-auto bg-gray-50 border-[1.5px] border-gray-200 rounded-[28px] flex flex-row items-end p-[6px_8px_6px_10px] gap-[6px] transition-all focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(50,68,230,0.08)] sm:p-[8px_10px_8px_14px] sm:gap-[10px]">
           
@@ -623,7 +616,7 @@ export default function ChatArea({
                 <input
                   type="file"
                   accept="*/*"
-                  onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null)}
+                  onChange={(e) => void handleFileSelected(e.target.files ? e.target.files[0] : null, e.target)}
                   className="hidden"
                 />
               </label>
@@ -694,7 +687,7 @@ export default function ChatArea({
               <button 
                 type="button"
                 onClick={() => void handleSend(inputValue)}
-                disabled={isLoading || !inputValue.trim()}
+                disabled={isLoading || isUploadingDoc || !inputValue.trim()}
                 className="w-[36px] h-[36px] cursor-pointer rounded-full bg-primary text-white text-[15px] flex items-center justify-center transition-all shadow-[0_2px_8px_rgba(50,68,230,0.35)] shrink-0 hover:bg-[#1e2db8] hover:scale-105 hover:shadow-[0_8px_24px_rgba(50,68,230,0.22)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
