@@ -603,8 +603,8 @@ export default function FinHealChat() {
     if (authSession) handleLogout();
   }, SESSION_TIMEOUT_MS);
 
-  const handleSendMessage = useCallback(async (text: string) => {
-    await chat.sendMessage(text);
+  const handleSendMessage = useCallback(async (text: string, docOptions?: { document_name?: string; document_text?: string }) => {
+    await chat.sendMessage(text, docOptions);
     if (authSession?.isGuest) {
       await refreshHearts();
     }

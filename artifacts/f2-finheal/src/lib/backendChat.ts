@@ -78,6 +78,7 @@ export interface ChatMessage {
   time: string;
   mood?: BackendMood;
   suggestions?: string[];
+  attachmentName?: string;
 }
 
 export interface ConversationSummary {
@@ -112,6 +113,8 @@ export interface BackendConversationMessage {
   created_at?: string;
   mood?: BackendMood;
   suggestions?: string[];
+  attachment_metadata?: { filename?: string; type?: string; char_count?: number } | null;
+  attachment_name?: string | null;
 }
 
 export interface BackendConversationSummary {
@@ -427,6 +430,7 @@ function normalizeConversation(summary: BackendConversationSummary): Conversatio
 
 function normalizeConversationMessage(message: BackendConversationMessage): ChatMessage {
   const rawTimestamp = message.timestamp || message.created_at || new Date().toISOString();
+  const attachmentName = message.attachment_metadata?.filename || message.attachment_name || undefined;
   return {
     id: message.id || message.message_id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     role: message.role === "user" ? "user" : "bot",
@@ -435,6 +439,7 @@ function normalizeConversationMessage(message: BackendConversationMessage): Chat
     time: formatMessageTimestamp(rawTimestamp),
     mood: message.mood,
     suggestions: message.suggestions,
+    attachmentName,
   };
 }
 
@@ -449,6 +454,8 @@ export async function sendChatMessage(
     user_id: string;
     conversation_id?: string;
     message_id?: string;
+    document_name?: string;
+    document_text?: string;
   },
   onChunk: (chunk: any) => void,
   signal?: AbortSignal
