@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
+import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 
 
 function getLenderLogoUrl(name: string): string | null {
@@ -542,7 +543,6 @@ export default function EligibilityCibilView({
       window.removeEventListener("finheal:lenders_update", handleUpdate);
     };
   }, []);
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -551,9 +551,33 @@ export default function EligibilityCibilView({
     }
   };
 
+  // BSA Streaming Progress Modal States
+  const [bsaModalOpen, setBsaModalOpen] = useState<boolean>(false);
+  const [bsaModalStep, setBsaModalStep] = useState<number>(1);
+  const [bsaModalMessage, setBsaModalMessage] = useState<string>("");
+  const [bsaModalLogs, setBsaModalLogs] = useState<LogEntry[]>([]);
+  const [bsaSessionId, setBsaSessionId] = useState<string>("");
+
   const performBsaUpload = async (file: File, isCibilContext: boolean = false) => {
     setBsaUploading(true);
     setBsaError(null);
+    setBsaModalOpen(true);
+    setBsaModalStep(1);
+    setBsaModalMessage("Initializing secure bank statement analysis...");
+    setBsaModalLogs([]);
+    setBsaSessionId("");
+
+    const addLog = (stepNum: number, textMsg: string) => {
+      setBsaModalLogs((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(7),
+          time: new Date().toLocaleTimeString("en-US", { hour12: false }),
+          text: textMsg,
+          step: stepNum,
+        },
+      ]);
+    };
 
     const formData = new FormData();
     formData.append("user_id", userId);
@@ -567,32 +591,85 @@ export default function EligibilityCibilView({
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
+      const response = await fetch(`${apiBase}/cibil/bsa/upload-stream`, {
         method: "POST",
         body: formData,
       });
 
-      if (!res.ok) {
-        const errJson = await res.json();
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
         throw new Error(errJson.detail || "Failed to analyze bank statement");
       }
 
-      const data = await res.json();
-      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      if (!reader) {
+        throw new Error("Unable to read response stream.");
+      }
+
+      let done = false;
+      let finalBsaData: any = null;
+      let buffer = "";
+
+      while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        done = streamDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("data:")) {
+              const jsonStr = trimmed.replace(/^data:\s*/, "");
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+                if (parsed.sess_id) {
+                  setBsaSessionId(parsed.sess_id);
+                }
+                if (parsed.step) {
+                  setBsaModalStep(parsed.step);
+                }
+                if (parsed.message) {
+                  setBsaModalMessage(parsed.message);
+                  addLog(parsed.step || 1, parsed.message);
+                }
+                if (parsed.data) {
+                  finalBsaData = parsed.data;
+                }
+              } catch (e: any) {
+                if (e.message && !e.message.includes("JSON")) {
+                  throw e;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const data = finalBsaData;
+      if (!data) {
+        throw new Error("BSA analysis stream finished without data.");
+      }
+
       if (isCibilContext && cibilReport) {
         setCibilReport({
           ...cibilReport,
-          bsa_analysis: data
+          bsa_analysis: data,
         });
         toast({
           title: "Statement Attached",
           description: "Bank statement analysis successfully attached to this CIBIL report.",
         });
       } else {
-        // Auto-fill states for generic standalone tab
         if (data.metrics) {
-          setEligIncome(String(Math.round(data.metrics.verified_monthly_salary)));
-          setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi)));
+          setEligIncome(String(Math.round(data.metrics.verified_monthly_salary || 0)));
+          setEligEmi(String(Math.round(data.metrics.total_existing_monthly_emi || 0)));
         }
         if (data.excel_report_url) {
           setBsaExcelUrl(data.excel_report_url);
@@ -600,15 +677,19 @@ export default function EligibilityCibilView({
         setBsaBankName(data.bank_name || "Verified Bank");
         setBsaPeriod(data.metrics?.statement_period || "");
         setBsaVerified(true);
-        
+
         toast({
           title: "Bank Statement Verified!",
-          description: `Income: ${formatCurrency(data.metrics.verified_monthly_salary)}, EMI: ${formatCurrency(data.metrics.total_existing_monthly_emi)}`,
+          description: `Income: ${formatCurrency(data.metrics?.verified_monthly_salary || 0)}, EMI: ${formatCurrency(data.metrics?.total_existing_monthly_emi || 0)}`,
         });
       }
-      
-      // Dispatch update to sync other components
+
       window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
+
+      setTimeout(() => {
+        setBsaModalOpen(false);
+      }, 1200);
+
     } catch (err: any) {
       console.error(err);
       setBsaError(err.message || "Failed to process file");
@@ -2849,6 +2930,21 @@ export default function EligibilityCibilView({
         showAcceptCheckbox={!cibilReport}
         agreed={cibilAgreed}
         onAgreeChange={setCibilAgreed}
+      />
+
+      {/* BSA Real-time Log Stream & Progress Stepper Modal */}
+      <BsaProgressModal
+        isOpen={bsaModalOpen}
+        currentStep={bsaModalStep}
+        currentMessage={bsaModalMessage}
+        logs={bsaModalLogs}
+        fileName={selectedBsaFile?.name || "bank_statement.pdf"}
+        sessionId={bsaSessionId}
+        error={bsaError}
+        onClose={() => {
+          setBsaModalOpen(false);
+          setBsaUploading(false);
+        }}
       />
     </div>
   );
