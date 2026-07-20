@@ -485,7 +485,8 @@ export default function CibilAnalyzerView({
         logging: false,
         backgroundColor: "#ffffff",
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        windowWidth: 1024
       });
       
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -542,7 +543,7 @@ export default function CibilAnalyzerView({
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(7.5);
         pdf.setTextColor(156, 163, 175); // gray-400
-        pdf.text("CIBIL BUREAU ANALYZER", margin, margin - 3.5);
+        pdf.text(`CREDIT REPORT ANALYZER • ${(report.bureau || "CIBIL").toUpperCase()}`, margin, margin - 3.5);
         
         pdf.setFont("helvetica", "normal");
         pdf.text(`CLIENT: ${report.name.toUpperCase()}`, pdfWidth - margin, margin - 3.5, { align: "right" });
@@ -552,7 +553,7 @@ export default function CibilAnalyzerView({
         pdf.text(`Page ${i} of ${totalPages}`, pdfWidth - margin, pdfHeight - margin + 5.5, { align: "right" });
       }
       
-      pdf.save(`CIBIL_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
+      pdf.save(`Credit_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
       
       toast({
         title: "PDF Saved!",
@@ -834,11 +835,20 @@ export default function CibilAnalyzerView({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">CIBIL Bureau Analyzer</h1>
+              <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">Credit Report Analyzer</h1>
               {report && (
-                <span className="text-[11px] bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full inline-block cibil-pdf-only-name">
-                  {report.name}
-                </span>
+                <>
+                  <span className="text-[11px] bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full inline-block cibil-pdf-only-name">
+                    {report.name}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block uppercase border shadow-xs ${
+                    (report.bureau || "").toLowerCase() === "experian"
+                      ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}>
+                    {report.bureau || "CIBIL"}
+                  </span>
+                </>
               )}
             </div>
             <p className="text-[11px] font-medium text-gray-400 uppercase tracking-[0.5px]">Official Credit Diagnostic Toolkit</p>
