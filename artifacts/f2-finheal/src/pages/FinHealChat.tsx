@@ -1173,6 +1173,8 @@ export default function FinHealChat() {
               onApplyNow={handleApplyLoan}
               onTalkToAdvisor={() => setMainView("advisor")}
               onOpenAdmin={openAdmin}
+              isGuest={authSession?.isGuest ?? true}
+              onLoginRequired={handleLogout}
             />
           ) : mainView === "cibil-analyzer" ? (
             <CibilAnalyzerView

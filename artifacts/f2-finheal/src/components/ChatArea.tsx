@@ -344,6 +344,15 @@ export default function ChatArea({
             display: flex !important;
           }
         }
+
+        @keyframes heartPump {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.18); }
+        }
+        .heart-pump {
+          display: inline-block;
+          animation: heartPump 1.4s infinite ease-in-out;
+        }
       `}</style>
       <div className="relative flex flex-col gap-[10px] border-b border-gray-100 px-[16px] py-[12px] shrink-0 bg-white dark:bg-slate-950 dark:border-slate-800 rounded-t-[20px] sm:px-[20px] pl-[54px] sm:pl-[84px] lg:pl-0">
         <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center w-full gap-y-3">
@@ -369,44 +378,6 @@ export default function ChatArea({
                 FinHeal AI · {latestConversation} · {conversationCount} {conversationCount === 1 ? "chat" : "chats"}
               </span>
             </div>
-
-            {typeof remainingHearts === "number" && (
-              <div className="mt-[10px] w-full rounded-[18px] border border-primary/10 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] lg:w-[calc(100%-32px)] lg:mx-auto">
-                <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">Hearts remaining</div>
-                    <div className="mt-[6px] text-[12px] text-slate-500 dark:text-slate-400">Each chat uses 10 hearts. Sign up for more access.</div>
-                  </div>
-                  <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 dark:bg-slate-805 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 dark:text-slate-100 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
-                    <span className="heart-pump" aria-hidden="true">❤️</span>
-                    <span>{remainingHearts} / 50</span>
-                  </div>
-                </div>
-
-                <div className="mt-[12px] h-[14px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 shadow-inner">
-                  <div
-                    className={`h-full rounded-full bg-gradient-to-r from-primary via-cyan-500 to-emerald-500 transition-all duration-500 ease-out ${
-                      remainingHearts <= 10 ? "shadow-[0_0_0_8px_rgba(254,226,226,0.16)]" : ""
-                    }`}
-                    style={{ width: `${Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%` }}
-                  />
-                </div>
-
-                <div className="mt-[10px] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span>
-                    {remainingHearts <= 0 ? (
-                      <button
-                        onClick={onSignupPrompt}
-                        className="font-semibold text-primary dark:text-indigo-400 underline hover:text-[#1e2db8] dark:hover:text-indigo-300"
-                      >
-                        Hearts exhausted — click here to sign up and continue chatting free
-                      </button>
-                    ) : "Progress toward sign up — every chat reduces your hearts."}
-                  </span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
-                </div>
-              </div>
-            )}
           </div>
           {/* Action controls container */}
           <div className="flex flex-wrap items-center w-full sm:w-auto justify-start sm:justify-end gap-[8px] sm:ml-auto sm:mr-[96px] 2xl:mr-0 z-20 pt-[2px] sm:pt-0">
@@ -474,6 +445,43 @@ export default function ChatArea({
             )}
           </div>
         </div>
+
+        {/* Hearts Remaining Card - aligned cleanly as a separate row below title and actions */}
+        {typeof remainingHearts === "number" && (
+          <div className="-ml-[38px] sm:-ml-[64px] lg:ml-5 rounded-[18px] border border-primary/10 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-[14px] shadow-[0_20px_80px_rgba(71,85,105,0.06)] sm:px-[18px] select-none">
+            <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">Hearts remaining</div>
+                <div className="mt-[6px] text-[12px] text-slate-500 dark:text-slate-400">Each chat uses 10 hearts. Sign up for more access.</div>
+              </div>
+              <div className="inline-flex items-center gap-[10px] rounded-full bg-slate-100 dark:bg-slate-805 px-[12px] py-[8px] text-[12px] font-semibold text-slate-900 dark:text-slate-100 shadow-[0_4px_14px_rgba(15,23,42,0.08)]">
+                <span className="heart-pump text-[12.5px]" aria-hidden="true">❤️</span>
+                <span>{remainingHearts} / 50</span>
+              </div>
+            </div>
+
+            <div className="mt-[12px] h-[14px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 shadow-inner">
+              <div
+                className={`h-full rounded-full bg-gradient-to-r from-primary via-cyan-500 to-emerald-500 transition-all duration-500 ease-out`}
+                style={{ width: `${Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%` }}
+              />
+            </div>
+
+            <div className="mt-[10px] flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <span>
+                {remainingHearts <= 0 ? (
+                  <button
+                    onClick={onSignupPrompt}
+                    className="font-semibold text-primary dark:text-indigo-400 underline hover:text-[#1e2db8] dark:hover:text-indigo-300 cursor-pointer"
+                  >
+                    Hearts exhausted — click here to sign up and continue chatting free
+                  </button>
+                ) : "Progress toward sign up — every chat reduces your hearts."}
+              </span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{Math.max(0, Math.min(100, Math.round((remainingHearts / 50) * 100)))}%</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (

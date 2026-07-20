@@ -84,6 +84,8 @@ interface EligibilityCibilViewProps {
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
   onTalkToAdvisor?: () => void;
   onOpenAdmin?: (tab?: string) => void;
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
 }
 
 export interface LenderProduct {
@@ -291,6 +293,8 @@ export default function EligibilityCibilView({
   onApplyNow,
   onTalkToAdvisor,
   onOpenAdmin,
+  isGuest = false,
+  onLoginRequired,
 }: EligibilityCibilViewProps) {
   const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa">("eligibility");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
@@ -1198,7 +1202,7 @@ export default function EligibilityCibilView({
               className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 cibilSubTab === "eligibility"
                   ? "bg-primary text-white shadow-md border border-transparent"
-                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
               }`}
             >
               <CheckCircle className="h-4 w-4 shrink-0" />
@@ -1210,17 +1214,17 @@ export default function EligibilityCibilView({
               className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 cibilSubTab === "cibil"
                   ? "bg-primary text-white shadow-md border border-transparent"
-                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <ShieldCheck className="h-4 w-4 shrink-0" />
+              {isGuest ? <Lock className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <ShieldCheck className="h-4 w-4 shrink-0" />}
               <span>CIBIL Score Checker</span>
             </button>
             {hasCibilViewPermission && (
               <button
                 type="button"
                 onClick={() => onOpenAdmin?.("cibil-enquiries")}
-                className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
               >
                 <FileText className="h-4 w-4 shrink-0" />
                 <span>Past Reports fetched</span>
@@ -1232,10 +1236,10 @@ export default function EligibilityCibilView({
               className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
                 cibilSubTab === "bsa"
                   ? "bg-primary text-white shadow-md border border-transparent"
-                  : "bg-gray-50 border border-gray-200 text-gray-600 hover:bg-gray-100"
+                  : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <Sparkles className="h-4 w-4 shrink-0" />
+              {isGuest ? <Lock className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <Sparkles className="h-4 w-4 shrink-0" />}
               <span>Bank Statement Analyzer</span>
             </button>
           </div>
@@ -1638,49 +1642,98 @@ export default function EligibilityCibilView({
 
         {/* ----------------- CIBIL SCORE CHECKER SUBTAB ----------------- */}
         {cibilSubTab === "cibil" && (
-          <div className="animate-fade-up">
-            {cibilError ? (
-              <div className="mx-auto max-w-[480px] my-8">
-                <div className="rounded-[20px] border border-amber-200 bg-amber-50 p-6 shadow-sm flex flex-col items-center text-center">
-                  <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
-                  <h3 className="text-[15px] font-bold text-gray-800">Bureau Record Retrieval Failed</h3>
-                  <div className="my-3 text-[12px] text-gray-600 leading-relaxed max-w-[380px]">
-                    <p className="font-semibold text-rose-600">{cibilError}</p>
-                    <ul className="list-disc text-left pl-5 mt-2 space-y-1 text-gray-500">
-                      <li>The PAN card number might be invalid or typed incorrectly</li>
-                      <li>The mobile number is not linked to your credit bureau file</li>
-                      <li>There is a name mismatch between PAN records and your input</li>
-                    </ul>
-                  </div>
+          <div className="relative animate-fade-up min-h-[400px]">
+            {isGuest && (
+              <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[20px]">
+                <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                  <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                  <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to check CIBIL Score</h3>
+                  <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                    Create a free account or sign in to verify your official credit score, monitor open accounts, and access personalized AI recommendations.
+                  </p>
                   <button
-                    onClick={() => { setCibilError(null); setCibilReport(null); }}
-                    className="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
+                    onClick={onLoginRequired}
+                    className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
+                    type="button"
                   >
-                    Try Again with Different Details
+                    Sign Up / Login
                   </button>
                 </div>
               </div>
-            ) : !cibilReport ? (
-              // CIBIL Retrieval Form
-              <div className="mx-auto max-w-[500px] my-6 animate-fade-up">
-                <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
-                  
-                  {!hasCibilFetchPermission ? (
-                    <div className="text-center py-4">
-                      <div className="mx-auto w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 mb-3">
-                        <Lock className="w-5 h-5" />
+            )}
+
+            <div className={isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}>
+              {cibilError ? (
+                <div className="mx-auto max-w-[480px] my-8">
+                  <div className="rounded-[20px] border border-amber-200 bg-amber-50 p-6 shadow-sm flex flex-col items-center text-center">
+                    <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
+                    <h3 className="text-[15px] font-bold text-gray-800">Bureau Record Retrieval Failed</h3>
+                    <div className="my-3 text-[12px] text-gray-600 leading-relaxed max-w-[380px]">
+                      <p className="font-semibold text-rose-600">{cibilError}</p>
+                      <ul className="list-disc text-left pl-5 mt-2 space-y-1 text-gray-500">
+                        <li>The PAN card number might be invalid or typed incorrectly</li>
+                        <li>The mobile number is not linked to your credit bureau file</li>
+                        <li>There is a name mismatch between PAN records and your input</li>
+                      </ul>
+                    </div>
+                    <button
+                      onClick={() => { setCibilError(null); setCibilReport(null); }}
+                      className="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
+                    >
+                      Try Again with Different Details
+                    </button>
+                  </div>
+                </div>
+              ) : !cibilReport ? (
+                // CIBIL Retrieval Form
+                <div className="mx-auto max-w-[500px] my-6 animate-fade-up">
+                  <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
+                    
+                    {!hasCibilFetchPermission ? (
+                      <div className="text-center py-4">
+                        <div className="mx-auto w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 mb-3">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-[16px] font-bold text-gray-900">
+                          Credit Check Locked
+                        </h2>
+                        <p className="text-[11px] text-gray-400 mt-[2px] font-semibold">Access Denied</p>
+                        <div className="my-4 p-4 rounded-[14px] bg-rose-550 border border-rose-100 text-rose-900 text-left" style={{ backgroundColor: "#fef2f2" }}>
+                          <p className="text-[12px] leading-normal text-rose-700 font-medium">
+                            You do not have permission to fetch credit score reports. Please contact your Super Admin to adjust your Role-Based Access controls (RBA).
+                          </p>
+                        </div>
+                        {storedCibilReport && (
+                          <button
+                            type="button"
+                            onClick={() => setCibilReport(storedCibilReport)}
+                            className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                          >
+                            View Stored Report
+                          </button>
+                        )}
                       </div>
-                      <h2 className="text-[16px] font-bold text-gray-900">
-                        Credit Check Locked
-                      </h2>
-                      <p className="text-[11px] text-gray-400 mt-[2px] font-semibold">Access Denied</p>
-                      <div className="my-4 p-4 rounded-[14px] bg-rose-550 border border-rose-100 text-rose-900 text-left" style={{ backgroundColor: "#fef2f2" }}>
-                        <p className="text-[12px] leading-normal text-rose-700 font-medium">
-                          You do not have permission to fetch credit score reports. Please contact your Super Admin to adjust your Role-Based Access controls (RBA).
-                        </p>
-                      </div>
-                      {storedCibilReport && (
+                    ) : storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
+                      <div className="text-center py-4">
+                        <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <h2 className="text-[16px] font-bold text-gray-900">
+                          Credit Report Fetch Locked
+                        </h2>
+                        <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-200 text-amber-900 text-left">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-[12px] leading-normal text-amber-700 font-medium">
+                                You have fetched your credit report recently (on {new Date(storedCibilReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
+                                To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
+                                You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedCibilReport.fetched_at)}</strong>.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setCibilReport(storedCibilReport)}
@@ -1688,102 +1741,119 @@ export default function EligibilityCibilView({
                         >
                           View Stored Report
                         </button>
-                      )}
-                    </div>
-                  ) : storedCibilReport && isReportFresh(storedCibilReport.fetched_at) && !isExemptRole(userEmail, storedCibilReport.name) ? (
-                    <div className="text-center py-4">
-                      <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
-                        <Lock className="w-5 h-5" />
                       </div>
-                      <h2 className="text-[16px] font-bold text-gray-900">
-                        Credit Report Fetch Locked
-                      </h2>
-                      <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-200 text-amber-900 text-left">
-                        <div className="flex items-start gap-2">
-                          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-[12px] leading-normal text-amber-700 font-medium">
-                              You have fetched your credit report recently (on {new Date(storedCibilReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
-                              To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
-                              You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedCibilReport.fetched_at)}</strong>.
-                            </p>
+                    ) : (
+                      <>
+                        
+                        <div className="text-center mb-6">
+                          <div className="mx-auto w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2.5">
+                            <Lock className="w-5 h-5" />
                           </div>
+                          <h2 className="text-[16px] font-bold text-gray-900">
+                            {cibilReportType === "company"
+                              ? `Check Company ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                              : `Check Your Official ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
+                            }
+                          </h2>
+                          <p className="text-[12px] text-gray-400 mt-1">
+                            {cibilReportType === "company"
+                              ? "Retrieve commercial credit rank and bureau report securely."
+                              : "Retrieve your credit score and bureau report securely."
+                            }
+                          </p>
                         </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setCibilReport(storedCibilReport)}
-                        className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
-                      >
-                        View Stored Report
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      
-                      <div className="text-center mb-6">
-                        <div className="mx-auto w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2.5">
-                          <Lock className="w-5 h-5" />
+
+                        {/* Report Type Selector */}
+                        <div className="flex bg-gray-100 rounded-[12px] p-1 mb-5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCibilReportType("individual");
+                              setCibilName("");
+                              setCibilPhone("");
+                              setCibilPan("");
+                            }}
+                            className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                              cibilReportType === "individual"
+                                ? "bg-white text-primary shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                            }`}
+                          >
+                            Individual CIBIL
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCibilReportType("company");
+                              setCibilName("");
+                              setCibilPhone("");
+                              setCibilPan("");
+                            }}
+                            className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
+                              cibilReportType === "company"
+                                ? "bg-white text-primary shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                            }`}
+                          >
+                            Company CIBIL
+                          </button>
                         </div>
-                        <h2 className="text-[16px] font-bold text-gray-900">
-                          {cibilReportType === "company"
-                            ? `Check Company ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
-                            : `Check Your Official ${cibilBureau === "experian" ? "Experian" : "CIBIL"} Score`
-                          }
-                        </h2>
-                        <p className="text-[12px] text-gray-400 mt-1">
-                          {cibilReportType === "company"
-                            ? "Retrieve commercial credit rank and bureau report securely."
-                            : "Retrieve your credit score and bureau report securely."
-                          }
-                        </p>
-                      </div>
+                      </>
+                    )}
 
-                      {/* Report Type Selector */}
-                      <div className="flex bg-gray-100 rounded-[12px] p-1 mb-5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCibilReportType("individual");
-                            setCibilName("");
-                            setCibilPhone("");
-                            setCibilPan("");
-                          }}
-                          className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
-                            cibilReportType === "individual"
-                              ? "bg-white text-primary shadow-sm"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                        >
-                          Individual CIBIL
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCibilReportType("company");
-                            setCibilName("");
-                            setCibilPhone("");
-                            setCibilPan("");
-                          }}
-                          className={`flex-1 py-1.5 text-[12px] font-bold rounded-[9px] transition-all cursor-pointer ${
-                            cibilReportType === "company"
-                              ? "bg-white text-primary shadow-sm"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                        >
-                          Company CIBIL
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  <TooltipProvider delayDuration={0}>
-                    <form onSubmit={handleFetchCibilReport} className="space-y-4">
-                      {/* Experian: separate First + Last Name fields */}
-                      {cibilBureau === "experian" ? (
-                        <div className="grid grid-cols-2 gap-3">
+                    <TooltipProvider delayDuration={0}>
+                      <form onSubmit={handleFetchCibilReport} className="space-y-4">
+                        {/* Experian: separate First + Last Name fields */}
+                        {cibilBureau === "experian" ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">First Name</label>
+                              <div className="relative">
+                                <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={cibilFirstName}
+                                      onChange={(e) => setCibilFirstName(e.target.value)}
+                                      placeholder="e.g. Rahul"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Enter your first name as it appears in bank and ID records.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Last Name</label>
+                              <div className="relative">
+                                <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={cibilLastName}
+                                      onChange={(e) => setCibilLastName(e.target.value)}
+                                      placeholder="e.g. Sharma"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Enter your last name. If you have no last name, you can use your initials.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
                           <div className="flex flex-col">
-                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">First Name</label>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
+                              {cibilReportType === "company" ? "Company Registered Name" : "Full Name"}
+                            </label>
                             <div className="relative">
                               <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                               <Tooltip>
@@ -1791,82 +1861,23 @@ export default function EligibilityCibilView({
                                   <input
                                     type="text"
                                     required
-                                    value={cibilFirstName}
-                                    onChange={(e) => setCibilFirstName(e.target.value)}
-                                    placeholder="e.g. Rahul"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    value={cibilName}
+                                    onChange={(e) => setCibilName(e.target.value)}
+                                    placeholder={cibilReportType === "company" ? "e.g. F2 Fintech Private Limited" : "e.g. Rahul Sharma"}
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                   />
                                 </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  sideOffset={10}
-                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                                >
-                                  Please fill out this field
+                                <TooltipContent>
+                                  Enter the exact name as registered on PAN card/company registration certificate.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                           </div>
-                          <div className="flex flex-col">
-                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Last Name</label>
-                            <div className="relative">
-                              <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={cibilLastName}
-                                    onChange={(e) => setCibilLastName(e.target.value)}
-                                    placeholder="e.g. Sharma"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  sideOffset={10}
-                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                                >
-                                  Please fill out this field
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col">
-                          <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                            {cibilReportType === "company" ? "Company Name (as on PAN)" : "Full Name (as on PAN)"}
-                          </label>
-                          <div className="relative">
-                            <UserIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <input
-                                  type="text"
-                                  required
-                                  value={cibilName}
-                                  onChange={(e) => setCibilName(e.target.value)}
-                                  placeholder={cibilReportType === "company" ? "e.g. Acme Corporation Pvt Ltd" : "e.g. Rahul Sharma"}
-                                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="top"
-                                sideOffset={10}
-                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                              >
-                                Please fill out this field
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      <div className={cibilBureau === "experian" ? "flex flex-col" : "grid grid-cols-1 sm:grid-cols-2 gap-4"}>
                         <div className="flex flex-col">
                           <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                            {cibilReportType === "company" ? "Authorized Mobile Number" : "Mobile Number"}
+                            {cibilReportType === "company" ? "Auth Signatory Mobile Number" : "Mobile Number"}
                           </label>
                           <div className="relative">
                             <Phone className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -1875,26 +1886,24 @@ export default function EligibilityCibilView({
                                 <input
                                   type="tel"
                                   required
+                                  pattern="[0-9]{10}"
                                   value={cibilPhone}
                                   onChange={handlePhoneChange}
-                                  placeholder="e.g. 98765XXXXX"
-                                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                  placeholder="10-digit number"
+                                  className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                 />
                               </TooltipTrigger>
-                              <TooltipContent
-                                side="top"
-                                sideOffset={10}
-                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                              >
-                                Please fill out this field
+                              <TooltipContent>
+                                Provide the active mobile number linked with your bank accounts.
                               </TooltipContent>
                             </Tooltip>
                           </div>
                         </div>
+
                         {cibilBureau !== "experian" && (
                           <div className="flex flex-col">
                             <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">
-                              {cibilReportType === "company" ? "Company PAN Card Number" : "PAN Card Number"}
+                              {cibilReportType === "company" ? "Company PAN Number" : "PAN Card Number"}
                             </label>
                             <div className="relative">
                               <FileText className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -1905,68 +1914,29 @@ export default function EligibilityCibilView({
                                     required
                                     value={cibilPan}
                                     onChange={handlePanChange}
-                                    placeholder="e.g. AAAAA1111B"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    placeholder="ABCDE1234F"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
                                   />
                                 </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  sideOffset={10}
-                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                                >
-                                  Please fill out this field
+                                <TooltipContent>
+                                  Standard 10-digit Permanent Account Number (PAN). Format: ABCDE1234F.
                                 </TooltipContent>
                               </Tooltip>
                             </div>
                           </div>
                         )}
-                      </div>
 
-                    <div className="flex flex-col mb-4">
-                      <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Select Credit Bureau</label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setCibilBureau("cibil")}
-                          className={`flex-1 py-2 rounded-[10px] text-[13px] font-bold border transition-all cursor-pointer ${
-                            cibilBureau === "cibil"
-                              ? "bg-primary text-white border-primary shadow-sm"
-                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                          }`}
-                        >
-                          CIBIL
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCibilBureau("experian")}
-                          className={`flex-1 py-2 rounded-[10px] text-[13px] font-bold border transition-all cursor-pointer ${
-                            cibilBureau === "experian"
-                              ? "bg-primary text-white border-primary shadow-sm"
-                              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                          }`}
-                        >
-                          Experian
-                        </button>
-                      </div>
-                    </div>
-
-                    {cibilFetching ? (
-                      <div className="flex flex-col items-center justify-center py-4 gap-2">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        <p className="text-[11px] font-bold text-gray-500">Retrieving {cibilBureau === "cibil" ? "CIBIL" : "Experian"} report...</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-start gap-2.5 my-3 text-left">
+                        <div className="flex bg-gray-55/30 p-3 rounded-lg border border-gray-150">
                           <input
                             type="checkbox"
-                            id="cibil-privacy-policy-elig"
+                            id="terms-check"
+                            required
                             checked={cibilAgreed}
                             onChange={(e) => setCibilAgreed(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                            className="mt-0.5 shrink-0 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded cursor-pointer"
                           />
-                          <label htmlFor="cibil-privacy-policy-elig" className="text-[11.5px] text-gray-500 leading-normal cursor-pointer select-none">
-                            By logging in, you agree to the following{" "}
+                          <label htmlFor="terms-check" className="ml-2 text-[11px] text-gray-500 leading-normal select-none">
+                            I authorize FinHeal to retrieve my credit information from CICs. I have read and agree to the{" "}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1974,23 +1944,11 @@ export default function EligibilityCibilView({
                                 setActiveTermsTab("credit-consent");
                                 setIsTermsModalOpen(true);
                               }}
-                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                              className="text-primary hover:underline font-bold"
                             >
-                              Credit Consent
-                            </button>
-                            ,{" "}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setActiveTermsTab("terms-of-use");
-                                setIsTermsModalOpen(true);
-                              }}
-                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
-                            >
-                              Terms of Use
-                            </button>
-                            ,{" "}
+                              Consent Terms
+                            </button>{" "}
+                            and{" "}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1998,105 +1956,83 @@ export default function EligibilityCibilView({
                                 setActiveTermsTab("privacy-policy");
                                 setIsTermsModalOpen(true);
                               }}
-                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
+                              className="text-primary hover:underline font-bold"
                             >
                               Privacy Policy
                             </button>
-                            ,{" "}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setActiveTermsTab("dpdp-notice");
-                                setIsTermsModalOpen(true);
-                              }}
-                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
-                            >
-                              DPDP Notice
-                            </button>
-                            {" "}and{" "}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setActiveTermsTab("data-retention");
-                                setIsTermsModalOpen(true);
-                              }}
-                              className="text-primary font-bold hover:underline bg-transparent border-none p-0 cursor-pointer inline font-sans text-[11px]"
-                            >
-                              Data Retention Policy
-                            </button>
+                            .
                           </label>
                         </div>
 
-                        <button
-                          type="submit"
-                          disabled={!cibilAgreed}
-                          className={`w-full bg-primary text-white font-bold py-2.5 rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-2 shadow-md ${
-                            cibilAgreed ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
-                          }`}
-                        >
-                          <Sparkles className="w-4 h-4 shrink-0" />
-                          <span>
-                            {cibilReportType === "company"
-                              ? `Download Company ${cibilBureau === "cibil" ? "CIBIL" : "Experian"} Credit Report`
-                              : `Download ${cibilBureau === "cibil" ? "CIBIL" : "Experian"} Credit Report`
-                            }
-                          </span>
-                        </button>
-                      </>
-                    )}
-
-                    <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400 mt-2 text-center">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>Secure connection. Your credit history is safe with us.</span>
-                    </div>
-                  </form>
-                </TooltipProvider>
+                        <div className="flex flex-col gap-2 pt-2">
+                          <button
+                            type="submit"
+                            disabled={cibilFetching || !cibilAgreed}
+                            className="w-full bg-primary text-white font-bold py-3 rounded-[14px] hover:bg-[#1e2db8] transition-all cursor-pointer shadow-md shadow-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {cibilFetching ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4.5 w-4.5 border-b-2 border-white"></div>
+                                <span>Verifying Credit Record...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-4.5 h-4.5" />
+                                <span>Retrieve Credit Score</span>
+                              </>
+                            )}
+                          </button>
+                          
+                          {/* Expose link to clear cache if needed */}
+                          {storedCibilReport && (
+                            <button
+                              type="button"
+                              onClick={() => setCibilReport(storedCibilReport)}
+                              className="w-full bg-gray-50 text-gray-700 font-bold py-2.5 rounded-[12px] hover:bg-gray-100 transition-all cursor-pointer text-xs border border-gray-200 mt-1"
+                            >
+                              Open Last Retrieved Report
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </TooltipProvider>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              // CIBIL Score Dashboard
-              <div className="space-y-6">
-                
-                {/* Score Summary Cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Gauge representation */}
-                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
-                    <div className="flex justify-between items-center w-full mb-3 shrink-0">
-                      <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{cibilBureau.toUpperCase()} Bureau</h3>
-                      {(() => {
-                        const fresh = isReportFresh(cibilReport?.fetched_at);
-                        const exempt = isExemptRole(userEmail, cibilReport?.name);
-                        
-                        if (fresh && !exempt) {
-                          const nextDate = getNextAvailableFetchDate(cibilReport?.fetched_at);
-                          return (
-                            <span className="text-[9.5px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-[5px] font-semibold" title={`Next update available on ${nextDate}`}>
-                              Next update: {nextDate}
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
+              ) : (
+                // CIBIL Report Dashboard (Retrieved)
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
+                  
+                  {/* Gauge dial card */}
+                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-between text-center relative">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-indigo-500" />
                     
-                    <div className="relative w-[180px] h-[180px] flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90">
+                    <div className="w-full flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                      <span className="text-[12px] font-bold text-gray-808 flex items-center gap-1.5 uppercase">
+                        <ShieldCheck className="h-4.5 w-4.5 text-primary" />
+                        <span>Bureau Summary</span>
+                      </span>
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-[6px] bg-indigo-50 text-indigo-700 border border-indigo-150">
+                        {cibilBureau.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="relative w-[180px] h-[180px] flex items-center justify-center my-1 select-none">
+                      <svg width="180" height="180" className="transform -rotate-90">
                         <circle
                           cx="90"
                           cy="90"
                           r={scoreGauge.radius}
                           stroke="#f3f4f6"
-                          strokeWidth="8"
+                          strokeWidth="10"
                           fill="transparent"
                         />
                         <circle
                           cx="90"
                           cy="90"
                           r={scoreGauge.radius}
-                          stroke={scoreTheme.fill}
-                          strokeWidth="8"
+                          stroke={`url(#score-grad-${userId})`}
+                          strokeWidth="12"
                           fill="transparent"
                           strokeDasharray={scoreGauge.dashArray}
                           strokeDashoffset={scoreGauge.dashOffset}
@@ -2133,7 +2069,7 @@ export default function EligibilityCibilView({
                           placeholder="Statement Password (if any)"
                           value={bsaPassword}
                           onChange={(e) => setBsaPassword(e.target.value)}
-                          className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+                          className="w-full pl-8 pr-3 py-1.5 bg-gray-55/30 border border-gray-200 rounded-[10px] text-[11px] font-medium text-gray-700 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                           disabled={bsaUploading || !!cibilReport.bsa_analysis}
                         />
                       </div>
@@ -2222,7 +2158,7 @@ export default function EligibilityCibilView({
                       disabled={isGeneratingCAM}
                       className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
-                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <Sparkles className="w-4.5 h-4.5 shrink-0" />
                       <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
                     </button>
                     <button
@@ -2351,7 +2287,7 @@ export default function EligibilityCibilView({
                         </div>
 
                         {filteredOpenAccounts.length === 0 ? (
-                          <div className="py-6 text-center text-gray-400 bg-gray-55/30 rounded-[12px] border border-gray-150 border-dashed text-[12px] font-medium">
+                          <div className="py-6 text-center text-gray-450 bg-gray-55/30 rounded-[12px] border border-gray-150 border-dashed text-[12px] font-medium">
                             No open accounts found in this category.
                           </div>
                         ) : (
@@ -2365,7 +2301,7 @@ export default function EligibilityCibilView({
                                       Open
                                     </span>
                                   </div>
-                                  <p className="text-[11px] text-gray-400 mt-1">{acc.type} | Opened: {new Date(acc.open_date).toLocaleDateString()}</p>
+                                  <p className="text-[11px] text-gray-400 mt-1">{acc.type} | Opened: {(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-right">
                                   <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString()}</div>
@@ -2411,10 +2347,11 @@ export default function EligibilityCibilView({
                     )}
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
-        )}
+        </div>
+      )}
       </div>
 
       {/* Floating Comparison Bar */}
@@ -2664,183 +2601,206 @@ export default function EligibilityCibilView({
 
       {/* ----------------- BANK STATEMENT ANALYZER (BSA) SUBTAB ----------------- */}
       {cibilSubTab === "bsa" && (
-        <div className="animate-fade-up max-w-[500px] mx-auto mt-0 mb-6 h-fit flex flex-col gap-6">
-          
-          {/* Card 1: Upload Box */}
-          <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
-            
-            <div className="flex items-center justify-center gap-2 text-center w-full">
-              <Sparkles className="h-4.5 w-4.5 text-indigo-600 animate-pulse shrink-0" />
-              <span className="text-[14.5px] font-extrabold text-indigo-950">Verify instantly with Bank Statement Analyzer</span>
-            </div>
-            <p className="text-[12px] text-gray-500 leading-normal text-center w-full">
-              Upload your 6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
-            </p>
-            
-            {bsaVerified ? (
-              <div className="bg-white border border-emerald-100 rounded-[10px] p-3.5 flex flex-col items-center justify-center gap-2 shadow-sm text-center">
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-1.5 justify-center">
-                    <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span className="text-[12.5px] font-bold text-gray-850">{bsaBankName} Verified</span>
-                  </div>
-                  <span className="text-[10px] text-gray-400 mt-0.5 font-semibold">Period: {bsaPeriod}</span>
-                </div>
+        <div className="relative animate-fade-up max-w-[500px] mx-auto mt-0 mb-6 h-fit min-h-[400px]">
+          {isGuest && (
+            <div className="absolute inset-0 z-30 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center select-none rounded-[20px]">
+              <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.15)] animate-scale-in">
+                <div className="text-[32px] text-center mb-[12px]">🔒</div>
+                <h3 className="text-[18px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign up to analyze statement</h3>
+                <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+                  Create a free account or sign in to upload your bank statement and get detailed income, EMI, and cashflow indicators analyzed instantly.
+                </p>
                 <button
+                  onClick={onLoginRequired}
+                  className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer"
                   type="button"
-                  onClick={() => {
-                    setBsaVerified(false);
-                    setBsaExcelUrl("");
-                    setBsaBankName("");
-                    setBsaPeriod("");
-                    setBsaError(null);
-                  }}
-                  className="text-[11px] text-rose-500 font-extrabold hover:underline cursor-pointer bg-transparent border-none p-0 mt-1"
                 >
-                  Reset Statement
+                  Sign Up / Login
                 </button>
               </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="password"
-                    placeholder="Enter statement password (if any)"
-                    value={bsaPassword}
-                    onChange={(e) => setBsaPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-[10px] text-[12px] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium shadow-inner"
-                  />
-                </div>
-                
-                {selectedBsaFile ? (
-                  <div className="flex flex-col gap-2 w-full">
-                    <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
-                      <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
-                      <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
-                    </div>
-                    <button 
-                      onClick={submitBsaAnalysis}
-                      disabled={bsaUploading}
-                      className={`w-full font-bold py-3 rounded-[14px] text-[12.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                    >
-                      {bsaUploading ? (
-                        <span>Analyzing Bank Statement...</span>
-                      ) : (
-                        <>
-                          <FileText className="w-4.5 h-4.5 shrink-0" />
-                          <span>Start Bank Statement Analysis</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
-                    <FileText className="h-4.5 w-4.5 text-indigo-500" />
-                    <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
-                      Upload Bank Statement (PDF/Excel)
-                    </span>
-                    <input
-                      type="file"
-                      accept=".pdf,.xls,.xlsx,.csv"
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      disabled={bsaUploading}
-                    />
-                  </label>
-                )}
-                {bsaError && (
-                  <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-2.5 text-rose-700 text-left w-full shadow-xs">
-                    <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
-                    <div className="flex-1 text-[11px] leading-relaxed">
-                      <span className="font-bold">Analysis Error:</span>{" "}
-                      {(() => {
-                        if (bsaError.includes("{")) {
-                          const parts = bsaError.split("{");
-                          const prefix = parts[0].trim();
-                          const jsonStr = "{" + parts.slice(1).join("{");
-                          try {
-                            const parsed = JSON.parse(jsonStr);
-                            const errMsg = parsed.message || parsed.detail || "Details in JSON log below";
-                            return (
-                              <>
-                                <span>{prefix.replace("Here is exactly what FinEye sent back:", "")}</span>
-                                <div className="mt-1 font-bold text-rose-800">
-                                  Reason: {errMsg}
-                                </div>
-                                <details className="mt-1.5 cursor-pointer">
-                                  <summary className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 select-none">
-                                    Show technical logs
-                                  </summary>
-                                  <pre className="mt-1.5 bg-white/70 p-2 rounded-lg border border-rose-100/80 overflow-x-auto font-mono text-[9px] text-rose-600 leading-normal max-h-[100px]">
-                                    {JSON.stringify(parsed, null, 2)}
-                                  </pre>
-                                </details>
-                              </>
-                            );
-                          } catch (e) {
-                            return <span>{bsaError}</span>;
-                          }
-                        }
-                        return <span>{bsaError}</span>;
-                      })()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Card 2: Results Dashboard / Empty State */}
-          <div className="w-full">
-            {bsaVerified ? (
-              <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden flex flex-col items-center justify-center gap-4 text-center animate-fade-up">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500" />
-                
-                <h3 className="text-[15px] font-extrabold text-gray-800">Bank Statement Analyzed Successfully</h3>
-                
-                {bsaExcelUrl ? (
-                  <a
-                    href={bsaExcelUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-6 py-3 rounded-[12px] bg-indigo-600 text-white text-[13px] font-bold border border-indigo-700 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-md cursor-pointer font-sans"
+          <div className={`flex flex-col gap-6 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
+            
+            {/* Card 1: Upload Box */}
+            <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
+              
+              <div className="flex items-center justify-center gap-2 text-center w-full">
+                <Sparkles className="h-4.5 w-4.5 text-indigo-600 animate-pulse shrink-0" />
+                <span className="text-[14.5px] font-extrabold text-indigo-950">Verify instantly with Bank Statement Analyzer</span>
+              </div>
+              <p className="text-[12px] text-gray-500 leading-normal text-center w-full">
+                Upload your 6 months bank statement PDF or Excel. Our BSA API will securely extract your verified monthly salary and existing EMIs to instantly match accurate lender products.
+              </p>
+              
+              {bsaVerified ? (
+                <div className="bg-white border border-emerald-100 rounded-[10px] p-3.5 flex flex-col items-center justify-center gap-2 shadow-sm text-center">
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center gap-1.5 justify-center">
+                      <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span className="text-[12.5px] font-bold text-gray-850">{bsaBankName} Verified</span>
+                    </div>
+                    <span className="text-[10px] text-gray-400 mt-0.5 font-semibold">Period: {bsaPeriod}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBsaVerified(false);
+                      setBsaExcelUrl("");
+                      setBsaBankName("");
+                      setBsaPeriod("");
+                      setBsaError(null);
+                    }}
+                    className="text-[11px] text-rose-500 font-extrabold hover:underline cursor-pointer bg-transparent border-none p-0 mt-1"
                   >
-                    <Download className="h-4 w-4" /> Download BSA Excel Report
-                  </a>
-                ) : (
-                  <p className="text-[12px] text-gray-500">Retrieving secure Excel link...</p>
-                )}
-              </div>
-            ) : bsaUploading ? (
-              <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-                <div>
-                  <h3 className="text-[14px] font-extrabold text-indigo-900">Analysis In Progress</h3>
-                  <p className="text-[11.5px] text-indigo-500 mt-1.5 max-w-[340px] leading-normal font-medium font-sans">
-                    FinEye is parsing transaction records, verifying salary income, and compiling your cashflow indicators. This may take up to 15 minutes for larger statements.
-                  </p>
+                    Reset Statement
+                  </button>
                 </div>
-              </div>
-            ) : selectedBsaFile ? (
-              // Hide the card completely when a statement is selected but not yet analyzed
-              null
-            ) : (
-              <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                  <FileText className="w-6 h-6" />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="password"
+                      placeholder="Enter statement password (if any)"
+                      value={bsaPassword}
+                      onChange={(e) => setBsaPassword(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-[10px] text-[12px] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium shadow-inner"
+                    />
+                  </div>
+                  
+                  {selectedBsaFile ? (
+                    <div className="flex flex-col gap-2 w-full">
+                      <div className="flex items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+                        <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
+                        <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
+                      </div>
+                      <button 
+                        onClick={submitBsaAnalysis}
+                        disabled={bsaUploading}
+                        className={`w-full font-bold py-3 rounded-[14px] text-[12.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                      >
+                        {bsaUploading ? (
+                          <span>Analyzing Bank Statement...</span>
+                        ) : (
+                          <>
+                            <FileText className="w-4.5 h-4.5 shrink-0" />
+                            <span>Start Bank Statement Analysis</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-full flex items-center justify-center gap-2 border border-dashed border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/10 py-4 rounded-[14px] cursor-pointer transition-all shadow-sm">
+                      <FileText className="h-4.5 w-4.5 text-indigo-500" />
+                      <span className="text-[12.5px] font-bold text-indigo-700 font-sans">
+                        Upload Bank Statement (PDF/Excel)
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.xls,.xlsx,.csv"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        disabled={bsaUploading}
+                      />
+                    </label>
+                  )}
+                  {bsaError && (
+                    <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-2.5 text-rose-700 text-left w-full shadow-xs">
+                      <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                      <div className="flex-1 text-[11px] leading-relaxed">
+                        <span className="font-bold">Analysis Error:</span>{" "}
+                        {(() => {
+                          if (bsaError.includes("{")) {
+                            const parts = bsaError.split("{");
+                            const prefix = parts[0].trim();
+                            const jsonStr = "{" + parts.slice(1).join("{");
+                            try {
+                              const parsed = JSON.parse(jsonStr);
+                              const errMsg = parsed.message || parsed.detail || "Details in JSON log below";
+                              return (
+                                <>
+                                  <span>{prefix.replace("Here is exactly what FinEye sent back:", "")}</span>
+                                  <div className="mt-1 font-bold text-rose-800">
+                                    Reason: {errMsg}
+                                  </div>
+                                  <details className="mt-1.5 cursor-pointer">
+                                    <summary className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 select-none">
+                                      Show technical logs
+                                    </summary>
+                                    <pre className="mt-1.5 bg-white/70 p-2 rounded-lg border border-rose-100/80 overflow-x-auto font-mono text-[9px] text-rose-600 leading-normal max-h-[100px]">
+                                      {JSON.stringify(parsed, null, 2)}
+                                    </pre>
+                                  </details>
+                                </>
+                              );
+                            } catch (e) {
+                              return <span>{bsaError}</span>;
+                            }
+                          }
+                          return <span>{bsaError}</span>;
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <h3 className="text-[14px] font-bold text-gray-700">No Statement Uploaded Yet</h3>
-                  <p className="text-[11.5px] text-gray-400 mt-1 max-w-[340px] leading-normal font-medium font-sans">
-                    Please upload your bank e-statement above. The system will process your cashflows and show a detailed dashboard of your verified financial indicators here.
-                  </p>
+              )}
+            </div>
+
+            {/* Card 2: Results Dashboard / Empty State */}
+            <div className="w-full">
+              {bsaVerified ? (
+                <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden flex flex-col items-center justify-center gap-4 text-center animate-fade-up">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500" />
+                  
+                  <h3 className="text-[15px] font-extrabold text-gray-800">Bank Statement Analyzed Successfully</h3>
+                  
+                  {bsaExcelUrl ? (
+                    <a
+                      href={bsaExcelUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-6 py-3 rounded-[12px] bg-indigo-600 text-white text-[13px] font-bold border border-indigo-700 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-md cursor-pointer font-sans"
+                    >
+                      <Download className="h-4 w-4" /> Download BSA Excel Report
+                    </a>
+                  ) : (
+                    <p className="text-[12px] text-gray-500">Retrieving secure Excel link...</p>
+                  )}
                 </div>
-              </div>
-            )}
+              ) : bsaUploading ? (
+                <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+                  <div>
+                    <h3 className="text-[14px] font-extrabold text-indigo-900">Analysis In Progress</h3>
+                    <p className="text-[11.5px] text-indigo-500 mt-1.5 max-w-[340px] leading-normal font-medium font-sans">
+                      FinEye is parsing transaction records, verifying salary income, and compiling your cashflow indicators. This may take up to 15 minutes for larger statements.
+                    </p>
+                  </div>
+                </div>
+              ) : selectedBsaFile ? (
+                // Hide the card completely when a statement is selected but not yet analyzed
+                null
+              ) : (
+                <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-700">No Statement Uploaded Yet</h3>
+                    <p className="text-[11.5px] text-gray-400 mt-1 max-w-[340px] leading-normal font-medium font-sans">
+                      Please upload your bank e-statement above. The system will process your cashflows and show a detailed dashboard of your verified financial indicators here.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}
+
       {/* Terms & Conditions Modal */}
       <PolicyModal
         isOpen={isTermsModalOpen}

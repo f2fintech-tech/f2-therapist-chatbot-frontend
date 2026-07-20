@@ -1498,7 +1498,7 @@ export default function CibilAnalyzerView({
                                     </div>
                                     <p className="text-[11px] text-gray-400 mt-[2px]">
                                       {acc.type}
-                                      {acc.open_date ? ` | Opened: ${new Date(acc.open_date).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
+                                      {acc.open_date ? ` | Opened: ${(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
                                     </p>
                                   </div>
                                   <div className="text-right">
