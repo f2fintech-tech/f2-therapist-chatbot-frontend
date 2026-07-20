@@ -3814,14 +3814,20 @@ ${sheetDataXml}
                     <tbody>
                       {cibilLoading ? (
                         <tr>
-                          <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
+                          <td colSpan={6} className="text-center p-6 text-gray-400">
+                            {filterBureau === "experian" 
+                              ? "Loading Experian enquiries..." 
+                              : filterBureau === "cibil" 
+                                ? "Loading CIBIL enquiries..." 
+                                : "Loading all enquiries..."}
+                          </td>
                         </tr>
                       ) : cibilEnquiries.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">
                             {filterDate
-                              ? "No CIBIL inquiries found for this particular day."
-                              : "No CIBIL inquiries found on the platform."}
+                              ? `No ${filterBureau === "experian" ? "Experian" : filterBureau === "cibil" ? "CIBIL" : ""} inquiries found for this particular day.`
+                              : `No ${filterBureau === "experian" ? "Experian" : filterBureau === "cibil" ? "CIBIL" : ""} inquiries found on the platform.`}
                           </td>
                         </tr>
                       ) : (
@@ -3924,7 +3930,7 @@ ${sheetDataXml}
                                 {enq.report_data ? (
                                   <button
                                     onClick={() => {
-                                      setViewingCibilReport(enq.report_data);
+                                      setViewingCibilReport({ ...(enq.report_data || {}), bureau: enq.bureau || "CIBIL" });
                                       setViewingCibilReportId(enq.id);
                                       setViewingCibilReportUserId(enq.user_id);
                                     }}
@@ -4999,14 +5005,20 @@ ${sheetDataXml}
                         <tbody>
                           {cibilLoading ? (
                             <tr>
-                              <td colSpan={6} className="text-center p-6 text-gray-400">Loading CIBIL enquiries...</td>
+                              <td colSpan={6} className="text-center p-6 text-gray-400">
+                                {filterBureau === "experian" 
+                                  ? "Loading Experian enquiries..." 
+                                  : filterBureau === "cibil" 
+                                    ? "Loading CIBIL enquiries..." 
+                                    : "Loading all enquiries..."}
+                              </td>
                             </tr>
                           ) : cibilEnquiries.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="text-center p-6 text-gray-400">
                                 {filterDate
-                                  ? "No CIBIL inquiries found for this particular day."
-                                  : "No CIBIL inquiries found on the platform."}
+                                  ? `No ${filterBureau === "experian" ? "Experian" : filterBureau === "cibil" ? "CIBIL" : ""} inquiries found for this particular day.`
+                                  : `No ${filterBureau === "experian" ? "Experian" : filterBureau === "cibil" ? "CIBIL" : ""} inquiries found on the platform.`}
                               </td>
                             </tr>
                           ) : (
@@ -5078,7 +5090,7 @@ ${sheetDataXml}
                                     {enq.report_data ? (
                                       <button
                                         onClick={() => {
-                                          setViewingCibilReport(enq.report_data);
+                                          setViewingCibilReport({ ...(enq.report_data || {}), bureau: enq.bureau || "CIBIL" });
                                           setViewingCibilReportId(enq.id);
                                         }}
                                         className="text-primary hover:underline font-bold text-[11px] block ml-auto cursor-pointer border-none bg-transparent"
