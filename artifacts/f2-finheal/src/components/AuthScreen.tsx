@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useLocation } from "wouter";
+import { Gauge, Landmark, ShieldCheck, ChevronRight } from "lucide-react";
 import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 import PolicyModal from "./PolicyModal";
@@ -84,7 +85,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [activeTermsTab, setActiveTermsTab] = useState<"terms-of-use" | "privacy-policy">("terms-of-use");
   const [referralCode, setReferralCode] = useState<string | null>(null);
-  
+
   const cardRef = useRef<HTMLDivElement>(null);
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
@@ -222,7 +223,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           } else {
             message = p.detail || p.error || message;
           }
-        } catch {}
+        } catch { }
       }
       setLoginError(message);
     } finally {
@@ -249,19 +250,19 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
     <div className="auth-screen-shell" style={{ position: "relative", width: "100%", minHeight: "100dvh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", overflow: "hidden" }}>
       <div className="auth-screen-grid-overlay" style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(99,102,241,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", zIndex: 0, WebkitMaskImage: "linear-gradient(to right,transparent 10%,black 45%)", maskImage: "linear-gradient(to right,transparent 10%,black 45%)", pointerEvents: "none" }} />
 
-      <div className="auth-screen-grid" style={{ 
-        width: "100%", 
-        maxWidth: "1140px", 
-        display: "grid", 
-        gridTemplateColumns: "minmax(0,1.05fr) minmax(360px,0.95fr)", 
-        gap: "clamp(24px, 4vw, 64px)", 
-        alignItems: "center", 
+      <div className="auth-screen-grid" style={{
+        width: "100%",
+        maxWidth: "1140px",
+        display: "grid",
+        gridTemplateColumns: "minmax(0,1.05fr) minmax(360px,0.95fr)",
+        gap: "clamp(24px, 4vw, 64px)",
+        alignItems: "center",
         alignContent: "center",
         height: "100dvh",
         boxSizing: "border-box",
-        padding: "clamp(16px, 3vw, 40px) clamp(16px, 4vw, 48px)", 
-        position: "relative", 
-        zIndex: 1 
+        padding: "clamp(16px, 3vw, 40px) clamp(16px, 4vw, 48px)",
+        position: "relative",
+        zIndex: 1
       }}>
         <style>{`
           @media (max-width: 1023px) {
@@ -365,12 +366,12 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
             }
           }
         `}</style>
-        
+
         {/* LEFT PANEL */}
-        <div className="auth-screen-left" style={{ 
-          display: "flex", 
-          flexDirection: "column", 
-          gap: "16px", 
+        <div className="auth-screen-left" style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
           width: "100%",
           minWidth: 0,
           minHeight: 0,
@@ -444,18 +445,72 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
               </div>
             </div>
 
-            {/* Grid Features */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+            {/* Sequential 3-Step Process Flow */}
+            <div style={{ display: "flex", alignItems: "stretch", gap: "4px", width: "100%" }}>
               {[
-                { icon: "🧠", label: "AI Ready" },
-                { icon: "📈", label: "Analytics" },
-                { icon: "🔒", label: "Encrypted" },
-              ].map((f, i) => (
-                <div key={i} style={{ background: "rgba(255,255,255,0.05)", borderRadius: "8px", padding: "8px 4px", textAlign: "center", border: "0.5px solid rgba(255,255,255,0.08)" }}>
-                  <span style={{ fontSize: "13px", display: "block", marginBottom: "2px" }}>{f.icon}</span>
-                  <span style={{ color: "#94a3b8", fontSize: "9px", letterSpacing: "0.3px", fontWeight: 500 }}>{f.label}</span>
-                </div>
-              ))}
+                {
+                  step: 1,
+                  icon: Gauge,
+                  iconColor: "#fbbf24",
+                  label: "Fetch your Credit Report",
+                },
+                {
+                  step: 2,
+                  icon: Landmark,
+                  iconColor: "#60a5fa",
+                  label: "Analyze your Bank Statement",
+                },
+                {
+                  step: 3,
+                  icon: ShieldCheck,
+                  iconColor: "#34d399",
+                  label: "Check Loan Eligibility",
+                },
+              ].map((s, i, arr) => {
+                const IconComponent = s.icon;
+                return (
+                  <div key={s.step} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0, gap: "4px" }}>
+                    <div
+                      style={{
+                        position: "relative",
+                        flex: 1,
+                        minWidth: 0,
+                        height: "100%",
+                        minHeight: "72px",
+                        background: "rgba(255,255,255,0.05)",
+                        borderRadius: "8px",
+                        padding: "10px 6px 8px 6px",
+                        textAlign: "center",
+                        border: "0.5px solid rgba(255,255,255,0.08)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <IconComponent size={16} color={s.iconColor} style={{ marginBottom: "4px", flexShrink: 0 }} />
+                      <span
+                        style={{
+                          color: "#ffffff",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textAlign: "center",
+                          lineHeight: 1.25,
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+
+                    {/* Chevron arrow in the gap between steps */}
+                    {i < arr.length - 1 && (
+                      <ChevronRight size={12} color="#818cf8" style={{ flexShrink: 0, opacity: 0.7, margin: "0 -1px" }} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Score Chart */}
@@ -485,7 +540,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           </div>
 
           {/* ADJUSTMENT: FEATURE BLOCKS ALIGNED HORIZONTALLY */}
-            <div className="auth-screen-features" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px", maxWidth: "460px", marginTop: "2px" }}>
+          <div className="auth-screen-features" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px", maxWidth: "460px", marginTop: "2px" }}>
             {features.map((f, i) => (
               <div
                 key={i}
@@ -523,9 +578,9 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         </div>
 
         {/* RIGHT PANEL FORM */}
-        <div style={{ 
-          width: "100%", 
-          display: "flex", 
+        <div style={{
+          width: "100%",
+          display: "flex",
           justifyContent: "center",
           minWidth: 0,
           opacity: animateIn ? 1 : 0,
@@ -545,13 +600,13 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
             </div>
             <div>
               <div style={{ fontSize: authMode === "signup" ? "20px" : "24px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>
-                {isEmployee 
-                  ? (authMode === "signup" ? "Register Employee" : "Employee Sign in") 
+                {isEmployee
+                  ? (authMode === "signup" ? "Register Employee" : "Employee Sign in")
                   : (authMode === "signup" ? "Create your account" : "Welcome back")}
               </div>
               <div style={{ marginTop: "4px", fontSize: "11px", lineHeight: 1.3, color: "#6b7280" }}>
-                {isEmployee 
-                  ? "Verify F2 Fintech credentials to manage advisor dashboard." 
+                {isEmployee
+                  ? "Verify F2 Fintech credentials to manage advisor dashboard."
                   : (authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey")}
               </div>
             </div>
@@ -674,25 +729,25 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 </div>
               )}
               {loginError && <div style={{ padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "11px", color: "#b91c1c" }}>{loginError}</div>}
-              <button 
-                type="submit" 
-                disabled={isSubmitting || (authMode === "signup" && !isEmployee && !agreedToPolicies)} 
-                style={{ 
-                  height: "38px", 
-                  background: (authMode === "signup" && !isEmployee && !agreedToPolicies) 
-                    ? "#d1d5db" 
-                    : "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)", 
-                  border: "none", 
-                  borderRadius: "10px", 
-                  color: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "#9ca3af" : "#fff", 
-                  fontSize: "13px", 
-                  fontWeight: 600, 
-                  cursor: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "not-allowed" : "pointer", 
-                  fontFamily: "inherit", 
-                  opacity: isSubmitting ? 0.7 : 1, 
-                  marginTop: "1px", 
-                  boxShadow: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "none" : "0 3px 10px rgba(51,68,230,0.25)", 
-                  transition: "all 0.2s" 
+              <button
+                type="submit"
+                disabled={isSubmitting || (authMode === "signup" && !isEmployee && !agreedToPolicies)}
+                style={{
+                  height: "38px",
+                  background: (authMode === "signup" && !isEmployee && !agreedToPolicies)
+                    ? "#d1d5db"
+                    : "linear-gradient(135deg,#3344e6 0%,#4f46e5 100%)",
+                  border: "none",
+                  borderRadius: "10px",
+                  color: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "#9ca3af" : "#fff",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  opacity: isSubmitting ? 0.7 : 1,
+                  marginTop: "1px",
+                  boxShadow: (authMode === "signup" && !isEmployee && !agreedToPolicies) ? "none" : "0 3px 10px rgba(51,68,230,0.25)",
+                  transition: "all 0.2s"
                 }}
                 onMouseOver={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
                 onMouseOut={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}
