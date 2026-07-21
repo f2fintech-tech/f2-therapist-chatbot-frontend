@@ -38,6 +38,7 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
   onClose
 }) => {
   const [tickerIndex, setTickerIndex] = useState(0);
+  const [displayPercent, setDisplayPercent] = useState(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll terminal log to bottom
@@ -55,6 +56,27 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
     }, 4000);
     return () => clearInterval(interval);
   }, [isOpen, currentStep, error]);
+
+  // Simulate gradual progress between steps so it doesn't appear stalled
+  useEffect(() => {
+    const baseProgress = Math.round((currentStep / 6) * 100);
+    setDisplayPercent(baseProgress);
+
+    if (!isOpen || currentStep >= 6 || error) return;
+
+    const maxProgress = Math.round(((currentStep + 1) / 6) * 100) - 2;
+
+    const interval = setInterval(() => {
+      setDisplayPercent(prev => {
+        if (prev < maxProgress) {
+          return prev + 1;
+        }
+        return prev;
+      });
+    }, 600); // Increase by 1% every 600ms while waiting for the next step
+
+    return () => clearInterval(interval);
+  }, [currentStep, isOpen, error]);
 
   if (!isOpen) return null;
 
@@ -163,7 +185,7 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
                     </span>
                   </div>
                   <span className="text-[11px] font-bold text-slate-400">
-                    {Math.round((currentStep / 6) * 100)}%
+                    {displayPercent}%
                   </span>
                 </div>
 
