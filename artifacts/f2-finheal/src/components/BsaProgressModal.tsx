@@ -193,6 +193,10 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
                 <div className="text-[13.5px] font-extrabold text-slate-900 flex items-center gap-2 min-h-[24px]">
                   {currentMessage || "Processing bank statement..."}
                 </div>
+                
+                <div className="text-[11px] font-bold text-amber-700 bg-amber-50/80 px-3 py-1.5 rounded-[8px] border border-amber-200 mt-1 flex items-center gap-1.5 w-full">
+                  ⚠️ Please do not refresh or exit this tab while we analyse your bank statement.
+                </div>
 
                 {/* Rotating Creative Ticker for larger statements */}
                 {currentStep >= 3 && currentStep < 6 && (

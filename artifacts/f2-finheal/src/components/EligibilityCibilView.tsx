@@ -22,13 +22,15 @@ import {
   Clock,
   RefreshCw
 } from "lucide-react";
-import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
+import html2canvas from "html2canvas-pro";
+import { jsPDF } from "jspdf";
 
 
 const formatDateRange = (rangeStr: string) => {
@@ -462,6 +464,9 @@ export default function EligibilityCibilView({
   const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
   const [bsaAnalysisData, setBsaAnalysisData] = useState<any>(null);
 
+  const bsaAnalyzerRef = React.useRef<HTMLDivElement>(null);
+  const [isGeneratingBSAPDF, setIsGeneratingBSAPDF] = useState<boolean>(false);
+
   // Lenders Catalog State
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
@@ -499,6 +504,139 @@ export default function EligibilityCibilView({
       setEligEmi(String(income));
     }
   }, [eligIncome, eligEmi]);
+
+  const handleDownloadBSAPDF = async () => {
+    if (!bsaAnalysisData) return;
+    setIsGeneratingBSAPDF(true);
+    
+    let clone: HTMLElement | null = null;
+    try {
+      const element = bsaAnalyzerRef.current;
+      if (!element) {
+        throw new Error("Report element not found in DOM");
+      }
+      
+      clone = element.cloneNode(true) as HTMLElement;
+      clone.classList.add("cibil-pdf-downloading");
+      
+      clone.style.setProperty("position", "absolute", "important");
+      clone.style.setProperty("top", "0", "important");
+      clone.style.setProperty("left", "-9999px", "important");
+      clone.style.setProperty("width", "1024px", "important");
+      clone.style.setProperty("height", "auto", "important");
+      clone.style.setProperty("max-height", "none", "important");
+      clone.style.setProperty("overflow", "visible", "important");
+      clone.style.setProperty("display", "block", "important");
+      
+      const scrollableElements = Array.from(clone.querySelectorAll(".cibil-print-scrollable")) as HTMLElement[];
+      scrollableElements.forEach(el => {
+        el.style.setProperty("height", "auto", "important");
+        el.style.setProperty("min-height", "0", "important");
+        el.style.setProperty("max-height", "none", "important");
+        el.style.setProperty("overflow", "visible", "important");
+        el.style.setProperty("display", "block", "important");
+      });
+      
+      const hideElements = Array.from(clone.querySelectorAll(".cibil-print-hide")) as HTMLElement[];
+      hideElements.forEach(el => {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+      });
+
+      document.body.appendChild(clone);
+      
+      await new Promise(resolve => setTimeout(resolve, 350));
+      
+      const cloneWidth = clone.clientWidth || 1024;
+      const pageHeightPx = Math.floor(cloneWidth * 1.45789); 
+      
+      const breakables = Array.from(clone.querySelectorAll([
+        '.cibil-print-section',
+        '.cibil-print-keep-together',
+        '.cibil-chart-container',
+        'table',
+        'tr'
+      ].join(','))) as HTMLElement[];
+      
+      breakables.forEach(el => {
+        const top = el.offsetTop;
+        const height = el.offsetHeight;
+        
+        if (Math.floor(top / pageHeightPx) !== Math.floor((top + height) / pageHeightPx)) {
+          const nextPageTop = Math.ceil(top / pageHeightPx) * pageHeightPx;
+          const pushDownAmount = nextPageTop - top;
+          
+          if (pushDownAmount > 0 && pushDownAmount < pageHeightPx * 0.5) { 
+             el.style.setProperty("margin-top", `${pushDownAmount + 20}px`, "important");
+          }
+        }
+      });
+      
+      const canvas = await html2canvas(clone, {
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        windowWidth: 1024,
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      
+      const printableWidth = pdfWidth - (margin * 2);
+      const printableHeight = pdfHeight - (margin * 2);
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const canvasWidth = imgProps.width;
+      const canvasHeight = imgProps.height;
+
+      const imgHeightInMm = (canvasHeight * printableWidth) / canvasWidth;
+
+      let heightLeft = imgHeightInMm;
+      let position = margin; 
+
+      pdf.addImage(imgData, "JPEG", margin, position, printableWidth, imgHeightInMm);
+      heightLeft -= printableHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeightInMm + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, position, printableWidth, imgHeightInMm);
+        heightLeft -= printableHeight;
+      }
+      
+      const cleanName = bsaAnalysisData?.person_name?.replace(/[^a-z0-9]/gi, '_') || "User";
+      pdf.save(`Bank_Statement_Analysis_${cleanName}.pdf`);
+      
+      toast({
+        title: "Download Complete",
+        description: "Your Bank Statement Analysis report has been downloaded as a PDF.",
+        variant: "default"
+      });
+    } catch (err: any) {
+      console.error("Error generating PDF:", err);
+      toast({
+        title: "Download Failed",
+        description: err.message || "Failed to generate PDF report.",
+        variant: "destructive"
+      });
+    } finally {
+      if (clone && document.body.contains(clone)) {
+        document.body.removeChild(clone);
+      }
+      setIsGeneratingBSAPDF(false);
+    }
+  };
 
   // Fetch User's Consolidated Profile & Stored Reports
   useEffect(() => {
@@ -1235,10 +1373,53 @@ export default function EligibilityCibilView({
 
   if (cibilLoading) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-[12px]">
-          <div className="h-[48px] w-[48px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-[14px] font-medium text-gray-500">Initializing...</p>
+      <div className="eligibility-view relative h-full w-full flex flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 animate-pulse">
+        {/* Header Skeleton */}
+        <div className="flex flex-col gap-[14px] border-b border-gray-100 bg-white py-[16px] px-[20px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-[10px]">
+            <div className="w-[36px] h-[36px] rounded-[10px] bg-gray-200"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-48"></div>
+              <div className="h-3 bg-gray-100 rounded w-64"></div>
+            </div>
+          </div>
+          <div className="flex gap-2 hidden sm:flex">
+            <div className="h-[36px] w-[120px] bg-gray-200 rounded-[10px]"></div>
+            <div className="h-[36px] w-[36px] bg-gray-200 rounded-[10px]"></div>
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="flex-1 p-[16px] sm:p-[24px] overflow-hidden">
+          <div className="max-w-[1200px] mx-auto space-y-[24px]">
+            {/* Tabs Skeleton */}
+            <div className="flex gap-4 border-b border-gray-200 pb-[12px]">
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+            </div>
+
+            {/* Main Cards Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-[24px]">
+              <div className="lg:col-span-2 space-y-[24px]">
+                <div className="h-[320px] bg-white border border-gray-200 rounded-[16px] p-[24px]">
+                  <div className="h-5 bg-gray-200 rounded w-1/3 mb-8"></div>
+                  <div className="space-y-4">
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-1 space-y-[24px]">
+                <div className="h-[320px] bg-white border border-gray-200 rounded-[16px] p-[24px] flex flex-col items-center justify-center">
+                  <div className="w-[140px] h-[140px] rounded-full bg-gray-100 border-[8px] border-gray-50 mb-6"></div>
+                  <div className="h-5 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-gray-100 rounded w-1/3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2235,9 +2416,7 @@ export default function EligibilityCibilView({
                     <p className="text-[11px] text-gray-500 mt-3 font-semibold">PAN: {cibilReport.pan}</p>
                     {cibilReport.pdf_url && (
                       <a
-                        href={cibilReport.pdf_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
                         className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
                       >
                         <Download className="w-4 h-4 shrink-0" />
@@ -3067,7 +3246,7 @@ export default function EligibilityCibilView({
             {/* Card 2: Results Dashboard / Empty State */}
             <div className="w-full">
               {bsaAnalysisData ? (
-                <div className="flex flex-col gap-4 animate-fade-in w-full">
+                <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-white sm:bg-transparent p-0">
                   {/* Account Info Header */}
                   <div className="bg-white border border-gray-200 rounded-[12px] p-5 shadow-sm flex flex-col gap-3">
                      <h3 className="text-[15px] font-extrabold text-gray-800 border-b border-gray-100 pb-2">Account Overview</h3>
@@ -3408,17 +3587,28 @@ export default function EligibilityCibilView({
                   )}
 
                   {/* Actions */}
-                  {bsaAnalysisData.excel_report_url && (
-                    <a 
-                      href={bsaAnalysisData.excel_report_url} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="mt-2 w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3.5 rounded-[14px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[13px] flex items-center justify-center gap-2 shadow-sm"
+                  <div className="flex flex-col gap-2 mt-2">
+                    <button
+                      onClick={handleDownloadBSAPDF}
+                      disabled={isGeneratingBSAPDF}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-[14px] shadow-sm transition-all text-[13px] disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
                       <Download className="w-4.5 h-4.5" />
-                      Download Detailed BSA Excel Report
-                    </a>
-                  )}
+                      {isGeneratingBSAPDF ? "Generating PDF..." : "Download PDF Report"}
+                    </button>
+                    
+                    {bsaAnalysisData.excel_report_url && (isStaff || isExemptRole(userEmail, storedCibilReport?.name)) && (
+                      <a 
+                        href={bsaAnalysisData.excel_report_url} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3.5 rounded-[14px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[13px] flex items-center justify-center gap-2 shadow-sm cibil-print-hide"
+                      >
+                        <Download className="w-4.5 h-4.5" />
+                        Download Detailed BSA Excel Report
+                      </a>
+                    )}
+                  </div>
                 </div>
               ) : bsaUploading ? (
                 <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">

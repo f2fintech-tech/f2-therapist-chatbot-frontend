@@ -202,7 +202,38 @@ function EmployeeDirectory({
       </div>
 
       {employeesLoading ? (
-        <div className="text-center py-[48px] text-gray-400">Loading directory...</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[16px]">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="border border-gray-200 rounded-[16px] bg-white p-[16px] shadow-xs flex flex-col justify-between relative overflow-hidden animate-pulse min-h-[220px]">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gray-200"></div>
+              <div className="flex items-start gap-[12px] mt-1">
+                <div className="w-[48px] h-[48px] rounded-xl bg-gray-200 shrink-0"></div>
+                <div className="min-w-0 flex-1 py-1">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-2.5 bg-gray-100 rounded w-1/2 mb-2.5"></div>
+                  <div className="h-2.5 bg-gray-200 rounded w-1/3"></div>
+                </div>
+              </div>
+              <div className="mt-[14px] pt-[12px] border-t border-gray-100/80 space-y-[10px]">
+                <div className="flex justify-between items-center">
+                  <div className="h-2.5 bg-gray-100 rounded w-16"></div>
+                  <div className="h-2.5 bg-gray-200 rounded w-20"></div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="h-2.5 bg-gray-100 rounded w-12"></div>
+                  <div className="h-2.5 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+              <div className="mt-[16px] pt-[12px] border-t border-gray-100 flex items-center justify-between">
+                <div className="h-[24px] bg-gray-200 rounded-[8px] w-[90px]"></div>
+                <div className="flex items-center gap-2">
+                  <div className="h-[26px] w-[26px] bg-gray-200 rounded-[6px]"></div>
+                  <div className="h-[26px] w-[26px] bg-gray-200 rounded-[6px]"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : employees.length === 0 ? (
         <div className="text-center py-[48px] bg-gray-50 border border-dashed rounded-[16px] text-gray-400">
           No employee profiles created yet.
@@ -351,12 +382,16 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // State Management
   const [backendStats, setBackendStats] = useState<BackendStats | null>(null);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
+  const [advisorsLoading, setAdvisorsLoading] = useState(false);
   const [employees, setEmployees] = useState<Advisor[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
+  const [educationLoading, setEducationLoading] = useState(false);
   const [educationTrash, setEducationTrash] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
+  const [testsLoading, setTestsLoading] = useState(false);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [filterAdvisor, setFilterAdvisor] = useState<string>("all");
   const [filterTestName, setFilterTestName] = useState<string>("all");
   const [filterLenderSearch, setFilterLenderSearch] = useState<string>("");
@@ -1536,8 +1571,9 @@ ${sheetDataXml}
     }
   };
 
-  const loadAdvisors = async () => {
+  const loadAdvisors = async (showLoading: boolean = false) => {
     try {
+      if (showLoading) setAdvisorsLoading(true);
       const list = await fetchAdvisors();
       const sortedList = [...list].sort((a, b) => {
         const idA = (a.f2FintechId || a.id || "").toLowerCase();
@@ -1561,6 +1597,8 @@ ${sheetDataXml}
         localStorage.setItem("finheal_advisors_list", JSON.stringify([]));
         setAdvisors([]);
       }
+    } finally {
+      if (showLoading) setAdvisorsLoading(false);
     }
   };
 
@@ -1645,13 +1683,15 @@ ${sheetDataXml}
     setEducationContent(activeList);
     setEducationTrash(trashList);
     localStorage.setItem("finheal_education_trash", JSON.stringify(trashList));
+    setEducationLoading(false);
 
     // 2. Tests List
     setTestCatalog(testCards);
   }, []);
 
-  const fetchCustomTests = async () => {
+  const fetchCustomTests = async (showLoading: boolean = false) => {
     try {
+      if (showLoading) setTestsLoading(true);
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
       const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
       const headers: Record<string, string> = {};
@@ -1675,11 +1715,13 @@ ${sheetDataXml}
       }
     } catch (err) {
       console.error("Error loading custom tests:", err);
+    } finally {
+      if (showLoading) setTestsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCustomTests();
+    fetchCustomTests(true);
   }, []);
 
   // Lazy load and poll advisors/employees only when needed
@@ -1691,8 +1733,8 @@ ${sheetDataXml}
     let intervalIdEmployees: any = null;
 
     if (shouldLoadAdvisors) {
-      loadAdvisors();
-      intervalIdAdvisors = setInterval(loadAdvisors, 300000); // 5 minutes polling
+      loadAdvisors(true);
+      intervalIdAdvisors = setInterval(() => loadAdvisors(false), 300000); // 5 minutes polling
     }
     if (shouldLoadEmployees) {
       loadEmployees(true); // Initial load with spinner
@@ -1730,8 +1772,8 @@ ${sheetDataXml}
     };
     
     if (shouldLoadAppointments) {
-      loadGlobalAppointments();
-      intervalId = setInterval(loadGlobalAppointments, 30000); // 30s interval for appointments (low impact)
+      loadGlobalAppointments(true);
+      intervalId = setInterval(() => loadGlobalAppointments(false), 30000); // 30s interval for appointments (low impact)
       window.addEventListener("storage", handleAppointmentsUpdate);
     }
     return () => {
@@ -1848,8 +1890,9 @@ ${sheetDataXml}
     setAddedSlots([]);
   }, [expertNextSlot]);
 
-  const loadGlobalAppointments = async () => {
+  const loadGlobalAppointments = async (showLoading: boolean = false) => {
     try {
+      if (showLoading) setAppointmentsLoading(true);
       const list = await fetchAllAppointments();
       setAllAppointments(list);
     } catch (err) {
@@ -1873,6 +1916,8 @@ ${sheetDataXml}
       // Sort by date / bookedAt descending
       list.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
       setAllAppointments(list);
+    } finally {
+      if (showLoading) setAppointmentsLoading(false);
     }
   };
 
@@ -2184,10 +2229,10 @@ ${sheetDataXml}
       localStorage.setItem("finheal_education_trash", JSON.stringify(updatedTrash));
 
       // 2. Add back to active content
-      const restoredItem = { ...itemToRestore };
+      const restoredItem = { ...itemToRestore } as any;
       delete restoredItem.isDeleted;
       delete restoredItem.deletedAt;
-      const updatedActive = [...educationContent, restoredItem];
+      const updatedActive = [...educationContent, restoredItem as ContentItem];
       setEducationContent(updatedActive);
       localStorage.setItem("finheal_education_content", JSON.stringify(updatedActive));
 
@@ -2880,7 +2925,43 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {advisors.map((adv) => (
+                      {advisorsLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i} className="border-b border-gray-100 animate-pulse">
+                            <td className="p-[12px] flex items-center gap-[10px]">
+                              <div className="w-[32px] h-[32px] rounded-full bg-gray-200"></div>
+                              <div className="space-y-2">
+                                <div className="h-3 bg-gray-200 rounded w-24"></div>
+                                <div className="h-2 bg-gray-100 rounded w-16"></div>
+                              </div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-28"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-100 rounded w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-12"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-4 bg-gray-200 rounded-full w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-4 bg-gray-200 rounded-full w-16"></div>
+                            </td>
+                            <td className="p-[12px] text-right space-x-[6px]">
+                              <div className="inline-block h-3 bg-gray-200 rounded w-12 mr-2"></div>
+                              <div className="inline-block h-3 bg-gray-200 rounded w-8 mr-2"></div>
+                              <div className="inline-block h-3 bg-gray-200 rounded w-10"></div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : advisors.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center p-6 text-gray-400">No experts found.</td>
+                        </tr>
+                      ) : advisors.map((adv) => (
                         <tr key={adv.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[12px] flex items-center gap-[10px]">
                             {adv.avatarUrl ? (
@@ -2998,7 +3079,37 @@ ${sheetDataXml}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredEducation.length === 0 ? (
+                      {educationLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i} className="border-b border-gray-100 animate-pulse">
+                            <td className="p-[12px] max-w-[240px]">
+                              <div className="flex items-center gap-[8px]">
+                                <div className="w-5 h-5 bg-gray-200 rounded-md"></div>
+                                <div className="w-full space-y-1.5">
+                                  <div className="h-3.5 bg-gray-200 rounded w-3/4"></div>
+                                  <div className="h-2.5 bg-gray-100 rounded w-full"></div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-4 bg-gray-200 rounded-full w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-20"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-100 rounded w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-100 rounded w-24"></div>
+                            </td>
+                            <td className="p-[12px] text-right space-x-[6px]">
+                              <div className="inline-block h-3 bg-gray-200 rounded w-8 mr-2"></div>
+                              <div className="inline-block h-3 bg-gray-200 rounded w-10"></div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : filteredEducation.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">
                             No educational content items found matching the filter criteria.
@@ -3123,7 +3234,31 @@ ${sheetDataXml}
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredTests.length === 0 ? (
+                          {testsLoading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                              <tr key={i} className="border-b border-gray-100 animate-pulse">
+                                <td className="p-[12px] max-w-[200px]">
+                                  <div className="space-y-1.5">
+                                    <div className="h-3.5 bg-gray-200 rounded w-3/4"></div>
+                                    <div className="h-2.5 bg-gray-100 rounded w-full"></div>
+                                  </div>
+                                </td>
+                                <td className="p-[12px]">
+                                  <div className="h-3 bg-gray-200 rounded w-16"></div>
+                                </td>
+                                <td className="p-[12px]">
+                                  <div className="h-3 bg-gray-200 rounded w-24"></div>
+                                </td>
+                                <td className="p-[12px]">
+                                  <div className="h-3 bg-gray-100 rounded w-20"></div>
+                                </td>
+                                <td className="p-[12px] text-right space-x-[6px]">
+                                  <div className="inline-block h-3 bg-gray-200 rounded w-8 mr-2"></div>
+                                  <div className="inline-block h-3 bg-gray-200 rounded w-10"></div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : filteredTests.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="text-center p-6 text-gray-400">
                                 No health tests match the selected filter.
@@ -3525,7 +3660,28 @@ ${sheetDataXml}
                   </div>
                 </div>
 
-                {filteredAppointments.length === 0 ? (
+                {appointmentsLoading ? (
+                  <div className="space-y-[10px]">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <div key={idx} className="border border-gray-200 bg-white p-[16px] rounded-[16px] flex flex-col justify-between sm:flex-row sm:items-center animate-pulse min-h-[100px]">
+                        <div className="space-y-[8px] w-full max-w-md">
+                          <div className="flex items-center gap-[8px]">
+                            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                            <div className="h-3 bg-gray-100 rounded-full w-20"></div>
+                            <div className="h-3 bg-gray-100 rounded-full w-24"></div>
+                          </div>
+                          <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                          <div className="h-3 bg-gray-100 rounded w-2/3"></div>
+                        </div>
+                        <div className="text-right shrink-0 mt-[12px] pt-[12px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 flex flex-col items-end gap-[6px]">
+                          <div className="h-4 bg-gray-200 rounded w-24"></div>
+                          <div className="h-3 bg-gray-100 rounded w-16"></div>
+                          <div className="h-2.5 bg-gray-100 rounded w-20"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredAppointments.length === 0 ? (
                   <div className="text-center py-[36px] bg-gray-50 border border-dashed rounded-[16px]">
                     <div className="text-[32px]">📅</div>
                     <div className="text-[12px] text-gray-400 mt-[6px]">
@@ -3657,9 +3813,35 @@ ${sheetDataXml}
                     </thead>
                     <tbody>
                       {lendersLoading ? (
-                        <tr>
-                          <td colSpan={7} className="text-center p-6 text-gray-400">Loading catalog...</td>
-                        </tr>
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <tr key={i} className="border-b border-gray-100 animate-pulse">
+                            <td className="p-[12px] max-w-[200px]">
+                              <div className="h-3.5 bg-gray-200 rounded w-3/4 mb-1"></div>
+                              <div className="h-2.5 bg-gray-100 rounded w-1/2 mb-1"></div>
+                              <div className="h-2 bg-gray-100 rounded w-1/3"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-20"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-24"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-28"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3 bg-gray-200 rounded w-20 mb-1"></div>
+                              <div className="h-2.5 bg-gray-100 rounded w-24"></div>
+                            </td>
+                            <td className="p-[12px] text-right">
+                              <div className="inline-block h-3 bg-gray-200 rounded w-8 mr-2"></div>
+                              <div className="inline-block h-3 bg-gray-200 rounded w-10"></div>
+                            </td>
+                          </tr>
+                        ))
                       ) : filteredLenders.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="text-center p-6 text-gray-400">
@@ -3893,15 +4075,32 @@ ${sheetDataXml}
                     </thead>
                     <tbody>
                       {cibilLoading ? (
-                        <tr>
-                          <td colSpan={6} className="text-center p-6 text-gray-400">
-                            {filterBureau === "experian" 
-                              ? "Loading Experian enquiries..." 
-                              : filterBureau === "cibil" 
-                                ? "Loading CIBIL enquiries..." 
-                                : "Loading all enquiries..."}
-                          </td>
-                        </tr>
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <tr key={i} className="border-b border-gray-100 animate-pulse">
+                            <td className="p-[12px]">
+                              <div className="h-3.5 bg-gray-200 rounded w-3/4 mb-1"></div>
+                              <div className="h-2.5 bg-gray-100 rounded w-1/2 mb-2"></div>
+                              <div className="h-4 bg-gray-100 rounded-full w-20"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-5 bg-gray-200 rounded-full w-16"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3.5 bg-gray-200 rounded w-24"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-4 bg-gray-200 rounded w-10 mb-1"></div>
+                              <div className="h-2.5 bg-gray-100 rounded w-12"></div>
+                            </td>
+                            <td className="p-[12px]">
+                              <div className="h-3.5 bg-gray-200 rounded w-28"></div>
+                            </td>
+                            <td className="p-[12px] flex flex-col items-end justify-center gap-1.5 mt-1">
+                              <div className="h-3 bg-gray-200 rounded w-20"></div>
+                              <div className="h-3 bg-gray-100 rounded w-24"></div>
+                            </td>
+                          </tr>
+                        ))
                       ) : cibilEnquiries.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center p-6 text-gray-400">
@@ -4112,7 +4311,37 @@ ${sheetDataXml}
                 </div>
 
                 {trashLoading ? (
-                  <div className="text-center py-[48px] text-gray-400">Loading trash bins...</div>
+                  <div className="grid grid-cols-1 gap-[24px]">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px] animate-pulse">
+                        <div className="h-5 bg-gray-200 rounded w-1/3 max-w-[250px]"></div>
+                        <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+                          <table className="w-full text-left text-[11.5px] border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-150">
+                                <th className="p-[10px]"><div className="h-3 bg-gray-200 rounded w-20"></div></th>
+                                <th className="p-[10px]"><div className="h-3 bg-gray-200 rounded w-24"></div></th>
+                                <th className="p-[10px]"><div className="h-3 bg-gray-200 rounded w-16"></div></th>
+                                <th className="p-[10px]"><div className="h-3 bg-gray-200 rounded w-20"></div></th>
+                                <th className="p-[10px] flex justify-end"><div className="h-3 bg-gray-200 rounded w-16"></div></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Array.from({ length: 2 }).map((_, j) => (
+                                <tr key={j} className="border-b border-gray-100">
+                                  <td className="p-[10px]"><div className="h-3 bg-gray-100 rounded w-32"></div></td>
+                                  <td className="p-[10px]"><div className="h-3 bg-gray-100 rounded w-24"></div></td>
+                                  <td className="p-[10px]"><div className="h-4 bg-gray-200 rounded w-12"></div></td>
+                                  <td className="p-[10px]"><div className="h-3 bg-gray-100 rounded w-28"></div></td>
+                                  <td className="p-[10px] flex justify-end"><div className="h-3 bg-gray-200 rounded w-16"></div></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-[24px]">
                     {/* Bins: CIBIL Enquiries */}
@@ -4245,7 +4474,7 @@ ${sheetDataXml}
                                 </td>
                               </tr>
                             ) : (
-                              educationTrash.map((item) => {
+                              educationTrash.map((item: any) => {
                                 const utcStr = item.deletedAt ? (item.deletedAt.endsWith("Z") || item.deletedAt.includes("+") ? item.deletedAt : `${item.deletedAt}Z`) : "";
                                 const delDateStr = utcStr ? new Date(utcStr).toLocaleString("en-IN") : "-";
                                 
