@@ -354,6 +354,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [employees, setEmployees] = useState<Advisor[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [educationContent, setEducationContent] = useState<ContentItem[]>([]);
+  const [educationTrash, setEducationTrash] = useState<ContentItem[]>([]);
   const [testCatalog, setTestCatalog] = useState<TestCard[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [filterAdvisor, setFilterAdvisor] = useState<string>("all");
@@ -1597,14 +1598,53 @@ ${sheetDataXml}
 
   // Load local storage states (static content with zero network cost)
   useEffect(() => {
-    // 1. Educational content
+    // 1. Educational content & Trash
     const storedContent = localStorage.getItem("finheal_education_content");
+    let activeList: ContentItem[] = [];
     if (storedContent) {
-      setEducationContent(JSON.parse(storedContent));
+      try {
+        activeList = JSON.parse(storedContent);
+      } catch (e) {
+        activeList = [...CONTENT];
+      }
     } else {
-      localStorage.setItem("finheal_education_content", JSON.stringify(CONTENT));
-      setEducationContent(CONTENT);
+      activeList = [...CONTENT];
     }
+
+    const storedTrash = localStorage.getItem("finheal_education_trash");
+    let trashList: ContentItem[] = [];
+    if (storedTrash) {
+      try {
+        const parsedTrash = JSON.parse(storedTrash);
+        const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000; // 3 days
+        // Prune expired trash items
+        trashList = parsedTrash.filter((item: any) => {
+          const deletedAtTime = new Date(item.deletedAt).getTime();
+          return deletedAtTime >= cutoff;
+        });
+      } catch (e) {
+        trashList = [];
+      }
+    }
+
+    // Check if any default CONTENT items are missing (Self-healing)
+    let missingDefaults: ContentItem[] = [];
+    CONTENT.forEach((defItem) => {
+      const existsInActive = activeList.some(item => item.id === defItem.id);
+      const existsInTrash = trashList.some(item => item.id === defItem.id);
+      if (!existsInActive && !existsInTrash) {
+        missingDefaults.push(defItem);
+      }
+    });
+
+    if (missingDefaults.length > 0) {
+      activeList = [...activeList, ...missingDefaults];
+      localStorage.setItem("finheal_education_content", JSON.stringify(activeList));
+    }
+
+    setEducationContent(activeList);
+    setEducationTrash(trashList);
+    localStorage.setItem("finheal_education_trash", JSON.stringify(trashList));
 
     // 2. Tests List
     setTestCatalog(testCards);
@@ -2116,10 +2156,50 @@ ${sheetDataXml}
   };
 
   const handleDeleteEdu = (id: string) => {
-    if (confirm("Are you sure you want to delete this educational content?")) {
+    const itemToDelete = educationContent.find(c => c.id === id);
+    if (itemToDelete && confirm("Are you sure you want to move this educational content to Trash?")) {
       const updatedList = educationContent.filter(c => c.id !== id);
       setEducationContent(updatedList);
       localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
+
+      const trashedItem = {
+        ...itemToDelete,
+        isDeleted: true,
+        deletedAt: new Date().toISOString()
+      };
+      const updatedTrash = [...educationTrash, trashedItem];
+      setEducationTrash(updatedTrash);
+      localStorage.setItem("finheal_education_trash", JSON.stringify(updatedTrash));
+
+      dispatchUpdateEvent("finheal:education_update");
+    }
+  };
+
+  const handleRestoreEdu = (id: string) => {
+    const itemToRestore = educationTrash.find(c => c.id === id);
+    if (itemToRestore) {
+      // 1. Remove from trash
+      const updatedTrash = educationTrash.filter(c => c.id !== id);
+      setEducationTrash(updatedTrash);
+      localStorage.setItem("finheal_education_trash", JSON.stringify(updatedTrash));
+
+      // 2. Add back to active content
+      const restoredItem = { ...itemToRestore };
+      delete restoredItem.isDeleted;
+      delete restoredItem.deletedAt;
+      const updatedActive = [...educationContent, restoredItem];
+      setEducationContent(updatedActive);
+      localStorage.setItem("finheal_education_content", JSON.stringify(updatedActive));
+
+      dispatchUpdateEvent("finheal:education_update");
+    }
+  };
+
+  const handlePermanentDeleteEdu = (id: string) => {
+    if (confirm("Are you sure you want to permanently delete this content? This action cannot be undone.")) {
+      const updatedTrash = educationTrash.filter(c => c.id !== id);
+      setEducationTrash(updatedTrash);
+      localStorage.setItem("finheal_education_trash", JSON.stringify(updatedTrash));
       dispatchUpdateEvent("finheal:education_update");
     }
   };
@@ -4130,6 +4210,87 @@ ${sheetDataXml}
                                         className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
                                       >
                                         Restore ↺
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Bins: Educational Content */}
+                    <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
+                      <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
+                        📚 Deleted Educational Content ({educationTrash.length})
+                      </h4>
+                      <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+                        <table className="w-full text-left text-[11.5px] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-150 text-gray-500 font-bold">
+                              <th className="p-[10px]">Title</th>
+                              <th className="p-[10px]">Type</th>
+                              <th className="p-[10px]">Category</th>
+                              <th className="p-[10px]">Deleted At</th>
+                              <th className="p-[10px] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {educationTrash.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-[24px] text-gray-450 italic">
+                                  No deleted educational content in Trash.
+                                </td>
+                              </tr>
+                            ) : (
+                              educationTrash.map((item) => {
+                                const utcStr = item.deletedAt ? (item.deletedAt.endsWith("Z") || item.deletedAt.includes("+") ? item.deletedAt : `${item.deletedAt}Z`) : "";
+                                const delDateStr = utcStr ? new Date(utcStr).toLocaleString("en-IN") : "-";
+                                
+                                // Calculate remaining time before auto-purging (3 days)
+                                let remainingStr = "";
+                                if (item.deletedAt) {
+                                  const delTime = new Date(item.deletedAt).getTime();
+                                  const expiry = delTime + 3 * 24 * 60 * 60 * 1000;
+                                  const diff = expiry - Date.now();
+                                  if (diff > 0) {
+                                    const hoursTotal = Math.floor(diff / (1000 * 60 * 60));
+                                    const days = Math.floor(hoursTotal / 24);
+                                    const hours = hoursTotal % 24;
+                                    remainingStr = ` (${days}d ${hours}h left)`;
+                                  } else {
+                                    remainingStr = " (Expiring)";
+                                  }
+                                }
+
+                                return (
+                                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                    <td className="p-[10px] font-semibold text-gray-850">
+                                      <span className="mr-1.5 text-[14px]">{item.emoji}</span>
+                                      {item.title}
+                                    </td>
+                                    <td className="p-[10px] text-gray-500">
+                                      {item.type === "article" ? "📄 Article" : "🎥 Video"}
+                                    </td>
+                                    <td className="p-[10px] text-gray-650">{item.category}</td>
+                                    <td className="p-[10px] text-gray-450">
+                                      {delDateStr}
+                                      <span className="text-[10px] text-rose-500 font-bold block mt-[2px]">{remainingStr}</span>
+                                    </td>
+                                    <td className="p-[10px] text-right space-x-[8px]">
+                                      <button
+                                        onClick={() => handleRestoreEdu(item.id)}
+                                        className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                                      >
+                                        Restore ↺
+                                      </button>
+                                      <button
+                                        onClick={() => handlePermanentDeleteEdu(item.id)}
+                                        className="text-rose-500 hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                                      >
+                                        Delete Forever ❌
                                       </button>
                                     </td>
                                   </tr>
