@@ -73,6 +73,8 @@ export default function CibilAnalyzerView({
   const { toast } = useToast();
   const analyzerRef = React.useRef<HTMLDivElement>(null);
 
+  const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
   // Core CIBIL Report State
   const [report, setReport] = useState<CibilReport | null>(null);
   const [storedReport, setStoredReport] = useState<CibilReport | null>(null);
@@ -1271,7 +1273,7 @@ export default function CibilAnalyzerView({
                   </div>
                 )}
 
-                {bsaExcelUrl && (
+                {bsaExcelUrl && (isExemptRole(userEmail, report?.name) || isEmployeeId) && (
                   <a
                     href={bsaExcelUrl}
                     download

@@ -53,6 +53,7 @@ export interface CibilReport {
   pdf_url?: string;
   fetched_at: string;
   bsa_analysis?: any;
+  bureau?: string;
 }
 
 export async function fetchCibilReport(
