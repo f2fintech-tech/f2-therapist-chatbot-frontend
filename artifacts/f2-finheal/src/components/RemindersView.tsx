@@ -15,7 +15,9 @@ import {
   Search, 
   AlertTriangle,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 interface Reminder {
@@ -66,6 +68,18 @@ const CATEGORY_ICONS = {
   Admin: "📄"
 };
 
+const format24to12 = (time24?: string): string => {
+  if (!time24) return "";
+  const parts = time24.split(":");
+  if (parts.length < 2) return time24;
+  let hr = parseInt(parts[0], 10);
+  const min = parts[1];
+  const period = hr >= 12 ? "PM" : "AM";
+  hr = hr % 12;
+  if (hr === 0) hr = 12;
+  return `${String(hr).padStart(2, "0")}:${min} ${period}`;
+};
+
 export default function RemindersView({ userId, onToggleSidebar, onToggleInsights, onOpenFinancialWellnessAssistant }: RemindersViewProps) {
   const storageKey = `${STORAGE_KEY_PREFIX}:${userId || "anonymous"}`;
   
@@ -88,6 +102,11 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
   const [remindersLoading, setRemindersLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [startDateOffset, setStartDateOffset] = useState<number>(0);
   
   useEffect(() => {
     if (!isAdvisor) return;
@@ -201,20 +220,22 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   const calendarDays = useMemo(() => {
     const list = [];
     const today = new Date();
+    const baseDate = new Date(today);
+    baseDate.setDate(today.getDate() + startDateOffset);
     for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
       const dateStr = d.toISOString().split("T")[0];
       list.push({
         dateStr,
         dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
         dayNum: d.getDate(),
-        isToday: i === 0,
+        isToday: dateStr === new Date().toISOString().split("T")[0],
         fullDateLabel: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
       });
     }
     return list;
-  }, []);
+  }, [startDateOffset]);
 
   const CATEGORY_DOTS: Record<string, string> = {
     EMI: "bg-indigo-500",
@@ -229,10 +250,6 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   };
   
   // State for UI filters & search
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [filterDate, setFilterDate] = useState<string | null>(null);
   
   // State for Add/Edit Form Panel
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -244,6 +261,37 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   const [formAmount, setFormAmount] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
   const [formDueTime, setFormDueTime] = useState("");
+  const [selectedHour, setSelectedHour] = useState<number>(8);
+  const [selectedMinute, setSelectedMinute] = useState<string>("00");
+  const [selectedPeriod, setSelectedPeriod] = useState<"AM" | "PM">("AM");
+  const [showTimePicker, setShowTimePicker] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (formDueTime) {
+      const parts = formDueTime.split(":");
+      if (parts.length >= 2) {
+        let hr = parseInt(parts[0], 10);
+        const min = parts[1];
+        const period = hr >= 12 ? "PM" : "AM";
+        hr = hr % 12;
+        if (hr === 0) hr = 12;
+        setSelectedHour(hr);
+        setSelectedMinute(min);
+        setSelectedPeriod(period);
+      }
+    } else {
+      setSelectedHour(8);
+      setSelectedMinute("00");
+      setSelectedPeriod("AM");
+    }
+  }, [formDueTime]);
+
+  const updateTimeState = (h: number, m: string, p: "AM" | "PM") => {
+    let hr24 = h;
+    if (p === "PM" && h < 12) hr24 = h + 12;
+    if (p === "AM" && h === 12) hr24 = 0;
+    setFormDueTime(`${String(hr24).padStart(2, "0")}:${m}`);
+  };
   const [formPriority, setFormPriority] = useState<"high" | "medium" | "low">("medium");
   const [formFrequency, setFormFrequency] = useState<"one-time" | "weekly" | "monthly" | "yearly">("one-time");
   const [formNotes, setFormNotes] = useState("");
@@ -638,21 +686,85 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
         
         {/* Calendar Planner Widget */}
         <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] shadow-[0_4px_16px_rgba(15,23,42,0.02)] space-y-[10px] dark:bg-slate-950 dark:border-slate-800">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-[8px] pb-[4px]">
             <div className="text-[11.5px] font-bold text-gray-800 dark:text-slate-300 uppercase tracking-wider flex items-center gap-[4px]">
-              📅 Weekly Schedule Planner
+              <span>📅 Weekly Schedule Planner</span>
             </div>
-            {filterDate && (
-              <button
-                onClick={() => setFilterDate(null)}
-                className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer flex items-center gap-[3px] bg-rose-50 px-[8px] py-[2px] rounded-full dark:bg-rose-950/25"
-              >
-                Clear Date Filter <X size={10} />
-              </button>
-            )}
+            
+            <div className="flex flex-wrap items-center gap-[8px] w-full sm:w-auto justify-end">
+              {/* Navigation Capsule */}
+              <div className="flex items-center gap-[2px] bg-gray-50 border border-gray-150 p-[2px] rounded-[10px] dark:bg-slate-900 dark:border-slate-800 shrink-0 shadow-xs">
+                {/* Prev Week */}
+                <button
+                  type="button"
+                  onClick={() => setStartDateOffset(startDateOffset - 7)}
+                  className="h-[26px] w-[26px] rounded-[8px] text-gray-400 hover:text-gray-700 hover:bg-white flex items-center justify-center transition-all cursor-pointer dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-850 hover:scale-[1.05] active:scale-[0.95]"
+                  title="Previous Week"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                {/* Reset to Today */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDateOffset(0);
+                    setFilterDate(null);
+                  }}
+                  className={`h-[26px] px-[12px] rounded-[8px] text-[10.5px] font-bold transition-all cursor-pointer flex items-center gap-[5px] hover:scale-[1.03] active:scale-[0.97] ${
+                    startDateOffset === 0
+                      ? "bg-white text-primary shadow-xs border border-gray-200/60 dark:bg-slate-850 dark:border-slate-800"
+                      : "text-gray-400 hover:text-gray-700 hover:bg-white dark:hover:text-slate-350 dark:hover:bg-slate-850"
+                  }`}
+                >
+                  {startDateOffset === 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                  )}
+                  <span>Today</span>
+                </button>
+
+                {/* Next Week */}
+                <button
+                  type="button"
+                  onClick={() => setStartDateOffset(startDateOffset + 7)}
+                  className="h-[26px] w-[26px] rounded-[8px] text-gray-400 hover:text-gray-700 hover:bg-white flex items-center justify-center transition-all cursor-pointer dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-850 hover:scale-[1.05] active:scale-[0.95]"
+                  title="Next Week"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {/* Jump to Date Picker */}
+              <div className="flex items-center gap-[4px] ml-[4px]">
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Jump to:</span>
+                <input
+                  type="date"
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    if (selected) {
+                      const selectedTime = new Date(selected).getTime();
+                      const todayTime = new Date(new Date().toISOString().split("T")[0]).getTime();
+                      const diffDays = Math.floor((selectedTime - todayTime) / (1000 * 60 * 60 * 24));
+                      setStartDateOffset(diffDays);
+                      setFilterDate(selected);
+                    }
+                  }}
+                  className="h-[28px] text-[10.5px] bg-gray-50 border border-gray-150 rounded-[8px] px-[8px] py-[4px] outline-none max-w-[115px] dark:bg-slate-900 dark:border-slate-800 dark:text-slate-350 cursor-pointer shadow-xs focus:border-primary focus:bg-white transition-all"
+                />
+              </div>
+
+              {filterDate && (
+                <button
+                  onClick={() => setFilterDate(null)}
+                  className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer flex items-center gap-[3px] bg-rose-50 px-[8px] py-[4px] rounded-full dark:bg-rose-950/25 ml-[4px] hover:bg-rose-100 transition-colors"
+                >
+                  Clear <X size={10} />
+                </button>
+              )}
+            </div>
           </div>
           
-          <div className="grid grid-cols-7 gap-[6px] select-none">
+          <div className="grid grid-cols-7 gap-[8px] select-none pt-[4px]">
             {calendarDays.map((day) => {
               // Find reminders on this day
               const dayReminders = combinedReminders.filter(r => r.dueDate === day.dateStr);
@@ -662,29 +774,48 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                 <div
                   key={day.dateStr}
                   onClick={() => setFilterDate(isActive ? null : day.dateStr)}
-                  className={`cursor-pointer p-[8px_4px] rounded-[12px] border text-center transition-all flex flex-col items-center justify-between min-h-[64px] ${
+                  className={`cursor-pointer p-[12px_4px_8px_4px] rounded-[16px] border text-center transition-all flex flex-col items-center justify-between min-h-[74px] relative hover:scale-[1.03] active:scale-[0.97] ${
                     isActive
-                      ? "bg-primary border-primary text-white shadow-sm scale-[1.02]"
+                      ? "bg-gradient-to-br from-primary to-[#4a5cf0] border-primary text-white shadow-[0_6px_20px_rgba(50,68,230,0.22)]"
                       : day.isToday
-                        ? "bg-blue-50/50 border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:bg-slate-900/50 dark:border-slate-800"
-                        : "bg-gray-50/50 border-gray-150 hover:bg-gray-50 hover:border-gray-250 dark:bg-slate-900/30 dark:border-slate-850"
+                        ? "bg-gradient-to-br from-blue-50/60 to-indigo-50/60 border-blue-300 hover:border-blue-400 dark:from-slate-900/60 dark:to-indigo-950/20 dark:border-indigo-900/50 shadow-[0_4px_12px_rgba(50,68,230,0.04)]"
+                        : "bg-white border-gray-150 hover:border-gray-300 hover:bg-gray-50/30 dark:bg-slate-950 dark:border-slate-800 dark:hover:border-slate-700"
                   }`}
                 >
-                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? "text-white/80" : "text-gray-400"}`}>
+                  {/* Today Badge */}
+                  {day.isToday && !isActive && (
+                    <span className="absolute -top-[5px] bg-[#06b6d4] text-white text-[7px] font-extrabold uppercase px-[6px] py-[1.5px] rounded-full tracking-wider leading-none shadow-sm scale-90">
+                      Today
+                    </span>
+                  )}
+
+                  <span className={`text-[8.5px] font-bold uppercase tracking-widest ${
+                    isActive 
+                      ? "text-white/80" 
+                      : day.isToday 
+                        ? "text-primary dark:text-blue-400" 
+                        : "text-gray-400 dark:text-slate-500"
+                  }`}>
                     {day.dayName}
                   </span>
                   
-                  <span className="text-[15px] font-extrabold font-sans leading-none my-[4px]">
+                  <span className={`text-[16px] font-extrabold leading-none my-[4px] ${
+                    isActive 
+                      ? "text-white" 
+                      : day.isToday 
+                        ? "text-primary dark:text-blue-400 font-black" 
+                        : "text-gray-800 dark:text-slate-300"
+                  }`}>
                     {day.dayNum}
                   </span>
 
                   {/* Dot status indicator list */}
-                  <div className="flex gap-[3px] justify-center items-center h-[6px] w-full px-[4px]">
+                  <div className="flex gap-[3.5px] justify-center items-center h-[6px] w-full px-[4px]">
                     {dayReminders.slice(0, 3).map((rem, idx) => (
                       <span
                         key={rem.id || idx}
                         title={`${rem.title} (${rem.category})`}
-                        className={`w-[4.5px] h-[4.5px] rounded-full shrink-0 ${
+                        className={`w-[5px] h-[5px] rounded-full shrink-0 ${
                           isActive 
                             ? "bg-white" 
                             : CATEGORY_DOTS[rem.category] || "bg-gray-400"
@@ -692,7 +823,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                       />
                     ))}
                     {dayReminders.length > 3 && (
-                      <span className={`text-[7px] font-bold leading-none ${isActive ? "text-white" : "text-gray-400"}`}>
+                      <span className={`text-[7px] font-black leading-none ${isActive ? "text-white" : "text-gray-400"}`}>
                         +
                       </span>
                     )}
@@ -952,7 +1083,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                             dateInfo.status === "tomorrow" ? "text-amber-600" :
                             "text-gray-500 dark:text-slate-400"
                           }`}>
-                            <Calendar size={11} /> {dateInfo.text} {rem.dueTime && `at ${rem.dueTime}`}
+                            <Calendar size={11} /> {dateInfo.text} {rem.dueTime && `at ${format24to12(rem.dueTime)}`}
                           </span>
 
                           {/* Amount */}
@@ -1224,14 +1355,121 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
                 </div>
 
                 {/* Due Time */}
-                <div>
+                <div className="relative">
                   <label className="text-[11px] font-semibold text-gray-700 dark:text-slate-300 block mb-[4px]">Due Time</label>
-                  <input
-                    type="time"
-                    value={formDueTime}
-                    onChange={(e) => setFormDueTime(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-[10px] py-[8px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:focus:bg-slate-950"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTimePicker(!showTimePicker)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-[10px] py-[8px] text-[12.5px] outline-none focus:border-primary focus:bg-white transition-all text-left flex items-center justify-between dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200"
+                  >
+                    <span>{formDueTime ? format24to12(formDueTime) : "--:-- --"}</span>
+                    <Clock size={14} className="text-gray-400" />
+                  </button>
+
+                  {showTimePicker && (
+                    <>
+                      {/* Back drop to close */}
+                      <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+                      
+                      <div className="absolute right-0 top-full mt-[4px] bg-white border border-gray-150 rounded-[12px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-[12px] z-50 flex gap-[6px] min-w-[170px] dark:bg-slate-900 dark:border-slate-800 animate-fade-in">
+                        {/* Hours list */}
+                        <div className="flex flex-col items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-[4px]">H</span>
+                          <div className="max-h-[140px] overflow-y-auto w-[42px] flex flex-col gap-[2px] pr-[2px] scrollbar-thin">
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => {
+                              const isSelected = selectedHour === h;
+                              return (
+                                <button
+                                  key={h}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedHour(h);
+                                    updateTimeState(h, selectedMinute, selectedPeriod);
+                                  }}
+                                  className={`text-[12px] font-semibold py-[4px] rounded-[6px] transition-all ${
+                                    isSelected
+                                      ? "bg-primary text-white"
+                                      : "hover:bg-gray-100 text-gray-700 dark:text-slate-350 dark:hover:bg-slate-800"
+                                  }`}
+                                >
+                                  {h}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-[1px] bg-gray-100 dark:bg-slate-800 self-stretch mt-[16px]" />
+
+                        {/* Minutes list */}
+                        <div className="flex flex-col items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-[4px]">M</span>
+                          <div className="max-h-[140px] overflow-y-auto w-[42px] flex flex-col gap-[2px] pr-[2px] scrollbar-thin">
+                            {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0")).map((m) => {
+                              const isSelected = selectedMinute === m;
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMinute(m);
+                                    updateTimeState(selectedHour, m, selectedPeriod);
+                                  }}
+                                  className={`text-[12px] font-semibold py-[4px] rounded-[6px] transition-all ${
+                                    isSelected
+                                      ? "bg-primary text-white"
+                                      : "hover:bg-gray-100 text-gray-700 dark:text-slate-350 dark:hover:bg-slate-800"
+                                  }`}
+                                >
+                                  {m}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-[1px] bg-gray-100 dark:bg-slate-800 self-stretch mt-[16px]" />
+
+                        {/* AM/PM */}
+                        <div className="flex flex-col items-center justify-between h-full pt-[16px] gap-[4px]">
+                          {["AM", "PM"].map((p) => {
+                            const isSelected = selectedPeriod === p;
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPeriod(p as any);
+                                  updateTimeState(selectedHour, selectedMinute, p as any);
+                                }}
+                                className={`text-[10px] font-bold px-[8px] py-[8px] rounded-[6px] transition-all ${
+                                  isSelected
+                                    ? "bg-primary text-white"
+                                    : "hover:bg-gray-100 text-gray-700 dark:text-slate-350 dark:hover:bg-slate-800"
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            );
+                          })}
+                          
+                          {/* Clear time */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormDueTime("");
+                              setShowTimePicker(false);
+                            }}
+                            className="text-[8px] text-rose-500 font-bold hover:underline mt-[6px]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
