@@ -189,11 +189,43 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       return clientAppointments.filter(a => !a.completed && !a.cancelled);
     }
   }, [isAdvisor, advisorAppointments, clientAppointments]);
+
+  // 7-day calendar row calculations
+  const calendarDays = useMemo(() => {
+    const list = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateStr = d.toISOString().split("T")[0];
+      list.push({
+        dateStr,
+        dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+        dayNum: d.getDate(),
+        isToday: i === 0,
+        fullDateLabel: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+      });
+    }
+    return list;
+  }, []);
+
+  const CATEGORY_DOTS: Record<string, string> = {
+    EMI: "bg-indigo-500",
+    Savings: "bg-emerald-500",
+    Bill: "bg-cyan-500",
+    Tax: "bg-rose-500",
+    General: "bg-gray-400",
+    Consultation: "bg-indigo-500",
+    Preparation: "bg-emerald-500",
+    FollowUp: "bg-cyan-500",
+    Admin: "bg-rose-500"
+  };
   
   // State for UI filters & search
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [filterDate, setFilterDate] = useState<string | null>(null);
   
   // State for Add/Edit Form Panel
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -520,7 +552,9 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       const matchesCategory = categoryFilter === "all" ? true :
                               r.category === categoryFilter;
 
-      return matchesSearch && matchesStatus && matchesCategory;
+      const matchesDate = filterDate ? r.dueDate === filterDate : true;
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesDate;
     }).sort((a, b) => {
       // Sort by status first (uncompleted first)
       if (a.completed !== b.completed) {
@@ -529,7 +563,7 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       // Then sort by due date ascending
       return a.dueDate.localeCompare(b.dueDate);
     });
-  }, [combinedReminders, searchQuery, statusFilter, categoryFilter]);
+  }, [combinedReminders, searchQuery, statusFilter, categoryFilter, filterDate]);
 
   const stats = useMemo(() => {
     const total = combinedReminders.length;
@@ -595,6 +629,78 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
       {/* Main Scrollable Dashboard */}
       <div className="flex-1 overflow-y-auto px-[16px] py-[16px] space-y-[18px] sm:px-[20px] sm:py-[20px]">
         
+        {/* Calendar Planner Widget */}
+        <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] shadow-[0_4px_16px_rgba(15,23,42,0.02)] space-y-[10px] dark:bg-slate-950 dark:border-slate-800">
+          <div className="flex justify-between items-center">
+            <div className="text-[11.5px] font-bold text-gray-800 dark:text-slate-300 uppercase tracking-wider flex items-center gap-[4px]">
+              📅 Weekly Schedule Planner
+            </div>
+            {filterDate && (
+              <button
+                onClick={() => setFilterDate(null)}
+                className="text-[10px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer flex items-center gap-[3px] bg-rose-50 px-[8px] py-[2px] rounded-full dark:bg-rose-950/25"
+              >
+                Clear Date Filter <X size={10} />
+              </button>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-7 gap-[6px] select-none">
+            {calendarDays.map((day) => {
+              // Find reminders on this day
+              const dayReminders = combinedReminders.filter(r => r.dueDate === day.dateStr);
+              const isActive = filterDate === day.dateStr;
+
+              return (
+                <div
+                  key={day.dateStr}
+                  onClick={() => setFilterDate(isActive ? null : day.dateStr)}
+                  className={`cursor-pointer p-[8px_4px] rounded-[12px] border text-center transition-all flex flex-col items-center justify-between min-h-[64px] ${
+                    isActive
+                      ? "bg-primary border-primary text-white shadow-sm scale-[1.02]"
+                      : day.isToday
+                        ? "bg-blue-50/50 border-blue-200 hover:bg-blue-50 hover:border-blue-300 dark:bg-slate-900/50 dark:border-slate-800"
+                        : "bg-gray-50/50 border-gray-150 hover:bg-gray-50 hover:border-gray-250 dark:bg-slate-900/30 dark:border-slate-850"
+                  }`}
+                >
+                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? "text-white/80" : "text-gray-400"}`}>
+                    {day.dayName}
+                  </span>
+                  
+                  <span className="text-[15px] font-extrabold font-sans leading-none my-[4px]">
+                    {day.dayNum}
+                  </span>
+
+                  {/* Dot status indicator list */}
+                  <div className="flex gap-[3px] justify-center items-center h-[6px] w-full px-[4px]">
+                    {dayReminders.slice(0, 3).map((rem, idx) => (
+                      <span
+                        key={rem.id || idx}
+                        title={`${rem.title} (${rem.category})`}
+                        className={`w-[4.5px] h-[4.5px] rounded-full shrink-0 ${
+                          isActive 
+                            ? "bg-white" 
+                            : CATEGORY_DOTS[rem.category] || "bg-gray-400"
+                        }`}
+                      />
+                    ))}
+                    {dayReminders.length > 3 && (
+                      <span className={`text-[7px] font-bold leading-none ${isActive ? "text-white" : "text-gray-400"}`}>
+                        +
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {filterDate && (
+            <p className="text-[10px] text-primary font-medium">
+              Showing reminders for {new Date(filterDate).toLocaleDateString("en-IN", { weekday: 'long', day: 'numeric', month: 'short' })}
+            </p>
+          )}
+        </div>
+
         {/* KPI Stats cards */}
         <div className="grid grid-cols-2 gap-[10px] md:grid-cols-3 xl:grid-cols-5">
           <div className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex items-center gap-[12px] shadow-[0_4px_16px_rgba(15,23,42,0.03)] dark:bg-slate-950 dark:border-slate-800">
