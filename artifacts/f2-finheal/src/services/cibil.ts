@@ -18,6 +18,12 @@ function getHeaders(userId?: string): Record<string, string> {
   return headers;
 }
 
+export function getBureauPdfDownloadUrl(pdfUrl: string, fileName: string): string {
+  const encodedUrl = encodeURIComponent(pdfUrl);
+  const encodedFileName = encodeURIComponent(fileName);
+  return `${API_BASE_URL}/cibil/proxy-pdf?url=${encodedUrl}&filename=${encodedFileName}`;
+}
+
 export interface CibilReportMetric {
   payment_on_time_pct: number;
   credit_utilization_pct: number;

@@ -22,7 +22,7 @@ import {
   Clock,
   RefreshCw
 } from "lucide-react";
-import { fetchCibilReport, getStoredCibilReport, CibilReport } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -2373,9 +2373,7 @@ export default function EligibilityCibilView({
                     <p className="text-[11px] text-gray-500 mt-3 font-semibold">PAN: {cibilReport.pan}</p>
                     {cibilReport.pdf_url && (
                       <a
-                        href={cibilReport.pdf_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
                         className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
                       >
                         <Download className="w-4 h-4 shrink-0" />
