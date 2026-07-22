@@ -1373,10 +1373,53 @@ export default function EligibilityCibilView({
 
   if (cibilLoading) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-[12px]">
-          <div className="h-[48px] w-[48px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-[14px] font-medium text-gray-500">Initializing...</p>
+      <div className="eligibility-view relative h-full w-full flex flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 animate-pulse">
+        {/* Header Skeleton */}
+        <div className="flex flex-col gap-[14px] border-b border-gray-100 bg-white py-[16px] px-[20px] shrink-0 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-[10px]">
+            <div className="w-[36px] h-[36px] rounded-[10px] bg-gray-200"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-48"></div>
+              <div className="h-3 bg-gray-100 rounded w-64"></div>
+            </div>
+          </div>
+          <div className="flex gap-2 hidden sm:flex">
+            <div className="h-[36px] w-[120px] bg-gray-200 rounded-[10px]"></div>
+            <div className="h-[36px] w-[36px] bg-gray-200 rounded-[10px]"></div>
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="flex-1 p-[16px] sm:p-[24px] overflow-hidden">
+          <div className="max-w-[1200px] mx-auto space-y-[24px]">
+            {/* Tabs Skeleton */}
+            <div className="flex gap-4 border-b border-gray-200 pb-[12px]">
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+              <div className="h-[36px] w-[140px] bg-gray-200 rounded-full"></div>
+            </div>
+
+            {/* Main Cards Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-[24px]">
+              <div className="lg:col-span-2 space-y-[24px]">
+                <div className="h-[320px] bg-white border border-gray-200 rounded-[16px] p-[24px]">
+                  <div className="h-5 bg-gray-200 rounded w-1/3 mb-8"></div>
+                  <div className="space-y-4">
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                    <div className="h-[48px] bg-gray-100 rounded-[10px] w-full"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-1 space-y-[24px]">
+                <div className="h-[320px] bg-white border border-gray-200 rounded-[16px] p-[24px] flex flex-col items-center justify-center">
+                  <div className="w-[140px] h-[140px] rounded-full bg-gray-100 border-[8px] border-gray-50 mb-6"></div>
+                  <div className="h-5 bg-gray-200 rounded w-1/2 mb-2"></div>
+                  <div className="h-3 bg-gray-100 rounded w-1/3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

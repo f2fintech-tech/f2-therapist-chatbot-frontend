@@ -87,10 +87,13 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   const isAdvisor = checkIsAdvisor();
 
   const [advisorAppointments, setAdvisorAppointments] = useState<any[]>([]);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  
   useEffect(() => {
     if (!isAdvisor) return;
     async function loadAdvisorAppts() {
       try {
+        setRemindersLoading(true);
         const storedSession = localStorage.getItem("finheal-auth-session");
         const parsed = storedSession ? JSON.parse(storedSession) : null;
         const advId = parsed?.f2FintechId || parsed?.userId || userId;
@@ -100,6 +103,8 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
         }
       } catch (e) {
         console.error("Failed to load appointments in RemindersView", e);
+      } finally {
+        setRemindersLoading(false);
       }
     }
     loadAdvisorAppts();
@@ -126,7 +131,9 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
         console.error("Failed to load client appointments in RemindersView", e);
       }
     };
+
     loadAppts();
+
     window.addEventListener("storage", loadAppts);
     window.addEventListener("finheal:advisors_update" as any, loadAppts);
     return () => {
@@ -750,7 +757,22 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
 
             {/* List block */}
             <div className="space-y-[10px]">
-              {filteredReminders.length === 0 ? (
+              {remindersLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-[16px] border border-gray-100 p-[12px_14px] flex gap-[12px] items-start shadow-[0_4px_16px_rgba(15,23,42,0.02)] dark:bg-slate-950 dark:border-slate-800 animate-pulse">
+                    <div className="w-[20px] h-[20px] rounded-full bg-gray-200 mt-[3px] shrink-0"></div>
+                    <div className="flex-1 min-w-0 space-y-[8px]">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <div className="flex gap-[8px]">
+                        <div className="h-3 bg-gray-200 rounded-full w-16"></div>
+                        <div className="h-3 bg-gray-100 rounded w-24"></div>
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded w-full max-w-sm"></div>
+                    </div>
+                    <div className="h-7 w-7 bg-gray-200 rounded-[6px] shrink-0 self-center"></div>
+                  </div>
+                ))
+              ) : filteredReminders.length === 0 ? (
                 <div className="bg-white rounded-[16px] border border-gray-100 p-[32px] text-center shadow-[0_4px_16px_rgba(15,23,42,0.02)] dark:bg-slate-950 dark:border-slate-800">
                   <div className="text-[28px] mb-[10px]">📭</div>
                   <div className="text-[13px] font-bold text-gray-700 dark:text-slate-300">No reminders found</div>
