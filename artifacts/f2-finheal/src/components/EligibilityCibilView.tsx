@@ -2369,17 +2369,23 @@ export default function EligibilityCibilView({
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
                   
                   {/* Gauge dial card */}
-                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-between text-center relative">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-indigo-500" />
-                    
-                    <div className="w-full flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                      <span className="text-[12px] font-bold text-gray-808 flex items-center gap-1.5 uppercase">
-                        <ShieldCheck className="h-4.5 w-4.5 text-primary" />
-                        <span>Bureau Summary</span>
-                      </span>
-                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-[6px] bg-indigo-50 text-indigo-700 border border-indigo-150">
-                        {cibilBureau.toUpperCase()}
-                      </span>
+                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    <div className="flex justify-between items-center w-full mb-3 shrink-0">
+                      <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px]">Credit Score Bureau</h3>
+                      {(() => {
+                        const fresh = isReportFresh(cibilReport?.fetched_at);
+                        const exempt = isExemptRole(userEmail, cibilReport?.name);
+                        
+                        if (fresh && !exempt) {
+                          const nextDate = getNextAvailableFetchDate(cibilReport?.fetched_at);
+                          return (
+                            <span className="text-[9.5px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-[5px] font-semibold font-sans" title={`Next update available on ${nextDate}`}>
+                              Next update: {nextDate}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     <div className="relative w-[180px] h-[180px] flex items-center justify-center my-1 select-none">
@@ -2396,8 +2402,8 @@ export default function EligibilityCibilView({
                           cx="90"
                           cy="90"
                           r={scoreGauge.radius}
-                          stroke={`url(#score-grad-${userId})`}
-                          strokeWidth="12"
+                          stroke={scoreTheme.fill}
+                          strokeWidth="10"
                           fill="transparent"
                           strokeDasharray={scoreGauge.dashArray}
                           strokeDashoffset={scoreGauge.dashOffset}
@@ -2406,20 +2412,21 @@ export default function EligibilityCibilView({
                         />
                       </svg>
                       <div className="absolute flex flex-col items-center justify-center">
-                        <span className="text-[32px] font-black text-gray-800 leading-none">{cibilReport.score}</span>
-                        <span className={`text-[11.5px] font-bold mt-1.5 px-3 py-0.5 rounded-[12px] border ${scoreTheme.bg} ${scoreTheme.color} ${scoreTheme.border}`}>
+                        <span className="text-[36px] font-black text-gray-800 leading-none">{cibilReport.score}</span>
+                        <span className={`text-[13px] font-bold mt-[6px] px-[12px] py-[3px] rounded-[20px] ${scoreTheme.bg} ${scoreTheme.color} border ${scoreTheme.border}`}>
                           {cibilReport.band}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-gray-500 mt-3 font-semibold">PAN: {cibilReport.pan}</p>
+                    <p className="text-[11px] text-gray-400 mt-[12px]">PAN: {cibilReport.pan} | Phone: {cibilReport.phone || 'N/A'}</p>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {cibilReport.fetched_at ? new Date(cibilReport.fetched_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                     {cibilReport.pdf_url && (
                       <a
-                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
-                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
+                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)}
+                        className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                       >
-                        <Download className="w-4 h-4 shrink-0" />
+                        <FileText className="w-[14px] h-[14px]" />
                         <span>Download PDF Report</span>
                       </a>
                     )}
@@ -2519,24 +2526,24 @@ export default function EligibilityCibilView({
                       type="button"
                       onClick={handleGenerateCAM}
                       disabled={isGeneratingCAM}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
+                      className="mt-[8px] flex items-center justify-center gap-[6px] bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
-                      <Sparkles className="w-4.5 h-4.5 shrink-0" />
+                      <FileText className="w-[14px] h-[14px]" />
                       <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCibilReport(null)}
-                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
+                      className="mt-[14px] text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
                     >
                       Check Different PAN
                     </button>
                   </div>
 
                   {/* Impact factors cards */}
-                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col justify-between">
-                    <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">Credit Score Impact Factors</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm flex flex-col">
+                    <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px] mb-[16px]">Key Credit Impact Factors</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
                       <FactorCard
                         label="Payment History"
                         value={`${cibilReport.metrics.payment_on_time_pct}%`}
@@ -2544,27 +2551,27 @@ export default function EligibilityCibilView({
                         status={cibilReport.metrics.payment_on_time_pct >= 95 ? "Excellent" : cibilReport.metrics.payment_on_time_pct >= 90 ? "Good" : "Poor"}
                       />
                       <FactorCard
-                        label="Credit Util"
+                        label="Credit Utilization"
                         value={`${cibilReport.metrics.credit_utilization_pct}%`}
-                        subtext="Of limits utilized"
+                        subtext="Of limit utilized"
                         status={cibilReport.metrics.credit_utilization_pct <= 30 ? "Excellent" : cibilReport.metrics.credit_utilization_pct <= 50 ? "Good" : "Poor"}
                       />
                       <FactorCard
                         label="Credit Age"
                         value={`${cibilReport.metrics.credit_history_age_years} yrs`}
-                        subtext="History duration"
+                        subtext="Credit vintage"
                         status={cibilReport.metrics.credit_history_age_years >= 5 ? "Excellent" : cibilReport.metrics.credit_history_age_years >= 3 ? "Good" : "Poor"}
                       />
                       <FactorCard
-                        label="Recent Queries"
-                        value={String(cibilReport.metrics.enquiries_l6m)}
-                        subtext="Enquiries (6M)"
-                        status={cibilReport.metrics.enquiries_l6m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l6m <= 2 ? "Good" : "Poor"}
+                        label="Recent Enquiries"
+                        value={String(cibilReport.metrics.enquiries_l3m)}
+                        subtext="Bureau queries (3M)"
+                        status={cibilReport.metrics.enquiries_l3m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
                       />
                     </div>
-                    <div className="mt-4 bg-gray-50 rounded-[12px] p-3 flex items-start gap-2 text-[11px] text-gray-500 border border-gray-100">
-                      <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <span>To optimize your score, keep utilization below 30%, avoid late payments, and do not make too many new loan queries in a short timeframe.</span>
+                    <div className="mt-[16px] bg-gray-50 border border-gray-100 rounded-[12px] p-[12px] flex items-start gap-[8px] text-[12px] text-gray-600">
+                      <Info className="w-[16px] h-[16px] text-primary shrink-0 mt-[1px]" />
+                      <span>The CIBIL score is computed from your payment history (35%), credit utilization (30%), history age (15%), and credit mix/recent inquiries (20%).</span>
                     </div>
                   </div>
                 </div>
@@ -3679,14 +3686,14 @@ interface FactorCardProps {
 
 function FactorCard({ label, value, subtext, status }: FactorCardProps) {
   return (
-    <div className="rounded-[16px] border border-gray-100 bg-gray-50/50 p-[14px] flex flex-col justify-between text-left transition-all hover:-translate-y-[0.5px] hover:shadow-sm">
+    <div className="rounded-[16px] border border-gray-100 bg-gray-55/35 p-[14px] flex flex-col justify-between text-left transition-all hover:-translate-y-[1px] hover:shadow-sm">
       <div>
-        <span className="text-[11px] font-semibold text-gray-400 block tracking-[0.5px] uppercase">{label}</span>
+        <span className="text-[11px] font-semibold text-gray-400 block tracking-[0.5px]">{label}</span>
         <div className="text-[20px] font-extrabold text-gray-800 mt-[4px]">{value}</div>
       </div>
       <div className="mt-[8px]">
-        <p className="text-[10px] text-gray-400 leading-none mb-1.5">{subtext}</p>
-        <span className={`text-[10px] font-bold inline-block px-[8px] py-[2px] rounded-[10px] ${
+        <p className="text-[10px] text-gray-400 leading-none">{subtext}</p>
+        <span className={`text-[10px] font-bold inline-block mt-[4px] px-[8px] py-[2px] rounded-[10px] ${
           status === "Excellent" ? "bg-emerald-50 text-emerald-700" :
           status === "Good" ? "bg-blue-50 text-blue-700" :
           "bg-rose-50 text-rose-700"
