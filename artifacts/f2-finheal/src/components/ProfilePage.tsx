@@ -110,7 +110,10 @@ function getIncomeLabel(val: string): string {
     "above-100000": "₹1,00,000+",
     "prefer-not-to-say": "Prefer not to say",
   };
-  return map[val] || val;
+  if (map[val]) return map[val];
+  // If it's a raw number from BSA extraction, prepend currency
+  if (!isNaN(Number(val))) return `₹${Number(val).toLocaleString('en-IN')}`;
+  return val;
 }
 
 function getStyleLabel(val: string): string {
@@ -128,6 +131,7 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
   const [avatarUrl, setAvatarUrl] = useState<string | null>(userProfile.avatarUrl ?? null);
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastSavedProfile, setLastSavedProfile] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const initialAvatarUrlRef = useRef<string | null>(userProfile.avatarUrl ?? null);
 
@@ -167,12 +171,14 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
       try {
         const profile = await fetchUserProfile(userId);
         if (!mounted) return;
+        setLastSavedProfile(profile);
         setFormData(toFormState(profile, userProfile.displayName, email, userId));
         setAvatarUrl(userProfile.avatarUrl ?? null);
         initialAvatarUrlRef.current = userProfile.avatarUrl ?? null;
         setIsSaved(false);
       } catch {
         if (!mounted) return;
+        setLastSavedProfile(null);
         setFormData(toFormState(null, userProfile.displayName, email, userId));
         setAvatarUrl(userProfile.avatarUrl ?? null);
         initialAvatarUrlRef.current = userProfile.avatarUrl ?? null;
@@ -243,6 +249,7 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
     }
 
     const saved = await saveUserProfile(userId, nextProfile);
+    setLastSavedProfile(saved);
     const nextState = toFormState(saved, userProfile.displayName, email, userId);
     setFormData(nextState);
     onSaveProfile({ fullName: saved.name, email: saved.email, avatarUrl });
@@ -250,7 +257,7 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
   };
 
   const handleReset = () => {
-    setFormData(toFormState(null, userProfile.displayName, email, userId));
+    setFormData(toFormState(lastSavedProfile, userProfile.displayName, email, userId));
     setAvatarUrl(initialAvatarUrlRef.current);
     setIsSaved(false);
   };
@@ -576,20 +583,18 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
                   </div>
 
                   <div className="space-y-[4px]">
-                    <label className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Monthly Income Range</label>
-                    <select
-                      value={formData.monthlyIncome}
-                      onChange={(event) => handleChange("monthlyIncome", event.target.value)}
-                      className="w-full h-[42px] px-[12px] border border-indigo-150 rounded-[12px] text-[13px] bg-white outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer shadow-sm hover:border-indigo-300 transition-all"
-                      disabled={isLoading}
-                    >
-                      <option value="">Select income range</option>
-                      <option value="under-25000">💵 Under ₹25,000</option>
-                      <option value="25000-50000">💴 ₹25,000 - ₹50,000</option>
-                      <option value="50000-100000">💶 ₹50,000 - ₹1,00,000</option>
-                      <option value="above-100000">💷 ₹1,00,000+</option>
-                      <option value="prefer-not-to-say">👤 Prefer not to say</option>
-                    </select>
+                    <label className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Monthly Income</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50000"
+                        value={formData.monthlyIncome}
+                        onChange={(event) => handleChange("monthlyIncome", event.target.value)}
+                        className="w-full h-[42px] pl-[24px] pr-[12px] border border-indigo-150 rounded-[12px] text-[13px] bg-white outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm hover:border-indigo-300 transition-all"
+                        disabled={isLoading}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-[4px] sm:col-span-2">
