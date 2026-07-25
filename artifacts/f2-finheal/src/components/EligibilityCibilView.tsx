@@ -20,7 +20,11 @@ import {
   Percent,
   Calendar,
   Clock,
-  RefreshCw
+  RefreshCw,
+  CalendarCheck,
+  PieChart,
+  Hourglass,
+  Search
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
@@ -2366,7 +2370,7 @@ export default function EligibilityCibilView({
               ) : (
                 // CIBIL Report Dashboard (Retrieved)
                 <>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up pb-3">
                   
                   {/* Gauge dial card */}
                   <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
@@ -2445,9 +2449,22 @@ export default function EligibilityCibilView({
                       </div>
                     )}
                     {cibilReport.bsa_analysis ? (
-                      <div className="mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm cibil-print-hide bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <ShieldCheck className="w-4 h-4 shrink-0" />
-                        <span>Bank Statement Ready ✓</span>
+                      <div className="flex flex-col gap-2 mt-2 w-full cibil-print-hide">
+                        <div className="w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <ShieldCheck className="w-4 h-4 shrink-0" />
+                          <span>Bank Statement Ready ✓</span>
+                        </div>
+                        {cibilReport.bsa_analysis.excel_report_url && (isStaff || isExemptRole(userEmail, cibilReport.name)) && (
+                          <a 
+                            href={cibilReport.bsa_analysis.excel_report_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-[10px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[11.5px] flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download Excel Report
+                          </a>
+                        )}
                       </div>
                     ) : selectedBsaFile ? (
                       <div className="mt-2 flex flex-col gap-2 w-full cibil-print-hide">
@@ -2541,37 +2558,151 @@ export default function EligibilityCibilView({
                   </div>
 
                   {/* Impact factors cards */}
-                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm flex flex-col">
-                    <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px] mb-[16px]">Key Credit Impact Factors</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
-                      <FactorCard
-                        label="Payment History"
-                        value={`${cibilReport.metrics.payment_on_time_pct}%`}
-                        subtext="On-time payments"
-                        status={cibilReport.metrics.payment_on_time_pct >= 95 ? "Excellent" : cibilReport.metrics.payment_on_time_pct >= 90 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Credit Utilization"
-                        value={`${cibilReport.metrics.credit_utilization_pct}%`}
-                        subtext="Of limit utilized"
-                        status={cibilReport.metrics.credit_utilization_pct <= 30 ? "Excellent" : cibilReport.metrics.credit_utilization_pct <= 50 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Credit Age"
-                        value={`${cibilReport.metrics.credit_history_age_years} yrs`}
-                        subtext="Credit vintage"
-                        status={cibilReport.metrics.credit_history_age_years >= 5 ? "Excellent" : cibilReport.metrics.credit_history_age_years >= 3 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Recent Enquiries"
-                        value={String(cibilReport.metrics.enquiries_l3m)}
-                        subtext="Bureau queries (3M)"
-                        status={cibilReport.metrics.enquiries_l3m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l3m <= 2 ? "Good" : "Poor"}
-                      />
-                    </div>
-                    <div className="mt-[16px] bg-gray-50 border border-gray-100 rounded-[12px] p-[12px] flex items-start gap-[8px] text-[12px] text-gray-600">
-                      <Info className="w-[16px] h-[16px] text-primary shrink-0 mt-[1px]" />
-                      <span>The CIBIL score is computed from your payment history (35%), credit utilization (30%), history age (15%), and credit mix/recent inquiries (20%).</span>
+                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-[24px] shadow-sm flex flex-col">
+                    <h3 className="text-[14px] font-extrabold text-[#1e293b] uppercase tracking-[1px] mb-[24px]">Key Credit Impact Factors</h3>
+                    
+                    <table className="w-full border-collapse">
+                      <colgroup>
+                        <col style={{ width: '45%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '20%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left text-[#64748b] font-medium text-[12px] pb-[12px]">Factor</th>
+                          <th className="text-left text-[#64748b] font-medium text-[12px] pb-[12px]">Your Status</th>
+                          <th className="text-right text-[#64748b] font-medium text-[12px] pb-[12px]">Impact</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Row 1: Payment History */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+                                <CalendarCheck className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Payment History</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">On-time payments</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.payment_on_time_pct}%</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${cibilReport.metrics.payment_on_time_pct}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.payment_on_time_pct >= 95 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.payment_on_time_pct >= 90 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 2: Credit Utilization */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                                <PieChart className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Credit Utilization</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Of credit limit utilized</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.credit_utilization_pct}%</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(cibilReport.metrics.credit_utilization_pct, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.credit_utilization_pct <= 30 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.credit_utilization_pct <= 50 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 3: Credit Age */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                                <Hourglass className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Credit Age</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Credit history length</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.credit_history_age_years} years</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((cibilReport.metrics.credit_history_age_years / 10) * 100, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.credit_history_age_years >= 5 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.credit_history_age_years >= 3 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 4: Recent Enquiries */}
+                        <tr>
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-violet-50 text-violet-500 flex items-center justify-center shrink-0">
+                                <Search className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Recent Enquiries</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Bureau queries (3M)</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.enquiries_l3m}</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 rounded-full" style={{ width: `${cibilReport.metrics.enquiries_l3m === 0 ? 0 : Math.min((cibilReport.metrics.enquiries_l3m / 5) * 100, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.enquiries_l3m <= 1 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.enquiries_l3m <= 2 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {/* Information Footer */}
+                    <div className="mt-[24px] bg-[#f8fafc] border border-gray-100 rounded-[12px] p-[16px] flex items-start gap-[12px]">
+                      <Info className="w-[20px] h-[20px] text-blue-500 shrink-0 mt-[1px]" />
+                      <span className="text-[12.5px] font-semibold text-gray-500 leading-relaxed">
+                        Your CIBIL score is calculated using: Payment History (35%), Credit Utilization (30%), Credit History Age (15%), Credit Mix / Recent Inquiries (20%).
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2674,7 +2805,7 @@ export default function EligibilityCibilView({
                                   <p className="text-[11px] text-gray-400 mt-1">{acc.type} | Opened: {(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString()}</div>
+                                  <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString('en-IN')}</div>
                                   <div className="flex items-center gap-1 justify-end mt-1 text-[11px] font-semibold">
                                     <span className={`w-1.5 h-1.5 rounded-full ${acc.payment_status.includes("Past Due") ? "bg-rose-500" : "bg-emerald-500"}`} />
                                     <span className={acc.payment_status.includes("Past Due") ? "text-rose-600" : "text-gray-500"}>
