@@ -658,22 +658,6 @@ export default function EligibilityCibilView({
           if (profileData.cibil_report && Object.keys(profileData.cibil_report).length > 0) {
              setStoredCibilReport(profileData.cibil_report);
           }
-          
-          // Restore BSA from profile
-          if (profileData.bsa_analysis) {
-            setBsaVerified(true);
-            if (profileData.bsa_analysis.excel_report_url) {
-              setBsaExcelUrl(profileData.bsa_analysis.excel_report_url);
-            }
-            if (profileData.bsa_analysis.bank_name) {
-              setBsaBankName(profileData.bsa_analysis.bank_name);
-            }
-            if (profileData.bsa_analysis.metrics) {
-               setEligIncome(String(Math.round(profileData.bsa_analysis.metrics.verified_monthly_salary)));
-               setEligEmi(String(Math.round(profileData.bsa_analysis.metrics.total_existing_monthly_emi)));
-               setBsaPeriod(profileData.bsa_analysis.metrics.statement_period || "");
-            }
-          }
         }
       } catch (err) {
         console.error("Failed to load initial data", err);
@@ -683,6 +667,7 @@ export default function EligibilityCibilView({
     }
     init();
   }, [userId]);
+
 
   // Load lenders catalog on mount
   useEffect(() => {
@@ -831,6 +816,7 @@ export default function EligibilityCibilView({
           ...cibilReport,
           bsa_analysis: data,
         });
+        setBsaAnalysisData(data);
         toast({
           title: "Statement Attached",
           description: "Bank statement analysis successfully attached to this CIBIL report.",
@@ -3383,251 +3369,339 @@ export default function EligibilityCibilView({
 
             {/* Card 2: Results Dashboard / Empty State */}
             <div className="w-full">
-              {bsaAnalysisData ? (
-                <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-white sm:bg-transparent p-0">
-                  {/* Account Info Header */}
-                  <div className="bg-white border border-gray-200 rounded-[12px] p-5 shadow-sm flex flex-col gap-3">
-                     <h3 className="text-[15px] font-extrabold text-gray-800 border-b border-gray-100 pb-2">Account Overview</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Account Holder</span>
-                           <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.person_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Bank Name</span>
-                           <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.bank_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.bank_name || 'Unknown'}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Statement Period</span>
-                           <span className="text-[14px] font-bold text-gray-800">{formatDateRange(bsaAnalysisData.metrics?.statement_period || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_period || 'N/A')}</span>
-                        </div>
-                     </div>
-                  </div>
+              {bsaAnalysisData ? (() => {
+                let bounceEventsCount = bsaAnalysisData.metrics?.bounce_events_count;
+                if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+                  const bouncedData = bsaAnalysisData.raw_json_data?.bounced_transaction_data;
+                  if (bouncedData) {
+                    const txnsDict = bouncedData.trasactions || bouncedData.transactions;
+                    if (txnsDict) {
+                      let count = 0;
+                      for (const k in txnsDict) {
+                        if (Array.isArray(txnsDict[k])) {
+                          count += txnsDict[k].length;
+                        }
+                      }
+                      if (count > 0) bounceEventsCount = count;
+                    }
+                    if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+                      const summary = bouncedData.bounces_summary;
+                      if (Array.isArray(summary)) {
+                        const totalItem = summary.find((s: any) => s?.month === 'Total');
+                        if (totalItem) {
+                          bounceEventsCount = (
+                            (totalItem.ecs_bounce?.count || 0) +
+                            (totalItem.ach_bounce?.count || 0) +
+                            (totalItem.cheque_inward_bounce?.count || 0) +
+                            (totalItem.cheque_outward_bounce?.count || 0)
+                          );
+                        }
+                      }
+                    }
+                  }
+                }
+                const finalBounceCount = bounceEventsCount || 0;
 
-                  {/* Key Metrics Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Salary</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                // Recalculate Average Monthly Salary
+                let calculatedSalary = 0;
+                try {
+                  const salaryCredit = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.salary_credit || bsaAnalysisData.raw_json_data?.salary_credit || bsaAnalysisData.raw_json_data?.income_analysis?.salary_credit || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.salary_credit;
+                  let monthsCount = 6;
+                  const durationStr = bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_duration;
+                  if (durationStr && durationStr.includes('days')) {
+                    const days = parseInt(durationStr);
+                    monthsCount = Math.round(days / 30.44) || 1;
+                  } else if (bsaPeriod || bsaAnalysisData?.metrics?.statement_period) {
+                    const period = bsaPeriod || bsaAnalysisData?.metrics?.statement_period || "";
+                    const parts = period.split('to').map(s => s.trim());
+                    if (parts.length === 2) {
+                      const d1 = new Date(parts[0].split('-').reverse().join('-'));
+                      const d2 = new Date(parts[1].split('-').reverse().join('-'));
+                      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                        const diffTime = Math.abs(d2.getTime() - d1.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        monthsCount = Math.round(diffDays / 30.44) || 1;
+                      }
+                    }
+                  } else if (bsaAnalysisData?.months?.length) {
+                    monthsCount = bsaAnalysisData.months.length;
+                  }
+
+                  if (salaryCredit?.amount?.Total) {
+                    calculatedSalary = Math.round(salaryCredit.amount.Total / monthsCount);
+                  } else {
+                    calculatedSalary = bsaAnalysisData.metrics?.verified_monthly_salary || 
+                                       bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.insights?.key_insights?.income_insights?.total_income || 
+                                       0;
+                  }
+                } catch (e) {
+                  calculatedSalary = 0;
+                }
+
+                // Recalculate Average Monthly EMI
+                let calculatedEmi = 0;
+                try {
+                  const emiData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.debits?.emi_and_loan;
+                  if (emiData?.amount?.Total && emiData?.count?.Total > 0) {
+                    calculatedEmi = Math.round(emiData.amount.Total / emiData.count.Total);
+                  } else {
+                    calculatedEmi = bsaAnalysisData.metrics?.total_existing_monthly_emi || 0;
+                  }
+                } catch (e) {
+                  calculatedEmi = 0;
+                }
+
+                // Calculate FOIR
+                let calculatedFoir = 0;
+                if (calculatedSalary > 0) {
+                  calculatedFoir = (calculatedEmi / calculatedSalary) * 100;
+                } else {
+                  try {
+                    let rawFoirVal = bsaAnalysisData.metrics?.foir;
+                    if (rawFoirVal === undefined || rawFoirVal === null) {
+                      const findFoir = (obj: any): any => {
+                        if (!obj || typeof obj !== 'object') return null;
+                        if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
+                          return obj.monthwise_foir_score.amount.Total;
+                        }
+                        for (const key in obj) {
+                          const res = findFoir(obj[key]);
+                          if (res !== null) return res;
+                        }
+                        return null;
+                      };
+                      if (bsaAnalysisData.raw_json_data) {
+                        rawFoirVal = findFoir(bsaAnalysisData.raw_json_data);
+                      }
+                    }
+                    if (rawFoirVal !== null && rawFoirVal !== undefined) {
+                      calculatedFoir = parseFloat(rawFoirVal) || 0;
+                    }
+                  } catch (e) {}
+                }
+
+                return (
+                  <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-white sm:bg-transparent p-0">
+                    {/* Account Info Header */}
+                    <div className="bg-white border border-gray-200 rounded-[12px] p-5 shadow-sm flex flex-col gap-3">
+                       <h3 className="text-[15px] font-extrabold text-gray-800 border-b border-gray-100 pb-2">Account Overview</h3>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="flex flex-col gap-0.5">
+                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Account Holder</span>
+                             <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.person_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}</span>
                           </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-emerald-600">₹{
-                        (() => {
-                          try {
-                            const salaryCredit = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.salary_credit || bsaAnalysisData.raw_json_data?.salary_credit || bsaAnalysisData.raw_json_data?.income_analysis?.salary_credit || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.salary_credit;
-                            if (salaryCredit?.amount?.Total && salaryCredit?.count?.Total > 0) {
-                              return Math.round(salaryCredit.amount.Total / salaryCredit.count.Total).toLocaleString('en-IN');
-                            }
-                            return (bsaAnalysisData.metrics?.verified_monthly_salary || 
-                                   bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.insights?.key_insights?.income_insights?.total_income || 
-                                   0).toLocaleString('en-IN');
-                          } catch(e) { return '0'; }
-                        })()
-                      }</span>
+                          <div className="flex flex-col gap-0.5">
+                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Bank Name</span>
+                             <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.bank_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.bank_name || 'Unknown'}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Statement Period</span>
+                             <span className="text-[14px] font-bold text-gray-800">{formatDateRange(bsaAnalysisData.metrics?.statement_period || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_period || 'N/A')}</span>
+                          </div>
+                       </div>
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Credit</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds divided by the number of months, excluding internal transfers.</p>
+
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-[12px]" />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Salary</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                            </div>
                           </div>
                         </div>
+                        <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
                       </div>
-                      <span className="text-[18px] font-extrabold text-indigo-600">₹{
-                        (bsaAnalysisData.monthly_credits?.amount?.length > 0 
-                          ? Math.round(bsaAnalysisData.monthly_credits.amount.reduce((a: number, b: number) => a + b, 0) / bsaAnalysisData.monthly_credits.amount.length)
-                          : 0).toLocaleString('en-IN')
-                      }</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Monthly EMI</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Sum of all active, recurring monthly loan repayment installments identified.</p>
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-[12px]" />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Credit</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds (excluding internal transfers and loan disbursals) divided by the number of months.</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-amber-600">₹{bsaAnalysisData.metrics?.total_existing_monthly_emi?.toLocaleString('en-IN') || '0'}</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Balance</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 md:left-0 md:right-auto mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-blue-600">₹{
-                        (bsaAnalysisData.metrics?.average_monthly_balance || 
-                        bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
-                        0).toLocaleString('en-IN')
-                      }</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-[12px] ${(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Bounce Events</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className={`text-[18px] font-extrabold ${(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {bsaAnalysisData.metrics?.bounce_events_count || 0}
-                      </span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">FOIR</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-fuchsia-600">
-                        {(() => {
-                          let foirVal = bsaAnalysisData.metrics?.foir;
-                          if (foirVal === undefined || foirVal === null) {
-                            const findFoir = (obj: any): any => {
-                              if (!obj || typeof obj !== 'object') return null;
-                              if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
-                                return obj.monthwise_foir_score.amount.Total;
+                        <span className="text-[18px] font-extrabold text-indigo-600">₹{
+                          (() => {
+                            try {
+                              const creditsData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits;
+                              if (creditsData?.total_credit?.amount && creditsData?.loan_disbursed?.amount) {
+                                const totalAmtDict = creditsData.total_credit.amount;
+                                const loanAmtDict = creditsData.loan_disbursed.amount;
+                                
+                                const months = Object.keys(totalAmtDict).filter(k => k.toLowerCase() !== 'total');
+                                if (months.length > 0) {
+                                  let sum = 0;
+                                  months.forEach(m => {
+                                    const totalVal = totalAmtDict[m] || 0;
+                                    const loanVal = loanAmtDict[m] || 0;
+                                    sum += Math.max(0, totalVal - loanVal);
+                                  });
+                                  return Math.round(sum / months.length).toLocaleString('en-IN');
+                                }
                               }
-                              for (const key in obj) {
-                                const res = findFoir(obj[key]);
-                                if (res !== null) return res;
-                              }
-                              return null;
-                            };
-                            if (bsaAnalysisData.raw_json_data) {
-                              foirVal = findFoir(bsaAnalysisData.raw_json_data);
+                              
+                              return (bsaAnalysisData.monthly_credits?.amount?.length > 0 
+                                ? Math.round(bsaAnalysisData.monthly_credits.amount.reduce((a: number, b: number) => a + b, 0) / bsaAnalysisData.monthly_credits.amount.length)
+                                : 0).toLocaleString('en-IN');
+                            } catch(e) {
+                              return '0';
                             }
-                          }
-                          return (foirVal !== null && foirVal !== undefined && !Number.isNaN(foirVal)) ? `${foirVal}%` : '05';
-                        })()}
-                      </span>
+                          })()
+                        }</span>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 rounded-l-[12px]" />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly EMI</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all identified EMI and loan repayment transaction amounts.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-[12px]" />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Balance</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full right-0 md:left-0 md:right-auto mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-blue-600">₹{
+                          (bsaAnalysisData.metrics?.average_monthly_balance || 
+                          bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
+                          0).toLocaleString('en-IN')
+                        }</span>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className={`absolute top-0 left-0 w-1 h-full rounded-l-[12px] ${finalBounceCount > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Bounce Events</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`text-[18px] font-extrabold ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {finalBounceCount}
+                        </span>
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-500 rounded-l-[12px]" />
+                        <div className="flex items-center gap-1 group relative w-fit">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">FOIR</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
+                      </div>
                     </div>
-                  </div>
                   
                   {/* Alerts */}
                   <div className="flex flex-col gap-3">
-                    {(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 && (
+                    {finalBounceCount > 0 && (
                       <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
                         <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-1">
                           <span className="text-[13px] font-bold text-rose-800">Cheque/EMI Bounces Detected</span>
                           <span className="text-[11.5px] text-rose-600 leading-snug font-medium">
-                            We detected {bsaAnalysisData.metrics?.bounce_events_count || 0} bounce events in the last 6 months. This negatively impacts creditworthiness and loan eligibility.
+                            We detected {finalBounceCount} bounce events in the last 6 months. This negatively impacts creditworthiness and loan eligibility.
                           </span>
                         </div>
                       </div>
                     )}
                     
                     {(() => {
-                      let foirVal = bsaAnalysisData.metrics?.foir;
-                      if (foirVal === undefined || foirVal === null) {
-                        const findFoir = (obj: any): any => {
-                          if (!obj || typeof obj !== 'object') return null;
-                          if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
-                            return obj.monthwise_foir_score.amount.Total;
+                      if (calculatedFoir > 0) {
+                        const numericFoir = calculatedFoir;
+                        if (!Number.isNaN(numericFoir)) {
+                          const displayFoir = numericFoir.toFixed(2);
+                          if (numericFoir > 70) {
+                            return (
+                              <div className="bg-rose-100 border border-rose-300 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-rose-900">Extremely High FOIR ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-rose-700 leading-snug font-medium">
+                                    You are highly over-leveraged. Standard loans will likely be rejected outright. Focus on debt consolidation or clearing existing EMIs before applying for new credit.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 65) {
+                            return (
+                              <div className="bg-red-50 border border-red-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-red-800">Critical FOIR Warning ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-red-600 leading-snug font-medium">
+                                    This is critically high. Most lenders cap FOIR at 60-65%. Approval chances are severely restricted without a strong co-applicant or collateral.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 50) {
+                            return (
+                              <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-orange-800">High FOIR Warning ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-orange-700 leading-snug font-medium">
+                                    A FOIR above 50% indicates a high debt burden. This may reduce the chances of loan approval or result in higher interest rates.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 30) {
+                            return (
+                              <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-amber-800">Moderate FOIR ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-amber-700 leading-snug font-medium">
+                                    This is a moderate debt level. You still have room for additional credit, but banks will start analyzing your surplus income closer.
+                                  </span>
+                                </div>
+                              </div>
+                            );
                           }
-                          for (const key in obj) {
-                            const res = findFoir(obj[key]);
-                            if (res !== null) return res;
-                          }
-                          return null;
-                        };
-                        if (bsaAnalysisData.raw_json_data) {
-                          foirVal = findFoir(bsaAnalysisData.raw_json_data);
-                        }
-                      }
-                      if (foirVal !== null && foirVal !== undefined && !Number.isNaN(foirVal)) {
-                        if (foirVal > 70) {
-                          return (
-                            <div className="bg-rose-100 border border-rose-300 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-rose-900">Extremely High FOIR ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-rose-700 leading-snug font-medium">
-                                  You are highly over-leveraged. Standard loans will likely be rejected outright. Focus on debt consolidation or clearing existing EMIs before applying for new credit.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 65) {
-                          return (
-                            <div className="bg-red-50 border border-red-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-red-800">Critical FOIR Warning ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-red-600 leading-snug font-medium">
-                                  This is critically high. Most lenders cap FOIR at 60-65%. Approval chances are severely restricted without a strong co-applicant or collateral.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 50) {
-                          return (
-                            <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-orange-800">High FOIR Warning ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-orange-700 leading-snug font-medium">
-                                  A FOIR above 50% indicates a high debt burden. This may reduce the chances of loan approval or result in higher interest rates.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 30) {
-                          return (
-                            <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-amber-800">Moderate FOIR ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-amber-700 leading-snug font-medium">
-                                  This is a moderate debt level. You still have room for additional credit, but banks will start analyzing your surplus income closer.
-                                </span>
-                              </div>
-                            </div>
-                          );
                         }
                       }
                       return null;
@@ -3640,7 +3714,22 @@ export default function EligibilityCibilView({
                       <h4 className="text-[13px] font-bold text-black uppercase tracking-wider">Monthly Inflow Trend</h4>
                       <div className="h-[200px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={bsaAnalysisData?.months?.map((month: string, i: number) => ({ month, inflows: bsaAnalysisData.monthly_credits?.amount?.[i] || 0 })) || []}>
+                          <BarChart data={(() => {
+                            if (!bsaAnalysisData?.months) return [];
+                            
+                            const totalAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.total_credit?.amount;
+                            const loanAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.loan_disbursed?.amount;
+                            
+                            return bsaAnalysisData.months.map((month: string, i: number) => {
+                              let inflows = bsaAnalysisData.monthly_credits?.amount?.[i] || 0;
+                              if (totalAmtDict && loanAmtDict && totalAmtDict[month] !== undefined) {
+                                const totalVal = totalAmtDict[month] || 0;
+                                const loanVal = loanAmtDict[month] || 0;
+                                inflows = Math.max(0, totalVal - loanVal);
+                              }
+                              return { month, inflows };
+                            });
+                          })()}>
                             <defs>
                               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
@@ -3748,7 +3837,8 @@ export default function EligibilityCibilView({
                     )}
                   </div>
                 </div>
-              ) : bsaUploading ? (
+                );
+              })() : bsaUploading ? (
                 <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">
                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
                   <div>
