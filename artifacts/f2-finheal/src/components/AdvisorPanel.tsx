@@ -1331,7 +1331,7 @@ export default function AdvisorPanel({
                       )}
                     </div>
 
-                    <div className="mt-[12px] pt-[12px] border-t border-gray-100 flex items-center justify-between gap-[8px]">
+                    <div className="mt-[12px] pt-[12px] border-t border-gray-100 flex items-end justify-between gap-[8px]">
                       
                       {activeAppt ? (
                         /* Appt booked visual indicator inside expert card */
@@ -1475,7 +1475,7 @@ export default function AdvisorPanel({
                       ) : (
                         /* Standard Book Appointment Button */
                         <>
-                          <div className="text-left">
+                          <div className="text-left min-w-0 flex-1 min-h-[52px] flex flex-col justify-between">
                             <div className="text-[9.5px] text-gray-400 uppercase tracking-[0.5px]">Next Slot • Fee</div>
                             <div className="text-[12.5px] font-medium text-gray-700 mt-[1px]">
                               {advisor.nextSlot} • <span className="text-primary font-extrabold">
@@ -1495,7 +1495,7 @@ export default function AdvisorPanel({
                           </div>
                           <button
                             onClick={() => handleOpenBooking(advisor)}
-                            className="group relative overflow-hidden bg-gradient-to-r from-primary to-[#5b6bf9] text-white font-bold py-[5px] px-[12px] rounded-[6px] text-[10.5px] shadow-[0_2px_8px_rgba(50,68,230,0.15)] cursor-pointer flex items-center"
+                            className="group relative overflow-hidden bg-gradient-to-r from-primary to-[#5b6bf9] text-white font-bold py-[5px] px-[12px] rounded-[6px] text-[10.5px] shadow-[0_2px_8px_rgba(50,68,230,0.15)] cursor-pointer flex items-center shrink-0 whitespace-nowrap"
                           >
                             <span className="relative z-10">Book Call</span>
                             {/* Subtle shine effect on hover */}

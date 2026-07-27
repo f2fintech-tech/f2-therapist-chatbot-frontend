@@ -20,11 +20,16 @@ import {
   Percent,
   Calendar,
   Clock,
-  RefreshCw
+  RefreshCw,
+  CalendarCheck,
+  PieChart,
+  Hourglass,
+  Search
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
@@ -250,65 +255,7 @@ const CURRENCIES = [
 
 
 
-export function isExemptRole(email?: string, name?: string): boolean {
-  const cleanEmail = (email || "").toLowerCase().trim();
-  const cleanName = (name || "").toLowerCase().trim();
-
-  // Admin Check
-  if (
-    cleanEmail === "admin@finheal.com" || 
-    cleanEmail === "admin@f2finheal.com" || 
-    cleanEmail.startsWith("admin@") ||
-    cleanName.includes("admin") ||
-    cleanName === "finheal admin"
-  ) {
-    return true;
-  }
-
-  // Manager & Advisor Check
-  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
-  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
-
-  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
-  const hasLeadershipName = leadershipPrefixes.some(pref => cleanName.includes(pref));
-  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
-  const hasManagerName = managerPrefixes.some(pref => cleanName.includes(pref));
-
-  if (hasLeadershipEmail || hasLeadershipName || hasManagerEmail || (isInternalDomain && hasManagerName)) {
-    return true;
-  }
-
-  // If email domain is f2fintech.com, it is an advisor/employee
-  if (cleanEmail.endsWith("@f2fintech.com")) {
-    return true;
-  }
-
-  return false;
-}
-
-export function isReportFresh(fetchedAtStr?: string): boolean {
-  if (!fetchedAtStr) return false;
-  try {
-    const fetchedAt = new Date(fetchedAtStr);
-    const diffTime = Math.abs(new Date().getTime() - fetchedAt.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays < 30;
-  } catch (e) {
-    return false;
-  }
-}
-
-export function getNextAvailableFetchDate(fetchedAtStr?: string): string {
-  if (!fetchedAtStr) return "";
-  try {
-    const date = new Date(fetchedAtStr);
-    date.setDate(date.getDate() + 30);
-    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
-  } catch (e) {
-    return "";
-  }
-}
+// Shared helper functions are imported from '../utils/cibilUtils'
 
 export default function EligibilityCibilView({
   userId,
@@ -654,22 +601,6 @@ export default function EligibilityCibilView({
           if (profileData.cibil_report && Object.keys(profileData.cibil_report).length > 0) {
              setStoredCibilReport(profileData.cibil_report);
           }
-          
-          // Restore BSA from profile
-          if (profileData.bsa_analysis) {
-            setBsaVerified(true);
-            if (profileData.bsa_analysis.excel_report_url) {
-              setBsaExcelUrl(profileData.bsa_analysis.excel_report_url);
-            }
-            if (profileData.bsa_analysis.bank_name) {
-              setBsaBankName(profileData.bsa_analysis.bank_name);
-            }
-            if (profileData.bsa_analysis.metrics) {
-               setEligIncome(String(Math.round(profileData.bsa_analysis.metrics.verified_monthly_salary)));
-               setEligEmi(String(Math.round(profileData.bsa_analysis.metrics.total_existing_monthly_emi)));
-               setBsaPeriod(profileData.bsa_analysis.metrics.statement_period || "");
-            }
-          }
         }
       } catch (err) {
         console.error("Failed to load initial data", err);
@@ -679,6 +610,7 @@ export default function EligibilityCibilView({
     }
     init();
   }, [userId]);
+
 
   // Load lenders catalog on mount
   useEffect(() => {
@@ -827,6 +759,7 @@ export default function EligibilityCibilView({
           ...cibilReport,
           bsa_analysis: data,
         });
+        setBsaAnalysisData(data);
         toast({
           title: "Statement Attached",
           description: "Bank statement analysis successfully attached to this CIBIL report.",
@@ -2366,20 +2299,26 @@ export default function EligibilityCibilView({
               ) : (
                 // CIBIL Report Dashboard (Retrieved)
                 <>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up pb-3">
                   
                   {/* Gauge dial card */}
-                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-between text-center relative">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-indigo-500" />
-                    
-                    <div className="w-full flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                      <span className="text-[12px] font-bold text-gray-808 flex items-center gap-1.5 uppercase">
-                        <ShieldCheck className="h-4.5 w-4.5 text-primary" />
-                        <span>Bureau Summary</span>
-                      </span>
-                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-[6px] bg-indigo-50 text-indigo-700 border border-indigo-150">
-                        {cibilBureau.toUpperCase()}
-                      </span>
+                  <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    <div className="flex justify-between items-center w-full mb-3 shrink-0">
+                      <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-[0.8px]">Credit Score Bureau</h3>
+                      {(() => {
+                        const fresh = isReportFresh(cibilReport?.fetched_at);
+                        const exempt = isExemptRole(userEmail, cibilReport?.name);
+                        
+                        if (fresh && !exempt) {
+                          const nextDate = getNextAvailableFetchDate(cibilReport?.fetched_at);
+                          return (
+                            <span className="text-[9.5px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-[5px] font-semibold font-sans" title={`Next update available on ${nextDate}`}>
+                              Next update: {nextDate}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     <div className="relative w-[180px] h-[180px] flex items-center justify-center my-1 select-none">
@@ -2396,8 +2335,8 @@ export default function EligibilityCibilView({
                           cx="90"
                           cy="90"
                           r={scoreGauge.radius}
-                          stroke={`url(#score-grad-${userId})`}
-                          strokeWidth="12"
+                          stroke={scoreTheme.fill}
+                          strokeWidth="10"
                           fill="transparent"
                           strokeDasharray={scoreGauge.dashArray}
                           strokeDashoffset={scoreGauge.dashOffset}
@@ -2406,20 +2345,21 @@ export default function EligibilityCibilView({
                         />
                       </svg>
                       <div className="absolute flex flex-col items-center justify-center">
-                        <span className="text-[32px] font-black text-gray-800 leading-none">{cibilReport.score}</span>
-                        <span className={`text-[11.5px] font-bold mt-1.5 px-3 py-0.5 rounded-[12px] border ${scoreTheme.bg} ${scoreTheme.color} ${scoreTheme.border}`}>
+                        <span className="text-[36px] font-black text-gray-800 leading-none">{cibilReport.score}</span>
+                        <span className={`text-[13px] font-bold mt-[6px] px-[12px] py-[3px] rounded-[20px] ${scoreTheme.bg} ${scoreTheme.color} border ${scoreTheme.border}`}>
                           {cibilReport.band}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-gray-500 mt-3 font-semibold">PAN: {cibilReport.pan}</p>
+                    <p className="text-[11px] text-gray-400 mt-[12px]">PAN: {cibilReport.pan} | Phone: {cibilReport.phone || 'N/A'}</p>
+                    <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {cibilReport.fetched_at ? new Date(cibilReport.fetched_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                     {cibilReport.pdf_url && (
                       <a
-                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
-                        className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm cibil-print-hide"
+                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)}
+                        className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                       >
-                        <Download className="w-4 h-4 shrink-0" />
+                        <FileText className="w-[14px] h-[14px]" />
                         <span>Download PDF Report</span>
                       </a>
                     )}
@@ -2438,9 +2378,22 @@ export default function EligibilityCibilView({
                       </div>
                     )}
                     {cibilReport.bsa_analysis ? (
-                      <div className="mt-2 w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm cibil-print-hide bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <ShieldCheck className="w-4 h-4 shrink-0" />
-                        <span>Bank Statement Ready ✓</span>
+                      <div className="flex flex-col gap-2 mt-2 w-full cibil-print-hide">
+                        <div className="w-full font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 shadow-sm bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <ShieldCheck className="w-4 h-4 shrink-0" />
+                          <span>Bank Statement Ready ✓</span>
+                        </div>
+                        {cibilReport.bsa_analysis.excel_report_url && (isStaff || isExemptRole(userEmail, cibilReport.name)) && (
+                          <a 
+                            href={cibilReport.bsa_analysis.excel_report_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-[10px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[11.5px] flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download Excel Report
+                          </a>
+                        )}
                       </div>
                     ) : selectedBsaFile ? (
                       <div className="mt-2 flex flex-col gap-2 w-full cibil-print-hide">
@@ -2519,52 +2472,166 @@ export default function EligibilityCibilView({
                       type="button"
                       onClick={handleGenerateCAM}
                       disabled={isGeneratingCAM}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-[10px] text-[11.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
+                      className="mt-[8px] flex items-center justify-center gap-[6px] bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-50 disabled:cursor-not-allowed cibil-print-hide"
                     >
-                      <Sparkles className="w-4.5 h-4.5 shrink-0" />
+                      <FileText className="w-[14px] h-[14px]" />
                       <span>{isGeneratingCAM ? "Generating CAM..." : "Generate CAM Report 📊"}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCibilReport(null)}
-                      className="mt-3.5 text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
+                      className="mt-[14px] text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
                     >
                       Check Different PAN
                     </button>
                   </div>
 
                   {/* Impact factors cards */}
-                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-5 shadow-sm flex flex-col justify-between">
-                    <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">Credit Score Impact Factors</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <FactorCard
-                        label="Payment History"
-                        value={`${cibilReport.metrics.payment_on_time_pct}%`}
-                        subtext="On-time payments"
-                        status={cibilReport.metrics.payment_on_time_pct >= 95 ? "Excellent" : cibilReport.metrics.payment_on_time_pct >= 90 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Credit Util"
-                        value={`${cibilReport.metrics.credit_utilization_pct}%`}
-                        subtext="Of limits utilized"
-                        status={cibilReport.metrics.credit_utilization_pct <= 30 ? "Excellent" : cibilReport.metrics.credit_utilization_pct <= 50 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Credit Age"
-                        value={`${cibilReport.metrics.credit_history_age_years} yrs`}
-                        subtext="History duration"
-                        status={cibilReport.metrics.credit_history_age_years >= 5 ? "Excellent" : cibilReport.metrics.credit_history_age_years >= 3 ? "Good" : "Poor"}
-                      />
-                      <FactorCard
-                        label="Recent Queries"
-                        value={String(cibilReport.metrics.enquiries_l6m)}
-                        subtext="Enquiries (6M)"
-                        status={cibilReport.metrics.enquiries_l6m <= 1 ? "Excellent" : cibilReport.metrics.enquiries_l6m <= 2 ? "Good" : "Poor"}
-                      />
-                    </div>
-                    <div className="mt-4 bg-gray-50 rounded-[12px] p-3 flex items-start gap-2 text-[11px] text-gray-500 border border-gray-100">
-                      <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <span>To optimize your score, keep utilization below 30%, avoid late payments, and do not make too many new loan queries in a short timeframe.</span>
+                  <div className="lg:col-span-2 rounded-[20px] border border-gray-200 bg-white p-[24px] shadow-sm flex flex-col">
+                    <h3 className="text-[14px] font-extrabold text-[#1e293b] uppercase tracking-[1px] mb-[24px]">Key Credit Impact Factors</h3>
+                    
+                    <table className="w-full border-collapse">
+                      <colgroup>
+                        <col style={{ width: '45%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '20%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left text-[#64748b] font-medium text-[12px] pb-[12px]">Factor</th>
+                          <th className="text-left text-[#64748b] font-medium text-[12px] pb-[12px]">Your Status</th>
+                          <th className="text-right text-[#64748b] font-medium text-[12px] pb-[12px]">Impact</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Row 1: Payment History */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+                                <CalendarCheck className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Payment History</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">On-time payments</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.payment_on_time_pct}%</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${cibilReport.metrics.payment_on_time_pct}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.payment_on_time_pct >= 95 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.payment_on_time_pct >= 90 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 2: Credit Utilization */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                                <PieChart className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Credit Utilization</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Of credit limit utilized</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.credit_utilization_pct}%</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(cibilReport.metrics.credit_utilization_pct, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.credit_utilization_pct <= 30 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.credit_utilization_pct <= 50 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 3: Credit Age */}
+                        <tr className="border-b border-gray-100 border-dashed">
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                                <Hourglass className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Credit Age</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Credit history length</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.credit_history_age_years} years</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((cibilReport.metrics.credit_history_age_years / 10) * 100, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.credit_history_age_years >= 5 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.credit_history_age_years >= 3 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Row 4: Recent Enquiries */}
+                        <tr>
+                          <td className="py-[14px] pr-[8px]">
+                            <div className="flex items-center gap-[14px]">
+                              <div className="w-[44px] h-[44px] rounded-full bg-violet-50 text-violet-500 flex items-center justify-center shrink-0">
+                                <Search className="w-[20px] h-[20px]" />
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-[#1e293b] text-[13.5px]">Recent Enquiries</div>
+                                <div className="text-[#64748b] text-[11.5px] font-medium mt-[3px]">Bureau queries (3M)</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-[14px] pr-[24px]">
+                            <div className="font-extrabold text-[#1e293b] text-[13.5px] mb-[8px]">{cibilReport.metrics.enquiries_l3m}</div>
+                            <div className="w-full h-[6px] bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 rounded-full" style={{ width: `${cibilReport.metrics.enquiries_l3m === 0 ? 0 : Math.min((cibilReport.metrics.enquiries_l3m / 5) * 100, 100)}%` }} />
+                            </div>
+                          </td>
+                          <td className="py-[14px] text-right">
+                            {cibilReport.metrics.enquiries_l3m <= 1 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-emerald-50 text-emerald-600">Excellent</span>
+                            ) : cibilReport.metrics.enquiries_l3m <= 2 ? (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-blue-50 text-blue-600">Good</span>
+                            ) : (
+                              <span className="inline-block px-[14px] py-[6px] rounded-full text-[11.5px] font-extrabold bg-red-50 text-red-600">Poor</span>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {/* Information Footer */}
+                    <div className="mt-[24px] bg-[#f8fafc] border border-gray-100 rounded-[12px] p-[16px] flex items-start gap-[12px]">
+                      <Info className="w-[20px] h-[20px] text-blue-500 shrink-0 mt-[1px]" />
+                      <span className="text-[12.5px] font-semibold text-gray-500 leading-relaxed">
+                        Your CIBIL score is calculated using: Payment History (35%), Credit Utilization (30%), Credit History Age (15%), Credit Mix / Recent Inquiries (20%).
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2667,7 +2734,7 @@ export default function EligibilityCibilView({
                                   <p className="text-[11px] text-gray-400 mt-1">{acc.type} | Opened: {(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString()}</div>
+                                  <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString('en-IN')}</div>
                                   <div className="flex items-center gap-1 justify-end mt-1 text-[11px] font-semibold">
                                     <span className={`w-1.5 h-1.5 rounded-full ${acc.payment_status.includes("Past Due") ? "bg-rose-500" : "bg-emerald-500"}`} />
                                     <span className={acc.payment_status.includes("Past Due") ? "text-rose-600" : "text-gray-500"}>
@@ -3062,6 +3129,15 @@ export default function EligibilityCibilView({
                   
                   {/* Grid Data */}
                   <div className="flex flex-wrap gap-y-3 border-t border-gray-100 pt-3.5">
+                    <div className="w-full flex flex-col gap-0.5 pb-1 border-b border-gray-100/50">
+                      <div className="flex items-center gap-1.5 text-gray-500">
+                        <UserIcon className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Account Holder</span>
+                      </div>
+                      <span className="text-[12px] font-extrabold text-gray-800">
+                        {bsaAnalysisData?.person_name || bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}
+                      </span>
+                    </div>
                     <div className="w-[45%] flex flex-col gap-0.5 pr-2">
                       <div className="flex items-center gap-1.5 text-gray-500">
                         <Calendar className="h-3 w-3" />
@@ -3245,251 +3321,339 @@ export default function EligibilityCibilView({
 
             {/* Card 2: Results Dashboard / Empty State */}
             <div className="w-full">
-              {bsaAnalysisData ? (
-                <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-white sm:bg-transparent p-0">
-                  {/* Account Info Header */}
-                  <div className="bg-white border border-gray-200 rounded-[12px] p-5 shadow-sm flex flex-col gap-3">
-                     <h3 className="text-[15px] font-extrabold text-gray-800 border-b border-gray-100 pb-2">Account Overview</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Account Holder</span>
-                           <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.person_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Bank Name</span>
-                           <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.bank_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.bank_name || 'Unknown'}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Statement Period</span>
-                           <span className="text-[14px] font-bold text-gray-800">{formatDateRange(bsaAnalysisData.metrics?.statement_period || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_period || 'N/A')}</span>
-                        </div>
-                     </div>
-                  </div>
+              {bsaAnalysisData ? (() => {
+                let bounceEventsCount = bsaAnalysisData.metrics?.bounce_events_count;
+                if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+                  const bouncedData = bsaAnalysisData.raw_json_data?.bounced_transaction_data;
+                  if (bouncedData) {
+                    const txnsDict = bouncedData.trasactions || bouncedData.transactions;
+                    if (txnsDict) {
+                      let count = 0;
+                      for (const k in txnsDict) {
+                        if (Array.isArray(txnsDict[k])) {
+                          count += txnsDict[k].length;
+                        }
+                      }
+                      if (count > 0) bounceEventsCount = count;
+                    }
+                    if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+                      const summary = bouncedData.bounces_summary;
+                      if (Array.isArray(summary)) {
+                        const totalItem = summary.find((s: any) => s?.month === 'Total');
+                        if (totalItem) {
+                          bounceEventsCount = (
+                            (totalItem.ecs_bounce?.count || 0) +
+                            (totalItem.ach_bounce?.count || 0) +
+                            (totalItem.cheque_inward_bounce?.count || 0) +
+                            (totalItem.cheque_outward_bounce?.count || 0)
+                          );
+                        }
+                      }
+                    }
+                  }
+                }
+                const finalBounceCount = bounceEventsCount || 0;
 
-                  {/* Key Metrics Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Salary</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                // Recalculate Average Monthly Salary
+                let calculatedSalary = 0;
+                try {
+                  const salaryCredit = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.salary_credit || bsaAnalysisData.raw_json_data?.salary_credit || bsaAnalysisData.raw_json_data?.income_analysis?.salary_credit || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.salary_credit;
+                  let monthsCount = 6;
+                  const durationStr = bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_duration;
+                  if (durationStr && durationStr.includes('days')) {
+                    const days = parseInt(durationStr);
+                    monthsCount = Math.round(days / 30.44) || 1;
+                  } else if (bsaPeriod || bsaAnalysisData?.metrics?.statement_period) {
+                    const period = bsaPeriod || bsaAnalysisData?.metrics?.statement_period || "";
+                    const parts = period.split('to').map((s: string) => s.trim());
+                    if (parts.length === 2) {
+                      const d1 = new Date(parts[0].split('-').reverse().join('-'));
+                      const d2 = new Date(parts[1].split('-').reverse().join('-'));
+                      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                        const diffTime = Math.abs(d2.getTime() - d1.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        monthsCount = Math.round(diffDays / 30.44) || 1;
+                      }
+                    }
+                  } else if (bsaAnalysisData?.months?.length) {
+                    monthsCount = bsaAnalysisData.months.length;
+                  }
+
+                  if (salaryCredit?.amount?.Total) {
+                    calculatedSalary = Math.round(salaryCredit.amount.Total / monthsCount);
+                  } else {
+                    calculatedSalary = bsaAnalysisData.metrics?.verified_monthly_salary || 
+                                       bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.insights?.key_insights?.income_insights?.total_income || 
+                                       0;
+                  }
+                } catch (e) {
+                  calculatedSalary = 0;
+                }
+
+                // Recalculate Average Monthly EMI
+                let calculatedEmi = 0;
+                try {
+                  const emiData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.debits?.emi_and_loan;
+                  if (emiData?.amount?.Total && emiData?.count?.Total > 0) {
+                    calculatedEmi = Math.round(emiData.amount.Total / emiData.count.Total);
+                  } else {
+                    calculatedEmi = bsaAnalysisData.metrics?.total_existing_monthly_emi || 0;
+                  }
+                } catch (e) {
+                  calculatedEmi = 0;
+                }
+
+                // Calculate FOIR
+                let calculatedFoir = 0;
+                if (calculatedSalary > 0) {
+                  calculatedFoir = (calculatedEmi / calculatedSalary) * 100;
+                } else {
+                  try {
+                    let rawFoirVal = bsaAnalysisData.metrics?.foir;
+                    if (rawFoirVal === undefined || rawFoirVal === null) {
+                      const findFoir = (obj: any): any => {
+                        if (!obj || typeof obj !== 'object') return null;
+                        if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
+                          return obj.monthwise_foir_score.amount.Total;
+                        }
+                        for (const key in obj) {
+                          const res = findFoir(obj[key]);
+                          if (res !== null) return res;
+                        }
+                        return null;
+                      };
+                      if (bsaAnalysisData.raw_json_data) {
+                        rawFoirVal = findFoir(bsaAnalysisData.raw_json_data);
+                      }
+                    }
+                    if (rawFoirVal !== null && rawFoirVal !== undefined) {
+                      calculatedFoir = parseFloat(rawFoirVal) || 0;
+                    }
+                  } catch (e) {}
+                }
+
+                return (
+                  <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-transparent p-0">
+
+                    {/* Key Metrics Grid */}
+                    <div className="relative w-full overflow-visible">
+                      {/* Decorative ambient glassmorphism glows */}
+                      <div className="absolute top-1/2 left-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(99,102,241,0.18)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '4s' }} />
+                      <div className="absolute top-1/2 right-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(16,185,129,0.12)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
+                        <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Salary</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
+                        <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
                       </div>
-                      <span className="text-[18px] font-extrabold text-emerald-600">₹{
-                        (() => {
-                          try {
-                            const salaryCredit = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.salary_credit || bsaAnalysisData.raw_json_data?.salary_credit || bsaAnalysisData.raw_json_data?.income_analysis?.salary_credit || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.salary_credit;
-                            if (salaryCredit?.amount?.Total && salaryCredit?.count?.Total > 0) {
-                              return Math.round(salaryCredit.amount.Total / salaryCredit.count.Total).toLocaleString('en-IN');
-                            }
-                            return (bsaAnalysisData.metrics?.verified_monthly_salary || 
-                                   bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.insights?.key_insights?.income_insights?.total_income || 
-                                   0).toLocaleString('en-IN');
-                          } catch(e) { return '0'; }
-                        })()
-                      }</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Credit</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds divided by the number of months, excluding internal transfers.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Credit</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds (excluding internal transfers and loan disbursals) divided by the number of months.</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-indigo-600">₹{
-                        (bsaAnalysisData.monthly_credits?.amount?.length > 0 
-                          ? Math.round(bsaAnalysisData.monthly_credits.amount.reduce((a: number, b: number) => a + b, 0) / bsaAnalysisData.monthly_credits.amount.length)
-                          : 0).toLocaleString('en-IN')
-                      }</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Monthly EMI</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Sum of all active, recurring monthly loan repayment installments identified.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-amber-600">₹{bsaAnalysisData.metrics?.total_existing_monthly_emi?.toLocaleString('en-IN') || '0'}</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Balance</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 md:left-0 md:right-auto mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-blue-600">₹{
-                        (bsaAnalysisData.metrics?.average_monthly_balance || 
-                        bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
-                        0).toLocaleString('en-IN')
-                      }</span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-[12px] ${(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Bounce Events</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className={`text-[18px] font-extrabold ${(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {bsaAnalysisData.metrics?.bounce_events_count || 0}
-                      </span>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-500 rounded-l-[12px]" />
-                      <div className="flex items-center gap-1 group relative w-fit">
-                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">FOIR</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                        <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                          <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                            <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                            <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[18px] font-extrabold text-fuchsia-600">
-                        {(() => {
-                          let foirVal = bsaAnalysisData.metrics?.foir;
-                          if (foirVal === undefined || foirVal === null) {
-                            const findFoir = (obj: any): any => {
-                              if (!obj || typeof obj !== 'object') return null;
-                              if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
-                                return obj.monthwise_foir_score.amount.Total;
+                        <span className="text-[18px] font-extrabold text-indigo-600">₹{
+                          (() => {
+                            try {
+                              const creditsData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits;
+                              if (creditsData?.total_credit?.amount && creditsData?.loan_disbursed?.amount) {
+                                const totalAmtDict = creditsData.total_credit.amount;
+                                const loanAmtDict = creditsData.loan_disbursed.amount;
+                                
+                                const months = Object.keys(totalAmtDict).filter(k => k.toLowerCase() !== 'total');
+                                if (months.length > 0) {
+                                  let sum = 0;
+                                  months.forEach(m => {
+                                    const totalVal = totalAmtDict[m] || 0;
+                                    const loanVal = loanAmtDict[m] || 0;
+                                    sum += Math.max(0, totalVal - loanVal);
+                                  });
+                                  return Math.round(sum / months.length).toLocaleString('en-IN');
+                                }
                               }
-                              for (const key in obj) {
-                                const res = findFoir(obj[key]);
-                                if (res !== null) return res;
-                              }
-                              return null;
-                            };
-                            if (bsaAnalysisData.raw_json_data) {
-                              foirVal = findFoir(bsaAnalysisData.raw_json_data);
+                              
+                              return (bsaAnalysisData.monthly_credits?.amount?.length > 0 
+                                ? Math.round(bsaAnalysisData.monthly_credits.amount.reduce((a: number, b: number) => a + b, 0) / bsaAnalysisData.monthly_credits.amount.length)
+                                : 0).toLocaleString('en-IN');
+                            } catch(e) {
+                              return '0';
                             }
-                          }
-                          return (foirVal !== null && foirVal !== undefined && !Number.isNaN(foirVal)) ? `${foirVal}%` : '05';
-                        })()}
-                      </span>
+                          })()
+                        }</span>
+                      </div>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly EMI</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all identified EMI and loan repayment transaction amounts.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Balance</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-blue-600">₹{
+                          (bsaAnalysisData.metrics?.average_monthly_balance || 
+                          bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
+                          0).toLocaleString('en-IN')
+                        }</span>
+                      </div>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className={`absolute top-[1px] bottom-[1px] left-[1px] w-1 rounded-l-[15px] ${finalBounceCount > 0 ? 'bg-gradient-to-b from-rose-400 to-rose-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`} />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Bounce Events</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`text-[18px] font-extrabold ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {finalBounceCount}
+                        </span>
+                      </div>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">FOIR</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full right-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
+                      </div>
                     </div>
                   </div>
                   
                   {/* Alerts */}
                   <div className="flex flex-col gap-3">
-                    {(bsaAnalysisData.metrics?.bounce_events_count || 0) > 0 && (
+                    {finalBounceCount > 0 && (
                       <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
                         <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-1">
                           <span className="text-[13px] font-bold text-rose-800">Cheque/EMI Bounces Detected</span>
                           <span className="text-[11.5px] text-rose-600 leading-snug font-medium">
-                            We detected {bsaAnalysisData.metrics?.bounce_events_count || 0} bounce events in the last 6 months. This negatively impacts creditworthiness and loan eligibility.
+                            We detected {finalBounceCount} bounce events in the last 6 months. This negatively impacts creditworthiness and loan eligibility.
                           </span>
                         </div>
                       </div>
                     )}
                     
                     {(() => {
-                      let foirVal = bsaAnalysisData.metrics?.foir;
-                      if (foirVal === undefined || foirVal === null) {
-                        const findFoir = (obj: any): any => {
-                          if (!obj || typeof obj !== 'object') return null;
-                          if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
-                            return obj.monthwise_foir_score.amount.Total;
+                      if (calculatedFoir > 0) {
+                        const numericFoir = calculatedFoir;
+                        if (!Number.isNaN(numericFoir)) {
+                          const displayFoir = numericFoir.toFixed(2);
+                          if (numericFoir > 70) {
+                            return (
+                              <div className="bg-rose-100 border border-rose-300 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-rose-900">Extremely High FOIR ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-rose-700 leading-snug font-medium">
+                                    You are highly over-leveraged. Standard loans will likely be rejected outright. Focus on debt consolidation or clearing existing EMIs before applying for new credit.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 65) {
+                            return (
+                              <div className="bg-red-50 border border-red-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-red-800">Critical FOIR Warning ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-red-600 leading-snug font-medium">
+                                    This is critically high. Most lenders cap FOIR at 60-65%. Approval chances are severely restricted without a strong co-applicant or collateral.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 50) {
+                            return (
+                              <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-orange-800">High FOIR Warning ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-orange-700 leading-snug font-medium">
+                                    A FOIR above 50% indicates a high debt burden. This may reduce the chances of loan approval or result in higher interest rates.
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          } else if (numericFoir > 30) {
+                            return (
+                              <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                                <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[13px] font-bold text-amber-800">Moderate FOIR ({displayFoir}%)</span>
+                                  <span className="text-[11.5px] text-amber-700 leading-snug font-medium">
+                                    This is a moderate debt level. You still have room for additional credit, but banks will start analyzing your surplus income closer.
+                                  </span>
+                                </div>
+                              </div>
+                            );
                           }
-                          for (const key in obj) {
-                            const res = findFoir(obj[key]);
-                            if (res !== null) return res;
-                          }
-                          return null;
-                        };
-                        if (bsaAnalysisData.raw_json_data) {
-                          foirVal = findFoir(bsaAnalysisData.raw_json_data);
-                        }
-                      }
-                      if (foirVal !== null && foirVal !== undefined && !Number.isNaN(foirVal)) {
-                        if (foirVal > 70) {
-                          return (
-                            <div className="bg-rose-100 border border-rose-300 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-rose-900">Extremely High FOIR ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-rose-700 leading-snug font-medium">
-                                  You are highly over-leveraged. Standard loans will likely be rejected outright. Focus on debt consolidation or clearing existing EMIs before applying for new credit.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 65) {
-                          return (
-                            <div className="bg-red-50 border border-red-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-red-800">Critical FOIR Warning ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-red-600 leading-snug font-medium">
-                                  This is critically high. Most lenders cap FOIR at 60-65%. Approval chances are severely restricted without a strong co-applicant or collateral.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 50) {
-                          return (
-                            <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-orange-800">High FOIR Warning ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-orange-700 leading-snug font-medium">
-                                  A FOIR above 50% indicates a high debt burden. This may reduce the chances of loan approval or result in higher interest rates.
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        } else if (foirVal > 30) {
-                          return (
-                            <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
-                              <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                              <div className="flex flex-col gap-1">
-                                <span className="text-[13px] font-bold text-amber-800">Moderate FOIR ({foirVal}%)</span>
-                                <span className="text-[11.5px] text-amber-700 leading-snug font-medium">
-                                  This is a moderate debt level. You still have room for additional credit, but banks will start analyzing your surplus income closer.
-                                </span>
-                              </div>
-                            </div>
-                          );
                         }
                       }
                       return null;
@@ -3502,7 +3666,22 @@ export default function EligibilityCibilView({
                       <h4 className="text-[13px] font-bold text-black uppercase tracking-wider">Monthly Inflow Trend</h4>
                       <div className="h-[200px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={bsaAnalysisData?.months?.map((month: string, i: number) => ({ month, inflows: bsaAnalysisData.monthly_credits?.amount?.[i] || 0 })) || []}>
+                          <BarChart data={(() => {
+                            if (!bsaAnalysisData?.months) return [];
+                            
+                            const totalAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.total_credit?.amount;
+                            const loanAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.loan_disbursed?.amount;
+                            
+                            return bsaAnalysisData.months.map((month: string, i: number) => {
+                              let inflows = bsaAnalysisData.monthly_credits?.amount?.[i] || 0;
+                              if (totalAmtDict && loanAmtDict && totalAmtDict[month] !== undefined) {
+                                const totalVal = totalAmtDict[month] || 0;
+                                const loanVal = loanAmtDict[month] || 0;
+                                inflows = Math.max(0, totalVal - loanVal);
+                              }
+                              return { month, inflows };
+                            });
+                          })()}>
                             <defs>
                               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
@@ -3610,7 +3789,8 @@ export default function EligibilityCibilView({
                     )}
                   </div>
                 </div>
-              ) : bsaUploading ? (
+                );
+              })() : bsaUploading ? (
                 <div className="rounded-[20px] border border-indigo-200 bg-indigo-50/10 p-8 flex flex-col items-center justify-center text-center min-h-[220px] gap-4 animate-pulse">
                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
                   <div>
@@ -3679,14 +3859,14 @@ interface FactorCardProps {
 
 function FactorCard({ label, value, subtext, status }: FactorCardProps) {
   return (
-    <div className="rounded-[16px] border border-gray-100 bg-gray-50/50 p-[14px] flex flex-col justify-between text-left transition-all hover:-translate-y-[0.5px] hover:shadow-sm">
+    <div className="rounded-[16px] border border-gray-100 bg-gray-55/35 p-[14px] flex flex-col justify-between text-left transition-all hover:-translate-y-[1px] hover:shadow-sm">
       <div>
-        <span className="text-[11px] font-semibold text-gray-400 block tracking-[0.5px] uppercase">{label}</span>
+        <span className="text-[11px] font-semibold text-gray-400 block tracking-[0.5px]">{label}</span>
         <div className="text-[20px] font-extrabold text-gray-800 mt-[4px]">{value}</div>
       </div>
       <div className="mt-[8px]">
-        <p className="text-[10px] text-gray-400 leading-none mb-1.5">{subtext}</p>
-        <span className={`text-[10px] font-bold inline-block px-[8px] py-[2px] rounded-[10px] ${
+        <p className="text-[10px] text-gray-400 leading-none">{subtext}</p>
+        <span className={`text-[10px] font-bold inline-block mt-[4px] px-[8px] py-[2px] rounded-[10px] ${
           status === "Excellent" ? "bg-emerald-50 text-emerald-700" :
           status === "Good" ? "bg-blue-50 text-blue-700" :
           "bg-rose-50 text-rose-700"

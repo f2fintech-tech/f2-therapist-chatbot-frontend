@@ -275,7 +275,7 @@ export default function FinancialHealthTestCatalog({
               Pick the financial area you want to understand first.
             </h1>
             <p className="mt-[10px] max-w-[560px] text-[13px] leading-[1.7] text-white/80 sm:text-[14px]">
-              Each test gives a focused score and a short summary so users can move quickly from a question to a clear next step.
+              Take a quick test to understand your financial health, receive a simple score, and get personalized next steps.
             </p>
             <div className="mt-[14px] flex flex-wrap gap-[8px] text-[11px] font-medium text-white/90">
               <span className="rounded-[999px] border border-white/15 bg-white/10 px-[10px] py-[5px] backdrop-blur-md">Instant summary</span>

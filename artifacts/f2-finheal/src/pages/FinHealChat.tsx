@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/Sidebar";
 import ChatArea from "@/components/ChatArea";
@@ -10,14 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import FinancialHealthTestCatalog from "@/components/FinancialHealthTestCatalog";
-import FinancialLiteracyTestView from "@/components/FinancialLiteracyTestView";
-import EmergencyFundCheckView from "@/components/EmergencyFundCheckView";
-import LoanFitTestView from "@/components/LoanFitTestView";
-import DebtBalanceReviewView from "@/components/DebtBalanceReviewView";
-import CreditReadinessReviewView from "@/components/CreditReadinessReviewView";
-import DynamicTestView from "@/components/DynamicTestView";
-import InsightsPanel from "@/components/InsightsPanel";
+const FinancialHealthTestCatalog = lazy(() => import("@/components/FinancialHealthTestCatalog"));
+const FinancialLiteracyTestView = lazy(() => import("@/components/FinancialLiteracyTestView"));
+const EmergencyFundCheckView = lazy(() => import("@/components/EmergencyFundCheckView"));
+const LoanFitTestView = lazy(() => import("@/components/LoanFitTestView"));
+const DebtBalanceReviewView = lazy(() => import("@/components/DebtBalanceReviewView"));
+const CreditReadinessReviewView = lazy(() => import("@/components/CreditReadinessReviewView"));
+const DynamicTestView = lazy(() => import("@/components/DynamicTestView"));
+const InsightsPanel = lazy(() => import("@/components/InsightsPanel"));
 import AuthScreen from "@/components/AuthScreen";
 import ProfilePage from "@/components/ProfilePage";
 import { useBackendChat } from "@/hooks/useBackendChat";
@@ -29,14 +29,14 @@ import { fetchHearts, fetchUserProfile, authRequest, fetchAdvisorProfile } from 
 import { syncGoalsFromBackend } from "@/utils/localGoals";
 import QuizPopup from "@/components/QuizPopup/QuizPopup";
 import WelcomeSplash from "@/components/WelcomeSplash";
-import FinancialEducation from "@/components/FinancialEducation";
-import AdvisorPanel from "@/components/AdvisorPanel";
-import AdminPortal from "@/components/AdminPortal"; // Dynamic admin/expert workspace portal
-import LoanCalculatorView from "@/components/LoanCalculatorView";
-import CibilAnalyzerView from "@/components/CibilAnalyzerView";
-import EligibilityCibilView from "@/components/EligibilityCibilView";
-import Dashboard from "@/components/Dashboard";
-import RemindersView from "@/components/RemindersView";
+const FinancialEducation = lazy(() => import("@/components/FinancialEducation"));
+const AdvisorPanel = lazy(() => import("@/components/AdvisorPanel"));
+const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const LoanCalculatorView = lazy(() => import("@/components/LoanCalculatorView"));
+const CibilAnalyzerView = lazy(() => import("@/components/CibilAnalyzerView"));
+const EligibilityCibilView = lazy(() => import("@/components/EligibilityCibilView"));
+const Dashboard = lazy(() => import("@/components/Dashboard"));
+const RemindersView = lazy(() => import("@/components/RemindersView"));
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 
 const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -999,7 +999,13 @@ export default function FinHealChat() {
           onOpenReminders={openReminders}
         />
         <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          {mainView === "chat" || mainView === "goals" ? (
+          <Suspense fallback={
+            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/50 h-full w-full">
+              <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+              <p className="mt-4 text-[13px] text-gray-500 font-medium animate-pulse">Loading view...</p>
+            </div>
+          }>
+            {mainView === "chat" || mainView === "goals" ? (
             <ChatArea
               conversationId={chat.conversationId}
               conversationCount={chat.conversationCount}
@@ -1201,6 +1207,7 @@ export default function FinHealChat() {
               onOpenFinancialWellnessAssistant={openChatView}
             />
           )}
+          </Suspense>
 
           {/* Global Pinned Profile Dropdown */}
           {userProfile && (
