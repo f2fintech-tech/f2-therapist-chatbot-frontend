@@ -3053,6 +3053,7 @@ export default function EligibilityCibilView({
           )}
 
           <div className={`flex flex-col gap-6 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
+            <div ref={bsaAnalyzerRef} className="flex flex-col gap-6 w-full">
             
             {/* Card 1: Upload Box */}
             <div className="rounded-[20px] border border-gray-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 shadow-sm relative overflow-hidden flex flex-col gap-4 text-center justify-center max-w-[600px] mx-auto w-full">
@@ -3224,7 +3225,7 @@ export default function EligibilityCibilView({
                       setBsaError(null);
                       setBsaAnalysisData(null);
                     }}
-                    className="mt-4 w-full flex items-center justify-center gap-1.5 border-2 border-indigo-500/20 text-indigo-600 bg-indigo-50/30 hover:bg-indigo-50 font-bold py-1.5 rounded-[10px] transition-colors text-[11px]"
+                    className="mt-4 w-full flex items-center justify-center gap-1.5 border-2 border-indigo-500/20 text-indigo-600 bg-indigo-50/30 hover:bg-indigo-50 font-bold py-1.5 rounded-[10px] transition-colors text-[11px] cibil-print-hide"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Replace Statement
@@ -3434,7 +3435,7 @@ export default function EligibilityCibilView({
                 }
 
                 return (
-                  <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-transparent p-0">
+                  <div className="flex flex-col gap-4 animate-fade-in w-full bg-transparent p-0">
 
                     {/* Key Metrics Grid */}
                     <div className="relative w-full overflow-visible">
@@ -3818,7 +3819,8 @@ export default function EligibilityCibilView({
                 </div>
               )}
             </div>
-
+          
+            </div>
           </div>
         </div>
       )}
