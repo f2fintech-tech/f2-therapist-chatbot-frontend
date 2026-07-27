@@ -861,6 +861,242 @@ export default function LoanCalculatorView({
       };
     }
 
+    if (activeTab === "professional" && profStructure === "flexi") {
+      const limit = Number(flexiLimit) || 0;
+      const utilized = Number(flexiUtilized) || 0;
+      const rate = Number(flexiRate) || 0;
+      const deposit = Number(flexiDeposit) || 0;
+      const interestOnlyTenure = Number(flexiInterestOnlyTenure) || 3;
+      const repaymentTenure = Number(flexiRepaymentTenure) || 5;
+
+      const monthlyRate = rate / 12 / 100;
+      const ioMonths = interestOnlyTenure * 12;
+      const amortMonths = repaymentTenure * 12;
+
+      // Simulate Month-by-month
+      let currentUtilized = utilized;
+      let totalInterestPaidIO = 0;
+      const monthlyAmortization: { month: number; interest: number; principal: number; extra: number; balance: number }[] = [];
+
+      // First run Phase 1 Interest Only Simulation to calculate remaining utilized at the end of Phase 1
+      let simUtilized = utilized;
+      for (let m = 1; m <= ioMonths; m++) {
+        simUtilized = Math.max(0, simUtilized - deposit);
+      }
+      const remainingUtilized = simUtilized;
+
+      // Calculate subsequent EMI for Phase 2
+      const monthlyEMI = amortMonths === 0 ? 0 : (
+        monthlyRate === 0
+          ? remainingUtilized / amortMonths
+          : (remainingUtilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
+            (Math.pow(1 + monthlyRate, amortMonths) - 1)
+      );
+
+      // Now run actual monthly simulation
+      for (let m = 1; m <= ioMonths + amortMonths; m++) {
+        const interestThisMonth = currentUtilized * monthlyRate;
+        let principalThisMonth = 0;
+        let extraPaid = 0;
+
+        if (m <= ioMonths) {
+          // Interest only phase
+          extraPaid = Math.min(currentUtilized, deposit);
+          currentUtilized = currentUtilized - extraPaid;
+          totalInterestPaidIO += interestThisMonth;
+        } else {
+          // Amortization phase
+          principalThisMonth = monthlyEMI - interestThisMonth;
+          if (currentUtilized <= principalThisMonth) {
+            principalThisMonth = currentUtilized;
+            currentUtilized = 0;
+          } else {
+            currentUtilized -= principalThisMonth;
+          }
+        }
+
+        monthlyAmortization.push({
+          month: m,
+          interest: Math.round(interestThisMonth),
+          principal: Math.round(principalThisMonth),
+          extra: Math.round(extraPaid),
+          balance: Math.max(0, Math.round(currentUtilized)),
+        });
+      }
+
+      // Group by year
+      const yearlyAmortization: {
+        year: number;
+        interest: number;
+        principal: number;
+        extra: number;
+        endBalance: number;
+        months: typeof monthlyAmortization;
+      }[] = [];
+
+      for (let i = 0; i < monthlyAmortization.length; i += 12) {
+        const chunk = monthlyAmortization.slice(i, i + 12);
+        const yearNum = Math.floor(i / 12) + 1;
+        const yrInterest = chunk.reduce((sum, m) => sum + m.interest, 0);
+        const yrPrincipal = chunk.reduce((sum, m) => sum + m.principal, 0);
+        const yrExtra = chunk.reduce((sum, m) => sum + m.extra, 0);
+        const lastBal = chunk[chunk.length - 1].balance;
+
+        yearlyAmortization.push({
+          year: yearNum,
+          interest: yrInterest,
+          principal: yrPrincipal,
+          extra: yrExtra,
+          endBalance: lastBal,
+          months: chunk,
+        });
+      }
+
+      const totalInterestVal = monthlyAmortization.reduce((sum, m) => sum + m.interest, 0);
+      const totalPayableVal = utilized + totalInterestVal;
+
+      return {
+        monthlyEmi: Math.round(monthlyEMI),
+        totalPayable: Math.round(totalPayableVal),
+        totalInterest: Math.round(totalInterestVal),
+        actualMonths: ioMonths + amortMonths,
+        principalPct: (utilized / totalPayableVal) * 100 || 0,
+        interestPct: (totalInterestVal / totalPayableVal) * 100 || 0,
+        capitalizedInterestPct: 0,
+        capitalizedInterest: 0,
+        interestSaved: 0,
+        monthsSaved: 0,
+        donutRadius: 70,
+        donutCircumference: 2 * Math.PI * 70,
+        principalStrokeLength: ((utilized / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70),
+        interestStrokeLength: ((totalInterestVal / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70),
+        interestStrokeOffset: -(((utilized / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70)),
+        yearlyAmortization,
+        maxYearlyOutflow: Math.round(
+          Math.max(...yearlyAmortization.map((yr) => yr.principal + yr.interest + yr.extra)) || 1
+        ),
+        comparison: undefined,
+      };
+    }
+
+    if (activeTab === "professional" && profStructure === "dropdown") {
+      const initialLimit = Number(dropdownLimit) || 0;
+      const utilized = Number(dropdownUtilized) || 0;
+      const rate = Number(dropdownRate) || 0;
+      const tenure = Number(dropdownTenure) || 0;
+
+      const monthlyRate = rate / 12 / 100;
+      const isFully = utilized >= initialLimit;
+      const fullMonths = (1 + tenure) * 12;
+      const amortMonths = tenure * 12;
+
+      const fullEMI = fullMonths === 0 ? 0 : (
+        monthlyRate === 0
+          ? utilized / fullMonths
+          : (utilized * monthlyRate * Math.pow(1 + monthlyRate, fullMonths)) /
+            (Math.pow(1 + monthlyRate, fullMonths) - 1)
+      );
+
+      const subsequentEMI = amortMonths === 0 ? 0 : (
+        monthlyRate === 0
+          ? utilized / amortMonths
+          : (utilized * monthlyRate * Math.pow(1 + monthlyRate, amortMonths)) /
+            (Math.pow(1 + monthlyRate, amortMonths) - 1)
+      );
+
+      const monthlyAmortization: { month: number; interest: number; principal: number; extra: number; balance: number }[] = [];
+
+      let currentUtilized = utilized;
+      for (let m = 1; m <= fullMonths; m++) {
+        let interestThisMonth = currentUtilized * monthlyRate;
+        let principalThisMonth = 0;
+
+        if (isFully) {
+          principalThisMonth = fullEMI - interestThisMonth;
+          if (currentUtilized <= principalThisMonth) {
+            principalThisMonth = currentUtilized;
+            currentUtilized = 0;
+          } else {
+            currentUtilized -= principalThisMonth;
+          }
+        } else {
+          if (m <= 12) {
+            principalThisMonth = 0;
+          } else {
+            principalThisMonth = subsequentEMI - interestThisMonth;
+            if (currentUtilized <= principalThisMonth) {
+              principalThisMonth = currentUtilized;
+              currentUtilized = 0;
+            } else {
+              currentUtilized -= principalThisMonth;
+            }
+          }
+        }
+
+        monthlyAmortization.push({
+          month: m,
+          interest: Math.round(interestThisMonth),
+          principal: Math.round(principalThisMonth),
+          extra: 0,
+          balance: Math.max(0, Math.round(currentUtilized)),
+        });
+      }
+
+      // Group by year
+      const yearlyAmortization: {
+        year: number;
+        interest: number;
+        principal: number;
+        extra: number;
+        endBalance: number;
+        months: typeof monthlyAmortization;
+      }[] = [];
+
+      for (let i = 0; i < monthlyAmortization.length; i += 12) {
+        const chunk = monthlyAmortization.slice(i, i + 12);
+        const yearNum = Math.floor(i / 12) + 1;
+        const yrInterest = chunk.reduce((sum, m) => sum + m.interest, 0);
+        const yrPrincipal = chunk.reduce((sum, m) => sum + m.principal, 0);
+        const yrExtra = chunk.reduce((sum, m) => sum + m.extra, 0);
+        const lastBal = chunk[chunk.length - 1].balance;
+
+        yearlyAmortization.push({
+          year: yearNum,
+          interest: yrInterest,
+          principal: yrPrincipal,
+          extra: yrExtra,
+          endBalance: lastBal,
+          months: chunk,
+        });
+      }
+
+      const totalInterestVal = monthlyAmortization.reduce((sum, m) => sum + m.interest, 0);
+      const totalPayableVal = utilized + totalInterestVal;
+
+      return {
+        monthlyEmi: Math.round(isFully ? fullEMI : subsequentEMI),
+        totalPayable: Math.round(totalPayableVal),
+        totalInterest: Math.round(totalInterestVal),
+        actualMonths: fullMonths,
+        principalPct: (utilized / totalPayableVal) * 100 || 0,
+        interestPct: (totalInterestVal / totalPayableVal) * 100 || 0,
+        capitalizedInterestPct: 0,
+        capitalizedInterest: 0,
+        interestSaved: 0,
+        monthsSaved: 0,
+        donutRadius: 70,
+        donutCircumference: 2 * Math.PI * 70,
+        principalStrokeLength: ((utilized / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70),
+        interestStrokeLength: ((totalInterestVal / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70),
+        interestStrokeOffset: -(((utilized / totalPayableVal) * 100 / 100) * (2 * Math.PI * 70)),
+        yearlyAmortization,
+        maxYearlyOutflow: Math.round(
+          Math.max(...yearlyAmortization.map((yr) => yr.principal + yr.interest + yr.extra)) || 1
+        ),
+        comparison: undefined,
+      };
+    }
+
     const amountVal = Number(emiAmount) || 0;
     const rateVal = Number(emiRate) || 0;
     const tenureVal = Number(emiTenure) || 0;
@@ -1000,7 +1236,18 @@ export default function LoanCalculatorView({
     eduPrepayMonthly,
     eduPrepayLump,
     eduPrepayStrategy,
-    currencyScale
+    currencyScale,
+    profStructure,
+    flexiLimit,
+    flexiUtilized,
+    flexiRate,
+    flexiDeposit,
+    flexiInterestOnlyTenure,
+    flexiRepaymentTenure,
+    dropdownLimit,
+    dropdownUtilized,
+    dropdownRate,
+    dropdownTenure
   ]);
 
   // Calculations for Flexi OD (Doctors)
@@ -1658,7 +1905,10 @@ export default function LoanCalculatorView({
 
     let rowsXml = "";
     let rowIndex = 2;
-    let rollingBalance = activeTab === "education" ? 0 : (Number(emiAmount) || 0);
+    let rollingBalance = activeTab === "education" ? 0
+      : (activeTab === "professional" && profStructure === "flexi") ? (Number(flexiUtilized) || 0)
+      : (activeTab === "professional" && profStructure === "dropdown") ? (Number(dropdownUtilized) || 0)
+      : (Number(emiAmount) || 0);
 
     emiCalculations.yearlyAmortization.forEach((yr) => {
       yr.months.forEach((m) => {
@@ -3704,7 +3954,7 @@ export default function LoanCalculatorView({
             </div>
 
             {/* Amortization Schedule section */}
-            {!(activeTab === "professional" && profStructure !== "standard") && (
+            {true && (
               <div className="mt-8 border-t border-gray-100 pt-6">
                 <button
                   type="button"
