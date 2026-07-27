@@ -29,7 +29,7 @@ import {
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
-import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
@@ -458,6 +458,7 @@ export default function EligibilityCibilView({
     
     let clone: HTMLElement | null = null;
     try {
+      await inlineCrossOriginStylesheets();
       const element = bsaAnalyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");

@@ -57,3 +57,30 @@ export function getNextAvailableFetchDate(fetchedAtStr?: string): string {
     return "";
   }
 }
+
+const inlinedUrls = new Set<string>();
+
+export async function inlineCrossOriginStylesheets(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const sheets = Array.from(document.styleSheets);
+  for (const sheet of sheets) {
+    if (!sheet.href || inlinedUrls.has(sheet.href)) continue;
+    try {
+      // Test if rules are accessible
+      const _ = sheet.cssRules;
+    } catch (e) {
+      try {
+        const res = await fetch(sheet.href);
+        if (res.ok) {
+          const cssText = await res.text();
+          const styleEl = document.createElement("style");
+          styleEl.textContent = cssText;
+          document.head.appendChild(styleEl);
+          inlinedUrls.add(sheet.href);
+        }
+      } catch (fetchErr) {
+        console.warn("Failed to fetch and inline cross-origin stylesheet:", sheet.href, fetchErr);
+      }
+    }
+  }
+}

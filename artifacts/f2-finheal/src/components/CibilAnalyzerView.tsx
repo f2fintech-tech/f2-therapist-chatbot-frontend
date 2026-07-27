@@ -28,7 +28,7 @@ import {
   Search
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount, getBureauPdfDownloadUrl } from "../services/cibil";
-import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -406,6 +406,7 @@ export default function CibilAnalyzerView({
     
     let clone: HTMLElement | null = null;
     try {
+      await inlineCrossOriginStylesheets();
       const element = analyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");
