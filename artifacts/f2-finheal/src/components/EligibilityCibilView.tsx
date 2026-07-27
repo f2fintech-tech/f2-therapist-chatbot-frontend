@@ -29,6 +29,7 @@ import {
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchAdvisorProfile } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
@@ -254,65 +255,7 @@ const CURRENCIES = [
 
 
 
-export function isExemptRole(email?: string, name?: string): boolean {
-  const cleanEmail = (email || "").toLowerCase().trim();
-  const cleanName = (name || "").toLowerCase().trim();
-
-  // Admin Check
-  if (
-    cleanEmail === "admin@finheal.com" || 
-    cleanEmail === "admin@f2finheal.com" || 
-    cleanEmail.startsWith("admin@") ||
-    cleanName.includes("admin") ||
-    cleanName === "finheal admin"
-  ) {
-    return true;
-  }
-
-  // Manager & Advisor Check
-  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
-  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
-
-  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
-  const hasLeadershipName = leadershipPrefixes.some(pref => cleanName.includes(pref));
-  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
-  const hasManagerName = managerPrefixes.some(pref => cleanName.includes(pref));
-
-  if (hasLeadershipEmail || hasLeadershipName || hasManagerEmail || (isInternalDomain && hasManagerName)) {
-    return true;
-  }
-
-  // If email domain is f2fintech.com, it is an advisor/employee
-  if (cleanEmail.endsWith("@f2fintech.com")) {
-    return true;
-  }
-
-  return false;
-}
-
-export function isReportFresh(fetchedAtStr?: string): boolean {
-  if (!fetchedAtStr) return false;
-  try {
-    const fetchedAt = new Date(fetchedAtStr);
-    const diffTime = Math.abs(new Date().getTime() - fetchedAt.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays < 30;
-  } catch (e) {
-    return false;
-  }
-}
-
-export function getNextAvailableFetchDate(fetchedAtStr?: string): string {
-  if (!fetchedAtStr) return "";
-  try {
-    const date = new Date(fetchedAtStr);
-    date.setDate(date.getDate() + 30);
-    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
-  } catch (e) {
-    return "";
-  }
-}
+// Shared helper functions are imported from '../utils/cibilUtils'
 
 export default function EligibilityCibilView({
   userId,
@@ -3186,6 +3129,15 @@ export default function EligibilityCibilView({
                   
                   {/* Grid Data */}
                   <div className="flex flex-wrap gap-y-3 border-t border-gray-100 pt-3.5">
+                    <div className="w-full flex flex-col gap-0.5 pb-1 border-b border-gray-100/50">
+                      <div className="flex items-center gap-1.5 text-gray-500">
+                        <UserIcon className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Account Holder</span>
+                      </div>
+                      <span className="text-[12px] font-extrabold text-gray-800">
+                        {bsaAnalysisData?.person_name || bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}
+                      </span>
+                    </div>
                     <div className="w-[45%] flex flex-col gap-0.5 pr-2">
                       <div className="flex items-center gap-1.5 text-gray-500">
                         <Calendar className="h-3 w-3" />
@@ -3413,7 +3365,7 @@ export default function EligibilityCibilView({
                     monthsCount = Math.round(days / 30.44) || 1;
                   } else if (bsaPeriod || bsaAnalysisData?.metrics?.statement_period) {
                     const period = bsaPeriod || bsaAnalysisData?.metrics?.statement_period || "";
-                    const parts = period.split('to').map(s => s.trim());
+                    const parts = period.split('to').map((s: string) => s.trim());
                     if (parts.length === 2) {
                       const d1 = new Date(parts[0].split('-').reverse().join('-'));
                       const d2 = new Date(parts[1].split('-').reverse().join('-'));
@@ -3481,55 +3433,46 @@ export default function EligibilityCibilView({
                 }
 
                 return (
-                  <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-white sm:bg-transparent p-0">
-                    {/* Account Info Header */}
-                    <div className="bg-white border border-gray-200 rounded-[12px] p-5 shadow-sm flex flex-col gap-3">
-                       <h3 className="text-[15px] font-extrabold text-gray-800 border-b border-gray-100 pb-2">Account Overview</h3>
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="flex flex-col gap-0.5">
-                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Account Holder</span>
-                             <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.person_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || 'Unknown'}</span>
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Bank Name</span>
-                             <span className="text-[14px] font-bold text-gray-800">{bsaAnalysisData.bank_name || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.bank_name || 'Unknown'}</span>
-                          </div>
-                          <div className="flex flex-col gap-0.5">
-                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Statement Period</span>
-                             <span className="text-[14px] font-bold text-gray-800">{formatDateRange(bsaAnalysisData.metrics?.statement_period || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_period || 'N/A')}</span>
-                          </div>
-                       </div>
-                    </div>
+                  <div ref={bsaAnalyzerRef} className="flex flex-col gap-4 animate-fade-in w-full bg-transparent p-0">
 
                     {/* Key Metrics Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500 rounded-l-[12px]" />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Salary</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                    <div className="relative w-full overflow-visible">
+                      {/* Decorative ambient glassmorphism glows */}
+                      <div className="absolute top-1/2 left-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(99,102,241,0.18)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '4s' }} />
+                      <div className="absolute top-1/2 right-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(16,185,129,0.12)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
+                        <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Salary</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
                         <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-[12px]" />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Credit</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds (excluding internal transfers and loan disbursals) divided by the number of months.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Credit</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds (excluding internal transfers and loan disbursals) divided by the number of months.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3562,33 +3505,37 @@ export default function EligibilityCibilView({
                           })()
                         }</span>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 rounded-l-[12px]" />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly EMI</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full left-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all identified EMI and loan repayment transaction amounts.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly EMI</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all identified EMI and loan repayment transaction amounts.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
                         <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-[12px]" />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Average Monthly Balance</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full right-0 md:left-0 md:right-auto mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Balance</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3598,17 +3545,19 @@ export default function EligibilityCibilView({
                           0).toLocaleString('en-IN')
                         }</span>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className={`absolute top-0 left-0 w-1 h-full rounded-l-[12px] ${finalBounceCount > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Bounce Events</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className={`absolute top-[1px] bottom-[1px] left-[1px] w-1 rounded-l-[15px] ${finalBounceCount > 0 ? 'bg-gradient-to-b from-rose-400 to-rose-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`} />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Bounce Events</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3616,23 +3565,26 @@ export default function EligibilityCibilView({
                           {finalBounceCount}
                         </span>
                       </div>
-                      <div className="bg-white border border-gray-200 rounded-[12px] p-4 shadow-sm flex flex-col justify-between gap-1.5 h-full relative">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-500 rounded-l-[12px]" />
-                        <div className="flex items-center gap-1 group relative w-fit">
-                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">FOIR</span>
-                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
-                          <div className="absolute bottom-full right-0 mb-4 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
-                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
-                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
-                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
+                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 rounded-l-[15px]" />
+                        <div className="flex items-start justify-between gap-1.5 w-full">
+                          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">FOIR</span>
+                          <div className="group shrink-0">
+                            <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                            <div className="absolute bottom-full right-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                              <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                                <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)', transform: 'translateZ(0)' }} />
+                                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.02)_45%,transparent_45%,transparent_100%)] rounded-[16px] pointer-events-none -z-10" />
+                                <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
                         <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
                       </div>
                     </div>
+                  </div>
                   
                   {/* Alerts */}
                   <div className="flex flex-col gap-3">

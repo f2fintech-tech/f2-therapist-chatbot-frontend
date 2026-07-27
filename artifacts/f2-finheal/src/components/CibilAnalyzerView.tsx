@@ -28,7 +28,7 @@ import {
   Search
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount, getBureauPdfDownloadUrl } from "../services/cibil";
-import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "./EligibilityCibilView";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
