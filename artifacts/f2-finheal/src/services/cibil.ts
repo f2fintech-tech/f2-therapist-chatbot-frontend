@@ -19,6 +19,12 @@ function getHeaders(userId?: string): Record<string, string> {
 }
 
 export function getBureauPdfDownloadUrl(pdfUrl: string, fileName: string): string {
+  // CIBIL's new API returns an interactive HTML web view. This cannot be proxied as a PDF.
+  if (pdfUrl.includes("myscore.cibil.com")) {
+    return pdfUrl;
+  }
+  
+  // For Experian S3 PDFs, use the backend proxy to enforce the custom filename convention.
   const encodedUrl = encodeURIComponent(pdfUrl);
   const encodedFileName = encodeURIComponent(fileName);
   return `${API_BASE_URL}/cibil/proxy-pdf?url=${encodedUrl}&filename=${encodedFileName}`;
@@ -68,7 +74,9 @@ export async function fetchCibilReport(
   phone: string,
   pan?: string,
   bureau: "cibil" | "experian" | "company_cibil" | "company_experian" = "cibil",
-  reportType: "individual" | "company" = "individual"
+  reportType: "individual" | "company" = "individual",
+  fetchedForEmployeeId?: string
+
 ): Promise<CibilReport> {
   const response = await fetch(`${API_BASE_URL}/cibil/fetch`, {
     method: "POST",
@@ -80,6 +88,7 @@ export async function fetchCibilReport(
       pan: pan || "",
       bureau,
       report_type: reportType,
+      fetched_for_employee_id: fetchedForEmployeeId,
     }),
   });
 

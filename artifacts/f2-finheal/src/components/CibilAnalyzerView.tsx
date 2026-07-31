@@ -1177,6 +1177,8 @@ export default function CibilAnalyzerView({
                 {report.pdf_url && (
                   <a
                     href={getBureauPdfDownloadUrl(report.pdf_url, `${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(report.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                   >
                     <FileText className="w-[14px] h-[14px]" />
@@ -1623,7 +1625,7 @@ export default function CibilAnalyzerView({
                                       </span>
                                     </div>
                                     <p className="text-[11px] text-gray-400 mt-[2px]">
-                                      {acc.type}
+                                      {acc.type === "50" ? "Business Loan" : acc.type}
                                       {acc.open_date ? ` | Opened: ${(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
                                     </p>
                                   </div>

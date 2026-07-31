@@ -145,9 +145,9 @@ const LOAN_TYPES: LoanTypeConfig[] = [
     minAmount: 50000,
     maxAmount: 15000000, // 1.5 Cr
     amountStep: 10000,
-    defaultRate: 9.5,
-    minRate: 7.5,
-    maxRate: 16.0,
+    defaultRate: 8.0,
+    minRate: 6.0,
+    maxRate: 18.0,
     rateStep: 0.05,
     defaultTenure: 7,
     minTenure: 1,

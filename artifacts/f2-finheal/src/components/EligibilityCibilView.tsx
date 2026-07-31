@@ -29,9 +29,10 @@ import {
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
-import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
+import { isExemptRole, isReportFresh, getNextAvailableFetchDate } from "../utils/cibilUtils";
+import { generatePdfFromElement } from "../utils/pdfGenerator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetchAdvisorProfile } from "@/lib/backendAuth";
+import { fetchAdvisorProfile, fetchAdvisors } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import html2canvas from "html2canvas-pro";
@@ -385,6 +386,51 @@ export default function EligibilityCibilView({
   const [cibilReportType, setCibilReportType] = useState<"individual" | "company">("individual");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Admin Attribute States
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeeDirectory, setEmployeeDirectory] = useState<any[]>([]);
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const employeeDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(event.target as Node)) {
+        setIsEmployeeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      fetchAdvisors(undefined, true).then((list) => {
+        const sortedList = [...list].sort((a, b) => {
+          const idA = (a.f2FintechId || a.id || "").toLowerCase();
+          const idB = (b.f2FintechId || b.id || "").toLowerCase();
+          return idA.localeCompare(idB);
+        });
+        setEmployeeDirectory(sortedList);
+      }).catch(err => {
+        console.error("Failed to fetch all employees:", err);
+        // Fallback to local storage
+        try {
+          const stored = localStorage.getItem("finheal_advisors_list");
+          if (stored) setEmployeeDirectory(JSON.parse(stored));
+        } catch (e) {}
+      });
+    } else {
+      try {
+        const stored = localStorage.getItem("finheal_advisors_list");
+        if (stored) {
+          setEmployeeDirectory(JSON.parse(stored));
+        }
+      } catch (e) {}
+    }
+  }, [isSuperAdmin]);
+
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
@@ -456,115 +502,20 @@ export default function EligibilityCibilView({
     if (!bsaAnalysisData) return;
     setIsGeneratingBSAPDF(true);
     
-    let clone: HTMLElement | null = null;
     try {
-      await inlineCrossOriginStylesheets();
       const element = bsaAnalyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");
       }
       
-      clone = element.cloneNode(true) as HTMLElement;
-      clone.classList.add("cibil-pdf-downloading");
-      
-      clone.style.setProperty("position", "absolute", "important");
-      clone.style.setProperty("top", "0", "important");
-      clone.style.setProperty("left", "-9999px", "important");
-      clone.style.setProperty("width", "1024px", "important");
-      clone.style.setProperty("height", "auto", "important");
-      clone.style.setProperty("max-height", "none", "important");
-      clone.style.setProperty("overflow", "visible", "important");
-      clone.style.setProperty("display", "block", "important");
-      
-      const scrollableElements = Array.from(clone.querySelectorAll(".cibil-print-scrollable")) as HTMLElement[];
-      scrollableElements.forEach(el => {
-        el.style.setProperty("height", "auto", "important");
-        el.style.setProperty("min-height", "0", "important");
-        el.style.setProperty("max-height", "none", "important");
-        el.style.setProperty("overflow", "visible", "important");
-        el.style.setProperty("display", "block", "important");
-      });
-      
-      const hideElements = Array.from(clone.querySelectorAll(".cibil-print-hide")) as HTMLElement[];
-      hideElements.forEach(el => {
-        el.style.setProperty("display", "none", "important");
-        el.style.setProperty("visibility", "hidden", "important");
-      });
-
-      document.body.appendChild(clone);
-      
-      await new Promise(resolve => setTimeout(resolve, 350));
-      
-      const cloneWidth = clone.clientWidth || 1024;
-      const pageHeightPx = Math.floor(cloneWidth * 1.45789); 
-      
-      const breakables = Array.from(clone.querySelectorAll([
-        '.cibil-print-section',
-        '.cibil-print-keep-together',
-        '.cibil-chart-container',
-        'table',
-        'tr'
-      ].join(','))) as HTMLElement[];
-      
-      breakables.forEach(el => {
-        const top = el.offsetTop;
-        const height = el.offsetHeight;
-        
-        if (Math.floor(top / pageHeightPx) !== Math.floor((top + height) / pageHeightPx)) {
-          const nextPageTop = Math.ceil(top / pageHeightPx) * pageHeightPx;
-          const pushDownAmount = nextPageTop - top;
-          
-          if (pushDownAmount > 0 && pushDownAmount < pageHeightPx * 0.5) { 
-             el.style.setProperty("margin-top", `${pushDownAmount + 20}px`, "important");
-          }
-        }
-      });
-      
-      const canvas = await html2canvas(clone, {
-        scale: 2, 
-        useCORS: true,
-        logging: false,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        windowWidth: 1024,
-      });
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      
-      const printableWidth = pdfWidth - (margin * 2);
-      const printableHeight = pdfHeight - (margin * 2);
-
-      const imgProps = pdf.getImageProperties(imgData);
-      const canvasWidth = imgProps.width;
-      const canvasHeight = imgProps.height;
-
-      const imgHeightInMm = (canvasHeight * printableWidth) / canvasWidth;
-
-      let heightLeft = imgHeightInMm;
-      let position = margin; 
-
-      pdf.addImage(imgData, "JPEG", margin, position, printableWidth, imgHeightInMm);
-      heightLeft -= printableHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeightInMm + margin;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", margin, position, printableWidth, imgHeightInMm);
-        heightLeft -= printableHeight;
-      }
-      
       const cleanName = bsaAnalysisData?.person_name?.replace(/[^a-z0-9]/gi, '_') || "User";
-      pdf.save(`Bank_Statement_Analysis_${cleanName}.pdf`);
+      
+      await generatePdfFromElement({
+        element,
+        filename: `Bank_Statement_Analysis_${cleanName}.pdf`,
+        clientName: bsaAnalysisData?.person_name || "User",
+        bureau: "BANK STATEMENT ANALYSIS"
+      });
       
       toast({
         title: "Download Complete",
@@ -579,9 +530,6 @@ export default function EligibilityCibilView({
         variant: "destructive"
       });
     } finally {
-      if (clone && document.body.contains(clone)) {
-        document.body.removeChild(clone);
-      }
       setIsGeneratingBSAPDF(false);
     }
   };
@@ -888,7 +836,8 @@ export default function EligibilityCibilView({
         cibilPhone, 
         cibilBureau === "experian" ? undefined : cibilPan.toUpperCase(), 
         cibilBureau, 
-        cibilReportType
+        cibilReportType,
+        selectedEmployeeId || undefined
       );
       setCibilReport(result);
       setStoredCibilReport(result);
@@ -1903,8 +1852,8 @@ export default function EligibilityCibilView({
               ) : !cibilReport ? (
                 // CIBIL Retrieval Form
                 <div className="mx-auto max-w-[500px] my-6 animate-fade-up">
-                  <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
+                  <div className="rounded-[20px] border border-gray-200 bg-white p-6 shadow-sm relative">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-primary rounded-t-[20px]" />
                     
                     {!hasCibilFetchPermission ? (
                       <div className="text-center py-4">
@@ -2200,6 +2149,82 @@ export default function EligibilityCibilView({
                           </div>
                         </div>
 
+                        {isSuperAdmin && (
+                          <div className="flex flex-col mb-4 mt-2" ref={employeeDropdownRef}>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Fetch On Behalf Of (Admin Only)</label>
+                            <div className="relative">
+                              <div
+                                onClick={() => setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen)}
+                                className="w-full pl-3 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold flex items-center justify-between cursor-pointer select-none hover:border-primary/50 transition-colors"
+                              >
+                                <span className="truncate">
+                                  {selectedEmployeeId === "" 
+                                    ? "System Admin (Self)" 
+                                    : employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name 
+                                      ? `${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name} ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation ? `- ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation}` : ""}`
+                                      : "System Admin (Self)"}
+                                </span>
+                                <ChevronDown className={`absolute right-3 w-4 h-4 text-gray-500 transition-transform ${isEmployeeDropdownOpen ? 'rotate-180' : ''}`} />
+                              </div>
+                              
+                              {isEmployeeDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg overflow-hidden flex flex-col max-h-[240px]">
+                                  <div className="p-2 border-b border-gray-100 bg-gray-50/50 sticky top-0">
+                                    <div className="relative">
+                                      <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        placeholder="Search employees..."
+                                        value={employeeSearchQuery}
+                                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-[6px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="overflow-y-auto overflow-x-hidden flex-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+                                    <div
+                                      onClick={() => {
+                                        setSelectedEmployeeId("");
+                                        setIsEmployeeDropdownOpen(false);
+                                        setEmployeeSearchQuery("");
+                                      }}
+                                      className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors ${selectedEmployeeId === "" ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                    >
+                                      System Admin (Self)
+                                    </div>
+                                    {employeeDirectory
+                                      .filter(emp => {
+                                        const search = employeeSearchQuery.toLowerCase();
+                                        const name = (emp.name || "").toLowerCase();
+                                        const desig = (emp.designation || "").toLowerCase();
+                                        return name.includes(search) || desig.includes(search);
+                                      })
+                                      .map((emp: any) => {
+                                        const id = emp.f2FintechId || emp.id;
+                                        return (
+                                          <div
+                                            key={id}
+                                            onClick={() => {
+                                              setSelectedEmployeeId(id);
+                                              setIsEmployeeDropdownOpen(false);
+                                              setEmployeeSearchQuery("");
+                                            }}
+                                            className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors border-t border-gray-50 ${selectedEmployeeId === id ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                          >
+                                            <div className="truncate">
+                                              {emp.name} <span className="text-gray-400 font-normal">{emp.designation ? `- ${emp.designation}` : ""}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex bg-gray-55/30 pt-2 rounded-[12px]">
                           <input
                             type="checkbox"
@@ -2358,6 +2383,8 @@ export default function EligibilityCibilView({
                     {cibilReport.pdf_url && (
                       <a
                         href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                       >
                         <FileText className="w-[14px] h-[14px]" />
@@ -2386,7 +2413,7 @@ export default function EligibilityCibilView({
                         </div>
                         {cibilReport.bsa_analysis.excel_report_url && (isStaff || isExemptRole(userEmail, cibilReport.name)) && (
                           <a 
-                            href={cibilReport.bsa_analysis.excel_report_url} 
+                            href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/cibil/bsa/download-excel?url=${encodeURIComponent(cibilReport.bsa_analysis.excel_report_url)}&filename=${encodeURIComponent(`${(cibilReport.name || "Client").replaceAll(" ", "_")}_BSA_Report.xlsx`)}`}
                             target="_blank" 
                             rel="noreferrer"
                             className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-[10px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[11.5px] flex items-center justify-center gap-1.5 shadow-sm"
@@ -2732,7 +2759,7 @@ export default function EligibilityCibilView({
                                       Open
                                     </span>
                                   </div>
-                                  <p className="text-[11px] text-gray-400 mt-1">{acc.type} | Opened: {(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString()}</p>
+                                  <p className="text-[11px] text-gray-400 mt-1">{acc.type === "50" ? "Business Loan" : acc.type} | Opened: {(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-right">
                                   <div className="text-[12.5px] font-extrabold text-gray-808">₹{acc.outstanding_balance.toLocaleString('en-IN')}</div>
@@ -3780,7 +3807,7 @@ export default function EligibilityCibilView({
                     
                     {bsaAnalysisData.excel_report_url && (isStaff || isExemptRole(userEmail, storedCibilReport?.name)) && (
                       <a 
-                        href={bsaAnalysisData.excel_report_url} 
+                        href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/cibil/bsa/download-excel?url=${encodeURIComponent(bsaAnalysisData.excel_report_url)}&filename=${encodeURIComponent(`${(storedCibilReport?.name || "Client").replaceAll(" ", "_")}_BSA_Report.xlsx`)}`} 
                         target="_blank" 
                         rel="noreferrer"
                         className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3.5 rounded-[14px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[13px] flex items-center justify-center gap-2 shadow-sm cibil-print-hide"
