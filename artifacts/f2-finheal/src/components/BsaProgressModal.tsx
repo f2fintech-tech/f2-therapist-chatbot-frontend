@@ -108,11 +108,6 @@ export const BsaProgressModal: React.FC<BsaProgressModalProps> = ({
                 </p>
               </div>
             </div>
-            {sessionId && (
-              <span className="text-[10px] font-mono bg-white/15 px-2.5 py-1 rounded-full border border-white/20 text-indigo-100 font-semibold shadow-xs">
-                {sessionId}
-              </span>
-            )}
           </div>
         </div>
 

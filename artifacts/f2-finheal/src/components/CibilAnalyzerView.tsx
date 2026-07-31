@@ -102,6 +102,116 @@ export default function CibilAnalyzerView({
   const [lenders, setLenders] = useState<LenderProduct[]>([]);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(true);
 
+  // Pre-Session Prep Checklist Modal States (No checklist modal needed)
+  const openAccounts = useMemo(() => {
+    if (!report || !report.accounts) return [];
+    return report.accounts.filter((a: any) => a.is_active);
+  }, [report]);
+
+  const dynamicRecommendations = useMemo(() => {
+    if (!report) return [];
+
+    const recs: { title: string; desc: string; rule: string; type: "alert" | "warning" | "info" }[] = [];
+    
+    // 1. Check for Late Payments / Bounces in specific accounts
+    const lateAccounts = openAccounts.filter(a => 
+      a.payment_status && 
+      (a.payment_status.includes("Past Due") || a.payment_status.match(/\d+\s*Days/i))
+    );
+    if (lateAccounts.length > 0) {
+      lateAccounts.forEach(la => {
+        recs.push({
+          title: `Late Payment: ${la.lender}`,
+          desc: `An active payment default/late marker is reported in your ${la.type} account with ${la.lender} (outstanding balance of Rs. ${la.outstanding_balance.toLocaleString("en-IN")}).`,
+          rule: `Official Policy: Underwriting guidelines (e.g. DL-TATA, HDFC Bank) strictly reject new loan applications if there are active late payments or defaults within the past 12-24 months. Pay this balance immediately and obtain a No Dues Certificate (NDC) to rectify.`,
+          type: "alert"
+        });
+      });
+    }
+
+    // 2. Check for High Debt-to-income (FOIR) or Utilization
+    const utilization = report.metrics?.credit_utilization_pct || 0;
+    if (utilization > 30) {
+      recs.push({
+        title: "High Credit Card Utilization",
+        desc: `Your credit card utilization is currently at ${utilization}%, exceeding the healthy threshold of 30%.`,
+        rule: `Official Policy: Standard bank criteria define card utilization >30% as high risk/dependency, negatively impacting credit scoring. Prepay your outstanding card bills before the statement generation date.`,
+        type: "warning"
+      });
+    }
+
+    // 3. Check for multiple small ticket loans (unnecessary CD/PL loans)
+    const smallLoans = openAccounts.filter(a => 
+      a.type.toLowerCase().includes("consumer") || 
+      a.type.toLowerCase().includes("durable") || 
+      (a.type.toLowerCase().includes("personal") && a.sanctioned_amount <= 50000)
+    );
+    if (smallLoans.length >= 2) {
+      const names = smallLoans.map(l => l.lender).slice(0, 3).join(", ");
+      recs.push({
+        title: "Multiple Small Ticket Loans",
+        desc: `You have ${smallLoans.length} active consumer durable/micro loans (with ${names}).`,
+        rule: `Official Policy: Multiple micro-loans create a "credit hungry" pattern in underwriting. Pre-closing small consumer/personal loans instantly improves your Debt-to-Income (FOIR) ratios for larger home/business loans.`,
+        type: "info"
+      });
+    }
+
+    // 4. Secured Loan Mix
+    const securedCount = report.metrics?.secured_loans_count || 0;
+    if (securedCount === 0) {
+      recs.push({
+        title: "Imbalanced Portfolio Mix",
+        desc: "Your credit profile contains 0 secured loans (e.g. Home, Auto, Gold, or FD-backed loans).",
+        rule: "Official Policy: Underwriting scoring models favor profiles showing a balance of secured and unsecured credit lines to verify asset-backed repayment patterns.",
+        type: "info"
+      });
+    }
+
+    // Fallback if profile is healthy
+    if (recs.length === 0) {
+      recs.push({
+        title: "Excellent Credit Profile",
+        desc: "Your active accounts do not exhibit any late payments, high utilization, or imbalanced credit mix patterns.",
+        rule: "Official Policy: Maintain card utilization below 30% and ensure zero defaults to qualify for premium interest rates and priority processing.",
+        type: "info"
+      });
+    }
+
+    return recs;
+  }, [report, openAccounts]);
+
+  // Pre-Session Prep Checklist Modal States (No checklist modal needed)
+  const [isAgendaModalOpen, setIsAgendaModalOpen] = useState<boolean>(false);
+  const [compiledAgenda, setCompiledAgenda] = useState<string[]>([]);
+
+  const handleTalkToAdvisorClick = () => {
+    const realRecs = dynamicRecommendations.filter(r => r.title !== "Excellent Credit Profile");
+    const agendaArray = realRecs.length > 0 
+      ? realRecs.map(r => `${r.title}: ${r.desc}`)
+      : ["Review my overall credit profile and healthy credit habits."];
+    
+    setCompiledAgenda(agendaArray);
+    setIsAgendaModalOpen(true);
+  };
+
+  const handleConsultPrepaymentClick = () => {
+    const agendaArray = [
+      `Debt Prepayment Review: Standard Interest of Rs. ${prepaymentOutput.standardInterest.toLocaleString("en-IN")} vs Prepaid Interest of Rs. ${prepaymentOutput.prepaidInterest.toLocaleString("en-IN")}, aiming to save Rs. ${prepaymentOutput.interestSaved.toLocaleString("en-IN")} and reduce tenure by ${prepaymentOutput.tenureReductionYears} years.`
+    ];
+    setCompiledAgenda(agendaArray);
+    setIsAgendaModalOpen(true);
+  };
+
+  const handleProceedToBooking = () => {
+    localStorage.setItem("finheal_pending_appointment_agenda", JSON.stringify(compiledAgenda));
+    setIsAgendaModalOpen(false);
+    if (onTalkToAdvisor) {
+      onTalkToAdvisor();
+    } else {
+      window.location.href = "/advisor";
+    }
+  };
+
   // --- Sub-Calculator States ---
   // 1. EMI Calculator
   const [emiAmount, setEmiAmount] = useState<string>("500000");
@@ -1463,7 +1573,6 @@ export default function CibilAnalyzerView({
               {/* Tab 1: Credit Report & Tips */}
               {activeTab === "report" && (() => {
                 // Compute open accounts grouped by display category
-                const openAccounts = report.accounts.filter(a => a.is_active);
                 const closedCount = report.accounts.length - openAccounts.length;
 
                 const CATEGORY_DEFS: { key: string; label: string; short: string; color: string; bg: string; border: string }[] = [
@@ -1654,20 +1763,42 @@ export default function CibilAnalyzerView({
                           </div>
 
                           <div className="space-y-[12px] relative z-10">
-                            {report.tips.map((tip, idx) => (
-                              <div key={idx} className="flex gap-[8px] text-[12px] text-gray-600 bg-gray-55/40 border border-gray-100 rounded-[12px] p-[10px]">
-                                <span className="text-primary font-bold">{idx + 1}.</span>
-                                <p className="leading-relaxed">{tip}</p>
+                            {dynamicRecommendations.map((rec, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`text-[12px] border rounded-[16px] p-4 flex flex-col gap-2 shadow-xs transition-all ${
+                                  rec.type === "alert" 
+                                    ? "bg-rose-50/50 border-rose-100 text-rose-950" 
+                                    : rec.type === "warning"
+                                    ? "bg-amber-50/50 border-amber-100 text-amber-950"
+                                    : "bg-blue-50/30 border-blue-100 text-blue-950"
+                                }`}
+                              >
+                                <div className="flex items-center gap-1.5 font-bold text-[12px]">
+                                  <span>{rec.type === "alert" ? "🔴" : rec.type === "warning" ? "⚠️" : "💡"}</span>
+                                  <span>{rec.title}</span>
+                                </div>
+                                <p className="leading-relaxed font-semibold opacity-90">{rec.desc}</p>
+                                <div className={`text-[11px] p-3 rounded-[12px] mt-1 border leading-relaxed ${
+                                  rec.type === "alert"
+                                    ? "bg-rose-100/30 border-rose-200/50 text-rose-800"
+                                    : rec.type === "warning"
+                                    ? "bg-amber-100/30 border-amber-200/50 text-amber-800"
+                                    : "bg-blue-100/30 border-blue-200/50 text-blue-800"
+                                }`}>
+                                  <strong className="block mb-0.5">Lender Policy Check:</strong>
+                                  {rec.rule}
+                                </div>
                               </div>
                             ))}
                           </div>
 
-                          <button
-                            onClick={onTalkToAdvisor}
-                            className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
-                          >
-                            Talk to Credit Score Repair Expert
-                          </button>
+                           <button
+                             onClick={handleTalkToAdvisorClick}
+                             className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
+                           >
+                             Talk to Credit Score Repair Expert
+                           </button>
                         </div>
                       </div>
                     </div>
@@ -2183,7 +2314,7 @@ export default function CibilAnalyzerView({
                     </div>
 
                     <button
-                      onClick={onTalkToAdvisor}
+                      onClick={handleConsultPrepaymentClick}
                       className="w-full bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] cursor-pointer mt-[16px]"
                     >
                       Consult Advisor on Debt Prepayment Strategy
@@ -2205,6 +2336,76 @@ export default function CibilAnalyzerView({
         agreed={agreedToTerms}
         onAgreeChange={setAgreedToTerms}
       />
+
+      {/* Pre-Session Agenda Preview Modal */}
+      {isAgendaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[6px] animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[500px] w-full shadow-2xl animate-scale-up border border-gray-100 max-h-[90vh] flex flex-col overflow-hidden">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <CalendarCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-[16px] font-extrabold text-gray-800">
+                    Confirm Consultation Agenda
+                  </h3>
+                  <p className="text-[12px] text-gray-400 mt-0.5">This agenda will be sent to your Credit Repair Expert.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAgendaModalOpen(false)}
+                className="p-1.5 hover:bg-gray-150 rounded-full transition-colors cursor-pointer border-none bg-transparent"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 py-4 space-y-4">
+              <p className="text-[12.5px] text-gray-600 font-semibold leading-relaxed text-left">
+                FinHeal AI has compiled the following key findings and discussion topics from your credit report:
+              </p>
+              
+              <div className="space-y-3 text-left">
+                {compiledAgenda.map((item, idx) => (
+                  <div 
+                    key={idx}
+                    className="p-4 rounded-[16px] border border-gray-150 bg-gray-50/50 flex items-start gap-3"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 text-[11px] font-bold">
+                      ✓
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[12.5px] font-semibold text-gray-700 leading-relaxed block">
+                        {item}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-6 pt-4 border-t border-gray-100 flex gap-3 shrink-0">
+              <button
+                onClick={() => setIsAgendaModalOpen(false)}
+                className="flex-1 py-2.5 px-4 border border-gray-200 rounded-[10px] text-[12px] font-bold text-gray-700 hover:bg-gray-55 transition-colors cursor-pointer text-center bg-transparent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProceedToBooking}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-[12px] font-bold transition-colors cursor-pointer shadow-md hover:shadow-lg text-center border-none"
+              >
+                Proceed to Advisor Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

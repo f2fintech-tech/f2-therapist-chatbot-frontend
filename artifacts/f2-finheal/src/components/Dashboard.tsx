@@ -372,6 +372,42 @@ function ChartRangeSelector({
   );
 }
 
+const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
+  const hasAgenda = agenda && agenda.length > 0;
+  
+  if (!hasAgenda) {
+    if (!notes) return null;
+    return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
+  }
+  
+  // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
+  if (agenda.length === 1 && agenda[0] === notes) {
+    return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
+  }
+  
+  return (
+    <div className="mt-2.5 flex flex-col gap-2 text-left">
+      <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[12px] p-3 flex flex-col gap-1.5">
+        <span className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-[0.5px] block">📋 Consultation Agenda</span>
+        <div className="space-y-1">
+          {agenda.map((item, i) => (
+            <div key={i} className="text-[11px] text-gray-650 font-medium leading-relaxed flex items-start gap-1.5">
+              <span className="text-emerald-500 select-none font-bold">✓</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
+        <div className="text-[11px] text-gray-500 italic bg-gray-55/60 p-2.5 border border-gray-150/50 rounded-[10px] leading-relaxed whitespace-pre-wrap">
+          &quot;{notes}&quot;
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function Dashboard({
   userId,
   userProfile,
@@ -2687,9 +2723,7 @@ ${sheetDataXml}
                               <div className="text-[12px] font-bold text-gray-900">
                                 Client: <span className="text-primary">{appt.clientName ? `${appt.clientName} (${appt.clientEmail})` : (appt.clientEmail || appt.userId)}</span>
                               </div>
-                              {appt.notes && (
-                                <p className="text-[11px] text-gray-500 mt-1 italic">&quot;{appt.notes}&quot;</p>
-                              )}
+                              {renderApptNotes(appt.notes, appt.agenda)}
                             </div>
                             <div className="text-right sm:text-right text-[11.5px] font-semibold text-gray-750">
                               <div className="text-primary font-bold">{appt.date}</div>
@@ -3957,11 +3991,7 @@ ${sheetDataXml}
                                 Scheduled
                               </span>
                             </div>
-                            {appt.notes && (
-                              <div className="text-[10px] text-gray-500 bg-white/50 border border-gray-100 rounded-[6px] p-2 leading-relaxed italic">
-                                "{appt.notes}"
-                              </div>
-                            )}
+                            {renderApptNotes(appt.notes, appt.agenda)}
                             {appt.meetUrl && (
                               <a
                                 href={appt.meetUrl}

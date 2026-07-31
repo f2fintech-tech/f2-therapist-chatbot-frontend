@@ -495,6 +495,7 @@ export interface Appointment {
   date: string;
   time: string;
   notes?: string;
+  agenda?: string[];
   bookedAt: string;
   completed?: boolean;
   cancelled?: boolean;
@@ -514,6 +515,7 @@ export interface BookAppointmentPayload {
   date: string;
   time: string;
   notes?: string;
+  agenda?: string[];
   meet_url?: string;
 }
 
@@ -533,6 +535,7 @@ function mapBackendAppointmentToFrontend(a: any): Appointment {
     date: a.date,
     time: a.time,
     notes: a.notes,
+    agenda: a.agenda || [],
     bookedAt: a.booked_at,
     completed: a.completed,
     cancelled: a.cancelled,
@@ -562,6 +565,31 @@ export async function fetchUserAppointments(userId: string): Promise<Appointment
 
 export async function fetchAllAppointments(): Promise<Appointment[]> {
   const list = await authRequest<any[]>("advisors/appointments/all", {
+    method: "GET"
+  });
+  return list.map(mapBackendAppointmentToFrontend);
+}
+
+export async function deleteAppointment(apptId: string): Promise<any> {
+  return await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}`, {
+    method: "DELETE"
+  });
+}
+
+export async function restoreAppointment(apptId: string): Promise<any> {
+  return await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}/restore`, {
+    method: "POST"
+  });
+}
+
+export async function permanentlyDeleteAppointment(apptId: string): Promise<any> {
+  return await authRequest<any>(`advisors/appointments/${encodeURIComponent(apptId)}/permanently`, {
+    method: "DELETE"
+  });
+}
+
+export async function fetchAppointmentsTrash(): Promise<Appointment[]> {
+  const list = await authRequest<any[]>("advisors/appointments/trash", {
     method: "GET"
   });
   return list.map(mapBackendAppointmentToFrontend);
