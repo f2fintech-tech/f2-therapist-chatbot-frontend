@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment, rescheduleAppointment, fetchAdvisorAppointments, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -511,9 +512,7 @@ export default function AdvisorPanel({
     }
   };
 
-  useEffect(() => {
-    loadAppointments();
-  }, [userId]);
+  usePolling(loadAppointments, 15000, !!userId);
 
   // Generate the next 7 days for the interactive date picker
   useEffect(() => {

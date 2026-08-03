@@ -96,8 +96,18 @@ export default function FinHealChat() {
           if (!profile || profile.isActive === false) {
             throw new Error("Account deactivated or deleted.");
           }
+          if (profile.name && profile.name !== authSession.displayName) {
+            const updatedSession = { ...authSession, displayName: profile.name };
+            setStoredAuthSession(updatedSession);
+            setAuthSession(updatedSession);
+          }
         } else if (authSession.userId && !authSession.isGuest) {
-          await fetchUserProfile(authSession.userId);
+          const profile = await fetchUserProfile(authSession.userId);
+          if (profile && profile.name && profile.name !== authSession.displayName) {
+            const updatedSession = { ...authSession, displayName: profile.name };
+            setStoredAuthSession(updatedSession);
+            setAuthSession(updatedSession);
+          }
         }
       } catch (err) {
         console.warn("Session validation failed. Forcing logout:", err);
@@ -1006,207 +1016,207 @@ export default function FinHealChat() {
             </div>
           }>
             {mainView === "chat" || mainView === "goals" ? (
-            <ChatArea
-              conversationId={chat.conversationId}
-              conversationCount={chat.conversationCount}
-              error={chat.error}
-              isHealthy={chat.isHealthy}
-              isLoading={chat.isLoading}
-              isSendingMessage={chat.isSendingMessage}
-              messages={chat.messages}
-              userProfile={userProfile}
-              remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
-              onClearChat={chat.clearMessages}
-              onMoodUpdate={handleMoodUpdate}
-              onSendMessage={handleSendMessage}
-              onEditMessage={chat.editMessage}
-              onStopSendingMessage={chat.stopSendingMessage}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              isSidebarOpen={sidebarOpen}
-              isInsightsOpen={insightsOpen}
-              prefillMessage={prefillMessage ?? undefined}
-              onClearPrefill={() => setPrefillMessage(null)}
-              onSignupPrompt={() => {
-                clearStoredAuthSession();
-                setAuthSession(null);
-              }}
-              onOpenEligibilityCibil={openEligibilityCibil}
-              onOpenProfile={openProfilePage}
-              onLogout={handleLogout}
-            />
-          ) : mainView === "tests" ? (
-            <FinancialHealthTestCatalog
-              userId={userId}
-              isGuest={authSession?.isGuest ?? true}
-              onLoginRequired={() => { clearStoredAuthSession(); setAuthSession(null); }}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
-              onOpenEmergencyFundCheck={openEmergencyFundCheck}
-              onOpenLoanFitTest={openLoanFitTest}
-              onOpenDebtBalanceReview={openDebtBalanceReview}
-              onOpenCreditReadiness={openCreditReadiness}
-            />
-          ) : mainView === "emergency-fund" ? (
-            <EmergencyFundCheckView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onBackToCatalog={openTestCatalog}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          ) : mainView === "education" ? (
-            <FinancialEducation
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onAskAboutContent={(payload) => {
-                setMainView("chat");
-                const context = payload.type === "article"
-                  ? "Article: \"" + payload.title + "\" (" + payload.url + ") — " + payload.description
-                  : "Video: \"" + payload.title + "\" — " + payload.description;
-                setTimeout(() => {
-                  setPrefillMessage({ text: "", card: context });
-                }, 200);
-              }}
-            />
-          ) : mainView === "financial-literacy" ? (
-            <FinancialLiteracyTestView
-              userId={userId}
-              isGuest={authSession?.isGuest ?? true}
-              onLoginRequired={handleLogout}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onBackToCatalog={openTestCatalog}
-            />
-          ) : mainView === "loan-fit" ? (
-            <LoanFitTestView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onBackToCatalog={openTestCatalog}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          ) : mainView === "credit-readiness" ? (
-            <CreditReadinessReviewView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onBackToCatalog={openTestCatalog}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          ) : mainView === "custom-test" ? (
-            <DynamicTestView
-              userId={userId}
-              testId={customTestId || ""}
-              onBackToCatalog={openTestCatalog}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          ) : mainView === "profile" ? (
-            <ProfilePage
-              userId={userId}
-              userProfile={userProfile}
-              email={authSession.email}
-              isAdvisor={isUserAdvisor(authSession.email)}
-              onBackToChat={openChatView}
-              onSaveProfile={handleProfileSave}
-            />
-          ) : mainView === "advisor" ? (
-            <AdvisorPanel
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              isGuest={authSession?.isGuest ?? true}
-              onLoginRequired={handleLogout}
-            />
-          ) : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) ? (
-            <AdminPortal
-              userId={userId}
-              userEmail={authSession.email || ""}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              initialTab={mainView.split("/")[1] || "experts"}
-            />
-          ) : mainView === "loan-calculator" ? (
-            <LoanCalculatorView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onApplyNow={handleApplyLoan}
-              onTalkToAdvisor={() => setMainView("advisor")}
-              isGuest={authSession?.isGuest ?? true}
-              onLoginRequired={handleLogout}
-            />
-          ) : mainView === "dashboard" ? (
-            <Dashboard
-              userId={userId}
-              userProfile={userProfile}
-              isSidebarOpen={sidebarOpen}
-              isInsightsOpen={insightsOpen}
-              onNavigate={(page, conversationId) => {
-                if (page === "Talk to FinHeal") {
-                  if (conversationId) {
-                    handleConversationSelect(conversationId);
-                  } else {
-                    openFreshChat();
+              <ChatArea
+                conversationId={chat.conversationId}
+                conversationCount={chat.conversationCount}
+                error={chat.error}
+                isHealthy={chat.isHealthy}
+                isLoading={chat.isLoading}
+                isSendingMessage={chat.isSendingMessage}
+                messages={chat.messages}
+                userProfile={userProfile}
+                remainingHearts={authSession?.isGuest ? authSession.hearts ?? null : null}
+                onClearChat={chat.clearMessages}
+                onMoodUpdate={handleMoodUpdate}
+                onSendMessage={handleSendMessage}
+                onEditMessage={chat.editMessage}
+                onStopSendingMessage={chat.stopSendingMessage}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                isSidebarOpen={sidebarOpen}
+                isInsightsOpen={insightsOpen}
+                prefillMessage={prefillMessage ?? undefined}
+                onClearPrefill={() => setPrefillMessage(null)}
+                onSignupPrompt={() => {
+                  clearStoredAuthSession();
+                  setAuthSession(null);
+                }}
+                onOpenEligibilityCibil={openEligibilityCibil}
+                onOpenProfile={openProfilePage}
+                onLogout={handleLogout}
+              />
+            ) : mainView === "tests" ? (
+              <FinancialHealthTestCatalog
+                userId={userId}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={() => { clearStoredAuthSession(); setAuthSession(null); }}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onOpenFinancialLiteracyTest={openFinancialLiteracyInNewTab}
+                onOpenEmergencyFundCheck={openEmergencyFundCheck}
+                onOpenLoanFitTest={openLoanFitTest}
+                onOpenDebtBalanceReview={openDebtBalanceReview}
+                onOpenCreditReadiness={openCreditReadiness}
+              />
+            ) : mainView === "emergency-fund" ? (
+              <EmergencyFundCheckView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onBackToCatalog={openTestCatalog}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            ) : mainView === "education" ? (
+              <FinancialEducation
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onAskAboutContent={(payload) => {
+                  setMainView("chat");
+                  const context = payload.type === "article"
+                    ? "Article: \"" + payload.title + "\" (" + payload.url + ") — " + payload.description
+                    : "Video: \"" + payload.title + "\" — " + payload.description;
+                  setTimeout(() => {
+                    setPrefillMessage({ text: "", card: context });
+                  }, 200);
+                }}
+              />
+            ) : mainView === "financial-literacy" ? (
+              <FinancialLiteracyTestView
+                userId={userId}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onBackToCatalog={openTestCatalog}
+              />
+            ) : mainView === "loan-fit" ? (
+              <LoanFitTestView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onBackToCatalog={openTestCatalog}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            ) : mainView === "credit-readiness" ? (
+              <CreditReadinessReviewView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onBackToCatalog={openTestCatalog}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            ) : mainView === "custom-test" ? (
+              <DynamicTestView
+                userId={userId}
+                testId={customTestId || ""}
+                onBackToCatalog={openTestCatalog}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            ) : mainView === "profile" ? (
+              <ProfilePage
+                userId={userId}
+                userProfile={userProfile}
+                email={authSession.email}
+                isAdvisor={isUserAdvisor(authSession.email)}
+                onBackToChat={openChatView}
+                onSaveProfile={handleProfileSave}
+              />
+            ) : mainView === "advisor" ? (
+              <AdvisorPanel
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
+              />
+            ) : (mainView.startsWith("admin") || mainView.startsWith("advisor-workspace")) ? (
+              <AdminPortal
+                userId={userId}
+                userEmail={authSession.email || ""}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                initialTab={mainView.split("/")[1] || "experts"}
+              />
+            ) : mainView === "loan-calculator" ? (
+              <LoanCalculatorView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNow={handleApplyLoan}
+                onTalkToAdvisor={() => setMainView("advisor")}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
+              />
+            ) : mainView === "dashboard" ? (
+              <Dashboard
+                userId={userId}
+                userProfile={userProfile}
+                isSidebarOpen={sidebarOpen}
+                isInsightsOpen={insightsOpen}
+                onNavigate={(page, conversationId) => {
+                  if (page === "Talk to FinHeal") {
+                    if (conversationId) {
+                      handleConversationSelect(conversationId);
+                    } else {
+                      openFreshChat();
+                    }
+                  } else if (page === "Financial Goals") {
+                    const email = authSession?.email;
+                    const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+                    const isStaff = authSession?.isAdvisor || authSession?.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
+                    if (!isStaff) {
+                      setMainView("goals");
+                    }
+                  } else if (page === "Financial Health Test") {
+                    setMainView("tests");
+                  } else if (page === "Talk to an Advisor") {
+                    setMainView("advisor");
+                  } else if (page === "Financial Education") {
+                    setMainView("education");
+                  } else if (page === "Eligibility, CIBIL & BSA") {
+                    setMainView("eligibility-cibil");
                   }
-                } else if (page === "Financial Goals") {
-                  const email = authSession?.email;
-                  const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
-                  const isStaff = authSession?.isAdvisor || authSession?.isStaff || (email && ["admin@finheal.com", "admin@f2finheal.com"].includes(email.toLowerCase())) || isUserAdvisor(email) || isEmployeeId;
-                  if (!isStaff) {
-                    setMainView("goals");
-                  }
-                } else if (page === "Financial Health Test") {
-                  setMainView("tests");
-                } else if (page === "Talk to an Advisor") {
-                  setMainView("advisor");
-                } else if (page === "Financial Education") {
-                  setMainView("education");
-                } else if (page === "Eligibility, CIBIL & BSA") {
-                  setMainView("eligibility-cibil");
-                }
-              }}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-            />
-          ) : mainView === "eligibility-cibil" ? (
-            <EligibilityCibilView
-              userId={userId}
-              userEmail={authSession.email || ""}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onApplyNow={handleApplyLoan}
-              onTalkToAdvisor={() => setMainView("advisor")}
-              onOpenAdmin={openAdmin}
-              isGuest={authSession?.isGuest ?? true}
-              onLoginRequired={handleLogout}
-            />
-          ) : mainView === "cibil-analyzer" ? (
-            <CibilAnalyzerView
-              userId={userId}
-              userEmail={authSession.email || ""}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onApplyNow={handleApplyLoan}
-              onTalkToAdvisor={() => setMainView("advisor")}
-            />
-          ) : mainView === "reminders" ? (
-            <RemindersView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          ) : (
-            <DebtBalanceReviewView
-              userId={userId}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onToggleInsights={() => setInsightsOpen((open) => !open)}
-              onBackToCatalog={openTestCatalog}
-              onOpenFinancialWellnessAssistant={openChatView}
-            />
-          )}
+                }}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+              />
+            ) : mainView === "eligibility-cibil" ? (
+              <EligibilityCibilView
+                userId={userId}
+                userEmail={authSession.email || ""}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNow={handleApplyLoan}
+                onTalkToAdvisor={() => setMainView("advisor")}
+                onOpenAdmin={openAdmin}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
+              />
+            ) : mainView === "cibil-analyzer" ? (
+              <CibilAnalyzerView
+                userId={userId}
+                userEmail={authSession.email || ""}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNow={handleApplyLoan}
+                onTalkToAdvisor={() => setMainView("advisor")}
+              />
+            ) : mainView === "reminders" ? (
+              <RemindersView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            ) : (
+              <DebtBalanceReviewView
+                userId={userId}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onBackToCatalog={openTestCatalog}
+                onOpenFinancialWellnessAssistant={openChatView}
+              />
+            )}
           </Suspense>
 
           {/* Global Pinned Profile Dropdown */}

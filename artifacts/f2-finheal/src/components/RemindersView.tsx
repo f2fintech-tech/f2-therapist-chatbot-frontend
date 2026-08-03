@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import { fetchAdvisorAppointments, fetchUserAppointments } from "@/lib/backendAuth";
 import { 
   Bell, 
@@ -108,26 +109,24 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   const [filterDate, setFilterDate] = useState<string | null>(null);
   const [startDateOffset, setStartDateOffset] = useState<number>(0);
   
-  useEffect(() => {
-    if (!isAdvisor) return;
-    async function loadAdvisorAppts() {
-      try {
-        setRemindersLoading(true);
-        const storedSession = localStorage.getItem("finheal-auth-session");
-        const parsed = storedSession ? JSON.parse(storedSession) : null;
-        const advId = parsed?.f2FintechId || parsed?.userId || userId;
-        if (advId) {
-          const appts = await fetchAdvisorAppointments(advId);
-          setAdvisorAppointments(appts || []);
-        }
-      } catch (e) {
-        console.error("Failed to load appointments in RemindersView", e);
-      } finally {
-        setRemindersLoading(false);
+  const loadAdvisorAppts = async () => {
+    try {
+      setRemindersLoading(true);
+      const storedSession = localStorage.getItem("finheal-auth-session");
+      const parsed = storedSession ? JSON.parse(storedSession) : null;
+      const advId = parsed?.f2FintechId || parsed?.userId || userId;
+      if (advId) {
+        const appts = await fetchAdvisorAppointments(advId);
+        setAdvisorAppointments(appts || []);
       }
+    } catch (e) {
+      console.error("Failed to load appointments in RemindersView", e);
+    } finally {
+      setRemindersLoading(false);
     }
-    loadAdvisorAppts();
-  }, [userId, isAdvisor]);
+  };
+
+  usePolling(loadAdvisorAppts, 15000, isAdvisor && !!userId);
 
   // State for reminders
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -135,44 +134,45 @@ export default function RemindersView({ userId, onToggleSidebar, onToggleInsight
   // State for client appointments
   const [clientAppointments, setClientAppointments] = useState<any[]>([]);
 
+  const loadApptsFromStorage = () => {
+    const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    try {
+      const stored = localStorage.getItem(apptsKey);
+      if (stored) {
+        setClientAppointments(JSON.parse(stored));
+      } else {
+        setClientAppointments([]);
+      }
+    } catch (e) {
+      console.error("Failed to load client appointments from storage in RemindersView", e);
+    }
+  };
+
+  const fetchAndSyncAppts = async () => {
+    if (!userId) {
+      loadApptsFromStorage();
+      return;
+    }
+    const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+    try {
+      setRemindersLoading(true);
+      const list = await fetchUserAppointments(userId);
+      setClientAppointments(list || []);
+      localStorage.setItem(apptsKey, JSON.stringify(list || []));
+      window.dispatchEvent(new Event("storage"));
+    } catch (e) {
+      console.error("Failed to fetch client appointments from database in RemindersView", e);
+      loadApptsFromStorage();
+    } finally {
+      setRemindersLoading(false);
+    }
+  };
+
+  usePolling(fetchAndSyncAppts, 15000, !isAdvisor && !!userId);
+
   useEffect(() => {
     if (isAdvisor) return;
-    const apptsKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
-    
-    const loadApptsFromStorage = () => {
-      try {
-        const stored = localStorage.getItem(apptsKey);
-        if (stored) {
-          setClientAppointments(JSON.parse(stored));
-        } else {
-          setClientAppointments([]);
-        }
-      } catch (e) {
-        console.error("Failed to load client appointments from storage in RemindersView", e);
-      }
-    };
-
-    async function fetchAndSyncAppts() {
-      if (!userId) {
-        loadApptsFromStorage();
-        return;
-      }
-      try {
-        setRemindersLoading(true);
-        const list = await fetchUserAppointments(userId);
-        setClientAppointments(list || []);
-        localStorage.setItem(apptsKey, JSON.stringify(list || []));
-        window.dispatchEvent(new Event("storage"));
-      } catch (e) {
-        console.error("Failed to fetch client appointments from database in RemindersView", e);
-        loadApptsFromStorage();
-      } finally {
-        setRemindersLoading(false);
-      }
-    }
-
-    fetchAndSyncAppts();
-
+    loadApptsFromStorage();
     window.addEventListener("storage", loadApptsFromStorage);
     window.addEventListener("finheal:advisors_update" as any, loadApptsFromStorage);
     return () => {
