@@ -2811,17 +2811,19 @@ ${sheetDataXml}
               ) : (
                 <>
                   {/* KPI row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 ${isStaff ? 'lg:grid-cols-4' : 'lg:grid-cols-5'} gap-4`}>
                     {/* Credit Health Card */}
-                    <StatCard
-                      icon="🛡️"
-                      label="Credit Health"
-                      value={dashboardSummary?.credit_score?.score ? String(dashboardSummary.credit_score.score) : "No Score"}
-                      sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
-                      color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
-                      delay={0}
-                      onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
-                    />
+                    {!isStaff && (
+                      <StatCard
+                        icon="🛡️"
+                        label="Credit Health"
+                        value={dashboardSummary?.credit_score?.score ? String(dashboardSummary.credit_score.score) : "No Score"}
+                        sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
+                        color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
+                        delay={0}
+                        onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
+                      />
+                    )}
 
                     {/* Advisor Call Card */}
                     <StatCard
