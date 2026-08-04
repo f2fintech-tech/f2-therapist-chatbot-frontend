@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetchAdvisorProfile } from "@/lib/backendAuth";
+import { fetchAdvisorProfile, fetchAdvisors } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import html2canvas from "html2canvas-pro";
@@ -393,6 +393,50 @@ export default function EligibilityCibilView({
   const [cibilBureau, setCibilBureau] = useState<"cibil" | "experian">("cibil");
   const [cibilReportType, setCibilReportType] = useState<"individual" | "company">("individual");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Admin Attribute States
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeeDirectory, setEmployeeDirectory] = useState<any[]>([]);
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const employeeDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(event.target as Node)) {
+        setIsEmployeeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      fetchAdvisors(undefined, true).then((list) => {
+        const sortedList = [...list].sort((a, b) => {
+          const idA = (a.f2FintechId || a.id || "").toLowerCase();
+          const idB = (b.f2FintechId || b.id || "").toLowerCase();
+          return idA.localeCompare(idB);
+        });
+        setEmployeeDirectory(sortedList);
+      }).catch(err => {
+        console.error("Failed to fetch all employees:", err);
+        // Fallback to local storage
+        try {
+          const stored = localStorage.getItem("finheal_advisors_list");
+          if (stored) setEmployeeDirectory(JSON.parse(stored));
+        } catch (e) {}
+      });
+    } else {
+      try {
+        const stored = localStorage.getItem("finheal_advisors_list");
+        if (stored) {
+          setEmployeeDirectory(JSON.parse(stored));
+        }
+      } catch (e) {}
+    }
+  }, [isSuperAdmin]);
 
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
@@ -1054,7 +1098,8 @@ export default function EligibilityCibilView({
         cibilPhone, 
         cibilBureau === "experian" ? undefined : cibilPan.toUpperCase(), 
         cibilBureau, 
-        cibilReportType
+        cibilReportType,
+        selectedEmployeeId || undefined
       );
       setCibilReport(result);
       setStoredCibilReport(result);
@@ -2306,6 +2351,82 @@ export default function EligibilityCibilView({
                             </button>
                           </div>
                         </div>
+
+                        {isSuperAdmin && (
+                          <div className="flex flex-col mb-4 mt-2" ref={employeeDropdownRef}>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Fetch On Behalf Of (Admin Only)</label>
+                            <div className="relative">
+                              <div
+                                onClick={() => setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen)}
+                                className="w-full pl-3 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold flex items-center justify-between cursor-pointer select-none hover:border-primary/50 transition-colors"
+                              >
+                                <span className="truncate">
+                                  {selectedEmployeeId === "" 
+                                    ? "System Admin (Self)" 
+                                    : employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name 
+                                      ? `${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name} ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation ? `- ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation}` : ""}`
+                                      : "System Admin (Self)"}
+                                </span>
+                                <ChevronDown className={`absolute right-3 w-4 h-4 text-gray-500 transition-transform ${isEmployeeDropdownOpen ? 'rotate-180' : ''}`} />
+                              </div>
+                              
+                              {isEmployeeDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg overflow-hidden flex flex-col max-h-[240px]">
+                                  <div className="p-2 border-b border-gray-100 bg-gray-50/50 sticky top-0">
+                                    <div className="relative">
+                                      <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        placeholder="Search employees..."
+                                        value={employeeSearchQuery}
+                                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-[6px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="overflow-y-auto overflow-x-hidden flex-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+                                    <div
+                                      onClick={() => {
+                                        setSelectedEmployeeId("");
+                                        setIsEmployeeDropdownOpen(false);
+                                        setEmployeeSearchQuery("");
+                                      }}
+                                      className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors ${selectedEmployeeId === "" ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                    >
+                                      System Admin (Self)
+                                    </div>
+                                    {employeeDirectory
+                                      .filter(emp => {
+                                        const search = employeeSearchQuery.toLowerCase();
+                                        const name = (emp.name || "").toLowerCase();
+                                        const desig = (emp.designation || "").toLowerCase();
+                                        return name.includes(search) || desig.includes(search);
+                                      })
+                                      .map((emp: any) => {
+                                        const id = emp.f2FintechId || emp.id;
+                                        return (
+                                          <div
+                                            key={id}
+                                            onClick={() => {
+                                              setSelectedEmployeeId(id);
+                                              setIsEmployeeDropdownOpen(false);
+                                              setEmployeeSearchQuery("");
+                                            }}
+                                            className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors border-t border-gray-50 ${selectedEmployeeId === id ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                          >
+                                            <div className="truncate">
+                                              {emp.name} <span className="text-gray-400 font-normal">{emp.designation ? `- ${emp.designation}` : ""}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex bg-gray-55/30 pt-2 rounded-[12px]">
                           <input
