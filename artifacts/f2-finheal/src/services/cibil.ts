@@ -68,7 +68,8 @@ export async function fetchCibilReport(
   phone: string,
   pan?: string,
   bureau: "cibil" | "experian" | "company_cibil" | "company_experian" = "cibil",
-  reportType: "individual" | "company" = "individual"
+  reportType: "individual" | "company" = "individual",
+  fetchedForEmployeeId?: string
 ): Promise<CibilReport> {
   const response = await fetch(`${API_BASE_URL}/cibil/fetch`, {
     method: "POST",
@@ -80,6 +81,7 @@ export async function fetchCibilReport(
       pan: pan || "",
       bureau,
       report_type: reportType,
+      fetched_for_employee_id: fetchedForEmployeeId,
     }),
   });
 

@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { fetchAdvisorProfile } from "@/lib/backendAuth";
+import { fetchAdvisorProfile, fetchAdvisors } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import html2canvas from "html2canvas-pro";
@@ -105,6 +105,8 @@ export function LenderLogo({ name, className = "w-8 h-8" }: { name: string; clas
     </div>
   );
 }
+
+
 
 interface EligibilityCibilViewProps {
   userId: string;
@@ -270,6 +272,13 @@ export default function EligibilityCibilView({
 }: EligibilityCibilViewProps) {
   const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa">("eligibility");
   const [currency, setCurrency] = useState(CURRENCIES[0]);
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat(currency.locale, {
+      style: "currency",
+      currency: currency.code,
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
   const { toast } = useToast();
 
   const isUserAdvisor = (email?: string) => {
@@ -385,6 +394,50 @@ export default function EligibilityCibilView({
   const [cibilReportType, setCibilReportType] = useState<"individual" | "company">("individual");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Admin Attribute States
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeeDirectory, setEmployeeDirectory] = useState<any[]>([]);
+  const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const employeeDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(event.target as Node)) {
+        setIsEmployeeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      fetchAdvisors(undefined, true).then((list) => {
+        const sortedList = [...list].sort((a, b) => {
+          const idA = (a.f2FintechId || a.id || "").toLowerCase();
+          const idB = (b.f2FintechId || b.id || "").toLowerCase();
+          return idA.localeCompare(idB);
+        });
+        setEmployeeDirectory(sortedList);
+      }).catch(err => {
+        console.error("Failed to fetch all employees:", err);
+        // Fallback to local storage
+        try {
+          const stored = localStorage.getItem("finheal_advisors_list");
+          if (stored) setEmployeeDirectory(JSON.parse(stored));
+        } catch (e) {}
+      });
+    } else {
+      try {
+        const stored = localStorage.getItem("finheal_advisors_list");
+        if (stored) {
+          setEmployeeDirectory(JSON.parse(stored));
+        }
+      } catch (e) {}
+    }
+  }, [isSuperAdmin]);
+
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
@@ -411,6 +464,142 @@ export default function EligibilityCibilView({
   const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
   const [bsaAnalysisData, setBsaAnalysisData] = useState<any>(null);
 
+  // Calculations for Tab 2: Eligibility
+  const eligCalculations = useMemo(() => {
+    const incomeVal = Number(eligIncome) || 0;
+    const emiVal = Number(eligEmi) || 0;
+    const rateVal = Number(eligRate) || 0;
+    const tenureVal = Number(eligTenure) || 0;
+
+    // Dynamic acceptable FOIR based on gross monthly income
+    let maxFoirPct = 50;
+    if (incomeVal <= 50000) {
+      maxFoirPct = 50;
+    } else if (incomeVal <= 70000) {
+      maxFoirPct = 60;
+    } else if (incomeVal < 100000) {
+      maxFoirPct = 65;
+    } else {
+      maxFoirPct = 70;
+    }
+    const affordableMonthlyObligation = incomeVal * (maxFoirPct / 100);
+    const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - emiVal);
+
+    const monthlyRate = rateVal / 12 / 100;
+    const totalMonths = tenureVal * 12;
+
+    let eligibleAmount = 0;
+    if (maxEmiAllowed > 0 && monthlyRate > 0) {
+      eligibleAmount =
+        (maxEmiAllowed * (Math.pow(1 + monthlyRate, totalMonths) - 1)) /
+        (monthlyRate * Math.pow(1 + monthlyRate, totalMonths));
+    } else if (maxEmiAllowed > 0 && monthlyRate === 0) {
+      eligibleAmount = maxEmiAllowed * totalMonths;
+    }
+
+    const currentFoir = incomeVal > 0 ? ((emiVal + maxEmiAllowed) / incomeVal) * 100 : 0;
+    const baseFoir = incomeVal > 0 ? (emiVal / incomeVal) * 100 : 0;
+
+    // Safety assessment
+    let riskLevel: "low" | "medium" | "high" = "low";
+    if (baseFoir > 45) riskLevel = "high";
+    else if (baseFoir > 30) riskLevel = "medium";
+
+    return {
+      maxEmiAllowed: Math.round(maxEmiAllowed),
+      eligibleAmount: Math.round(eligibleAmount),
+      riskLevel,
+      currentFoir: Math.round(currentFoir),
+      baseFoir: Math.round(baseFoir),
+      maxFoirPct,
+    };
+  }, [eligIncome, eligEmi, eligRate, eligTenure]);
+
+  // Dynamic Pre-Session Prep Checklist options
+  const PREP_OPTIONS = useMemo(() => {
+    const selectedEligType = LOAN_TYPES.find((t) => t.id === eligLoanType) || LOAN_TYPES[0];
+    const loanName = selectedEligType?.name || "Loan";
+    const incomeVal = Number(eligIncome) || 0;
+    const emiVal = Number(eligEmi) || 0;
+    const cibilVal = Number(eligCibil) || 750;
+    const expVal = Number(eligExperience) || 0;
+    
+    // 1. Debt-to-income (FOIR) Check
+    const dti = incomeVal > 0 ? Math.round((emiVal / incomeVal) * 100) : 0;
+    const emiOption = dti > 40
+      ? {
+          id: "emi",
+          label: "High Current Debt Burden",
+          desc: `My current monthly EMIs consume ${dti}% of my income (${formatCurrency(emiVal)}). How can we reduce my high debt-to-income ratio?`
+        }
+      : {
+          id: "emi",
+          label: "Budgeting & EMI Structure",
+          desc: `My current EMI is ${formatCurrency(emiVal)} (${dti}% of my income). How can we optimize my future EMIs for a new ${loanName}?`
+        };
+
+    // 2. CIBIL Score Check
+    const cibilOption = cibilVal < 650
+      ? {
+          id: "utilization",
+          label: "Improving Low CIBIL Score",
+          desc: `My CIBIL score is low (${cibilVal}). What specific steps should I take to improve it before applying for a ${loanName}?`
+        }
+      : {
+          id: "utilization",
+          label: "Leveraging Good CIBIL Score",
+          desc: `My CIBIL score is high (${cibilVal}). Can we use this to negotiate lower interest rates on my ${loanName}?`
+        };
+
+    // 3. Experience / Vintage / Income stability Check
+    const expOption = (eligLoanType === "professional" || eligLoanType === "business")
+      ? {
+          id: "savings",
+          label: "Practice/Business Vintage",
+          desc: `My professional practice vintage is ${expVal} years. How does this vintage affect my eligibility limit for a ${loanName}?`
+        }
+      : {
+          id: "savings",
+          label: "Income Stability Assessment",
+          desc: `My gross monthly income is ${formatCurrency(incomeVal)}. How can I show stable income verification for a ${loanName}?`
+        };
+
+    // 4. Loan Specific Check
+    let categoryOption = {
+      id: "rates",
+      label: "Short-term Debt Strategy",
+      desc: `What are the pros and cons of taking a personal loan versus using existing liquid savings?`
+    };
+
+    if (eligLoanType === "home") {
+      categoryOption = {
+        id: "rates",
+        label: "Home Loan Down Payment",
+        desc: `For a Home Loan with eligible limit ${formatCurrency(eligCalculations.eligibleAmount)}, what down payment budget should I prepare?`
+      };
+    } else if (eligLoanType === "business" || eligLoanType === "professional") {
+      categoryOption = {
+        id: "rates",
+        label: "Working Capital vs Term Loan",
+        desc: `Should I apply for a business term loan or an overdraft facility for my ${eligLoanType === "professional" ? (eligDegree || "practice") : "business"}?`
+      };
+    } else if (eligLoanType === "education") {
+      categoryOption = {
+        id: "rates",
+        label: "Education Loan Moratorium Options",
+        desc: `For an Education Loan, how do co-borrower criteria and the moratorium period impact terms?`
+      };
+    } else if (eligLoanType === "lap") {
+      categoryOption = {
+        id: "rates",
+        label: "Collateral Valuation",
+        desc: `For a Loan Against Property, how does the property valuation and marketability affect interest rates?`
+      };
+    }
+
+    return [emiOption, cibilOption, expOption, categoryOption];
+  }, [eligLoanType, eligIncome, eligEmi, eligCibil, eligExperience, currency, eligCalculations.eligibleAmount, eligDegree]);
+
   const bsaAnalyzerRef = React.useRef<HTMLDivElement>(null);
   const [isGeneratingBSAPDF, setIsGeneratingBSAPDF] = useState<boolean>(false);
 
@@ -422,6 +611,27 @@ export default function EligibilityCibilView({
   const [selectedLenderIds, setSelectedLenderIds] = useState<string[]>([]);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+
+  // Pre-Session Prep Modal States
+  const [isPrepModalOpen, setIsPrepModalOpen] = useState<boolean>(false);
+  const [selectedAnxieties, setSelectedAnxieties] = useState<string[]>([]);
+
+  const handleTalkToAdvisorClick = () => {
+    setSelectedAnxieties([]);
+    setIsPrepModalOpen(true);
+  };
+
+  const handleConfirmPrep = () => {
+    if (selectedAnxieties.length > 0) {
+      const selectedOptions = PREP_OPTIONS.filter(o => selectedAnxieties.includes(o.id));
+      const agendaArray = selectedOptions.map(o => o.desc);
+      localStorage.setItem("finheal_pending_appointment_agenda", JSON.stringify(agendaArray));
+    } else {
+      localStorage.removeItem("finheal_pending_appointment_agenda");
+    }
+    setIsPrepModalOpen(false);
+    onTalkToAdvisor?.();
+  };
 
   // Dynamic Scale Factor based on chosen currency
   const currencyScale = useMemo(() => {
@@ -888,7 +1098,8 @@ export default function EligibilityCibilView({
         cibilPhone, 
         cibilBureau === "experian" ? undefined : cibilPan.toUpperCase(), 
         cibilBureau, 
-        cibilReportType
+        cibilReportType,
+        selectedEmployeeId || undefined
       );
       setCibilReport(result);
       setStoredCibilReport(result);
@@ -1043,14 +1254,6 @@ export default function EligibilityCibilView({
     return cibilReport.accounts.filter((acc: any) => acc.is_active);
   }, [selectedCategory, accountsSummary, cibilReport]);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat(currency.locale, {
-      style: "currency",
-      currency: currency.code,
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
-
   const handleEligLoanTypeChange = (typeId: string) => {
     setEligLoanType(typeId);
     setSelectedLenderIds([]);
@@ -1115,57 +1318,6 @@ export default function EligibilityCibilView({
       detailsStr
     );
   };
-
-  // Calculations for Tab 2: Eligibility
-  const eligCalculations = useMemo(() => {
-    const incomeVal = Number(eligIncome) || 0;
-    const emiVal = Number(eligEmi) || 0;
-    const rateVal = Number(eligRate) || 0;
-    const tenureVal = Number(eligTenure) || 0;
-
-    // Dynamic acceptable FOIR based on gross monthly income
-    let maxFoirPct = 50;
-    if (incomeVal <= 50000) {
-      maxFoirPct = 50;
-    } else if (incomeVal <= 70000) {
-      maxFoirPct = 60;
-    } else if (incomeVal < 100000) {
-      maxFoirPct = 65;
-    } else {
-      maxFoirPct = 70;
-    }
-    const affordableMonthlyObligation = incomeVal * (maxFoirPct / 100);
-    const maxEmiAllowed = Math.max(0, affordableMonthlyObligation - emiVal);
-
-    const monthlyRate = rateVal / 12 / 100;
-    const totalMonths = tenureVal * 12;
-
-    let eligibleAmount = 0;
-    if (maxEmiAllowed > 0 && monthlyRate > 0) {
-      eligibleAmount =
-        (maxEmiAllowed * (Math.pow(1 + monthlyRate, totalMonths) - 1)) /
-        (monthlyRate * Math.pow(1 + monthlyRate, totalMonths));
-    } else if (maxEmiAllowed > 0 && monthlyRate === 0) {
-      eligibleAmount = maxEmiAllowed * totalMonths;
-    }
-
-    const currentFoir = incomeVal > 0 ? ((emiVal + maxEmiAllowed) / incomeVal) * 100 : 0;
-    const baseFoir = incomeVal > 0 ? (emiVal / incomeVal) * 100 : 0;
-
-    // Safety assessment
-    let riskLevel: "low" | "medium" | "high" = "low";
-    if (baseFoir > 45) riskLevel = "high";
-    else if (baseFoir > 30) riskLevel = "medium";
-
-    return {
-      maxEmiAllowed: Math.round(maxEmiAllowed),
-      eligibleAmount: Math.round(eligibleAmount),
-      riskLevel,
-      currentFoir: Math.round(currentFoir),
-      baseFoir: Math.round(baseFoir),
-      maxFoirPct,
-    };
-  }, [eligIncome, eligEmi, eligRate, eligTenure]);
 
   // Matching Engine for Lender Products
   const matchedOffers = useMemo(() => {
@@ -1662,28 +1814,28 @@ export default function EligibilityCibilView({
               )}
 
               {/* Eligibility card summary */}
-              <div className="border border-gray-200 rounded-[14px] p-4 bg-white shadow-sm flex flex-wrap items-center justify-between gap-3 mt-2">
-                <div className="flex flex-col min-w-[140px]">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.8px] text-gray-400">
+              <div className="border border-gray-200 rounded-[18px] p-5 bg-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-3">
+                <div className="flex flex-col">
+                  <span className="text-[10.5px] font-extrabold uppercase tracking-[1px] text-gray-400">
                     Max Eligible Loan Amount
                   </span>
-                  <span className="text-[24px] font-bold text-primary mt-1">
+                  <span className="text-[28px] font-extrabold text-primary mt-1">
                     {formatCurrency(eligCalculations.eligibleAmount)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap sm:justify-end justify-start">
                   <button
                     type="button"
                     onClick={handleAskAssistant}
-                    className="px-3 py-2 bg-primary text-white text-[12px] font-bold rounded-[10px] hover:opacity-90 transition-all cursor-pointer shadow-[0_2px_8px_rgba(50,68,230,0.15)] hover:-translate-y-0.5 whitespace-nowrap"
+                    className="min-w-[140px] px-4 py-2.5 bg-primary text-white text-[12px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_2px_8px_rgba(50,68,230,0.15)] hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center text-center"
                   >
                     Ask Assistant
                   </button>
                   {onTalkToAdvisor && (
                     <button
                       type="button"
-                      onClick={onTalkToAdvisor}
-                      className="px-3 py-2 bg-emerald-600 text-white text-[12px] font-bold rounded-[10px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_2px_8px_rgba(16,185,129,0.15)] hover:-translate-y-0.5 whitespace-nowrap"
+                      onClick={handleTalkToAdvisorClick}
+                      className="min-w-[140px] px-4 py-2.5 bg-emerald-600 text-white text-[12px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_2px_8px_rgba(16,185,129,0.15)] hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center text-center"
                     >
                       Talk to Advisor
                     </button>
@@ -2199,6 +2351,82 @@ export default function EligibilityCibilView({
                             </button>
                           </div>
                         </div>
+
+                        {isSuperAdmin && (
+                          <div className="flex flex-col mb-4 mt-2" ref={employeeDropdownRef}>
+                            <label className="text-[12px] font-bold text-gray-700 uppercase mb-1.5">Fetch On Behalf Of (Admin Only)</label>
+                            <div className="relative">
+                              <div
+                                onClick={() => setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen)}
+                                className="w-full pl-3 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold flex items-center justify-between cursor-pointer select-none hover:border-primary/50 transition-colors"
+                              >
+                                <span className="truncate">
+                                  {selectedEmployeeId === "" 
+                                    ? "System Admin (Self)" 
+                                    : employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name 
+                                      ? `${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.name} ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation ? `- ${employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId)?.designation}` : ""}`
+                                      : "System Admin (Self)"}
+                                </span>
+                                <ChevronDown className={`absolute right-3 w-4 h-4 text-gray-500 transition-transform ${isEmployeeDropdownOpen ? 'rotate-180' : ''}`} />
+                              </div>
+                              
+                              {isEmployeeDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-[10px] shadow-lg overflow-hidden flex flex-col max-h-[240px]">
+                                  <div className="p-2 border-b border-gray-100 bg-gray-50/50 sticky top-0">
+                                    <div className="relative">
+                                      <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        placeholder="Search employees..."
+                                        value={employeeSearchQuery}
+                                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-[6px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="overflow-y-auto overflow-x-hidden flex-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+                                    <div
+                                      onClick={() => {
+                                        setSelectedEmployeeId("");
+                                        setIsEmployeeDropdownOpen(false);
+                                        setEmployeeSearchQuery("");
+                                      }}
+                                      className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors ${selectedEmployeeId === "" ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                    >
+                                      System Admin (Self)
+                                    </div>
+                                    {employeeDirectory
+                                      .filter(emp => {
+                                        const search = employeeSearchQuery.toLowerCase();
+                                        const name = (emp.name || "").toLowerCase();
+                                        const desig = (emp.designation || "").toLowerCase();
+                                        return name.includes(search) || desig.includes(search);
+                                      })
+                                      .map((emp: any) => {
+                                        const id = emp.f2FintechId || emp.id;
+                                        return (
+                                          <div
+                                            key={id}
+                                            onClick={() => {
+                                              setSelectedEmployeeId(id);
+                                              setIsEmployeeDropdownOpen(false);
+                                              setEmployeeSearchQuery("");
+                                            }}
+                                            className={`px-3 py-2.5 text-[12.5px] cursor-pointer transition-colors border-t border-gray-50 ${selectedEmployeeId === id ? "bg-primary/10 text-primary font-bold" : "hover:bg-gray-50 text-gray-700 font-medium"}`}
+                                          >
+                                            <div className="truncate">
+                                              {emp.name} <span className="text-gray-400 font-normal">{emp.designation ? `- ${emp.designation}` : ""}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex bg-gray-55/30 pt-2 rounded-[12px]">
                           <input
@@ -2770,7 +2998,7 @@ export default function EligibilityCibilView({
                     {onTalkToAdvisor && (
                       <button
                         type="button"
-                        onClick={onTalkToAdvisor}
+                        onClick={handleTalkToAdvisorClick}
                         className="mt-4 w-full bg-primary/5 hover:bg-primary/10 text-primary font-bold py-2 rounded-[10px] text-[11.5px] transition-all border border-primary/15 cursor-pointer"
                       >
                         Speak to Credit Advisor
@@ -3025,6 +3253,96 @@ export default function EligibilityCibilView({
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Session Prep Modal */}
+      {isPrepModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[6px] animate-fade-in">
+          <div className="bg-white rounded-[24px] max-w-[500px] w-full shadow-2xl animate-scale-up border border-gray-100 max-h-[90vh] flex flex-col overflow-hidden">
+            
+            {/* Header (Fixed) */}
+            <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <CalendarCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-[16px] font-extrabold text-gray-800">
+                    Pre-Session Prep Checklist
+                  </h3>
+                  <p className="text-[12px] text-gray-400 mt-0.5">Reframer your financial worries into constructive agenda questions.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPrepModalOpen(false)}
+                className="p-1.5 hover:bg-gray-150 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Scrollable Checklist Body */}
+            <div className="flex-1 overflow-y-auto p-6 py-4 space-y-4">
+              <p className="text-[12px] text-gray-600 font-medium leading-relaxed">
+                Before booking your slot, select any specific topics or worries you would like to address. We'll automatically build an agenda list for your human advisor to prepare beforehand:
+              </p>
+              
+              <div className="space-y-3">
+                {PREP_OPTIONS.map((opt) => {
+                  const isChecked = selectedAnxieties.includes(opt.id);
+                  return (
+                    <div 
+                      key={opt.id}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedAnxieties(selectedAnxieties.filter(id => id !== opt.id));
+                        } else {
+                          setSelectedAnxieties([...selectedAnxieties, opt.id]);
+                        }
+                      }}
+                      className={`p-3.5 rounded-[16px] border-[1.5px] cursor-pointer transition-all duration-200 flex items-start gap-3 select-none ${
+                        isChecked 
+                          ? 'border-emerald-500 bg-emerald-50/30' 
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={isChecked}
+                        readOnly
+                        className="w-4.5 h-4.5 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 mt-1 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <span className="text-[12.5px] font-bold text-gray-800 block">
+                          {opt.label}
+                        </span>
+                        <span className="text-[11.5px] text-gray-500 mt-0.5 block leading-normal italic">
+                          "{opt.desc}"
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer Buttons (Fixed) */}
+            <div className="p-6 pt-4 border-t border-gray-100 flex gap-3 shrink-0">
+              <button
+                onClick={() => setIsPrepModalOpen(false)}
+                className="flex-1 py-2.5 px-4 border border-gray-200 rounded-[10px] text-[12px] font-bold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer text-center"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPrep}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-[12px] font-bold transition-colors cursor-pointer shadow-md hover:shadow-lg text-center"
+              >
+                Continue to Booking
+              </button>
             </div>
           </div>
         </div>

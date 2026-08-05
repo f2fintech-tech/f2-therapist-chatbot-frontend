@@ -26,7 +26,8 @@ import {
   User as UserIcon,
   Phone,
   FileText,
-  Sparkles
+  Sparkles,
+  CalendarCheck
 } from "lucide-react";
 
 
@@ -195,6 +196,8 @@ const CURRENCIES = [
   { code: "JPY", symbol: "¥", locale: "ja-JP", name: "Japanese Yen (¥)" },
 ];
 
+
+
 export default function LoanCalculatorView({
   userId,
   onToggleSidebar,
@@ -203,7 +206,7 @@ export default function LoanCalculatorView({
   onTalkToAdvisor,
   isGuest = false,
   onLoginRequired,
-}: LoanCalculatorViewProps) {
+}: any) {
   // Global States
   const [location, setLocation] = useLocation();
 
@@ -249,6 +252,27 @@ export default function LoanCalculatorView({
     if (tabId === "personal") return "personal-loan";
     if (tabId === "professional") return "professional-loan";
     return tabId;
+  };
+
+  // Pre-Session Checklist States & Handlers
+  const [isPrepModalOpen, setIsPrepModalOpen] = useState<boolean>(false);
+  const [selectedAnxieties, setSelectedAnxieties] = useState<string[]>([]);
+
+  const handleTalkToAdvisorClick = () => {
+    setSelectedAnxieties([]);
+    setIsPrepModalOpen(true);
+  };
+
+  const handleConfirmPrep = () => {
+    if (selectedAnxieties.length > 0) {
+      const selectedOptions = PREP_OPTIONS.filter(o => selectedAnxieties.includes(o.id));
+      const agendaArray = selectedOptions.map(o => o.desc);
+      localStorage.setItem("finheal_pending_appointment_agenda", JSON.stringify(agendaArray));
+    } else {
+      localStorage.removeItem("finheal_pending_appointment_agenda");
+    }
+    setIsPrepModalOpen(false);
+    onTalkToAdvisor?.();
   };
 
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -402,6 +426,70 @@ export default function LoanCalculatorView({
   const [flexiDeposit, setFlexiDeposit] = useState<string>("100000"); // default 1L
   const [flexiInterestOnlyTenure, setFlexiInterestOnlyTenure] = useState<string>("3");
   const [flexiRepaymentTenure, setFlexiRepaymentTenure] = useState<string>("5");
+
+  // Dynamic Pre-Session Prep Checklist options
+  const PREP_OPTIONS = useMemo(() => {
+    const loanName = activeConfig?.name || "Loan";
+    const amountVal = Number(emiAmount) || 0;
+    const rateVal = Number(emiRate) || 0;
+    const tenureVal = Number(emiTenure) || 0;
+    
+    // 1. Loan Amount & Budget Check
+    const amountOption = {
+      id: "emi",
+      label: `Optimizing ${loanName} Amount`,
+      desc: `I am looking to borrow ${formatCurrency(amountVal)}. How can I verify if this fits my long-term debt capacity?`
+    };
+
+    // 2. Interest Rate Check
+    const rateOption = {
+      id: "utilization",
+      label: `Reducing Interest Rate (${rateVal}%)`,
+      desc: `The calculator shows an interest rate of ${rateVal}%. Can we negotiate lower rates or processing fees for this ${loanName}?`
+    };
+
+    // 3. Tenure & Prepayments Check
+    const tenureOption = {
+      id: "savings",
+      label: `Adjusting Tenure (${tenureVal} Years)`,
+      desc: `For a tenure of ${tenureVal} years, how would prepayments or foreclosure options reduce my total interest load?`
+    };
+
+    // 4. Loan Specific / Category Option
+    let categoryOption = {
+      id: "rates",
+      label: "Prepayment Impact",
+      desc: `If I prepay 1 extra EMI per year on my ${formatCurrency(amountVal)} Personal Loan, how much tenure will I save?`
+    };
+
+    if (activeTab === "home") {
+      categoryOption = {
+        id: "rates",
+        label: "Tax Benefits & Co-applicant",
+        desc: `What tax deductions under Section 80C/24(b) can I leverage for a ${formatCurrency(amountVal)} Home Loan?`
+      };
+    } else if (activeTab === "business" || activeTab === "professional") {
+      categoryOption = {
+        id: "rates",
+        label: "ROI vs Cashflow Security",
+        desc: `How can I balance monthly cash flows while paying EMIs for a ${formatCurrency(amountVal)} ${loanName}?`
+      };
+    } else if (activeTab === "education") {
+      categoryOption = {
+        id: "rates",
+        label: "Moratorium Period Options",
+        desc: `How does the interest accrual during the moratorium period affect my education loan payments?`
+      };
+    } else if (activeTab === "lap") {
+      categoryOption = {
+        id: "rates",
+        label: "Collateral Valuation Impact",
+        desc: `For a ${formatCurrency(amountVal)} Loan Against Property, how does property marketability affect interest rates?`
+      };
+    }
+
+    return [amountOption, rateOption, tenureOption, categoryOption];
+  }, [activeConfig, emiAmount, emiRate, emiTenure, activeTab, currency]);
 
   // Drop Down OD States
   const [dropdownLimit, setDropdownLimit] = useState<string>("5000000"); // default 50L
@@ -3386,7 +3474,7 @@ export default function LoanCalculatorView({
                     {onTalkToAdvisor && (
                       <button
                         type="button"
-                        onClick={onTalkToAdvisor}
+                        onClick={handleTalkToAdvisorClick}
                         className="flex-1 h-[40px] bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center hover:-translate-y-0.5 whitespace-nowrap"
                       >
                         Talk to Advisor
@@ -4391,7 +4479,7 @@ export default function LoanCalculatorView({
                   {onTalkToAdvisor && (
                     <button
                       type="button"
-                      onClick={onTalkToAdvisor}
+                      onClick={handleTalkToAdvisorClick}
                       className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                     >
                       <span>Talk to Advisor</span>
@@ -4612,7 +4700,7 @@ export default function LoanCalculatorView({
                 {onTalkToAdvisor && (
                   <button
                     type="button"
-                    onClick={onTalkToAdvisor}
+                    onClick={handleTalkToAdvisorClick}
                     className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
                   >
                     <span>Talk to Advisor</span>
@@ -4623,7 +4711,97 @@ export default function LoanCalculatorView({
             </div>
           </div>
           </div>
-        )}  
+        )}
+
+        {/* Pre-Session Prep Modal */}
+        {isPrepModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[6px] animate-fade-in">
+            <div className="bg-white rounded-[24px] max-w-[500px] w-full shadow-2xl animate-scale-up border border-gray-100 max-h-[90vh] flex flex-col overflow-hidden">
+              
+              {/* Header (Fixed) */}
+              <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <CalendarCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-[16px] font-extrabold text-gray-800">
+                      Pre-Session Prep Checklist
+                    </h3>
+                    <p className="text-[12px] text-gray-400 mt-0.5">Reframer your financial worries into constructive agenda questions.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPrepModalOpen(false)}
+                  className="p-1.5 hover:bg-gray-150 rounded-full transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Scrollable Checklist Body */}
+              <div className="flex-1 overflow-y-auto p-6 py-4 space-y-4">
+                <p className="text-[12px] text-gray-600 font-medium leading-relaxed text-left">
+                  Before booking your slot, select any specific topics or worries you would like to address. We'll automatically build an agenda list for your human advisor to prepare beforehand:
+                </p>
+                
+                <div className="space-y-3">
+                  {PREP_OPTIONS.map((opt) => {
+                    const isChecked = selectedAnxieties.includes(opt.id);
+                    return (
+                      <div 
+                        key={opt.id}
+                        onClick={() => {
+                          if (isChecked) {
+                            setSelectedAnxieties(selectedAnxieties.filter(id => id !== opt.id));
+                          } else {
+                            setSelectedAnxieties([...selectedAnxieties, opt.id]);
+                          }
+                        }}
+                        className={`p-3.5 rounded-[16px] border-[1.5px] cursor-pointer transition-all duration-200 flex items-start gap-3 select-none text-left ${
+                          isChecked 
+                            ? 'border-emerald-500 bg-emerald-50/30' 
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input 
+                          type="checkbox"
+                          checked={isChecked}
+                          readOnly
+                          className="w-4.5 h-4.5 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 mt-1 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <span className="text-[12.5px] font-bold text-gray-800 block">
+                            {opt.label}
+                          </span>
+                          <span className="text-[11.5px] text-gray-500 mt-0.5 block leading-normal italic">
+                            "{opt.desc}"
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer Buttons (Fixed) */}
+              <div className="p-6 pt-4 border-t border-gray-100 flex gap-3 shrink-0">
+                <button
+                  onClick={() => setIsPrepModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 border border-gray-200 rounded-[10px] text-[12px] font-bold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmPrep}
+                  className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-[12px] font-bold transition-colors cursor-pointer shadow-md hover:shadow-lg text-center"
+                >
+                  Continue to Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
 

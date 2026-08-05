@@ -363,7 +363,7 @@ export default function InsightsPanel({
                           🕒 {call.time}
                         </div>
                         {call.notes && (
-                          <div className="text-[10px] text-gray-500 italic bg-white/60 p-1.5 rounded-lg border border-gray-100 mb-2.5 max-h-[50px] overflow-y-auto">
+                          <div className="text-[10px] text-gray-500 italic bg-white/60 p-1.5 rounded-lg border border-gray-100 mb-2.5 max-h-[50px] overflow-y-auto whitespace-pre-wrap">
                             "{call.notes}"
                           </div>
                         )}

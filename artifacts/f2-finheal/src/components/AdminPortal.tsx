@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -39,6 +39,8 @@ interface Appointment {
   feedback?: string;
   meetUrl?: string;
   joined?: boolean;
+  agenda?: string[] | null;
+  deletedAt?: string;
 }
 
 export function classifyEnquiryRole(email: string, name: string, advisors: any[] = []): "Admin" | "Manager" | "Senior Leadership" | "User" {
@@ -350,6 +352,49 @@ const TEST_NAMES: Record<string, string> = {
   "loan_fit": "Loan Comfort Analysis"
 };
 
+const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
+  const hasAgenda = agenda && agenda.length > 0;
+  
+  if (!hasAgenda) {
+    if (!notes) return null;
+    return (
+      <div className="text-[11px] text-gray-500 mt-[4px] bg-gray-55/60 p-[8px] rounded-[8px] whitespace-pre-wrap text-left italic">
+        &quot;{notes}&quot;
+      </div>
+    );
+  }
+  
+  // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
+  if (agenda.length === 1 && agenda[0] === notes) {
+    return (
+      <div className="text-[11px] text-gray-500 mt-[4px] bg-gray-55/60 p-[8px] rounded-[8px] whitespace-pre-wrap text-left italic">
+        &quot;{notes}&quot;
+      </div>
+    );
+  }
+  
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 text-left">
+      <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[10px] p-2.5 flex flex-col gap-1">
+        <span className="text-[9px] font-bold text-emerald-800 uppercase tracking-[0.5px] block">📋 Pre-Session Agenda Topics</span>
+        <div className="space-y-1">
+          {agenda.map((item, i) => (
+            <div key={i} className="text-[10.5px] text-gray-650 font-medium leading-relaxed flex items-start gap-1">
+              <span className="text-emerald-500 select-none font-bold">✓</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
+        <div className="text-[10.5px] text-gray-500 italic bg-gray-55/60 p-2 border border-gray-100 rounded-[8px] leading-relaxed whitespace-pre-wrap">
+          &quot;{notes}&quot;
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function AdminPortal({ userId, userEmail, onToggleSidebar, onToggleInsights, initialTab }: AdminPortalProps) {
   const isAdmin = userEmail === "admin@finheal.com" || userEmail === "admin@f2finheal.com";
@@ -725,21 +770,57 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Trash State & Fetchers
   const [cibilTrash, setCibilTrash] = useState<any[]>([]);
   const [advisorsTrash, setAdvisorsTrash] = useState<Advisor[]>([]);
+  const [appointmentsTrash, setAppointmentsTrash] = useState<Appointment[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
 
   const fetchTrashData = async () => {
     try {
       setTrashLoading(true);
-      const [cibilRes, advisorsRes] = await Promise.all([
+      const [cibilRes, advisorsRes, appointmentsRes] = await Promise.all([
         fetchCibilTrash(userId).catch(() => []),
-        fetchAdvisorsTrash().catch(() => [])
+        fetchAdvisorsTrash().catch(() => []),
+        fetchAppointmentsTrash().catch(() => [])
       ]);
       setCibilTrash(cibilRes);
       setAdvisorsTrash(advisorsRes);
+      setAppointmentsTrash(appointmentsRes);
     } catch (err) {
       console.error("Error loading trash data:", err);
     } finally {
       setTrashLoading(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (apptId: string) => {
+    if (!window.confirm("Are you sure you want to move this scheduled call to trash?")) return;
+    try {
+      await deleteAppointment(apptId);
+      alert("Scheduled call moved to trash successfully.");
+      loadGlobalAppointments(true); // Refresh active appointments
+    } catch (err: any) {
+      alert(err.message || "Failed to delete scheduled call.");
+    }
+  };
+
+  const handleRestoreAppointment = async (apptId: string) => {
+    try {
+      await restoreAppointment(apptId);
+      alert("Scheduled call successfully restored.");
+      fetchTrashData();
+      loadGlobalAppointments(true); // Refresh active appointments
+    } catch (err: any) {
+      alert(err.message || "Failed to restore scheduled call.");
+    }
+  };
+
+  const handlePermanentlyDeleteAppointment = async (apptId: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this scheduled call from the database? This action cannot be undone.")) return;
+    try {
+      await permanentlyDeleteAppointment(apptId);
+      alert("Scheduled call permanently purged.");
+      fetchTrashData();
+    } catch (err: any) {
+      alert(err.message || "Failed to permanently delete scheduled call.");
     }
   };
 
@@ -3746,19 +3827,20 @@ ${sheetDataXml}
                               </div>
                             )
                           ) : (
-                            appt.notes && (
-                              <div className="text-[11px] italic text-gray-500 bg-gray-50 border border-gray-100 p-[10px] rounded-[12px] max-w-[480px] mt-[6px] flex flex-col gap-[3px] text-left">
-                                <span className="text-[9.5px] font-extrabold text-gray-400 uppercase tracking-wider block">📝 Session Notes</span>
-                                <span>&quot;{appt.notes}&quot;</span>
-                              </div>
-                            )
+                            renderApptNotes(appt.notes, appt.agenda)
                           )}
                         </div>
 
-                        <div className="text-right shrink-0 mt-[12px] pt-[12px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0">
+                        <div className="text-right shrink-0 mt-[12px] pt-[12px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0 flex flex-col items-end">
                           <div className="text-[13px] font-bold text-primary">{appt.date}</div>
                           <div className="text-[12px] font-bold text-gray-700 mt-[2px]">{appt.time} (IST)</div>
                           <div className="text-[10px] text-gray-400 mt-[4px]">Booked: {new Date(appt.bookedAt).toLocaleDateString()}</div>
+                          <button
+                            onClick={() => appt.id && handleDeleteAppointment(appt.id)}
+                            className="mt-2.5 text-rose-650 hover:text-rose-800 font-bold text-[10px] bg-rose-50/50 hover:bg-rose-100/50 px-2 py-1 rounded-[6px] border border-rose-100/70 transition cursor-pointer flex items-center gap-1 shadow-xs"
+                          >
+                            Delete Call 🗑️
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -4450,6 +4532,72 @@ ${sheetDataXml}
                       </div>
                     </div>
 
+                    {/* Bins: Scheduled Consultations */}
+                    <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
+                      <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
+                        📅 Deleted Scheduled Consultations ({appointmentsTrash.length})
+                      </h4>
+                      <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+                        <table className="w-full text-left text-[11.5px] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-150 text-gray-500 font-bold">
+                              <th className="p-[10px]">Client / Advisor</th>
+                              <th className="p-[10px]">Date & Time</th>
+                              <th className="p-[10px]">Status</th>
+                              <th className="p-[10px]">Deleted At</th>
+                              <th className="p-[10px] text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {appointmentsTrash.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-[24px] text-gray-450 italic">
+                                  No deleted scheduled consultations in Trash.
+                                </td>
+                              </tr>
+                            ) : (
+                              appointmentsTrash.map((appt) => {
+                                const utcStr = appt.deletedAt ? (appt.deletedAt.endsWith("Z") || appt.deletedAt.includes("+") ? appt.deletedAt : `${appt.deletedAt}Z`) : "";
+                                const delDate = utcStr 
+                                  ? new Date(utcStr).toLocaleString("en-IN") 
+                                  : "-";
+                                return (
+                                  <tr key={appt.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                    <td className="p-[10px] font-semibold text-gray-850">
+                                      <span className="block font-bold text-gray-900">{appt.clientName || appt.clientEmail || "Guest Client"}</span>
+                                      <span className="text-[10px] text-gray-400 block">Advisor: {appt.advisorName} ({appt.advisorId})</span>
+                                    </td>
+                                    <td className="p-[10px] text-gray-550">
+                                      <div className="font-semibold text-gray-700">{appt.date}</div>
+                                      <div className="text-[10px] text-gray-450">{appt.time} (IST)</div>
+                                    </td>
+                                    <td className="p-[10px]">
+                                      {appt.cancelled ? (
+                                        <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-[6px] py-[1.5px] rounded-full uppercase">Cancelled</span>
+                                      ) : appt.completed ? (
+                                        <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 px-[6px] py-[1.5px] rounded-full uppercase">Completed</span>
+                                      ) : (
+                                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 px-[6px] py-[1.5px] rounded-full uppercase">Active</span>
+                                      )}
+                                    </td>
+                                    <td className="p-[10px] text-gray-450">{delDate}</td>
+                                    <td className="p-[10px] text-right">
+                                      <button
+                                        onClick={() => appt.id && handleRestoreAppointment(appt.id)}
+                                        className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                                      >
+                                        Restore ↺
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
                     {/* Bins: Educational Content */}
                     <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
                       <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
@@ -4790,11 +4938,7 @@ ${sheetDataXml}
                                         </a>
                                       </div>
                                     )}
-                                    {appt.notes && (
-                                      <div className="text-[11px] text-gray-500 mt-[4px] bg-gray-50 p-[8px] rounded-[8px]">
-                                        📝 <strong>Notes:</strong> {appt.notes}
-                                      </div>
-                                    )}
+                                    {renderApptNotes(appt.notes, appt.agenda)}
                                   </div>
 
                                   <div className="text-right shrink-0 mt-[10px] pt-[10px] border-t border-gray-100 sm:border-t-0 sm:mt-0 sm:pt-0">
@@ -6970,6 +7114,12 @@ ${sheetDataXml}
                 reportId={viewingCibilReportId || undefined}
                 onToggleSidebar={() => {}} 
                 onToggleInsights={() => {}} 
+                onTalkToAdvisor={() => {
+                  setViewingCibilReport(null);
+                  setViewingCibilReportId(null);
+                  setViewingCibilReportUserId(null);
+                  setLocation("/advisor");
+                }}
               />
             </div>
           </div>

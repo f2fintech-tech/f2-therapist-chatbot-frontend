@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment, rescheduleAppointment, fetchAdvisorAppointments, isAdvisorSlotActive } from "@/lib/backendAuth";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -85,6 +86,7 @@ interface Appointment {
   feedback?: string;
   meetUrl?: string; // Pre-setup Google Meet URL
   joined?: boolean; // Unlocks rating once user clicks Join Call
+  agenda?: string[] | null;
 }
 
 interface AdvisorPanelProps {
@@ -268,6 +270,7 @@ export default function AdvisorPanel({
   const [selectedDateStr, setSelectedDateStr] = useState<string>("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
   const [userNotes, setUserNotes] = useState<string>("");
+  const [agendaItems, setAgendaItems] = useState<string[]>([]);
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [confirmedApptDetails, setConfirmedApptDetails] = useState<Appointment | null>(null);
   
@@ -489,6 +492,12 @@ export default function AdvisorPanel({
     try {
       const list = await fetchUserAppointments(userId);
       setAppointments(list);
+      
+      // Save fetched appointments to localStorage so other components stay in sync with the DB
+      const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
+      localStorage.setItem(storageKey, JSON.stringify(list));
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new CustomEvent("finheal:advisors_update"));
     } catch (e) {
       console.error("Failed to load appointments from backend", e);
       const storageKey = `finheal_advisor_appointments:${userId || "anonymous"}`;
@@ -503,9 +512,7 @@ export default function AdvisorPanel({
     }
   };
 
-  useEffect(() => {
-    loadAppointments();
-  }, [userId]);
+  usePolling(loadAppointments, 15000, !!userId);
 
   // Generate the next 7 days for the interactive date picker
   useEffect(() => {
@@ -630,6 +637,19 @@ export default function AdvisorPanel({
     setSelectedAdvisor(advisor);
     setSelectedTimeSlot(""); // Will be auto-set to first future slot by effect
     setUserNotes("");
+    
+    const pendingAgenda = localStorage.getItem("finheal_pending_appointment_agenda");
+    if (pendingAgenda) {
+      try {
+        setAgendaItems(JSON.parse(pendingAgenda));
+        localStorage.removeItem("finheal_pending_appointment_agenda");
+      } catch (e) {
+        setAgendaItems([]);
+      }
+    } else {
+      setAgendaItems([]);
+    }
+    
     setBookingConfirmed(false);
   };
 
@@ -650,13 +670,23 @@ export default function AdvisorPanel({
     if (!selectedAdvisor) return;
 
     const meetUrl = generateMeetUrl();
+    
+    let finalNotes = userNotes.trim();
+    if (agendaItems.length > 0) {
+      finalNotes = "Session Agenda:\n" + agendaItems.map(item => `- ${item}`).join("\n") + 
+                   (userNotes.trim() ? "\n\nAdditional Notes:\n" + userNotes.trim() : "");
+    }
+
+    const agendaPayload = agendaItems.length > 0 ? agendaItems : (userNotes.trim() ? [userNotes.trim()] : []);
+
     const apptPayload = {
       user_id: userId || "anonymous",
       advisor_id: selectedAdvisor.id,
       advisor_name: selectedAdvisor.name,
       date: selectedDateStr,
       time: selectedTimeSlot,
-      notes: userNotes.trim(),
+      notes: finalNotes,
+      agenda: agendaPayload,
       meet_url: meetUrl
     };
 
@@ -670,7 +700,8 @@ export default function AdvisorPanel({
         advisorName: selectedAdvisor.name,
         date: selectedDateStr,
         time: selectedTimeSlot,
-        notes: userNotes.trim(),
+        notes: finalNotes,
+        agenda: agendaPayload,
         bookedAt: new Date().toISOString(),
         meetUrl: meetUrl,
         joined: false
@@ -1884,17 +1915,48 @@ export default function AdvisorPanel({
                   </div>
 
                   {/* Notes / Reason area */}
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
-                      Primary Topic or Notes (Optional)
-                    </label>
-                    <textarea
-                      value={userNotes}
-                      onChange={(e) => setUserNotes(e.target.value)}
-                      placeholder="e.g. Need assistance setting up an automated 80C tax planning protocol and reviews on direct mutual fund schemes."
-                      rows={3}
-                      className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-gray-400"
-                    />
+                  <div className="space-y-4">
+                    {agendaItems.length > 0 && (
+                      <div className="bg-emerald-50/30 border border-emerald-100/50 rounded-[16px] p-4 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[14px]">📝</span>
+                            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-[0.5px]">
+                              Pre-Session Agenda Topics
+                            </span>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => setAgendaItems([])}
+                            className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
+                          >
+                            Clear Topics
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {agendaItems.map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-[11.5px] text-gray-750 font-medium leading-relaxed bg-white border border-emerald-50/50 rounded-[10px] p-2.5 shadow-sm">
+                              <span className="text-emerald-600 font-extrabold select-none">✓</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
+                        {agendaItems.length > 0 ? "Additional Notes (Optional)" : "Primary Topic or Notes (Optional)"}
+                      </label>
+                      <textarea
+                        value={userNotes}
+                        onChange={(e) => setUserNotes(e.target.value)}
+                        placeholder={agendaItems.length > 0 ? "Add any other comments or questions you want to discuss..." : "e.g. Need assistance setting up an automated 80C tax planning protocol and reviews on direct mutual fund schemes."}
+                        rows={3}
+                        className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-gray-400"
+                      />
+                    </div>
                   </div>
                 </div>
 

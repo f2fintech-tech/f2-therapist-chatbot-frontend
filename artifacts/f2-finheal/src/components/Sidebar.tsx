@@ -639,7 +639,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
             <>
               <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px]">Main</div>
 
-              <NavBtn icon="📊" label="My Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
+              <NavBtn icon="📊" label="Dashboard" active={activeNav === "My Dashboard"} onClick={handleOpenDashboard} />
               <button
                 type="button"
                 onClick={handleOpenTalkToFinHeal}
@@ -653,18 +653,18 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               {!isUserAdvisor(userEmail) && (
                 <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
               )}
-              <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} badge="New" badgeType="soft" onClick={handleOpenFinancialHealthTests} />
-              {!isStaff && (
-                <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
-              )}
-
-              <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
-              <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={handleOpenEducation} />
-              <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
-              <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
               {hasPermission("cibil_fetch") && (
                 <NavBtn icon="🛡️" label="Eligibility, CIBIL & BSA" active={activeNav === "Eligibility, CIBIL & BSA"} onClick={handleOpenEligibilityCibil} />
               )}
+              <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
+
+              <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
+              <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} onClick={handleOpenFinancialHealthTests} />
+              {!isStaff && (
+                <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
+              )}
+              <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={handleOpenEducation} />
+              <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
               <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
 
