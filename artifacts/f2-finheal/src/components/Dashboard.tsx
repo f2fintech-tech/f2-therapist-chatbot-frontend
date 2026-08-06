@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -374,17 +375,17 @@ function ChartRangeSelector({
 
 const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
   const hasAgenda = agenda && agenda.length > 0;
-  
+
   if (!hasAgenda) {
     if (!notes) return null;
     return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
   }
-  
+
   // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
   if (agenda.length === 1 && agenda[0] === notes) {
     return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
   }
-  
+
   return (
     <div className="mt-2.5 flex flex-col gap-2 text-left">
       <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[12px] p-3 flex flex-col gap-1.5">
@@ -398,7 +399,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
           ))}
         </div>
       </div>
-      
+
       {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
         <div className="text-[11px] text-gray-500 italic bg-gray-55/60 p-2.5 border border-gray-150/50 rounded-[10px] leading-relaxed whitespace-pre-wrap">
           &quot;{notes}&quot;
@@ -576,7 +577,7 @@ export default function Dashboard({
     const totalMinutes = Math.round(hoursFraction * 60);
     const hrs = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    
+
     if (isShort) {
       if (hrs > 0) {
         return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
@@ -1450,7 +1451,7 @@ export default function Dashboard({
   // Calculate BSA statement distribution
   const bsaOnlyEnquiries = cibilEnquiries.filter(enq => enq.bsa_excel_url);
   const totalBsaFetched = bsaOnlyEnquiries.length;
-  
+
   const bsaDistributionData = (() => {
     if (totalBsaFetched === 0) {
       // Mock data when no statement exists yet
@@ -1461,13 +1462,13 @@ export default function Dashboard({
         { name: "State Bank of India", value: 1, color: "#a855f7", percent: 20 },
       ];
     }
-    
+
     const counts: Record<string, number> = {};
     bsaOnlyEnquiries.forEach(enq => {
       const bankName = enq.bsa_json_data?.bank_name || "Unknown Bank";
       counts[bankName] = (counts[bankName] || 0) + 1;
     });
-    
+
     const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
     return Object.entries(counts).map(([name, val], idx) => ({
       name,
@@ -1511,7 +1512,7 @@ export default function Dashboard({
       if (fb && (fb === empId || fb === empF2Id)) {
         return true;
       }
-      
+
       // 2. Format: "Name (ID)"
       if (fb && fb.includes("(") && fb.includes(")")) {
         const idPart = fb.split("(")[1].split(")")[0].trim();
@@ -1520,7 +1521,7 @@ export default function Dashboard({
           return true;
         }
       }
-      
+
       // 3. Fallback: email matching
       if (!fb || fb === (enq.user_id || "").toLowerCase() || fb === 'client' || fb === 'user lead') {
         const cleanEmail = (enq.email || "").toLowerCase().trim();
@@ -1531,7 +1532,7 @@ export default function Dashboard({
 
       // 4. Name matching fallback (if fetched_by is just the exact name)
       if (fb && fb === empName) {
-          return true;
+        return true;
       }
 
       return false;
@@ -2900,15 +2901,17 @@ ${sheetDataXml}
                           </button>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <BarChart data={[...filteredTestScores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                            <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                            <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
-                            <Bar dataKey="score" fill={BRAND} radius={[4, 4, 0, 0]} barSize={32} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <ErrorBoundary moduleName="Test Scores Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <BarChart data={[...filteredTestScores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                              <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                              <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
+                              <Bar dataKey="score" fill={BRAND} radius={[4, 4, 0, 0]} barSize={32} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
@@ -3018,33 +3021,35 @@ ${sheetDataXml}
                           </button>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <LineChart data={filteredStressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#f43f5e" />
-                                <stop offset="100%" stopColor="#6366f1" />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                            <Tooltip content={({ active, payload, label }: any) => {
-                              if (!active || !payload?.length) return null;
-                              return (
-                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                  <div className="font-semibold text-gray-700 mb-1">{label}</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
-                                    <span className="text-gray-500">Stress:</span>
-                                    <span className="font-semibold text-gray-800">{payload[0].value}%</span>
+                        <ErrorBoundary moduleName="Mood Trend Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <LineChart data={filteredStressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#f43f5e" />
+                                  <stop offset="100%" stopColor="#6366f1" />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                              <Tooltip content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                    <div className="font-semibold text-gray-750 mb-1">{label}</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                                      <span className="text-gray-500">Stress:</span>
+                                      <span className="font-semibold text-gray-800">{payload[0].value}%</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            }} />
-                            <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
+                                );
+                              }} />
+                              <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
@@ -3120,34 +3125,35 @@ ${sheetDataXml}
                           <p className="text-[11px] text-gray-400 max-w-[280px] mt-1">Spend time using our calculators, chat, and test features to track your engagement.</p>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <AreaChart data={filteredUsageData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
-                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
-                            <Tooltip content={({ active, payload, label }: any) => {
-                              if (!active || !payload?.length) return null;
-                              return (
-                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                  <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
-                                    <span className="text-gray-500">Usage:</span>
-                                    <span className="font-bold text-gray-900">{formatActiveDuration(payload[0].value)}</span>
+                        <ErrorBoundary moduleName="Active Hours Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <AreaChart data={filteredUsageData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
+                                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
+                              <Tooltip content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                    <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
+                                      <span className="text-gray-500">Usage:</span>
+                                      <span className="font-bold text-gray-900">{formatActiveDuration(payload[0].value)}</span>
+                                    </div>
                                   </div>
-                                  <div className="text-[9.5px] text-gray-400 mt-0.5">({payload[0].payload.minutes} active minutes)</div>
-                                </div>
-                              );
-                            }} />
-                            <Area type="monotone" dataKey="hours" name="Active Time" stroke="#ec4899" strokeWidth={2.5} fill="url(#usageGrad)" dot={{ fill: "#ec4899", r: 3 }} />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                                );
+                              }} />
+                              <Area type="monotone" dataKey="hours" name="Active Time" stroke="#ec4899" strokeWidth={2.5} fill="url(#usageGrad)" dot={{ fill: "#ec4899", r: 3 }} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
