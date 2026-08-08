@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import Sidebar from "@/components/Sidebar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import ChatArea from "@/components/ChatArea";
 import {
   DropdownMenu,
@@ -1009,13 +1010,18 @@ export default function FinHealChat() {
           onOpenReminders={openReminders}
         />
         <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-          <Suspense fallback={
-            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/50 h-full w-full">
-              <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-              <p className="mt-4 text-[13px] text-gray-500 font-medium animate-pulse">Loading view...</p>
-            </div>
-          }>
-            {mainView === "chat" || mainView === "goals" ? (
+          <ErrorBoundary
+            moduleName={`${mainView.charAt(0).toUpperCase() + mainView.slice(1)} Page`}
+            resetKeys={[mainView, userId, chat.conversationId]}
+          >
+            <Suspense fallback={
+              <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/50 h-full w-full">
+                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                <p className="mt-4 text-[13px] text-gray-500 font-medium animate-pulse">Loading view...</p>
+              </div>
+            }>
+              <div key={mainView} className="contents">
+                {mainView === "chat" || mainView === "goals" ? (
               <ChatArea
                 conversationId={chat.conversationId}
                 conversationCount={chat.conversationCount}
@@ -1217,7 +1223,9 @@ export default function FinHealChat() {
                 onOpenFinancialWellnessAssistant={openChatView}
               />
             )}
-          </Suspense>
+          </div>
+        </Suspense>
+      </ErrorBoundary>
 
           {/* Global Pinned Profile Dropdown */}
           {userProfile && (
