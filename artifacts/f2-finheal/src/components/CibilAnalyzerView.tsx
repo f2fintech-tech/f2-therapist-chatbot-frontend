@@ -32,8 +32,6 @@ import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOrig
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import html2canvas from "html2canvas-pro";
-import { jsPDF } from "jspdf";
 
  
 interface CibilAnalyzerViewProps {
@@ -516,6 +514,8 @@ export default function CibilAnalyzerView({
     
     let clone: HTMLElement | null = null;
     try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const { jsPDF } = await import("jspdf");
       await inlineCrossOriginStylesheets();
       const element = analyzerRef.current;
       if (!element) {

@@ -664,7 +664,6 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
                 <NavBtn icon="🎯" label="Financial Goals" active={activeNav === "Financial Goals"} badge={goals.length.toString()} badgeType="hard" onClick={() => setActiveNav("Financial Goals")} />
               )}
               <NavBtn icon="📚" label="Financial Education" active={activeNav === "Financial Education"} onClick={handleOpenEducation} />
-              <NavBtn icon="💡" label="Tips & Insights" active={activeNav === "Tips & Insights"} onClick={() => setActiveNav("Tips & Insights")} />
               <NavBtn icon="🔔" label="Reminders" active={activeNav === "Reminders"} onClick={handleOpenReminders} />
 
 
