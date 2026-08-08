@@ -32,6 +32,7 @@ import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOrig
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface CibilAnalyzerViewProps {
   userId: string;
