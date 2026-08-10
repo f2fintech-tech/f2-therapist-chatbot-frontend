@@ -350,6 +350,8 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Next Slot state for specific Advisor Workspace
   const [expertNextSlot, setExpertNextSlot] = useState("");
   const [slotDate, setSlotDate] = useState("");
+  const [slotStartDate, setSlotStartDate] = useState("");
+  const [slotEndDate, setSlotEndDate] = useState("");
   const [slotFromTime, setSlotFromTime] = useState("");
   const [slotToTime, setSlotToTime] = useState("");
   const [addedSlots, setAddedSlots] = useState<string[]>([]);
@@ -383,15 +385,28 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     "09:00 PM"
   ];
 
-  const formatSlotValue = (dateStr: string, timeStr: string): string => {
+  const formatSlotValue = (dateStr: string, timeStr: string, endDateStr?: string): string => {
     if (!dateStr || !timeStr) return "";
-    const dateObj = new Date(dateStr);
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = months[dateObj.getMonth()];
-    const day = dateObj.getDate();
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const dayName = days[dateObj.getDay()];
-    return `${month} ${day} (${dayName}), ${timeStr}`;
+
+    const startDateObj = new Date(dateStr);
+    const startMonth = months[startDateObj.getMonth()];
+    const startDay = startDateObj.getDate();
+    const startDayName = days[startDateObj.getDay()];
+
+    if (!endDateStr || endDateStr === dateStr) {
+      return `${startMonth} ${startDay} (${startDayName}), ${timeStr}`;
+    }
+
+    const endDateObj = new Date(endDateStr);
+    const endMonth = months[endDateObj.getMonth()];
+    const endDay = endDateObj.getDate();
+
+    if (startMonth === endMonth) {
+      return `${startMonth} ${startDay} - ${endDay}, ${timeStr}`;
+    }
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${timeStr}`;
   };
 
   // Self profile state for specific Advisor Workspace
@@ -468,6 +483,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     } catch (e) {}
     return null;
   })() : null);
+
+  useEffect(() => {
+    if (activeExpert?.nextSlot && activeExpert.nextSlot !== "Not available" && activeExpert.nextSlot !== "Tomorrow, 10:00 AM") {
+      const chips = activeExpert.nextSlot.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
+      if (chips.length > 0) {
+        setAddedSlots(chips);
+      }
+    }
+  }, [activeExpert?.f2FintechId, activeExpert?.nextSlot]);
 
   const [showLimitWarning, setShowLimitWarning] = useState(false);
   const [limitFetchCount, setLimitFetchCount] = useState(0);
@@ -1800,12 +1824,19 @@ ${sheetDataXml}
   const handleOpenEditExpert = (adv: Advisor) => {
     setEditingExpert(adv);
     const isCustomCategory = !["wealth", "tax", "debt", "property", "insurance"].includes(adv.category);
+    const rawAvail = (adv.availability || "").toLowerCase().trim();
+    const normAvail = rawAvail.includes("meeting")
+      ? "in meeting"
+      : (rawAvail.includes("available") && !rawAvail.includes("not available") && !rawAvail.includes("unavailable"))
+      ? "available"
+      : "unavailable";
+
     setExpertForm({
       f2FintechId: adv.f2FintechId || adv.id,
       name: adv.name,
       designation: adv.designation,
       avatarUrl: adv.avatarUrl,
-      availability: adv.availability,
+      availability: normAvail,
       expertise: adv.expertise ? (Array.isArray(adv.expertise) ? adv.expertise.join(", ") : adv.expertise) : "",
       strength: adv.strength || "",
       bio: adv.bio || "",
@@ -1883,6 +1914,7 @@ ${sheetDataXml}
       await saveAdvisor(item);
       await loadAdvisors();
       await loadEmployees();
+      dispatchUpdateEvent("finheal:advisors_update");
       setExpertModalOpen(false);
     } catch (err) {
       console.error("Error saving advisor to backend:", err);
@@ -2257,9 +2289,10 @@ ${sheetDataXml}
 
   // ==================== Expert Workspace Actions ====================
   const handleSetExpertAvailability = async (nextAvail: string) => {
-    if (!currentExpertId) return;
+    const targetId = currentExpertId || activeExpert?.f2FintechId || activeExpert?.id;
+    if (!targetId) return;
     try {
-      await updateAdvisorAvailability(currentExpertId, nextAvail);
+      await updateAdvisorAvailability(targetId, nextAvail);
       await loadAdvisors();
       dispatchUpdateEvent("finheal:advisors_update");
     } catch (err) {
@@ -2268,16 +2301,23 @@ ${sheetDataXml}
   };
 
   const handleAddTimeRange = () => {
+    const startDate = slotStartDate || slotDate;
+    const endDate = slotEndDate || startDate;
+    if (!startDate) {
+      alert("Please select a From Date first.");
+      return;
+    }
     if (!slotFromTime || !slotToTime) {
       alert("Please select both From and To times.");
       return;
     }
     const range = `${slotFromTime} - ${slotToTime}`;
-    if (addedSlots.includes(range)) {
-      alert("This time range has already been added.");
+    const formattedDateSlot = formatSlotValue(startDate, range, endDate);
+    if (addedSlots.includes(formattedDateSlot)) {
+      alert("This date & time slot has already been added.");
       return;
     }
-    setAddedSlots(prev => [...prev, range]);
+    setAddedSlots(prev => [...prev, formattedDateSlot]);
   };
 
   const handleRemoveTimeRange = (index: number) => {
@@ -2285,32 +2325,33 @@ ${sheetDataXml}
   };
 
   const handleUpdateExpertNextSlot = async () => {
-    if (!currentExpertId || !slotDate) {
-      alert("Please select a date.");
+    const targetId = currentExpertId || activeExpert?.f2FintechId || activeExpert?.id;
+    if (!targetId) {
+      alert("No active advisor session found.");
       return;
     }
 
     let slotsToSave = [...addedSlots];
     if (slotsToSave.length === 0) {
-      if (slotFromTime && slotToTime) {
-        slotsToSave.push(`${slotFromTime} - ${slotToTime}`);
+      const startDate = slotStartDate || slotDate;
+      const endDate = slotEndDate || startDate;
+      if (startDate && slotFromTime && slotToTime) {
+        slotsToSave.push(formatSlotValue(startDate, `${slotFromTime} - ${slotToTime}`, endDate));
       } else {
-        alert("Please add at least one time range.");
+        alert("Please add at least one date & time slot.");
         return;
       }
     }
 
-    const combinedTime = slotsToSave.join(" & ");
-    const formattedSlot = formatSlotValue(slotDate, combinedTime);
+    const combinedSlot = slotsToSave.join(" | ");
     try {
-      await updateAdvisorNextSlot(currentExpertId, formattedSlot);
-      await updateAdvisorAvailability(currentExpertId, slotsToSave[0]);
+      await updateAdvisorNextSlot(targetId, combinedSlot);
       await loadAdvisors();
       dispatchUpdateEvent("finheal:advisors_update");
-      alert("Next slot has been updated successfully!");
+      alert("Available slots updated successfully!");
     } catch (err) {
       console.error("Error updating next slot:", err);
-      alert("Failed to update next slot.");
+      alert("Failed to update slots.");
     }
   };
 
@@ -2970,15 +3011,61 @@ ${sheetDataXml}
                           <CardDescription className="text-[11px] text-gray-400">Set the next available booking slot users will see on your card.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-[16px] space-y-[12px]">
-                          <div className="space-y-[10px]">
+                          {/* Current Configured Availability Status Box */}
+                          <div className="bg-gradient-to-br from-[#f6f8ff] to-[#eff2fe] border border-[#d4d8fa] rounded-[12px] p-[10px] space-y-[6px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.5px]">Your Live Status</span>
+                              {(() => {
+                                const norm = (activeExpert.availability || "").toLowerCase().trim();
+                                const isAvail = norm.includes("available") && !norm.includes("not available") && !norm.includes("unavailable");
+                                const isInMeeting = norm.includes("meeting");
+                                return isAvail ? (
+                                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-[7px] py-[2px] rounded-full border border-emerald-200">🟢 Available</span>
+                                ) : isInMeeting ? (
+                                  <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-[7px] py-[2px] rounded-full border border-indigo-200">🟣 In Meeting</span>
+                                ) : (
+                                  <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-[7px] py-[2px] rounded-full border border-rose-200">🔴 Not Available</span>
+                                );
+                              })()}
+                            </div>
                             <div>
-                              <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">Select Date</label>
-                              <input
-                                type="date"
-                                value={slotDate}
-                                onChange={(e) => setSlotDate(e.target.value)}
-                                className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
-                              />
+                              <span className="text-[9.5px] font-bold text-gray-400 uppercase block mb-[1px]">Configured Slot Ranges</span>
+                              <p className="text-[11.5px] font-bold text-gray-900 break-words">
+                                {activeExpert.nextSlot && activeExpert.nextSlot !== "Not available" ? (
+                                  <span className="text-primary font-bold">📅 {activeExpert.nextSlot}</span>
+                                ) : (
+                                  <span className="text-gray-400 font-normal italic">No slot range configured</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-[10px]">
+                            <div className="grid grid-cols-2 gap-[10px]">
+                              <div>
+                                <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">From Date</label>
+                                <input
+                                  type="date"
+                                  value={slotStartDate}
+                                  onChange={(e) => {
+                                    setSlotStartDate(e.target.value);
+                                    if (!slotEndDate || slotEndDate < e.target.value) {
+                                      setSlotEndDate(e.target.value);
+                                    }
+                                  }}
+                                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10.5px] font-bold text-gray-400 uppercase block mb-[2px]">To Date</label>
+                                <input
+                                  type="date"
+                                  value={slotEndDate}
+                                  min={slotStartDate}
+                                  onChange={(e) => setSlotEndDate(e.target.value)}
+                                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium bg-white"
+                                />
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-[10px]">
                               <div>
@@ -4070,7 +4157,7 @@ ${sheetDataXml}
                     <option value="debt">Debt & Credit</option>
                     <option value="property">Real Estate</option>
                     <option value="insurance">Insurance</option>
-                    <option value="manual">Manual Type (Write own category)</option>
+                    <option value="manual">Manual Type</option>
                   </select>
                 </div>
                 <div>
@@ -4101,59 +4188,20 @@ ${sheetDataXml}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-[10px]">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
-                  <input
-                    type="number"
-                    value={expertForm.fee}
-                    onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
-                    placeholder="e.g. 899"
-                    min={0}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Next Slot</label>
-                  <input
-                    type="text"
-                    value={expertForm.nextSlot}
-                    onChange={(e) => setExpertForm({ ...expertForm, nextSlot: e.target.value })}
-                    placeholder="e.g. Tomorrow, 10:00 AM"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-[10px]">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Rating (0.0 to 5.0)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="5"
-                    value={expertForm.rating}
-                    onChange={(e) => setExpertForm({ ...expertForm, rating: Number(e.target.value) })}
-                    placeholder="e.g. 4.8"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Reviews Count</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={expertForm.reviewsCount}
-                    onChange={(e) => setExpertForm({ ...expertForm, reviewsCount: Number(e.target.value) })}
-                    placeholder="e.g. 15"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
+                <input
+                  type="number"
+                  value={expertForm.fee}
+                  onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
+                  placeholder="e.g. 899"
+                  min={0}
+                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags (Comma-separated)</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags</label>
                 <input
                   type="text"
                   value={expertForm.expertise}

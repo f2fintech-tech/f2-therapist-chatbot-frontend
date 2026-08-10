@@ -89,10 +89,12 @@ export default function ExpertsTab({
                 <td className="p-[12px] font-bold text-gray-950">₹{adv.fee || 899}</td>
                 <td className="p-[12px]">
                   {(() => {
-                    const effectiveAvail = adv.availability;
-                    return effectiveAvail === "available" ? (
+                    const norm = (adv.availability || "").toLowerCase().trim();
+                    const isAvail = norm.includes("available") && !norm.includes("not available") && !norm.includes("unavailable");
+                    const isInMeeting = norm.includes("meeting");
+                    return isAvail ? (
                       <span className="bg-emerald-50 text-emerald-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-emerald-100">Available</span>
-                    ) : effectiveAvail === "in meeting" ? (
+                    ) : isInMeeting ? (
                       <span className="bg-indigo-50 text-indigo-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-indigo-100">In Meeting</span>
                     ) : (
                       <span className="bg-rose-50 text-rose-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-rose-100">Not Available</span>

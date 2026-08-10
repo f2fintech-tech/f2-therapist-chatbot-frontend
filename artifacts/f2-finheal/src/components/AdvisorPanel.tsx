@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchAdvisors, bookAppointment, fetchUserAppointments, updateAppointmentStatus, joinAppointment, rescheduleAppointment, fetchAdvisorAppointments, isAdvisorSlotActive } from "@/lib/backendAuth";
-import { getEffectiveAvailability } from "@/utils/availability";
+import { getEffectiveAvailability, getSlotDates } from "@/utils/availability";
 
 export interface Advisor {
   id: string;
@@ -226,10 +226,7 @@ export default function AdvisorPanel({
     const intervalId = setInterval(loadAdvisors, 8000);
 
     const handleUpdate = () => {
-      const nextStored = localStorage.getItem("finheal_advisors_list");
-      if (nextStored) {
-        try { setAdvisors(JSON.parse(nextStored)); } catch {}
-      }
+      loadAdvisors();
     };
     window.addEventListener("storage", handleUpdate);
     window.addEventListener("finheal:advisors_update", handleUpdate);
@@ -565,28 +562,24 @@ export default function AdvisorPanel({
   const getFilteredTimeSlots = () => {
     let slots = timeSlots;
 
-    // Filter by selected advisor's nextSlot if the date matches
-    if (selectedAdvisor && selectedAdvisor.nextSlot) {
-      const parts = selectedAdvisor.nextSlot.split(",");
-      if (parts.length >= 2) {
-        const advDateStr = parts[0].trim(); // e.g. "Jun 20 (Sat)"
-        const advTimeStr = parts[1].trim(); // e.g. "09:00 AM - 12:00 PM & 02:00 PM - 04:00 PM"
-        
-        if (selectedDateStr.toLowerCase().includes(advDateStr.toLowerCase())) {
-          const ranges = advTimeStr.split(/\s*&\s*/);
+    if (selectedAdvisor && selectedAdvisor.nextSlot && selectedAdvisor.nextSlot !== "Not available") {
+      const ranges = getSlotDates(selectedAdvisor.nextSlot);
+      if (ranges && ranges.length > 0) {
+        const selectedDtObj = dateList.find(d => d.fullStr === selectedDateStr);
+        const targetDayNum = selectedDtObj ? selectedDtObj.dayNum : new Date().getDate();
+
+        const matchingRanges = ranges.filter(r => r.startDate.getDate() === targetDayNum);
+
+        if (matchingRanges.length > 0) {
           slots = slots.filter((slot) => {
             const slotMin = parseTimeToMinutes(slot);
-            return ranges.some(range => {
-              const [startStr, endStr] = range.split(/\s*-\s*/);
-              if (!startStr || !endStr) return false;
-              const startMin = parseTimeToMinutes(startStr);
-              const endMin = parseTimeToMinutes(endStr);
+            return matchingRanges.some(r => {
+              const startMin = r.startDate.getHours() * 60 + r.startDate.getMinutes();
+              const endMin = r.endDate.getHours() * 60 + r.endDate.getMinutes();
               return slotMin >= startMin && slotMin <= endMin;
             });
           });
         } else {
-          // If the selected date does not match the advisor's set slot date,
-          // they have no slots available
           return [];
         }
       }
@@ -601,7 +594,6 @@ export default function AdvisorPanel({
     const currentMinute = now.getMinutes();
 
     return slots.filter((slot) => {
-      // Parse "HH:MM AM/PM"
       const [timePart, meridiem] = slot.split(" ");
       let [hoursStr, minutesStr] = timePart.split(":");
       let hours = parseInt(hoursStr, 10);
@@ -1882,9 +1874,7 @@ export default function AdvisorPanel({
                       {activeTimeSlots.length === 0 ? (
                         <div className="col-span-3 text-center py-[16px] bg-amber-50/70 border border-amber-100/60 rounded-[14px]">
                           <span className="text-[12px] font-bold text-amber-700">
-                            {selectedAdvisor && selectedAdvisor.nextSlot && !selectedDateStr.toLowerCase().includes(selectedAdvisor.nextSlot.split(",")[0].trim().toLowerCase())
-                              ? `⚠️ Advisor is not available on this date. Please select ${selectedAdvisor.nextSlot.split(",")[0].trim()}.`
-                              : "⚠️ No slots remaining today. Please select a future date."}
+                            ⚠️ Advisor is not available on this date. Please select another date.
                           </span>
                         </div>
                       ) : (
