@@ -3982,7 +3982,7 @@ ${sheetDataXml}
                     <option value="Founder's Office">Founder's Office</option>
                     <option value="Product">Product</option>
                     <option value="Credit & Operations">Credit & Operations</option>
-                    <option value="Marketing & Sales">Marketing & Sales</option>
+                    <option value="Sales">Sales</option>
                     <option value="Human Resource">Human Resource</option>
                   </select>
                 </div>

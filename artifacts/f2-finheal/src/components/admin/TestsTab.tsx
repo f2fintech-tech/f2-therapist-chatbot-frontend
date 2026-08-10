@@ -13,8 +13,8 @@ const TEST_NAMES: Record<string, string> = {
 
 interface TestsTabProps {
   // Sub-tab state
-  testSubTab: string;
-  setTestSubTab: (val: string) => void;
+  testSubTab: "templates" | "logs";
+  setTestSubTab: (val: "templates" | "logs") => void;
 
   // Templates sub-tab
   filteredTests: TestCard[];
