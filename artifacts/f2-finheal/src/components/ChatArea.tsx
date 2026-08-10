@@ -102,26 +102,22 @@ export default function ChatArea({
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      // Use setTimeout to ensure DOM has updated before scrolling
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const el = scrollRef.current;
+      const doScroll = () => {
+        if (el) {
+          el.scrollTop = el.scrollHeight;
         }
-      }, 0);
+      };
+      doScroll();
+      // Ensure bottom scroll is maintained after DOM paints avatars and markdown
+      setTimeout(doScroll, 40);
+      setTimeout(doScroll, 150);
     }
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading, isSendingMessage]);
-
-  // Alternative: scroll last message into view as fallback
-  useEffect(() => {
-    const lastMessage = document.querySelector('[data-message-id]:last-of-type');
-    if (lastMessage) {
-      lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, [messages.length]);
+  }, [messages, conversationId, isLoading, isSendingMessage]);
 
   // Memoize aggregated mood to prevent recreating it on every render.
   // This memo only recomputes when messages actually change.

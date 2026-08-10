@@ -1267,15 +1267,9 @@ export default function Dashboard({
     };
   }, [userId]);
 
-  const loans = [
-    { icon: "🏠", name: "Home Loan", emi: 24500, remaining: 3200000, total: 5000000, rate: 8.5, months: 156, color: BRAND },
-    { icon: "🚗", name: "Car Loan", emi: 8200, remaining: 240000, total: 600000, rate: 9.2, months: 29, color: "#8b5cf6" },
-    { icon: "💳", name: "Personal Loan", emi: 5800, remaining: 120000, total: 300000, rate: 13.5, months: 21, color: "#10b981" },
-  ];
-
   const incomeVal = parseMonthlyIncome(monthlyIncome);
   const activeAccounts = cibilReport?.accounts?.filter(a => a.is_active) || [];
-  const dynamicLoans = cibilReport ? mapCibilAccountsToLoans(activeAccounts, BRAND) : loans;
+  const dynamicLoans = cibilReport ? mapCibilAccountsToLoans(activeAccounts, BRAND) : [];
 
   const totalDebtVal = dynamicLoans.reduce((sum, l) => sum + l.remaining, 0);
   const totalEmiVal = dynamicLoans.reduce((sum, l) => sum + l.emi, 0);
@@ -1285,7 +1279,7 @@ export default function Dashboard({
   const netWorth = useCountUp(Math.max(100000, incomeVal * 5.7), 1600);
   const totalDebt = useCountUp(totalDebtVal, 1400);
 
-  const activeLoansCount = cibilReport ? activeAccounts.length : 3;
+  const activeLoansCount = cibilReport ? activeAccounts.length : 0;
 
   const stressNudgeText = activeLoansCount > 0
     ? "Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety."
@@ -3321,18 +3315,39 @@ ${sheetDataXml}
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard icon="💰" label="Total Outstanding" value={`₹${totalDebtVal.toLocaleString("en-IN")}`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
-              <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub="Sync'd from credit report" color="#f59e0b" delay={80} />
+              <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub={cibilReport ? "Sync'd from credit report" : "No credit report linked"} color="#f59e0b" delay={80} />
             </div>
 
             {/* Loan cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {dynamicLoans.length === 0 ? (
-                <div className="col-span-full text-center py-10 bg-gray-50 rounded-[12px] border border-dashed border-gray-200">
-                  <p className="text-[20px] mb-1">🎉</p>
-                  <p className="text-[12px] font-semibold text-gray-750">No Active Loans</p>
-                  <p className="text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto">
-                    Your synced credit profile shows no outstanding loan accounts. Great job!
-                  </p>
+                <div className="col-span-full text-center py-10 px-4 bg-gray-50 dark:bg-slate-800/40 rounded-[12px] border border-dashed border-gray-200 dark:border-slate-700">
+                  {cibilReport ? (
+                    <>
+                      <p className="text-[20px] mb-1">🎉</p>
+                      <p className="text-[12px] font-semibold text-gray-750 dark:text-slate-200">No Active Loans</p>
+                      <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 max-w-[280px] mx-auto">
+                        Your synced credit profile shows no outstanding loan accounts. Great job!
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[20px] mb-1">🔍</p>
+                      <p className="text-[12px] font-semibold text-gray-750 dark:text-slate-200">No Credit Score / Report Linked</p>
+                      <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 max-w-[340px] mx-auto">
+                        Check or link your CIBIL / credit score to automatically sync and display your active loan accounts and total debt.
+                      </p>
+                      {onNavigate && (
+                        <button
+                          onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
+                          className="mt-3 px-4 py-2 bg-[#3244e6] hover:bg-[#2836b8] text-white text-[11px] font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <span>Check Credit Score Now</span>
+                          <span>→</span>
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               ) : (
                 dynamicLoans.map((l, i) => <LoanCard key={`${l.name}-${i}`} {...l} delay={i * 100} />)

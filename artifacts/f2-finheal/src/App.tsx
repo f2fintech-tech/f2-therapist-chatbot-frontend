@@ -1,10 +1,12 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import FinHealChat from "@/pages/FinHealChat";
-import NotFound from "@/pages/not-found";
+
+const FinHealChat = lazy(() => import("@/pages/FinHealChat"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 function resolveCodespacesBackendFromCurrentHost(): string | null {
   if (typeof window === "undefined") {
@@ -97,7 +99,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+              <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }>
+            <Router />
+          </Suspense>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
