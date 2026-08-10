@@ -144,13 +144,21 @@ function readStorage(userId: string): AssessmentStorage {
       };
     }
 
-    const normalizedAttempt = normalizeAttempt(parsed.currentAttempt ?? null);
+    const history = Array.isArray(parsed.history) ? parsed.history : [];
+    let normalizedAttempt = normalizeAttempt(parsed.currentAttempt ?? null);
+
+    if (!normalizedAttempt || normalizedAttempt.stage !== "results") {
+      const finishedInHistory = history.find((a) => a.stage === "results");
+      if (finishedInHistory) {
+        normalizedAttempt = finishedInHistory;
+      }
+    }
 
     return {
       version: financialLiteracyStorageVersion,
-      selectedLevel: parsed.selectedLevel ?? 1,
+      selectedLevel: normalizedAttempt?.levelId ?? parsed.selectedLevel ?? 1,
       currentAttempt: normalizedAttempt,
-      history: Array.isArray(parsed.history) ? parsed.history : [],
+      history,
     };
   } catch {
     return {
@@ -319,6 +327,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
   const [submittedAttemptIds, setSubmittedAttemptIds] = useState<Record<string, boolean>>({});
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<"all" | "correct" | "incorrect">("all");
 
   useEffect(() => {
     const stored = readStorage(userId);
@@ -329,23 +338,35 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
     writeStorage(userId, storageState);
   }, [storageState, userId]);
 
-  const currentAttempt = storageState.currentAttempt;
+  const activeAttempt = useMemo(() => {
+    if (storageState.currentAttempt && storageState.currentAttempt.stage === "results") {
+      return storageState.currentAttempt;
+    }
+    if (storageState.history && storageState.history.length > 0) {
+      const finishedInHistory = storageState.history.find((a) => a.stage === "results");
+      if (finishedInHistory) return finishedInHistory;
+      return storageState.history[0];
+    }
+    return storageState.currentAttempt;
+  }, [storageState.currentAttempt, storageState.history]);
+
+  const currentAttempt = storageState.currentAttempt ?? activeAttempt;
   const selectedLevel = storageState.selectedLevel;
-  const currentLevel = currentAttempt?.levelId ?? selectedLevel;
+  const currentLevel = activeAttempt?.levelId ?? selectedLevel;
   const currentLevelMeta = getLevelMeta(currentLevel);
 
   const orderedQuestions = useMemo(() => {
-    if (!currentAttempt) {
+    if (!activeAttempt) {
       return financialLiteracyQuestionsByLevel[selectedLevel];
     }
 
-    return currentAttempt.questionIds
-      .map((questionId) => findQuestion(currentAttempt.levelId, questionId))
+    return activeAttempt.questionIds
+      .map((questionId) => findQuestion(activeAttempt.levelId, questionId))
       .filter(Boolean);
-  }, [currentAttempt, selectedLevel]);
+  }, [activeAttempt, selectedLevel]);
 
-  const stage: AssessmentStage = currentAttempt?.stage ?? "selection";
-  const startedAt = currentAttempt?.startedAt ?? null;
+  const stage: AssessmentStage = activeAttempt?.stage ?? "selection";
+  const startedAt = activeAttempt?.startedAt ?? null;
   const elapsedSeconds = useMemo(() => {
     if (!startedAt) {
       return 0;
@@ -355,10 +376,10 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
   }, [nowTs, startedAt]);
   const totalTimeSeconds = financialLiteracyLevelDurationMinutes * 60;
   const remainingSeconds = Math.max(0, totalTimeSeconds - elapsedSeconds);
-  const isTimeExpired = Boolean(currentAttempt && currentAttempt.stage !== "results" && remainingSeconds <= 0);
+  const isTimeExpired = Boolean(activeAttempt && activeAttempt.stage !== "results" && remainingSeconds <= 0);
 
   useEffect(() => {
-    if (!currentAttempt || currentAttempt.stage === "results") {
+    if (!activeAttempt || activeAttempt.stage === "results") {
       return;
     }
 
@@ -367,15 +388,15 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [currentAttempt]);
+  }, [activeAttempt]);
 
   const currentResult = useMemo(() => {
-    if (!currentAttempt) {
+    if (!activeAttempt) {
       return null;
     }
 
-    return calculateFinancialLiteracyResult(currentAttempt, storageState.history);
-  }, [currentAttempt, storageState.history]);
+    return calculateFinancialLiteracyResult(activeAttempt, storageState.history);
+  }, [activeAttempt, storageState.history]);
 
   useEffect(() => {
     if (!isTimeExpired || !currentAttempt) {
@@ -907,6 +928,172 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
               </CardContent>
             </Card>
           </section>
+
+          {/* Detailed Question-by-Question Review Section */}
+          {activeAttempt && orderedQuestions.length > 0 && (
+            <section className="mt-[18px]">
+              <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-950">
+                <CardHeader className="space-y-3 px-[16px] pt-[16px] sm:px-[18px]">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="text-[18px] font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                        <span>📝</span> Detailed Question Review
+                      </CardTitle>
+                      <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400 mt-1">
+                        Review all questions in this test attempt to see what you got right or wrong and check the correct answers.
+                      </CardDescription>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-slate-900 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter("all")}
+                        className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition cursor-pointer ${
+                          reviewFilter === "all"
+                            ? "bg-white text-gray-900 shadow-sm dark:bg-slate-800 dark:text-slate-100"
+                            : "text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        All ({orderedQuestions.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter("correct")}
+                        className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition cursor-pointer ${
+                          reviewFilter === "correct"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-emerald-700 hover:text-emerald-900 dark:text-emerald-400"
+                        }`}
+                      >
+                        Correct ({orderedQuestions.filter(q => activeAttempt.answers[q.id] === q.correctAnswer).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter("incorrect")}
+                        className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition cursor-pointer ${
+                          reviewFilter === "incorrect"
+                            ? "bg-rose-600 text-white shadow-sm"
+                            : "text-rose-700 hover:text-rose-900 dark:text-rose-400"
+                        }`}
+                      >
+                        Incorrect ({orderedQuestions.filter(q => activeAttempt.answers[q.id] !== q.correctAnswer).length})
+                      </button>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4 px-[16px] pb-[18px] pt-[14px] sm:px-[18px]">
+                  {orderedQuestions
+                    .map((q, idx) => ({ q, idx }))
+                    .filter(({ q }) => {
+                      const selectedLetter = activeAttempt.answers[q.id];
+                      const isCorrect = selectedLetter === q.correctAnswer;
+                      if (reviewFilter === "correct") return isCorrect;
+                      if (reviewFilter === "incorrect") return !isCorrect;
+                      return true;
+                    })
+                    .map(({ q, idx }) => {
+                      const selectedLetter = activeAttempt.answers[q.id];
+                      const isCorrect = selectedLetter === q.correctAnswer;
+
+                      return (
+                        <div
+                          key={q.id}
+                          className={`rounded-[16px] border p-4 transition-all ${
+                            isCorrect
+                              ? "border-emerald-200 bg-emerald-50/30 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                              : "border-rose-200 bg-rose-50/30 dark:border-rose-900/50 dark:bg-rose-950/20"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-gray-200/70 px-2.5 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                                Q{idx + 1}
+                              </span>
+                              <span className="rounded-full bg-[#eef0fd] px-2.5 py-0.5 text-[11px] font-semibold text-primary capitalize dark:bg-primary/20 dark:text-primary-foreground">
+                                {q.category}
+                              </span>
+                            </div>
+
+                            {isCorrect ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                <span>✅</span> Correct
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                <span>❌</span> Incorrect
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-[14px] font-semibold leading-relaxed text-gray-900 dark:text-slate-100 mb-3">
+                            {q.prompt}
+                          </div>
+
+                          <div className="grid gap-2">
+                            {q.options.map((optText, optIdx) => {
+                              const letter = String.fromCharCode(65 + optIdx) as AnswerLetter;
+                              const isUserChoice = selectedLetter === letter;
+                              const isAnswerCorrect = q.correctAnswer === letter;
+
+                              let optionClass = "border-gray-200 bg-white text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300";
+                              if (isUserChoice && isAnswerCorrect) {
+                                optionClass = "border-emerald-400 bg-emerald-100/70 text-emerald-900 font-semibold dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200";
+                              } else if (isUserChoice && !isAnswerCorrect) {
+                                optionClass = "border-rose-400 bg-rose-100/70 text-rose-900 font-medium dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200";
+                              } else if (isAnswerCorrect) {
+                                optionClass = "border-emerald-300 bg-emerald-50 text-emerald-900 font-medium dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
+                              }
+
+                              return (
+                                <div
+                                  key={letter}
+                                  className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-[13px] leading-snug ${optionClass}`}
+                                >
+                                  <div className="flex items-center gap-2.5 pr-2">
+                                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                                      isUserChoice && isAnswerCorrect
+                                        ? "bg-emerald-600 text-white"
+                                        : isUserChoice && !isAnswerCorrect
+                                          ? "bg-rose-600 text-white"
+                                          : isAnswerCorrect
+                                            ? "bg-emerald-600 text-white"
+                                            : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400"
+                                    }`}>
+                                      {letter}
+                                    </span>
+                                    <span>{optText}</span>
+                                  </div>
+
+                                  <div className="shrink-0 flex items-center gap-1.5">
+                                    {isUserChoice && isAnswerCorrect && (
+                                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                                        Your Answer ✓
+                                      </span>
+                                    )}
+                                    {isUserChoice && !isAnswerCorrect && (
+                                      <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                                        Your Answer ✕
+                                      </span>
+                                    )}
+                                    {!isUserChoice && isAnswerCorrect && (
+                                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                                        Correct Answer ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </CardContent>
+              </Card>
+            </section>
+          )}
 
           <section className="mt-[18px] grid gap-[12px] lg:grid-cols-3">
             {currentResult.levelPerformance.map((item) => (

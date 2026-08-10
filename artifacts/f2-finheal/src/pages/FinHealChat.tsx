@@ -1063,6 +1063,7 @@ export default function FinHealChat() {
                 onOpenLoanFitTest={openLoanFitTest}
                 onOpenDebtBalanceReview={openDebtBalanceReview}
                 onOpenCreditReadiness={openCreditReadiness}
+                onViewPastResult={viewPastResultInCurrentTab}
               />
             ) : mainView === "emergency-fund" ? (
               <EmergencyFundCheckView

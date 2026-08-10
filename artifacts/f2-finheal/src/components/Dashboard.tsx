@@ -1925,9 +1925,11 @@ ${sheetDataXml}
 
             {/* Name + meta */}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <h1 className="font-serif text-xl sm:text-2xl text-white font-bold italic truncate">{userProfile.displayName}</h1>
-                <span className="text-[9px] sm:text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full tracking-wider uppercase">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 py-1 overflow-visible">
+                <h1 className="font-serif text-xl sm:text-2xl text-white font-bold italic pt-1.5 pb-1 leading-snug truncate max-w-full sm:max-w-md lg:max-w-xl inline-block">
+                  {userProfile.displayName}
+                </h1>
+                <span className="text-[9px] sm:text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full tracking-wider uppercase shrink-0">
                   {userProfile.userTier || "Standard"}
                 </span>
               </div>

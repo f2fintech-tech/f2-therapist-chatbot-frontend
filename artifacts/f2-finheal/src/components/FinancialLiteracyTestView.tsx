@@ -132,10 +132,19 @@ function readStorage(userId: string): LiteracyTestStorage {
       return { version: 1, currentAttempt: null, history: [] };
     }
 
+    const history = Array.isArray(parsed.history) ? parsed.history : [];
+    let currentAttempt = parsed.currentAttempt ?? null;
+    if (!currentAttempt || !currentAttempt.isFinished) {
+      const finishedInHistory = history.find((a) => a.isFinished);
+      if (finishedInHistory) {
+        currentAttempt = finishedInHistory;
+      }
+    }
+
     return {
       version: 1,
-      currentAttempt: parsed.currentAttempt ?? null,
-      history: Array.isArray(parsed.history) ? parsed.history : [],
+      currentAttempt,
+      history,
       selectedLevel: typeof parsed.selectedLevel === "number" ? parsed.selectedLevel : 1,
     };
   } catch {
@@ -511,6 +520,16 @@ export default function FinancialLiteracyTestView({ userId, isGuest, onLoginRequ
       setStorageState(stored);
       return;
     }
+    const finishedInHistory = stored.history.find((a) => a.isFinished);
+    if (finishedInHistory) {
+      setStorageState({
+        version: 1,
+        currentAttempt: finishedInHistory,
+        history: stored.history,
+        selectedLevel: finishedInHistory.level ?? 1,
+      });
+      return;
+    }
     const level = stored.selectedLevel ?? 1;
     const currentAttempt = createNewAttempt(level);
     const nextState: LiteracyTestStorage = {
@@ -527,7 +546,7 @@ export default function FinancialLiteracyTestView({ userId, isGuest, onLoginRequ
     writeStorage(userId, storageState);
   }, [storageState, userId]);
 
-  const currentAttempt = storageState.currentAttempt ?? createNewAttempt(storageState.selectedLevel ?? 1);
+  const currentAttempt = storageState.currentAttempt ?? storageState.history.find((a) => a.isFinished) ?? createNewAttempt(storageState.selectedLevel ?? 1);
   const isTestStarted = Boolean(currentAttempt.startedAt);
   const elapsedSeconds = useMemo(() => {
     if (!currentAttempt.startedAt) {
