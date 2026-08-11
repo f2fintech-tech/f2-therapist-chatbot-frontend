@@ -1486,12 +1486,22 @@ export default function Dashboard({
 
   // Unique departments calculation for CIBIL summary filtering
   const uniqueDepartments = Array.from(
-    new Set(employees.map(e => e.department).filter(Boolean))
+    new Set(
+      employees
+        .map(e => {
+          let dept = (e.department || "").trim();
+          if (dept === "Marketing & Sales") dept = "Sales";
+          return dept;
+        })
+        .filter(Boolean)
+    )
   ).sort() as string[];
 
   const filteredEmployeesSummary = employees.filter(e => {
     if (summaryDeptFilter === "all") return true;
-    return e.department === summaryDeptFilter;
+    let dept = (e.department || "").trim();
+    if (dept === "Marketing & Sales") dept = "Sales";
+    return dept === summaryDeptFilter;
   });
 
   const getEmployeeReportCount = (emp: any) => {
