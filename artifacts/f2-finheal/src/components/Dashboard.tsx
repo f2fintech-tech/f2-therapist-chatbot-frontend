@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useGetWellnessScore } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -374,17 +375,17 @@ function ChartRangeSelector({
 
 const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
   const hasAgenda = agenda && agenda.length > 0;
-  
+
   if (!hasAgenda) {
     if (!notes) return null;
     return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
   }
-  
+
   // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
   if (agenda.length === 1 && agenda[0] === notes) {
     return <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed whitespace-pre-wrap">&quot;{notes}&quot;</p>;
   }
-  
+
   return (
     <div className="mt-2.5 flex flex-col gap-2 text-left">
       <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[12px] p-3 flex flex-col gap-1.5">
@@ -398,7 +399,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
           ))}
         </div>
       </div>
-      
+
       {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
         <div className="text-[11px] text-gray-500 italic bg-gray-55/60 p-2.5 border border-gray-150/50 rounded-[10px] leading-relaxed whitespace-pre-wrap">
           &quot;{notes}&quot;
@@ -576,7 +577,7 @@ export default function Dashboard({
     const totalMinutes = Math.round(hoursFraction * 60);
     const hrs = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    
+
     if (isShort) {
       if (hrs > 0) {
         return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
@@ -1266,15 +1267,9 @@ export default function Dashboard({
     };
   }, [userId]);
 
-  const loans = [
-    { icon: "🏠", name: "Home Loan", emi: 24500, remaining: 3200000, total: 5000000, rate: 8.5, months: 156, color: BRAND },
-    { icon: "🚗", name: "Car Loan", emi: 8200, remaining: 240000, total: 600000, rate: 9.2, months: 29, color: "#8b5cf6" },
-    { icon: "💳", name: "Personal Loan", emi: 5800, remaining: 120000, total: 300000, rate: 13.5, months: 21, color: "#10b981" },
-  ];
-
   const incomeVal = parseMonthlyIncome(monthlyIncome);
   const activeAccounts = cibilReport?.accounts?.filter(a => a.is_active) || [];
-  const dynamicLoans = cibilReport ? mapCibilAccountsToLoans(activeAccounts, BRAND) : loans;
+  const dynamicLoans = cibilReport ? mapCibilAccountsToLoans(activeAccounts, BRAND) : [];
 
   const totalDebtVal = dynamicLoans.reduce((sum, l) => sum + l.remaining, 0);
   const totalEmiVal = dynamicLoans.reduce((sum, l) => sum + l.emi, 0);
@@ -1284,7 +1279,7 @@ export default function Dashboard({
   const netWorth = useCountUp(Math.max(100000, incomeVal * 5.7), 1600);
   const totalDebt = useCountUp(totalDebtVal, 1400);
 
-  const activeLoansCount = cibilReport ? activeAccounts.length : 3;
+  const activeLoansCount = cibilReport ? activeAccounts.length : 0;
 
   const stressNudgeText = activeLoansCount > 0
     ? "Your stress peaked on Wednesday due to loan payment reminders. Try setting up auto-pay to reduce recurring mid-week anxiety."
@@ -1450,7 +1445,7 @@ export default function Dashboard({
   // Calculate BSA statement distribution
   const bsaOnlyEnquiries = cibilEnquiries.filter(enq => enq.bsa_excel_url);
   const totalBsaFetched = bsaOnlyEnquiries.length;
-  
+
   const bsaDistributionData = (() => {
     if (totalBsaFetched === 0) {
       // Mock data when no statement exists yet
@@ -1461,13 +1456,13 @@ export default function Dashboard({
         { name: "State Bank of India", value: 1, color: "#a855f7", percent: 20 },
       ];
     }
-    
+
     const counts: Record<string, number> = {};
     bsaOnlyEnquiries.forEach(enq => {
       const bankName = enq.bsa_json_data?.bank_name || "Unknown Bank";
       counts[bankName] = (counts[bankName] || 0) + 1;
     });
-    
+
     const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
     return Object.entries(counts).map(([name, val], idx) => ({
       name,
@@ -1491,12 +1486,22 @@ export default function Dashboard({
 
   // Unique departments calculation for CIBIL summary filtering
   const uniqueDepartments = Array.from(
-    new Set(employees.map(e => e.department).filter(Boolean))
+    new Set(
+      employees
+        .map(e => {
+          let dept = (e.department || "").trim();
+          if (dept === "Marketing & Sales") dept = "Sales";
+          return dept;
+        })
+        .filter(Boolean)
+    )
   ).sort() as string[];
 
   const filteredEmployeesSummary = employees.filter(e => {
     if (summaryDeptFilter === "all") return true;
-    return e.department === summaryDeptFilter;
+    let dept = (e.department || "").trim();
+    if (dept === "Marketing & Sales") dept = "Sales";
+    return dept === summaryDeptFilter;
   });
 
   const getEmployeeReportCount = (emp: any) => {
@@ -1511,7 +1516,7 @@ export default function Dashboard({
       if (fb && (fb === empId || fb === empF2Id)) {
         return true;
       }
-      
+
       // 2. Format: "Name (ID)"
       if (fb && fb.includes("(") && fb.includes(")")) {
         const idPart = fb.split("(")[1].split(")")[0].trim();
@@ -1520,7 +1525,7 @@ export default function Dashboard({
           return true;
         }
       }
-      
+
       // 3. Fallback: email matching
       if (!fb || fb === (enq.user_id || "").toLowerCase() || fb === 'client' || fb === 'user lead') {
         const cleanEmail = (enq.email || "").toLowerCase().trim();
@@ -1531,7 +1536,7 @@ export default function Dashboard({
 
       // 4. Name matching fallback (if fetched_by is just the exact name)
       if (fb && fb === empName) {
-          return true;
+        return true;
       }
 
       return false;
@@ -1930,9 +1935,11 @@ ${sheetDataXml}
 
             {/* Name + meta */}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <h1 className="font-serif text-xl sm:text-2xl text-white font-bold italic truncate">{userProfile.displayName}</h1>
-                <span className="text-[9px] sm:text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full tracking-wider uppercase">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 py-1 overflow-visible">
+                <h1 className="font-serif text-xl sm:text-2xl text-white font-bold italic pt-1.5 pb-1 leading-snug truncate max-w-full sm:max-w-md lg:max-w-xl inline-block">
+                  {userProfile.displayName}
+                </h1>
+                <span className="text-[9px] sm:text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full tracking-wider uppercase shrink-0">
                   {userProfile.userTier || "Standard"}
                 </span>
               </div>
@@ -2900,15 +2907,17 @@ ${sheetDataXml}
                           </button>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <BarChart data={[...filteredTestScores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                            <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                            <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
-                            <Bar dataKey="score" fill={BRAND} radius={[4, 4, 0, 0]} barSize={32} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <ErrorBoundary moduleName="Test Scores Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <BarChart data={[...filteredTestScores].reverse()} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                              <XAxis dataKey="title" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                              <Tooltip formatter={(v: any) => [`${v}%`, "Score"]} />
+                              <Bar dataKey="score" fill={BRAND} radius={[4, 4, 0, 0]} barSize={32} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
@@ -3018,33 +3027,35 @@ ${sheetDataXml}
                           </button>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <LineChart data={filteredStressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#f43f5e" />
-                                <stop offset="100%" stopColor="#6366f1" />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                            <Tooltip content={({ active, payload, label }: any) => {
-                              if (!active || !payload?.length) return null;
-                              return (
-                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                  <div className="font-semibold text-gray-700 mb-1">{label}</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
-                                    <span className="text-gray-500">Stress:</span>
-                                    <span className="font-semibold text-gray-800">{payload[0].value}%</span>
+                        <ErrorBoundary moduleName="Mood Trend Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <LineChart data={filteredStressData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="stressGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#f43f5e" />
+                                  <stop offset="100%" stopColor="#6366f1" />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="displayDate" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                              <Tooltip content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                    <div className="font-semibold text-gray-750 mb-1">{label}</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                                      <span className="text-gray-500">Stress:</span>
+                                      <span className="font-semibold text-gray-800">{payload[0].value}%</span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            }} />
-                            <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
+                                );
+                              }} />
+                              <Line type="monotone" dataKey="stress" name="Stress Index" stroke="url(#stressGrad)" strokeWidth={3} dot={{ fill: "#f43f5e", r: 4, strokeWidth: 1 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
@@ -3120,34 +3131,35 @@ ${sheetDataXml}
                           <p className="text-[11px] text-gray-400 max-w-[280px] mt-1">Spend time using our calculators, chat, and test features to track your engagement.</p>
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height={180}>
-                          <AreaChart data={filteredUsageData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
-                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
-                            <Tooltip content={({ active, payload, label }: any) => {
-                              if (!active || !payload?.length) return null;
-                              return (
-                                <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
-                                  <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
-                                    <span className="text-gray-500">Usage:</span>
-                                    <span className="font-bold text-gray-900">{formatActiveDuration(payload[0].value)}</span>
+                        <ErrorBoundary moduleName="Active Hours Chart">
+                          <ResponsiveContainer width="100%" height={180}>
+                            <AreaChart data={filteredUsageData} margin={{ top: 10, right: 10, left: -24, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="usageGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
+                                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey={usageRange === "weekly" ? "day" : "displayDate"} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}h`} />
+                              <Tooltip content={({ active, payload, label }: any) => {
+                                if (!active || !payload?.length) return null;
+                                return (
+                                  <div className="bg-white border border-gray-100 rounded-[10px] p-2.5 shadow-lg text-[11px]">
+                                    <div className="font-semibold text-gray-750 mb-1">{payload[0].payload.displayDate} ({label})</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" />
+                                      <span className="text-gray-500">Usage:</span>
+                                      <span className="font-bold text-gray-900">{formatActiveDuration(payload[0].value)}</span>
+                                    </div>
                                   </div>
-                                  <div className="text-[9.5px] text-gray-400 mt-0.5">({payload[0].payload.minutes} active minutes)</div>
-                                </div>
-                              );
-                            }} />
-                            <Area type="monotone" dataKey="hours" name="Active Time" stroke="#ec4899" strokeWidth={2.5} fill="url(#usageGrad)" dot={{ fill: "#ec4899", r: 3 }} />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                                );
+                              }} />
+                              <Area type="monotone" dataKey="hours" name="Active Time" stroke="#ec4899" strokeWidth={2.5} fill="url(#usageGrad)" dot={{ fill: "#ec4899", r: 3 }} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </ErrorBoundary>
                       )}
                     </div>
 
@@ -3315,18 +3327,39 @@ ${sheetDataXml}
             {/* Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard icon="💰" label="Total Outstanding" value={`₹${totalDebtVal.toLocaleString("en-IN")}`} sub={`Across ${activeLoansCount} loan${activeLoansCount === 1 ? "" : "s"}`} color="#ef4444" delay={0} />
-              <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub="Sync'd from credit report" color="#f59e0b" delay={80} />
+              <StatCard icon="📁" label="Active Loans" value={`${activeLoansCount} Account${activeLoansCount === 1 ? "" : "s"}`} sub={cibilReport ? "Sync'd from credit report" : "No credit report linked"} color="#f59e0b" delay={80} />
             </div>
 
             {/* Loan cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {dynamicLoans.length === 0 ? (
-                <div className="col-span-full text-center py-10 bg-gray-50 rounded-[12px] border border-dashed border-gray-200">
-                  <p className="text-[20px] mb-1">🎉</p>
-                  <p className="text-[12px] font-semibold text-gray-750">No Active Loans</p>
-                  <p className="text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto">
-                    Your synced credit profile shows no outstanding loan accounts. Great job!
-                  </p>
+                <div className="col-span-full text-center py-10 px-4 bg-gray-50 dark:bg-slate-800/40 rounded-[12px] border border-dashed border-gray-200 dark:border-slate-700">
+                  {cibilReport ? (
+                    <>
+                      <p className="text-[20px] mb-1">🎉</p>
+                      <p className="text-[12px] font-semibold text-gray-750 dark:text-slate-200">No Active Loans</p>
+                      <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 max-w-[280px] mx-auto">
+                        Your synced credit profile shows no outstanding loan accounts. Great job!
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[20px] mb-1">🔍</p>
+                      <p className="text-[12px] font-semibold text-gray-750 dark:text-slate-200">No Credit Score / Report Linked</p>
+                      <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 max-w-[340px] mx-auto">
+                        Check or link your CIBIL / credit score to automatically sync and display your active loan accounts and total debt.
+                      </p>
+                      {onNavigate && (
+                        <button
+                          onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
+                          className="mt-3 px-4 py-2 bg-[#3244e6] hover:bg-[#2836b8] text-white text-[11px] font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <span>Check Credit Score Now</span>
+                          <span>→</span>
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
               ) : (
                 dynamicLoans.map((l, i) => <LoanCard key={`${l.name}-${i}`} {...l} delay={i * 100} />)

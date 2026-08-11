@@ -32,10 +32,8 @@ import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOrig
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import html2canvas from "html2canvas-pro";
-import { jsPDF } from "jspdf";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
- 
 interface CibilAnalyzerViewProps {
   userId: string;
   userEmail?: string;
@@ -112,10 +110,10 @@ export default function CibilAnalyzerView({
     if (!report) return [];
 
     const recs: { title: string; desc: string; rule: string; type: "alert" | "warning" | "info" }[] = [];
-    
+
     // 1. Check for Late Payments / Bounces in specific accounts
-    const lateAccounts = openAccounts.filter(a => 
-      a.payment_status && 
+    const lateAccounts = openAccounts.filter(a =>
+      a.payment_status &&
       (a.payment_status.includes("Past Due") || a.payment_status.match(/\d+\s*Days/i))
     );
     if (lateAccounts.length > 0) {
@@ -141,9 +139,9 @@ export default function CibilAnalyzerView({
     }
 
     // 3. Check for multiple small ticket loans (unnecessary CD/PL loans)
-    const smallLoans = openAccounts.filter(a => 
-      a.type.toLowerCase().includes("consumer") || 
-      a.type.toLowerCase().includes("durable") || 
+    const smallLoans = openAccounts.filter(a =>
+      a.type.toLowerCase().includes("consumer") ||
+      a.type.toLowerCase().includes("durable") ||
       (a.type.toLowerCase().includes("personal") && a.sanctioned_amount <= 50000)
     );
     if (smallLoans.length >= 2) {
@@ -186,10 +184,10 @@ export default function CibilAnalyzerView({
 
   const handleTalkToAdvisorClick = () => {
     const realRecs = dynamicRecommendations.filter(r => r.title !== "Excellent Credit Profile");
-    const agendaArray = realRecs.length > 0 
+    const agendaArray = realRecs.length > 0
       ? realRecs.map(r => `${r.title}: ${r.desc}`)
       : ["Review my overall credit profile and healthy credit habits."];
-    
+
     setCompiledAgenda(agendaArray);
     setIsAgendaModalOpen(true);
   };
@@ -331,8 +329,8 @@ export default function CibilAnalyzerView({
         setStoredReport(overrideReport);
         setReport(overrideReport);
         setIsLoading(false);
-        
-        
+
+
         try {
           const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
           const res = await fetch(`${apiBase}/lenders`);
@@ -363,7 +361,7 @@ export default function CibilAnalyzerView({
       } finally {
         setIsLoading(false);
       }
- 
+
       try {
         const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
         const res = await fetch(`${apiBase}/lenders`);
@@ -418,7 +416,7 @@ export default function CibilAnalyzerView({
   // Handle Form Submit
   const handleFetchReport = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validations
     if (!formName.trim()) {
       toast({ title: "Name Required", description: "Please enter your full name.", variant: "destructive" });
@@ -439,8 +437,8 @@ export default function CibilAnalyzerView({
       const result = await fetchCibilReport(userId, formName, formPhone, formPan.toUpperCase());
       setReport(result);
       setStoredReport(result);
-      toast({ 
-        title: "Report Retrieved!", 
+      toast({
+        title: "Report Retrieved!",
         description: `Successfully fetched credit report. CIBIL Score: ${result.score}`,
         variant: "default"
       });
@@ -449,10 +447,10 @@ export default function CibilAnalyzerView({
       window.dispatchEvent(event);
       window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
-      toast({ 
-        title: "Fetch Failed", 
-        description: err.message || "Something went wrong fetching your credit profile.", 
-        variant: "destructive" 
+      toast({
+        title: "Fetch Failed",
+        description: err.message || "Something went wrong fetching your credit profile.",
+        variant: "destructive"
       });
     } finally {
       setIsFetching(false);
@@ -470,9 +468,9 @@ export default function CibilAnalyzerView({
         headers["Authorization"] = `Bearer ${configuredApiKey}`;
         headers["X-API-Key"] = configuredApiKey;
       }
-      
+
       const activeReportId = (report && report.id) ? report.id : reportId;
-      const requestUrl = activeReportId 
+      const requestUrl = activeReportId
         ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${activeReportId}`
         : `${apiBase}/cibil/cam/generate/${userId}`;
 
@@ -481,7 +479,7 @@ export default function CibilAnalyzerView({
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.detail || "Failed to generate CAM Excel report.");
       }
-      
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -492,7 +490,7 @@ export default function CibilAnalyzerView({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: "CAM Generated!",
         description: "Your Credit Appraisal Memorandum report has been downloaded successfully.",
@@ -513,19 +511,21 @@ export default function CibilAnalyzerView({
   const handleDownloadPDF = async () => {
     if (!report) return;
     setIsGeneratingPDF(true);
-    
+
     let clone: HTMLElement | null = null;
     try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const { jsPDF } = await import("jspdf");
       await inlineCrossOriginStylesheets();
       const element = analyzerRef.current;
       if (!element) {
         throw new Error("Report element not found in DOM");
       }
-      
+
       // Create an offscreen clone of the report element to capture the full expanded height
       clone = element.cloneNode(true) as HTMLElement;
       clone.classList.add("cibil-pdf-downloading");
-      
+
       // Style the clone to render offscreen and expand to its natural height
       clone.style.setProperty("position", "absolute", "important");
       clone.style.setProperty("top", "0", "important");
@@ -535,7 +535,7 @@ export default function CibilAnalyzerView({
       clone.style.setProperty("max-height", "none", "important");
       clone.style.setProperty("overflow", "visible", "important");
       clone.style.setProperty("display", "block", "important");
-      
+
       // Expand all scrollable containers inside the clone
       const scrollableElements = Array.from(clone.querySelectorAll(".cibil-print-scrollable")) as HTMLElement[];
       scrollableElements.forEach(el => {
@@ -545,7 +545,7 @@ export default function CibilAnalyzerView({
         el.style.setProperty("overflow", "visible", "important");
         el.style.setProperty("display", "block", "important");
       });
-      
+
       // Hide all elements with print-hide class inside the clone
       const hideElements = Array.from(clone.querySelectorAll(".cibil-print-hide")) as HTMLElement[];
       hideElements.forEach(el => {
@@ -554,14 +554,14 @@ export default function CibilAnalyzerView({
       });
 
       document.body.appendChild(clone);
-      
+
       // Wait for layout reflow
       await new Promise(resolve => setTimeout(resolve, 350));
-      
+
       // Adjust positions of elements in the clone to avoid breaking them across A4 page splits
       const cloneWidth = clone.clientWidth || 1024;
       const pageHeightPx = Math.floor(cloneWidth * 1.45789); // A4 printable area ratio (277 / 190) -> ~1493px
-      
+
       const breakables = Array.from(clone.querySelectorAll([
         ".divide-y > div",
         ".divide-y > a",
@@ -576,25 +576,25 @@ export default function CibilAnalyzerView({
         const top = elRect.top - cloneRect.top;
         const height = elRect.height;
         const bottom = top + height;
-        
+
         const pageNumStart = Math.floor(top / pageHeightPx);
         const pageNumEnd = Math.floor(bottom / pageHeightPx);
-        
+
         if (pageNumStart !== pageNumEnd && height < pageHeightPx) {
           const topOnPage = top % pageHeightPx;
           const remainingPageSpace = pageHeightPx - topOnPage;
-          
+
           const spacer = document.createElement("div");
           spacer.style.height = `${remainingPageSpace}px`;
           spacer.style.width = "100%";
           spacer.style.clear = "both";
-          
+
           if (el.parentNode) {
             el.parentNode.insertBefore(spacer, el);
           }
         }
       });
-      
+
       // Generate canvas from the adjusted offscreen clone
       const canvas = await html2canvas(clone, {
         scale: 2,
@@ -605,37 +605,37 @@ export default function CibilAnalyzerView({
         scrollY: 0,
         windowWidth: 1024
       });
-      
+
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      
+
       // A4 dimensions: 210mm x 297mm
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
+
       const margin = 10;
       const contentWidth = pdfWidth - (margin * 2); // 190mm
       const contentHeight = 277; // Exactly 277mm printable area (10mm to 287mm)
-      
+
       // Calculate how the canvas height maps to PDF height
       const imgWidth = contentWidth;
       const imgHeight = (canvas.height * contentWidth) / canvas.width;
-      
+
       let heightLeft = imgHeight;
       let position = margin;
-      
+
       // Mask function to cover top/bottom margins with solid white rectangles
       const drawMarginMasks = (pdfDoc: typeof pdf) => {
         pdfDoc.setFillColor(255, 255, 255);
         pdfDoc.rect(0, 0, pdfWidth, margin, "F"); // Top margin mask
         pdfDoc.rect(0, pdfHeight - margin, pdfWidth, margin, "F"); // Bottom margin mask
       };
-      
+
       // Page 1
       pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
       drawMarginMasks(pdf);
       heightLeft -= contentHeight;
-      
+
       // Additional pages
       while (heightLeft > 0) {
         position = (heightLeft - imgHeight) + margin;
@@ -644,34 +644,34 @@ export default function CibilAnalyzerView({
         drawMarginMasks(pdf);
         heightLeft -= contentHeight;
       }
-      
+
       // Post-process to draw elegant divider lines, header & footer labels, and page numbers
       const totalPages = (pdf.internal as any).getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
-        
+
         // Draw thin horizontal separator lines
         pdf.setDrawColor(229, 231, 235); // gray-200
         pdf.setLineWidth(0.2);
         pdf.line(margin, margin, pdfWidth - margin, margin); // Top line
         pdf.line(margin, pdfHeight - margin, pdfWidth - margin, pdfHeight - margin); // Bottom line
-        
+
         // Draw Header text
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(7.5);
         pdf.setTextColor(156, 163, 175); // gray-400
         pdf.text(`CREDIT REPORT ANALYZER • ${(report.bureau || "CIBIL").toUpperCase()}`, margin, margin - 3.5);
-        
+
         pdf.setFont("helvetica", "normal");
         pdf.text(`CLIENT: ${report.name.toUpperCase()}`, pdfWidth - margin, margin - 3.5, { align: "right" });
-        
+
         // Draw Footer text
         pdf.text("F2 FINTECH • CREDIT REPORT ANALYSER", margin, pdfHeight - margin + 5.5);
         pdf.text(`Page ${i} of ${totalPages}`, pdfWidth - margin, pdfHeight - margin + 5.5, { align: "right" });
       }
-      
+
       pdf.save(`Credit_Analysis_${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}.pdf`);
-      
+
       toast({
         title: "PDF Saved!",
         description: "Your platform credit analysis report has been saved successfully.",
@@ -720,7 +720,7 @@ export default function CibilAnalyzerView({
   }, [report]);
 
   // --- Calculations Logic ---
-  
+
   // 1. EMI Calculations
   const emiOutput = useMemo(() => {
     const amt = Number(emiAmount) || 0;
@@ -795,9 +795,9 @@ export default function CibilAnalyzerView({
       } else if (maxAffordableEmi > 0) {
         calculatedLimit = maxAffordableEmi * totalMonths;
       }
-      
+
       const maxLimit = Math.min(calculatedLimit, l.maxAmount);
-      
+
       if (maxLimit < l.minAmount) {
         eligible = false;
         reasons.push(`Max eligible amount is below lender minimum loan size of ${l.minAmount.toLocaleString("en-IN")}`);
@@ -936,7 +936,7 @@ export default function CibilAnalyzerView({
 
   return (
     <div ref={analyzerRef} className="cibil-view flex h-full w-full flex-col overflow-hidden bg-gray-50 lg:rounded-[20px] lg:border lg:border-gray-200 cibil-print-section">
-      
+
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-100 bg-white px-[20px] py-[16px] shrink-0">
         <div className="flex items-center gap-[10px]">
@@ -958,11 +958,10 @@ export default function CibilAnalyzerView({
                   <span className="text-[11px] bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-full inline-block cibil-pdf-only-name">
                     {report.name}
                   </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block uppercase border shadow-xs ${
-                    (report.bureau || "").toLowerCase() === "experian"
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block uppercase border shadow-xs ${(report.bureau || "").toLowerCase() === "experian"
                       ? "bg-purple-50 text-purple-700 border-purple-200"
                       : "bg-blue-50 text-blue-700 border-blue-200"
-                  }`}>
+                    }`}>
                     {report.bureau || "CIBIL"}
                   </span>
                 </>
@@ -971,7 +970,7 @@ export default function CibilAnalyzerView({
             <p className="text-[11px] font-medium text-gray-400 uppercase tracking-[0.5px]">Official Credit Diagnostic Toolkit</p>
           </div>
         </div>
-        
+
         {/* Download Analysis Button */}
         {report && (
           <div className="shrink-0 cibil-print-hide">
@@ -989,75 +988,102 @@ export default function CibilAnalyzerView({
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar p-[20px] min-h-0 cibil-print-scrollable">        {!report ? (
-          // State A: Form to retrieve CIBIL Report
-          <div className="mx-auto max-w-[520px] my-[24px]">
-            <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">
-              {/* Premium top gradient line */}
-              <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-primary via-[#4a5cf0] to-[#6366f1]" />
-              
-              {storedReport && isReportFresh(storedReport.fetched_at) && !isExemptRole(userEmail, storedReport.name) ? (
-                <div className="text-center py-4">
-                  <div className="mx-auto w-[44px] h-[44px] rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+        // State A: Form to retrieve CIBIL Report
+        <div className="mx-auto max-w-[520px] my-[24px]">
+          <div className="rounded-[20px] border border-gray-200 bg-white p-[28px] shadow-lg relative overflow-hidden">
+            {/* Premium top gradient line */}
+            <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-primary via-[#4a5cf0] to-[#6366f1]" />
+
+            {storedReport && isReportFresh(storedReport.fetched_at) && !isExemptRole(userEmail, storedReport.name) ? (
+              <div className="text-center py-4">
+                <div className="mx-auto w-[44px] h-[44px] rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+                  <Lock className="w-[20px] h-[20px]" />
+                </div>
+                <h2 className="text-[18px] font-bold text-gray-800">Credit Report Fetch Locked</h2>
+                <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-220 text-amber-900 text-left">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[12.5px] leading-normal text-amber-700 font-semibold">
+                        You have fetched your credit report recently (on {new Date(storedReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
+                        To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
+                        You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedReport.fetched_at)}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReport(storedReport)}
+                  className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
+                >
+                  View Stored Report
+                </button>
+              </div>
+            ) : (
+              <>
+
+                <div className="text-center mb-[24px]">
+                  <div className="mx-auto w-[44px] h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary mb-[10px]">
                     <Lock className="w-[20px] h-[20px]" />
                   </div>
-                  <h2 className="text-[18px] font-bold text-gray-800">Credit Report Fetch Locked</h2>
-                  <div className="my-4 p-4 rounded-[14px] bg-amber-50 border border-amber-220 text-amber-900 text-left">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-[12.5px] leading-normal text-amber-700 font-semibold">
-                          You have fetched your credit report recently (on {new Date(storedReport.fetched_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}).
-                          To manage bureau API limits and cost, you can only fetch a fresh report once every 30 days.
-                          You will be able to retrieve a fresh refresh on <strong>{getNextAvailableFetchDate(storedReport.fetched_at)}</strong>.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setReport(storedReport)}
-                    className="w-full bg-primary text-white font-bold py-2.5 rounded-[10px] hover:opacity-95 transition-all cursor-pointer shadow-md shadow-primary/10"
-                  >
-                    View Stored Report
-                  </button>
+                  <h2 className="text-[18px] font-bold text-gray-800">Check Your Official CIBIL Score</h2>
+                  <p className="text-[13px] text-gray-500 mt-[4px]">Retrieve your actual credit report securely from the bureau.</p>
                 </div>
-              ) : (
-                <>
 
-                  <div className="text-center mb-[24px]">
-                    <div className="mx-auto w-[44px] h-[44px] rounded-full bg-primary/10 flex items-center justify-center text-primary mb-[10px]">
-                      <Lock className="w-[20px] h-[20px]" />
+                {isFetching ? (
+                  <div className="flex flex-col items-center justify-center py-[48px] gap-[16px]">
+                    <div className="relative flex items-center justify-center">
+                      <div className="h-[72px] w-[72px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <CreditCard className="w-[24px] h-[24px] text-primary absolute animate-bounce" />
                     </div>
-                    <h2 className="text-[18px] font-bold text-gray-800">Check Your Official CIBIL Score</h2>
-                    <p className="text-[13px] text-gray-500 mt-[4px]">Retrieve your actual credit report securely from the bureau.</p>
+                    <div className="text-center">
+                      <p className="text-[14px] font-bold text-gray-700">Verifying Identity & PAN...</p>
+                      <p className="text-[12px] text-gray-400 mt-[2px] animate-pulse">Retrieving encrypted credit data from CIBIL bureau</p>
+                    </div>
                   </div>
+                ) : (
+                  <TooltipProvider delayDuration={0}>
+                    <form onSubmit={handleFetchReport} className="space-y-[18px]">
+                      <div>
+                        <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
+                        <div className="relative">
+                          <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <input
+                                type="text"
+                                required
+                                value={formName}
+                                onChange={(e) => setFormName(e.target.value)}
+                                placeholder="e.g. Rahul Sharma"
+                                className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              sideOffset={10}
+                              className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                            >
+                              Please fill out this field
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
 
-                  {isFetching ? (
-                    <div className="flex flex-col items-center justify-center py-[48px] gap-[16px]">
-                      <div className="relative flex items-center justify-center">
-                        <div className="h-[72px] w-[72px] animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                        <CreditCard className="w-[24px] h-[24px] text-primary absolute animate-bounce" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[14px] font-bold text-gray-700">Verifying Identity & PAN...</p>
-                        <p className="text-[12px] text-gray-400 mt-[2px] animate-pulse">Retrieving encrypted credit data from CIBIL bureau</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <TooltipProvider delayDuration={0}>
-                      <form onSubmit={handleFetchReport} className="space-y-[18px]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
                         <div>
-                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Full Name (as on PAN Card)</label>
+                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
                           <div className="relative">
-                            <User className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                            <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <input
-                                  type="text"
+                                  type="tel"
                                   required
-                                  value={formName}
-                                  onChange={(e) => setFormName(e.target.value)}
-                                  placeholder="e.g. Rahul Sharma"
+                                  value={formPhone}
+                                  onChange={handlePhoneChange}
+                                  placeholder="e.g. 9876543210"
                                   className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                                 />
                               </TooltipTrigger>
@@ -1071,59 +1097,32 @@ export default function CibilAnalyzerView({
                             </Tooltip>
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
-                          <div>
-                            <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">Mobile Number</label>
-                            <div className="relative">
-                              <Phone className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <input
-                                    type="tel"
-                                    required
-                                    value={formPhone}
-                                    onChange={handlePhoneChange}
-                                    placeholder="e.g. 9876543210"
-                                    className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  sideOffset={10}
-                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                                >
-                                  Please fill out this field
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
-                            <div className="relative">
-                              <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={formPan}
-                                    onChange={handlePanChange}
-                                    placeholder="e.g. AAAAA1111B"
-                                    className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  sideOffset={10}
-                                  className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
-                                >
-                                  Please fill out this field
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
+                        <div>
+                          <label className="text-[12px] font-bold text-gray-700 uppercase block mb-[6px]">PAN Card Number</label>
+                          <div className="relative">
+                            <FileText className="absolute left-[12px] top-[10px] w-[16px] h-[16px] text-gray-400" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <input
+                                  type="text"
+                                  required
+                                  value={formPan}
+                                  onChange={handlePanChange}
+                                  placeholder="e.g. AAAAA1111B"
+                                  className="w-full pl-[36px] pr-[12px] py-[8px] border border-gray-300 rounded-[10px] text-[13px] uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                sideOffset={10}
+                                className="rounded-[12px] border border-gray-200 bg-white px-[10px] py-[6px] text-[11px] font-medium text-gray-700 shadow-[0_12px_30px_rgba(17,24,39,0.12)] animate-in fade-in-0 zoom-in-95"
+                              >
+                                Please fill out this field
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
+                      </div>
 
                       <div className="flex items-start gap-[10px] my-[12px] text-left">
                         <input
@@ -1200,9 +1199,8 @@ export default function CibilAnalyzerView({
                       <button
                         type="submit"
                         disabled={!agreedToTerms}
-                        className={`w-full bg-primary text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] shadow-md ${
-                          agreedToTerms ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
-                        }`}
+                        className={`w-full bg-primary text-white font-bold py-[10px] rounded-[10px] transition-all text-[13px] flex items-center justify-center gap-[8px] shadow-md ${agreedToTerms ? "hover:opacity-95 cursor-pointer" : "opacity-60 cursor-not-allowed"
+                          }`}
                       >
                         <Sparkles className="w-[16px] h-[16px]" />
                         <span>Download CIBIL Credit Report</span>
@@ -1215,17 +1213,18 @@ export default function CibilAnalyzerView({
                       </div>
                     </form>
                   </TooltipProvider>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+              </>
+            )}
           </div>
-        ) : (
-          // State B: CIBIL Report Dashboard + Loan Toolkit
+        </div>
+      ) : (
+        // State B: CIBIL Report Dashboard + Loan Toolkit
+        <ErrorBoundary moduleName="CIBIL Analyzer Dashboard" resetKeys={[report?.id, userId]}>
           <div className="space-y-[24px]">
             {/* CIBIL Score Summary card */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-[20px]">
-              
+
               {/* Score Gauge Card */}
               <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden">
                 <div className="flex justify-between items-center w-full mb-3 shrink-0">
@@ -1233,7 +1232,7 @@ export default function CibilAnalyzerView({
                   {(() => {
                     const fresh = isReportFresh(report?.fetched_at);
                     const exempt = isExemptRole(userEmail, report?.name);
-                    
+
                     if (fresh && !exempt) {
                       const nextDate = getNextAvailableFetchDate(report?.fetched_at);
                       return (
@@ -1245,7 +1244,7 @@ export default function CibilAnalyzerView({
                     return null;
                   })()}
                 </div>
-                
+
                 {/* SVG circular gauge */}
                 <div className="relative w-[180px] h-[180px] flex items-center justify-center">
                   <svg className="w-full h-full transform -rotate-90">
@@ -1272,7 +1271,7 @@ export default function CibilAnalyzerView({
                       className="transition-all duration-1000 ease-out"
                     />
                   </svg>
-                  
+
                   {/* Score details centered */}
                   <div className="absolute flex flex-col items-center justify-center">
                     <span className="text-[36px] font-black text-gray-800 leading-none">{report.score}</span>
@@ -1281,7 +1280,7 @@ export default function CibilAnalyzerView({
                     </span>
                   </div>
                 </div>
-                
+
                 <p className="text-[11px] text-gray-400 mt-[12px]">PAN: {report.pan} | Phone: {report.phone}</p>
                 <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {new Date(report.fetched_at).toLocaleDateString()}</p>
                 {report.pdf_url && (
@@ -1293,7 +1292,7 @@ export default function CibilAnalyzerView({
                     <span>Download PDF Report</span>
                   </a>
                 )}
-                
+
                 {!bsaVerified && (
                   <div className="mt-2.5 w-full relative cibil-print-hide">
                     <Lock className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
@@ -1319,7 +1318,7 @@ export default function CibilAnalyzerView({
                       <span className="font-medium text-indigo-700 truncate">{selectedBsaFile.name}</span>
                       <button onClick={() => setSelectedBsaFile(null)} className="text-indigo-400 hover:text-indigo-600 ml-2 font-bold p-1" disabled={bsaUploading}>✕</button>
                     </div>
-                    <button 
+                    <button
                       onClick={submitBsaAnalysis}
                       disabled={bsaUploading}
                       className={`flex items-center justify-center gap-[6px] text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all w-full ${bsaUploading ? 'bg-indigo-400 text-white cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
@@ -1396,7 +1395,7 @@ export default function CibilAnalyzerView({
                     <span>Download Excel Report 📥</span>
                   </a>
                 )}
-                
+
                 <button
                   onClick={handleGenerateCAM}
                   disabled={isGeneratingCAM}
@@ -1569,34 +1568,34 @@ export default function CibilAnalyzerView({
 
             {/* TAB CONTENTS */}
             <div className="min-h-[300px]">
-              
+
               {/* Tab 1: Credit Report & Tips */}
               {activeTab === "report" && (() => {
                 // Compute open accounts grouped by display category
                 const closedCount = report.accounts.length - openAccounts.length;
 
                 const CATEGORY_DEFS: { key: string; label: string; short: string; color: string; bg: string; border: string }[] = [
-                  { key: "Credit Card",       label: "Credit Card",       short: "CC",  color: "text-violet-700",  bg: "bg-violet-50",  border: "border-violet-200" },
-                  { key: "Personal Loan",     label: "Personal Loan",     short: "PL",  color: "text-blue-700",    bg: "bg-blue-50",    border: "border-blue-200" },
-                  { key: "Business Loan",     label: "Business Loan",     short: "BL",  color: "text-indigo-700",  bg: "bg-indigo-50",  border: "border-indigo-200" },
-                  { key: "Auto Loan",         label: "Auto / Vehicle",    short: "AL",  color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200" },
-                  { key: "Overdraft",         label: "Overdraft",         short: "OD",  color: "text-rose-700",    bg: "bg-rose-50",    border: "border-rose-200" },
-                  { key: "Professional Loan", label: "Professional Loan", short: "PrL", color: "text-teal-700",    bg: "bg-teal-50",    border: "border-teal-200" },
-                  { key: "Housing Loan",      label: "Housing Loan",      short: "HL",  color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-                  { key: "Consumer Loan",     label: "Consumer Loan",     short: "CL",  color: "text-orange-700",  bg: "bg-orange-50",  border: "border-orange-200" },
-                  { key: "Other",             label: "Other Loans",       short: "OL",  color: "text-gray-700",    bg: "bg-gray-100",   border: "border-gray-300" },
+                  { key: "Credit Card", label: "Credit Card", short: "CC", color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
+                  { key: "Personal Loan", label: "Personal Loan", short: "PL", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+                  { key: "Business Loan", label: "Business Loan", short: "BL", color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-200" },
+                  { key: "Auto Loan", label: "Auto / Vehicle", short: "AL", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+                  { key: "Overdraft", label: "Overdraft", short: "OD", color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
+                  { key: "Professional Loan", label: "Professional Loan", short: "PrL", color: "text-teal-700", bg: "bg-teal-50", border: "border-teal-200" },
+                  { key: "Housing Loan", label: "Housing Loan", short: "HL", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+                  { key: "Consumer Loan", label: "Consumer Loan", short: "CL", color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
+                  { key: "Other", label: "Other Loans", short: "OL", color: "text-gray-700", bg: "bg-gray-100", border: "border-gray-300" },
                 ];
 
                 const categoryKey = (type: string): string => {
                   const t = type.toLowerCase();
-                  if (t.includes("credit card"))   return "Credit Card";
+                  if (t.includes("credit card")) return "Credit Card";
                   if (t.includes("personal loan")) return "Personal Loan";
                   if (t.includes("business loan")) return "Business Loan";
                   if (t.includes("auto") || t.includes("vehicle") || t.includes("two wheeler")) return "Auto Loan";
-                  if (t.includes("overdraft"))     return "Overdraft";
-                  if (t.includes("professional"))  return "Professional Loan";
+                  if (t.includes("overdraft")) return "Overdraft";
+                  if (t.includes("professional")) return "Professional Loan";
                   if (t.includes("housing") || t.includes("home loan")) return "Housing Loan";
-                  if (t.includes("consumer"))      return "Consumer Loan";
+                  if (t.includes("consumer")) return "Consumer Loan";
                   return "Other";
                 };
 
@@ -1629,11 +1628,10 @@ export default function CibilAnalyzerView({
                       <div className="flex flex-wrap gap-[8px] mb-[16px] cibil-print-hide">
                         <button
                           onClick={() => setActiveAccountFilter(null)}
-                          className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${
-                            activeAccountFilter === null
+                          className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${activeAccountFilter === null
                               ? "bg-primary text-white border-primary shadow-sm"
                               : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                          }`}
+                            }`}
                         >
                           All Open ({openAccounts.length})
                         </button>
@@ -1641,11 +1639,10 @@ export default function CibilAnalyzerView({
                           <button
                             key={def.key}
                             onClick={() => setActiveAccountFilter(activeAccountFilter === def.key ? null : def.key)}
-                            className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${
-                              activeAccountFilter === def.key
+                            className={`px-[12px] py-[5px] rounded-[10px] text-[11px] font-bold border transition-all cursor-pointer ${activeAccountFilter === def.key
                                 ? `${def.bg} ${def.color} ${def.border} shadow-sm`
                                 : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
-                            }`}
+                              }`}
                           >
                             {def.label} ({categoryCounts[def.key] || 0})
                           </button>
@@ -1670,20 +1667,19 @@ export default function CibilAnalyzerView({
                                 <tr
                                   key={def.key}
                                   onClick={() => setActiveAccountFilter(activeAccountFilter === def.key ? null : def.key)}
-                                  className={`border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50/70 ${
-                                    activeAccountFilter === def.key ? def.bg : ""
-                                  }`}
+                                  className={`border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50/70 ${activeAccountFilter === def.key ? def.bg : ""
+                                    }`}
                                 >
                                   <td className="px-[12px] py-[10px]">
                                     <div className="flex items-center gap-[8px]">
                                       <span className={`text-[10px] font-bold px-[6px] py-[2px] rounded-[6px] ${def.bg} ${def.color} ${def.border} border`}>
                                         {def.short}
                                       </span>
-                                      <span className={`font-semibold ${ activeAccountFilter === def.key ? def.color : "text-gray-700"}`}>{def.label}</span>
+                                      <span className={`font-semibold ${activeAccountFilter === def.key ? def.color : "text-gray-700"}`}>{def.label}</span>
                                     </div>
                                   </td>
                                   <td className="px-[12px] py-[10px] text-center">
-                                    <span className={`text-[14px] font-black ${ activeAccountFilter === def.key ? def.color : "text-gray-800"}`}>
+                                    <span className={`text-[14px] font-black ${activeAccountFilter === def.key ? def.color : "text-gray-800"}`}>
                                       {categoryCounts[def.key] || 0}
                                     </span>
                                   </td>
@@ -1733,7 +1729,7 @@ export default function CibilAnalyzerView({
                                     </div>
                                     <p className="text-[11px] text-gray-400 mt-[2px]">
                                       {acc.type}
-                                      {acc.open_date ? ` | Opened: ${(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0,4)}-${String(acc.open_date).slice(4,6)}-${String(acc.open_date).slice(6,8)}`) : new Date(acc.open_date)).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
+                                      {acc.open_date ? ` | Opened: ${(String(acc.open_date).match(/^\d{8}$/) ? new Date(`${String(acc.open_date).slice(0, 4)}-${String(acc.open_date).slice(4, 6)}-${String(acc.open_date).slice(6, 8)}`) : new Date(acc.open_date)).toLocaleDateString("en-IN", { year: "numeric", month: "short" })}` : ""}
                                     </p>
                                   </div>
                                   <div className="text-right">
@@ -1756,7 +1752,7 @@ export default function CibilAnalyzerView({
                       <div className="lg:col-span-1 self-start">
                         <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm relative overflow-hidden">
                           <div className="absolute -right-[20px] -bottom-[20px] w-[110px] h-[110px] rounded-full bg-primary/5" />
-                          
+
                           <div className="flex items-center gap-[8px] mb-[14px]">
                             <Sparkles className="w-[18px] h-[18px] text-primary" />
                             <h3 className="text-[13px] font-bold text-gray-800">FinHeal AI Recommendations</h3>
@@ -1764,28 +1760,26 @@ export default function CibilAnalyzerView({
 
                           <div className="space-y-[12px] relative z-10">
                             {dynamicRecommendations.map((rec, idx) => (
-                              <div 
-                                key={idx} 
-                                className={`text-[12px] border rounded-[16px] p-4 flex flex-col gap-2 shadow-xs transition-all ${
-                                  rec.type === "alert" 
-                                    ? "bg-rose-50/50 border-rose-100 text-rose-950" 
+                              <div
+                                key={idx}
+                                className={`text-[12px] border rounded-[16px] p-4 flex flex-col gap-2 shadow-xs transition-all ${rec.type === "alert"
+                                    ? "bg-rose-50/50 border-rose-100 text-rose-950"
                                     : rec.type === "warning"
-                                    ? "bg-amber-50/50 border-amber-100 text-amber-950"
-                                    : "bg-blue-50/30 border-blue-100 text-blue-950"
-                                }`}
+                                      ? "bg-amber-50/50 border-amber-100 text-amber-950"
+                                      : "bg-blue-50/30 border-blue-100 text-blue-950"
+                                  }`}
                               >
                                 <div className="flex items-center gap-1.5 font-bold text-[12px]">
                                   <span>{rec.type === "alert" ? "🔴" : rec.type === "warning" ? "⚠️" : "💡"}</span>
                                   <span>{rec.title}</span>
                                 </div>
                                 <p className="leading-relaxed font-semibold opacity-90">{rec.desc}</p>
-                                <div className={`text-[11px] p-3 rounded-[12px] mt-1 border leading-relaxed ${
-                                  rec.type === "alert"
+                                <div className={`text-[11px] p-3 rounded-[12px] mt-1 border leading-relaxed ${rec.type === "alert"
                                     ? "bg-rose-100/30 border-rose-200/50 text-rose-800"
                                     : rec.type === "warning"
-                                    ? "bg-amber-100/30 border-amber-200/50 text-amber-800"
-                                    : "bg-blue-100/30 border-blue-200/50 text-blue-800"
-                                }`}>
+                                      ? "bg-amber-100/30 border-amber-200/50 text-amber-800"
+                                      : "bg-blue-100/30 border-blue-200/50 text-blue-800"
+                                  }`}>
                                   <strong className="block mb-0.5">Lender Policy Check:</strong>
                                   {rec.rule}
                                 </div>
@@ -1793,12 +1787,12 @@ export default function CibilAnalyzerView({
                             ))}
                           </div>
 
-                           <button
-                             onClick={handleTalkToAdvisorClick}
-                             className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
-                           >
-                             Talk to Credit Score Repair Expert
-                           </button>
+                          <button
+                            onClick={handleTalkToAdvisorClick}
+                            className="mt-[20px] w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-[9px] rounded-[10px] text-[12px] transition-all flex items-center justify-center gap-[6px] border border-gray-200 cursor-pointer"
+                          >
+                            Talk to Credit Score Repair Expert
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1810,11 +1804,11 @@ export default function CibilAnalyzerView({
               {/* Tab 2: EMI Calculator */}
               {activeTab === "emi" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px] rounded-[20px] border border-gray-200 bg-white p-[24px] shadow-sm">
-                  
+
                   {/* Inputs */}
                   <div className="space-y-[20px]">
                     <h3 className="text-[14px] font-bold text-gray-800">EMI Calculator</h3>
-                    
+
                     <div>
                       <div className="flex justify-between text-[12px] font-semibold text-gray-600 mb-[6px]">
                         <span>Loan Amount</span>
@@ -1899,11 +1893,11 @@ export default function CibilAnalyzerView({
               {/* Tab 3: Eligibility Checker */}
               {activeTab === "eligibility" && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-[24px]">
-                  
+
                   {/* Left Side: Inputs */}
                   <div className="lg:col-span-1 rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm space-y-[18px]">
                     <h3 className="text-[14px] font-bold text-gray-800">Eligibility Criteria</h3>
-                    
+
                     <div>
                       <label className="text-[11px] font-bold text-gray-600 uppercase block mb-[4px]">Loan Category</label>
                       <select
@@ -1973,9 +1967,9 @@ export default function CibilAnalyzerView({
                         </span>
                       </div>
                       <div className="h-[4px] bg-gray-200 rounded-[4px] overflow-hidden">
-                        <div 
-                          className={`h-full ${eligibilityOutput.foirPct > 45 ? "bg-rose-500" : "bg-emerald-500"}`} 
-                          style={{ width: `${Math.min(eligibilityOutput.foirPct, 100)}%` }} 
+                        <div
+                          className={`h-full ${eligibilityOutput.foirPct > 45 ? "bg-rose-500" : "bg-emerald-500"}`}
+                          style={{ width: `${Math.min(eligibilityOutput.foirPct, 100)}%` }}
                         />
                       </div>
                       <span className="text-[10px] text-gray-400 mt-[2px] block">Lenders prefer FOIR ratio below {eligibilityOutput.maxFoirPct}%</span>
@@ -2000,17 +1994,16 @@ export default function CibilAnalyzerView({
                             <div>
                               <div className="flex items-center gap-[8px]">
                                 <h4 className="text-[13px] font-bold text-gray-800">{off.lender.name}</h4>
-                                <span className={`text-[10px] font-bold px-[8px] py-[2px] rounded-[10px] border ${
-                                  off.likelihood === "High" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                                  off.likelihood === "Medium" ? "bg-blue-50 text-blue-700 border-blue-100" :
-                                  off.likelihood === "Low" ? "bg-amber-50 text-amber-700 border-amber-100" :
-                                  "bg-rose-50 text-rose-700 border-rose-100"
-                                }`}>
+                                <span className={`text-[10px] font-bold px-[8px] py-[2px] rounded-[10px] border ${off.likelihood === "High" ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                                    off.likelihood === "Medium" ? "bg-blue-50 text-blue-700 border-blue-100" :
+                                      off.likelihood === "Low" ? "bg-amber-50 text-amber-700 border-amber-100" :
+                                        "bg-rose-50 text-rose-700 border-rose-100"
+                                  }`}>
                                   {off.likelihood} Odds
                                 </span>
                               </div>
                               <p className="text-[11px] text-gray-400 mt-[2px]">Rates: {off.lender.minRate}% - {off.lender.maxRate}%</p>
-                              
+
                               {/* Reasons list for poor/ineligible cards */}
                               {off.reasons.length > 0 && (
                                 <div className="mt-[6px] space-y-[2px]">
@@ -2029,7 +2022,7 @@ export default function CibilAnalyzerView({
                               <div className="text-[15px] font-black text-gray-800">
                                 {off.likelihood === "Ineligible" ? "₹0" : `₹${off.eligibleLimit.toLocaleString("en-IN")}`}
                               </div>
-                              
+
                               {off.likelihood !== "Ineligible" && (
                                 <button
                                   onClick={() => onApplyNow?.(off.lender.category, off.eligibleLimit, off.lender.minRate, Number(eligTenure), `Approved offer with ${off.lender.name}`)}
@@ -2050,13 +2043,13 @@ export default function CibilAnalyzerView({
               {/* Tab 4: Compare Loans */}
               {activeTab === "compare" && (
                 <div className="space-y-[20px]">
-                  
+
                   {/* Sliding Inputs Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px]">
                     {/* Loan A */}
                     <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm space-y-[12px]">
                       <h4 className="text-[13px] font-bold text-gray-800 border-b border-gray-100 pb-[8px]">Loan Offer A</h4>
-                      
+
                       <div>
                         <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                           <span>Loan Amount</span>
@@ -2099,7 +2092,7 @@ export default function CibilAnalyzerView({
                     {/* Loan B */}
                     <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm space-y-[12px]">
                       <h4 className="text-[13px] font-bold text-gray-800 border-b border-gray-100 pb-[8px]">Loan Offer B</h4>
-                      
+
                       <div>
                         <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                           <span>Loan Amount</span>
@@ -2143,7 +2136,7 @@ export default function CibilAnalyzerView({
                   {/* Side-by-Side Comparison Output Card */}
                   <div className="rounded-[20px] border border-gray-200 bg-white p-[20px] shadow-sm">
                     <h4 className="text-[13px] font-bold text-gray-800 mb-[14px]">Comparison Breakdown</h4>
-                    
+
                     <div className="grid grid-cols-3 gap-[10px] text-center border-b border-gray-100 pb-[10px] mb-[10px] text-[12px] font-semibold text-gray-500">
                       <div>Metric</div>
                       <div>Loan Offer A</div>
@@ -2156,7 +2149,7 @@ export default function CibilAnalyzerView({
                         <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanA.emi.toLocaleString("en-IN")}</div>
                         <div className="font-extrabold text-gray-800">₹{comparisonOutput.loanB.emi.toLocaleString("en-IN")}</div>
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-[10px] py-[6px] border-b border-gray-55 items-center">
                         <div className="text-left font-medium text-gray-500">Total Interest</div>
                         <div className="font-bold text-gray-700">₹{comparisonOutput.loanA.totalInterest.toLocaleString("en-IN")}</div>
@@ -2181,7 +2174,7 @@ export default function CibilAnalyzerView({
                           </p>
                         </div>
                       </div>
-                      
+
                       <button
                         onClick={() => {
                           const isA = comparisonOutput.bestLoan === "Loan A";
@@ -2204,11 +2197,11 @@ export default function CibilAnalyzerView({
               {/* Tab 5: Prepayment Planner */}
               {activeTab === "prepayment" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-[24px] rounded-[20px] border border-gray-200 bg-white p-[24px] shadow-sm">
-                  
+
                   {/* Left Side: Inputs */}
                   <div className="space-y-[18px]">
                     <h3 className="text-[14px] font-bold text-gray-800">Prepayment Planner</h3>
-                    
+
                     <div>
                       <div className="flex justify-between text-[11px] text-gray-600 mb-[4px]">
                         <span>Current Loan Principal</span>
@@ -2274,7 +2267,7 @@ export default function CibilAnalyzerView({
                   <div className="bg-gray-50 border border-gray-100 rounded-[16px] p-[20px] flex flex-col justify-between">
                     <div>
                       <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] mb-[12px]">Prepayment Savings Summary</h4>
-                      
+
                       <div className="space-y-[12px] mb-[16px]">
                         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[14px] p-[12px] flex items-center justify-between">
                           <div className="flex items-center gap-[6px]">
@@ -2322,10 +2315,11 @@ export default function CibilAnalyzerView({
                   </div>
                 </div>
               )}
-              </div>
             </div>
-          )}
-        </div>
+          </div>
+        </ErrorBoundary>
+      )}
+      </div>
 
       {/* Terms & Conditions Modal */}
       <PolicyModal
@@ -2341,7 +2335,7 @@ export default function CibilAnalyzerView({
       {isAgendaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[6px] animate-fade-in">
           <div className="bg-white rounded-[24px] max-w-[500px] w-full shadow-2xl animate-scale-up border border-gray-100 max-h-[90vh] flex flex-col overflow-hidden">
-            
+
             {/* Header */}
             <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-3">
@@ -2368,10 +2362,10 @@ export default function CibilAnalyzerView({
               <p className="text-[12.5px] text-gray-600 font-semibold leading-relaxed text-left">
                 FinHeal AI has compiled the following key findings and discussion topics from your credit report:
               </p>
-              
+
               <div className="space-y-3 text-left">
                 {compiledAgenda.map((item, idx) => (
-                  <div 
+                  <div
                     key={idx}
                     className="p-4 rounded-[16px] border border-gray-150 bg-gray-50/50 flex items-start gap-3"
                   >
@@ -2427,11 +2421,10 @@ function FactorCard({ label, value, subtext, status }: FactorCardProps) {
       </div>
       <div className="mt-[8px]">
         <p className="text-[10px] text-gray-400 leading-none">{subtext}</p>
-        <span className={`text-[10px] font-bold inline-block mt-[4px] px-[8px] py-[2px] rounded-[10px] ${
-          status === "Excellent" ? "bg-emerald-50 text-emerald-700" :
-          status === "Good" ? "bg-blue-50 text-blue-700" :
-          "bg-rose-50 text-rose-700"
-        }`}>
+        <span className={`text-[10px] font-bold inline-block mt-[4px] px-[8px] py-[2px] rounded-[10px] ${status === "Excellent" ? "bg-emerald-50 text-emerald-700" :
+            status === "Good" ? "bg-blue-50 text-blue-700" :
+              "bg-rose-50 text-rose-700"
+          }`}>
           {status}
         </span>
       </div>
@@ -2450,11 +2443,10 @@ function TabButton({ active, onClick, icon, label }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-[6px] px-[16px] py-[8px] border-b-2 font-bold text-[12px] tracking-tight shrink-0 transition-all cursor-pointer ${
-        active 
-          ? "border-primary text-primary" 
+      className={`flex items-center gap-[6px] px-[16px] py-[8px] border-b-2 font-bold text-[12px] tracking-tight shrink-0 transition-all cursor-pointer ${active
+          ? "border-primary text-primary"
           : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200"
-      }`}
+        }`}
     >
       {icon}
       <span>{label}</span>

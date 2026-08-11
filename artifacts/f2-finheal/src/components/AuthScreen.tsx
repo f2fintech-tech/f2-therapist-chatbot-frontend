@@ -28,17 +28,38 @@ const BAR_HEIGHTS = [
   [60, 50, 80, 40, 75, 55, 90],
 ];
 
+export function checkPasswordRequirements(pw: string) {
+  const minLength = pw.length >= 8;
+  const hasUppercase = /[A-Z]/.test(pw);
+  const hasLowercase = /[a-z]/.test(pw);
+  const hasNumber = /[0-9]/.test(pw);
+  const hasSpecial = /[^a-zA-Z0-9]/.test(pw);
+
+  const isAllValid = minLength && hasUppercase && hasLowercase && hasNumber && hasSpecial;
+
+  return {
+    minLength,
+    hasUppercase,
+    hasLowercase,
+    hasNumber,
+    hasSpecial,
+    isAllValid,
+  };
+}
+
 function getPasswordStrength(pw: string): { width: number; color: string; label: string } {
   if (!pw) return { width: 0, color: "#e5e7eb", label: "" };
-  let str = 0;
-  if (pw.length >= 6) str++;
-  if (pw.length >= 10) str++;
-  if (/[A-Z]/.test(pw)) str++;
-  if (/[0-9]/.test(pw)) str++;
-  if (/[^a-zA-Z0-9]/.test(pw)) str++;
-  const colors = ["#ef4444", "#f59e0b", "#f59e0b", "#14b8a6", "#10b981"];
-  const labels = ["Too short", "Weak", "Fair", "Strong", "Very strong"];
-  return { width: str * 20, color: colors[Math.max(0, str - 1)], label: labels[Math.max(0, str - 1)] };
+  const reqs = checkPasswordRequirements(pw);
+  let count = 0;
+  if (reqs.minLength) count++;
+  if (reqs.hasUppercase) count++;
+  if (reqs.hasLowercase) count++;
+  if (reqs.hasNumber) count++;
+  if (reqs.hasSpecial) count++;
+
+  const colors = ["#ef4444", "#ef4444", "#f59e0b", "#3b82f6", "#10b981"];
+  const labels = ["Very Weak", "Weak", "Fair", "Strong", "Very Strong"];
+  return { width: count * 20, color: colors[Math.max(0, count - 1)], label: labels[Math.max(0, count - 1)] };
 }
 
 const features = [
@@ -54,6 +75,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [loginAge, setLoginAge] = useState("");
   const [loginPassword, setLoginPassword] = useState(loginDefaults.password);
   const [showPassword, setShowPassword] = useState(false);
+  const [isPwFocused, setIsPwFocused] = useState(false);
   const [location, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
@@ -137,6 +159,20 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
     const firstName = loginDisplayName.trim();
     const age = loginAge.trim();
 
+    if (authMode === "signup") {
+      const pwReqs = checkPasswordRequirements(password);
+      if (!pwReqs.isAllValid) {
+        const missing: string[] = [];
+        if (!pwReqs.minLength) missing.push("8+ characters");
+        if (!pwReqs.hasUppercase) missing.push("1 uppercase letter (A-Z)");
+        if (!pwReqs.hasLowercase) missing.push("1 lowercase letter (a-z)");
+        if (!pwReqs.hasNumber) missing.push("1 numeric character (0-9)");
+        if (!pwReqs.hasSpecial) missing.push("1 special character (!@#$%...)");
+        setLoginError("Password must include: " + missing.join(", ") + ".");
+        return;
+      }
+    }
+
     if (isEmployee) {
       if (authMode === "signup") {
         if (!employeeId.trim() || !designation.trim() || !password || !confirmPassword) {
@@ -145,10 +181,6 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         }
         if (password !== confirmPassword) {
           setLoginError("Passwords do not match.");
-          return;
-        }
-        if (password.length < 6) {
-          setLoginError("Password must be at least 6 characters long.");
           return;
         }
       } else {
@@ -245,6 +277,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   };
 
   const pwStrength = getPasswordStrength(loginPassword);
+  const pwReqs = checkPasswordRequirements(loginPassword);
 
   return (
     <div className="auth-screen-shell" style={{ position: "relative", width: "100%", minHeight: "100dvh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", overflow: "hidden" }}>
@@ -587,51 +620,51 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transform: animateIn ? "translateY(0px)" : "translateY(24px)",
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
-          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: "clamp(18px, 3vw, 32px) clamp(14px, 3vw, 32px)", width: "100%", maxWidth: "380px", minHeight: "560px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vw, 14px)" }}>
+          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: authMode === "signup" ? "16px 22px" : "24px 28px", width: "100%", maxWidth: "380px", minHeight: authMode === "signup" ? "auto" : "480px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "14px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", flexWrap: "wrap" }}>
               <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
-                <button type="button" onClick={() => handleSetAuthMode("login")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
-                <button type="button" onClick={() => handleSetAuthMode("signup")} style={{ padding: "8px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
+                <button type="button" onClick={() => handleSetAuthMode("login")} style={{ padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>
+                <button type="button" onClick={() => handleSetAuthMode("signup")} style={{ padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "signup" ? "#3344e6" : "#fff", color: authMode === "signup" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Create account</button>
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", userSelect: "none" }}>
-                <input type="checkbox" checked={isEmployee} onChange={(e) => { setIsEmployee(e.target.checked); setLoginError(null); }} style={{ width: "15px", height: "15px", accentColor: "#3344e6", cursor: "pointer" }} />
+                <input type="checkbox" checked={isEmployee} onChange={(e) => { setIsEmployee(e.target.checked); setLoginError(null); }} style={{ width: "14px", height: "14px", accentColor: "#3344e6", cursor: "pointer" }} />
                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#374151" }}>I am an Employee</span>
               </label>
             </div>
             <div>
-              <div style={{ fontSize: authMode === "signup" ? "20px" : "24px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>
+              <div style={{ fontSize: authMode === "signup" ? "19px" : "24px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>
                 {isEmployee
                   ? (authMode === "signup" ? "Register Employee" : "Employee Sign in")
                   : (authMode === "signup" ? "Create your account" : "Welcome back")}
               </div>
-              <div style={{ marginTop: "4px", fontSize: "11px", lineHeight: 1.3, color: "#6b7280" }}>
+              <div style={{ marginTop: "3px", fontSize: "11px", lineHeight: 1.3, color: "#6b7280" }}>
                 {isEmployee
                   ? "Verify F2 Fintech credentials to manage advisor dashboard."
                   : (authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey")}
               </div>
             </div>
             {referralCode && authMode === "signup" && !isEmployee && (
-              <div style={{ padding: "8px 12px", background: "rgba(20, 184, 166, 0.1)", border: "1px solid rgba(20, 184, 166, 0.2)", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                <span style={{ fontSize: "16px" }}>🎁</span>
-                <span style={{ fontSize: "11px", color: "#0f766e", fontWeight: 600 }}>Referral Code Applied. You'll unlock discounted expert sessions!</span>
+              <div style={{ padding: "6px 10px", background: "rgba(20, 184, 166, 0.1)", border: "1px solid rgba(20, 184, 166, 0.2)", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                <span style={{ fontSize: "14px" }}>🎁</span>
+                <span style={{ fontSize: "10.5px", color: "#0f766e", fontWeight: 600 }}>Referral Code Applied! Discount unlocked.</span>
               </div>
             )}
-            <form className="auth-screen-form" onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "9px" : "16px", minWidth: 0 }}>
+            <form className="auth-screen-form" onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "7px" : "14px", minWidth: 0 }}>
               {isEmployee ? (
                 <>
                   {authMode === "signup" ? (
                     <>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>F2 Fintech ID <span style={{ color: "#ef4444" }}>*</span></span>
-                        <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="e.g. F2-369-001" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                        <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="e.g. F2-369-001" style={{ height: "36px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                       </label>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Designation <span style={{ color: "#ef4444" }}>*</span></span>
-                        <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Sales Manager" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                        <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Sales Manager" style={{ height: "36px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                       </label>
                     </>
                   ) : (
-                    <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                       <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>F2 Fintech ID <span style={{ color: "#ef4444" }}>*</span></span>
                       <input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="e.g. F2-369-001" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                     </label>
@@ -640,31 +673,40 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
               ) : (
                 <>
                   {authMode === "signup" && (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>
-                        <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                        <input value={loginDisplayName} onChange={e => setLoginDisplayName(e.target.value)} placeholder="John" autoComplete="given-name" style={{ height: "36px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                       </label>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Last name</span>
-                        <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                        <input value={loginLastName} onChange={e => setLoginLastName(e.target.value)} placeholder="Smith" autoComplete="family-name" style={{ height: "36px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                       </label>
-                      <label style={{ display: "flex", flexDirection: "column", gap: "3px", gridColumn: "1 / -1" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 500, color: "#374151" }}>Age <span style={{ color: "#ef4444" }}>*</span></span>
-                        <input value={loginAge} onChange={e => setLoginAge(e.target.value)} placeholder="e.g. 28" type="number" min="18" max="100" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                      <label style={{ display: "flex", flexDirection: "column", gap: "2px", gridColumn: "1 / -1" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Age <span style={{ color: "#ef4444" }}>*</span></span>
+                        <input value={loginAge} onChange={e => setLoginAge(e.target.value)} placeholder="e.g. 28" type="number" min="18" max="100" style={{ height: "36px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                       </label>
                     </div>
                   )}
-                  <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Email</span>
-                    <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
+                    <input value={loginUsername} onChange={e => setLoginUsername(e.target.value)} placeholder="you@example.com" autoComplete="username" style={{ height: authMode === "signup" ? "36px" : "40px", padding: "0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", background: "#f9fafb", width: "100%", minWidth: 0, boxSizing: "border-box" }} />
                   </label>
                 </>
               )}
-              <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "2px", position: "relative" }}>
                 <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Password</span>
                 <div style={{ position: "relative" }}>
-                  <input type={showPassword ? "text" : "password"} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Enter your password" autoComplete={authMode === "signup" ? "new-password" : "current-password"} style={{ height: "40px", padding: "0 40px 0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", width: "100%", minWidth: 0, background: "#f9fafb" }} />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={e => setLoginPassword(e.target.value)}
+                    onFocus={() => setIsPwFocused(true)}
+                    onBlur={() => setIsPwFocused(false)}
+                    placeholder="Enter your password"
+                    autoComplete={authMode === "signup" ? "new-password" : "current-password"}
+                    style={{ height: authMode === "signup" ? "36px" : "40px", padding: "0 40px 0 10px", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", outline: "none", fontFamily: "inherit", width: "100%", minWidth: 0, background: "#f9fafb" }}
+                  />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0 }}>
                     {showPassword ? (
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: "18px", height: "18px" }}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
@@ -673,12 +715,56 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                     )}
                   </button>
                 </div>
-                {authMode === "signup" && !isEmployee && loginPassword.length > 0 && (
+
+                {/* Password Strength Indicator & Floating Requirements Popover */}
+                {authMode === "signup" && (
                   <div>
-                    <div style={{ height: "3px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden", marginTop: "3px" }}>
-                      <div style={{ height: "100%", width: `${pwStrength.width}%`, background: pwStrength.color, borderRadius: "999px", transition: "all 0.3s" }} />
-                    </div>
-                    <div style={{ fontSize: "8px", color: pwStrength.color, marginTop: "2px" }}>{pwStrength.label}</div>
+                    {loginPassword.length > 0 && (
+                      <div style={{ marginTop: "2px" }}>
+                        <div style={{ height: "3px", background: "#f3f4f6", borderRadius: "999px", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${pwStrength.width}%`, background: pwStrength.color, borderRadius: "999px", transition: "all 0.3s" }} />
+                        </div>
+                        <div style={{ fontSize: "9px", color: pwStrength.color, marginTop: "1px", fontWeight: 600 }}>{pwStrength.label}</div>
+                      </div>
+                    )}
+
+                    {/* Floating Popover - Takes 0px vertical form flow space */}
+                    {(isPwFocused || (loginPassword.length > 0 && !pwReqs.isAllValid)) && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        right: 0,
+                        zIndex: 60,
+                        background: "#ffffff",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "10px",
+                        padding: "8px 12px",
+                        boxShadow: "0 12px 28px -4px rgba(15,23,42,0.2), 0 8px 12px -6px rgba(15,23,42,0.12)",
+                      }}>
+                        <div style={{ fontSize: "10px", fontWeight: 600, color: "#334155", marginBottom: "4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span>Password requirements:</span>
+                          {pwReqs.isAllValid && <span style={{ color: "#059669", fontWeight: 700 }}>✓ All Met</span>}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "3px 8px", fontSize: "10px" }}>
+                          <span style={{ color: pwReqs.minLength ? "#059669" : "#64748b", fontWeight: pwReqs.minLength ? 600 : 400, display: "flex", alignItems: "center", gap: "3px" }}>
+                            <span>{pwReqs.minLength ? "✓" : "○"}</span> 8+ characters
+                          </span>
+                          <span style={{ color: pwReqs.hasUppercase ? "#059669" : "#64748b", fontWeight: pwReqs.hasUppercase ? 600 : 400, display: "flex", alignItems: "center", gap: "3px" }}>
+                            <span>{pwReqs.hasUppercase ? "✓" : "○"}</span> Uppercase (A-Z)
+                          </span>
+                          <span style={{ color: pwReqs.hasLowercase ? "#059669" : "#64748b", fontWeight: pwReqs.hasLowercase ? 600 : 400, display: "flex", alignItems: "center", gap: "3px" }}>
+                            <span>{pwReqs.hasLowercase ? "✓" : "○"}</span> Lowercase (a-z)
+                          </span>
+                          <span style={{ color: pwReqs.hasNumber ? "#059669" : "#64748b", fontWeight: pwReqs.hasNumber ? 600 : 400, display: "flex", alignItems: "center", gap: "3px" }}>
+                            <span>{pwReqs.hasNumber ? "✓" : "○"}</span> Number (0-9)
+                          </span>
+                          <span style={{ color: pwReqs.hasSpecial ? "#059669" : "#64748b", fontWeight: pwReqs.hasSpecial ? 600 : 400, display: "flex", alignItems: "center", gap: "3px", gridColumn: "1 / -1" }}>
+                            <span>{pwReqs.hasSpecial ? "✓" : "○"}</span> Special character (!@#$%...)
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </label>

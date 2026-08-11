@@ -294,8 +294,6 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
             <Card><CardHeader><CardTitle>Insights</CardTitle><CardDescription>What stood out from your answers</CardDescription></CardHeader><CardContent>{currentResult.insights.map((ins) => <div key={ins.title} className="p-3 rounded-md border mb-2"><div className="font-semibold">{ins.title}</div><div className="text-sm text-gray-600">{ins.description}</div></div>)}</CardContent></Card>
           </section>
 
-          <section className="mt-6"><Card><CardHeader><CardTitle>Key improvement areas</CardTitle></CardHeader><CardContent>{buildCreditRecommendations(state.answers).map((r) => <div key={r} className="p-3 rounded-md border mb-2">{r}</div>)}</CardContent></Card></section>
-
           <section className="mt-6 flex gap-3"><button onClick={handleRestart} className="px-4 py-2 rounded bg-cyan-500 text-white">Retake assessment</button><button onClick={onBackToCatalog} className="px-4 py-2 rounded border">Back to tests</button>{onOpenFinancialWellnessAssistant && <button onClick={onOpenFinancialWellnessAssistant} className="px-4 py-2 rounded border bg-cyan-50">Talk to assistant</button>}</section>
         </div>
       </main>

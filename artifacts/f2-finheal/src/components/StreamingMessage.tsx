@@ -87,18 +87,24 @@ export default function StreamingMessage({ content, isStreaming }: StreamingMess
       indexRef.current = 0;
       setDisplayedContent("");
       setIsTyping(false);
+    } else if (!isStreaming) {
+      // Historical/loaded message: render immediately without streaming animation
+      indexRef.current = content.length;
+      setDisplayedContent(content);
+      setIsTyping(false);
     } else if (indexRef.current > content.length) {
       indexRef.current = content.length;
       setDisplayedContent(content);
     } else {
       setIsTyping(true);
     }
-  }, [content]);
+  }, [content, isStreaming]);
 
-  // Adaptive typewriter speed typing effect
+  // Adaptive typewriter speed typing effect (only for actively streaming messages)
   useEffect(() => {
-    if (!isTyping) {
+    if (!isTyping || !isStreaming) {
       setDisplayedContent(content);
+      setIsTyping(false);
       return;
     }
 
@@ -145,9 +151,9 @@ export default function StreamingMessage({ content, isStreaming }: StreamingMess
     };
   }, [isTyping, isStreaming, content]);
 
-  // Scroll to bottom during streaming and progressive typing
+  // Scroll to bottom during active streaming only
   useEffect(() => {
-    if ((isStreaming || isTyping) && containerRef.current) {
+    if (isStreaming && isTyping && containerRef.current) {
       containerRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [displayedContent, isStreaming, isTyping]);

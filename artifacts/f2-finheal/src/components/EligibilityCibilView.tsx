@@ -34,8 +34,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { fetchAdvisorProfile, fetchAdvisors } from "@/lib/backendAuth";
 import { BsaProgressModal, LogEntry } from "./BsaProgressModal";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
-import html2canvas from "html2canvas-pro";
-import { jsPDF } from "jspdf";
+import FactorCard from "./cibil/FactorCard";
+import LenderOfferCard from "./cibil/LenderOfferCard";
+import { LenderLogo } from "./cibil/LenderLogo";
+import type { LenderProduct } from "./cibil/types";
 
 
 const formatDateRange = (rangeStr: string) => {
@@ -56,55 +58,10 @@ const formatDateRange = (rangeStr: string) => {
   return rangeStr;
 };
 
-function getLenderLogoUrl(name: string): string | null {
-  const clean = name.toLowerCase();
-  if (clean.includes("icici")) return "/icici_bank.png";
-  if (clean.includes("axis")) return "/axis_bank.png";
-  if (clean.includes("bajaj")) return "/bajaj_finance.png";
-  if (clean.includes("aditya birla")) return "/aditya_birla_capital.png";
-  if (clean.includes("hdfc")) return "https://logo.clearbit.com/hdfcbank.com";
-  if (clean.includes("state bank") || clean.includes("sbi")) return "https://logo.clearbit.com/sbi.co.in";
-  if (clean.includes("kotak")) return "https://logo.clearbit.com/kotak.com";
-  if (clean.includes("tata capital")) return "https://logo.clearbit.com/tatacapital.com";
-  if (clean.includes("idfc")) return "https://logo.clearbit.com/idfcfirstbank.com";
-  if (clean.includes("federal")) return "https://logo.clearbit.com/federalbank.co.in";
-  return null;
-}
-
-export function LenderLogo({ name, className = "w-8 h-8" }: { name: string; className?: string }) {
-  const logoUrl = getLenderLogoUrl(name);
-  const [error, setError] = useState(false);
-
-  const initials = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
-  const getFallbackStyle = (lenderName: string) => {
-    const clean = lenderName.toLowerCase();
-    if (clean.includes("hdfc")) return { bg: "bg-blue-600", text: "text-white" };
-    if (clean.includes("icici")) return { bg: "bg-orange-500", text: "text-white" };
-    if (clean.includes("axis")) return { bg: "bg-[#800020]", text: "text-white" };
-    if (clean.includes("sbi") || clean.includes("state bank")) return { bg: "bg-cyan-600", text: "text-white" };
-    if (clean.includes("kotak")) return { bg: "bg-red-600", text: "text-white" };
-    return { bg: "bg-primary/10", text: "text-primary" };
-  };
-
-  const style = getFallbackStyle(name);
-
-  if (logoUrl && !error) {
-    return (
-      <img
-        src={logoUrl}
-        alt={`${name} Logo`}
-        className={`${className} rounded-md object-contain p-0.5 bg-white border border-gray-150 shrink-0`}
-        onError={() => setError(true)}
-      />
-    );
-  }
-
-  return (
-    <div className={`${className} rounded-md flex items-center justify-center font-bold text-[11px] uppercase shrink-0 ${style.bg} ${style.text} border border-gray-150`}>
-      {initials}
-    </div>
-  );
-}
+// LenderLogo and LenderProduct are defined in ./cibil/LenderLogo and ./cibil/types
+// and re-exported here for backward compatibility with other consumers.
+export type { LenderProduct } from "./cibil/types";
+export { LenderLogo } from "./cibil/LenderLogo";
 
 
 
@@ -668,6 +625,8 @@ export default function EligibilityCibilView({
     
     let clone: HTMLElement | null = null;
     try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const { jsPDF } = await import("jspdf");
       await inlineCrossOriginStylesheets();
       const element = bsaAnalyzerRef.current;
       if (!element) {
@@ -3035,6 +2994,11 @@ export default function EligibilityCibilView({
                     </span>
                   ))}
                 </div>
+                {compareError && (
+                  <span className="text-[11px] font-semibold text-rose-600 animate-fade-in mt-1">
+                    {compareError}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -3047,7 +3011,19 @@ export default function EligibilityCibilView({
               </button>
               <button
                 type="button"
-                onClick={() => setIsCompareModalOpen(true)}
+                onClick={() => {
+                  if (selectedLenderIds.length < 2) {
+                    toast({
+                      title: "Selection Required",
+                      description: "Please select 2 or more lenders to compare.",
+                      variant: "destructive"
+                    });
+                    setCompareError("Please select 2 or more lenders to compare.");
+                    setTimeout(() => setCompareError(null), 4000);
+                    return;
+                  }
+                  setIsCompareModalOpen(true);
+                }}
                 className="px-4 py-2 bg-primary text-white text-[12.5px] font-bold rounded-[10px] hover:opacity-95 cursor-pointer shadow-md shadow-primary/20"
               >
                 Compare Selected
@@ -4171,225 +4147,3 @@ export default function EligibilityCibilView({
   );
 }
 
-interface FactorCardProps {
-  label: string;
-  value: string;
-  subtext: string;
-  status: "Excellent" | "Good" | "Poor";
-}
-
-function FactorCard({ label, value, subtext, status }: FactorCardProps) {
-  return (
-    <div className="rounded-[16px] border border-gray-100 bg-gray-55/35 p-[14px] flex flex-col justify-between text-left transition-all hover:-translate-y-[1px] hover:shadow-sm">
-      <div>
-        <span className="text-[11px] font-semibold text-gray-400 block tracking-[0.5px]">{label}</span>
-        <div className="text-[20px] font-extrabold text-gray-800 mt-[4px]">{value}</div>
-      </div>
-      <div className="mt-[8px]">
-        <p className="text-[10px] text-gray-400 leading-none">{subtext}</p>
-        <span className={`text-[10px] font-bold inline-block mt-[4px] px-[8px] py-[2px] rounded-[10px] ${
-          status === "Excellent" ? "bg-emerald-50 text-emerald-700" :
-          status === "Good" ? "bg-blue-50 text-blue-700" :
-          "bg-rose-50 text-rose-700"
-        }`}>
-          {status}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// Lender Offer Card Sub-Component
-function LenderOfferCard({
-  lender,
-  eligibleLimit,
-  emi,
-  resultingFoir,
-  likelihood,
-  reasons,
-  currency,
-  formatCurrency,
-  formatCompact,
-  onApplyNow,
-  eligIncome,
-  eligEmi,
-  eligTenure,
-  isSelected = false,
-  onToggleSelect
-}: {
-  lender: LenderProduct;
-  eligibleLimit: number;
-  emi: number;
-  resultingFoir: number;
-  likelihood: "high" | "medium" | "low" | "ineligible";
-  reasons: string[];
-  currency: any;
-  formatCurrency: (val: number) => string;
-  formatCompact: (val: number) => string;
-  onApplyNow: any;
-  eligIncome: string;
-  eligEmi: string;
-  eligTenure: string;
-  isSelected?: boolean;
-  onToggleSelect?: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const isNotApproved = likelihood === "ineligible";
-
-  // Likelihood Badge Config
-  const badgeConfig = {
-    high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
-    medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
-    low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
-    ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
-  }[likelihood];
-
-  const handleApplyClick = () => {
-    const rateStr = lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`;
-    let details = `Applied for ${lender.name} ${lender.productType} via matching suggestions. ` +
-      `Eligible Limit: ${formatCurrency(eligibleLimit)}, ROI: ${rateStr}, Tenure: ${eligTenure} years. ` +
-      `Lender constraints: Max FOIR: ${lender.maxFoirPct}%, processing fee: ${lender.processingFee || "N/A"}.`;
-    onApplyNow(
-      `${lender.name} ${lender.productType}`,
-      eligibleLimit,
-      lender.minRate,
-      Number(eligTenure) || 5,
-      details
-    );
-  };
-
-  return (
-    <div className={`border rounded-[16px] p-4 bg-white shadow-sm transition-all duration-300 ${
-      isNotApproved ? "opacity-75 border-gray-200" : "border-gray-200 hover:shadow-md hover:border-primary/30"
-    }`}>
-      {/* Top row */}
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex items-start gap-2.5">
-          {!isNotApproved && onToggleSelect && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSelect();
-              }}
-              className={`flex items-center justify-center h-[18px] w-[18px] rounded-[5px] border transition-all shrink-0 cursor-pointer mt-2 ${
-                isSelected 
-                  ? "bg-primary border-primary text-white shadow-sm shadow-primary/25" 
-                  : "border-gray-300 hover:border-primary/50 bg-white"
-              }`}
-            >
-              {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-            </button>
-          )}
-          <LenderLogo name={lender.name} className="w-8 h-8 mt-0.5" />
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[14px] font-bold text-gray-900">{lender.name}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border uppercase tracking-wider ${badgeConfig.bg}`}>
-                {badgeConfig.label}
-              </span>
-            </div>
-            <span className="text-[11px] font-semibold text-gray-400 mt-0.5">{lender.productType}</span>
-          </div>
-        </div>
-        {!isNotApproved && (
-          <button
-            onClick={handleApplyClick}
-            className="px-3.5 py-1.5 bg-primary text-white text-[11px] font-bold rounded-[8px] hover:opacity-90 transition-all cursor-pointer"
-          >
-            Apply Now
-          </button>
-        )}
-      </div>
-
-      {/* Middle Grid */}
-      <div className="grid grid-cols-3 gap-2 border-t border-b border-gray-100 py-3 my-3 text-center">
-        <div className="flex flex-col border-r border-gray-100">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Eligible Limit</span>
-          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
-            {isNotApproved ? "₹0" : formatCompact(eligibleLimit)}
-          </span>
-        </div>
-        <div className="flex flex-col border-r border-gray-100">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Interest Rate</span>
-          <span className="text-[13px] font-bold text-gray-900 mt-0.5">
-            {lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`}
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Est. Monthly EMI</span>
-          <span className="text-[14px] font-bold text-gray-900 mt-0.5">
-            {isNotApproved ? "—" : formatCompact(emi)}
-          </span>
-        </div>
-      </div>
-
-      {/* Bottom Collapsible Info */}
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between text-[11px] font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
-        >
-          <span>{expanded ? "Hide Details" : "View Checklist & Details"}</span>
-          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </button>
-
-        {expanded && (
-          <div className="mt-2 text-[11.5px] text-gray-600 flex flex-col gap-3 animate-fade-up">
-            {/* Why Matched / Why Not */}
-            <div className="p-2.5 rounded-[10px] bg-gray-50/50 border border-gray-100">
-              <span className="font-bold text-gray-700 block mb-1">
-                {isNotApproved ? "Reason for Not Approved:" : "Why Matched:"}
-              </span>
-              {isNotApproved ? (
-                <div className="flex flex-col gap-1 text-rose-700 font-semibold">
-                  {reasons.map((r, idx) => (
-                    <div key={idx} className="flex items-start gap-1">
-                      <span className="mt-0.5">•</span>
-                      <span>{r.split(": ")[1] || r}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-emerald-700 font-semibold flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Profile meets CIBIL (≥{lender.minCibil}), Income & FOIR requirements.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Pros and Cons */}
-            {!isNotApproved && (
-              <div className="grid grid-cols-2 gap-3.5">
-                <div>
-                  <span className="font-bold text-gray-700 block mb-1">Pros</span>
-                  <ul className="list-disc pl-3 text-emerald-700 space-y-0.5">
-                    {lender.pros.map((p, idx) => <li key={idx}>{p}</li>)}
-                  </ul>
-                </div>
-                <div>
-                  <span className="font-bold text-gray-700 block mb-1">Cons</span>
-                  <ul className="list-disc pl-3 text-amber-700 space-y-0.5">
-                    {lender.cons.map((c, idx) => <li key={idx}>{c}</li>)}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Document Checklist */}
-            <div className="border-t border-gray-100 pt-2">
-              <span className="font-bold text-gray-700 block mb-1.5">Required Documents Checklist:</span>
-              <div className="grid gap-1.5">
-                {lender.docsRequired.map((doc, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-[8px] px-2 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary block shrink-0" />
-                    <span>{doc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

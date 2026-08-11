@@ -340,6 +340,7 @@ export function useBackendChat(userId: string): UseBackendChatResult {
       setHeartsExhausted(false);
 
       if (!userId) {
+        bootstrappedUserId.current = null;
         setMessages([]);
         setConversations([]);
         setConversationId(null);

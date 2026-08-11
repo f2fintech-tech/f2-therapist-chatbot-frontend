@@ -122,6 +122,47 @@ export default function FinancialHealthTestCatalog({
   const [showPastResults, setShowPastResults] = useState(false);
   const [showLoginGate, setShowLoginGate] = useState(false);
   const [tests, setTests] = useState<TestCard[]>([]);
+  const [selectedResultModal, setSelectedResultModal] = useState<PastResult | null>(null);
+
+  const getResultSummaryText = (result: PastResult): string => {
+    const id = result.testId.toLowerCase();
+    if (id.includes("literacy")) {
+      return `Your achieved score of ${result.score} demonstrates your financial knowledge across budgeting, credit usage, debt risk, and long-term planning.`;
+    }
+    if (id.includes("emergency")) {
+      return `Your safety score indicates ${result.score} preparedness. This reflects your liquid savings buffer available to absorb surprise expenses.`;
+    }
+    if (id.includes("loan")) {
+      return `Your loan comfort score is ${result.score}. This tracks your EMI obligations against net income to ensure healthy leverage.`;
+    }
+    if (id.includes("debt")) {
+      return `Your debt pressure analysis shows a rating of ${result.score}, measuring overall monthly debt commitments against savings capacity.`;
+    }
+    if (id.includes("credit")) {
+      return `Your credit readiness score is ${result.score}, evaluating repayment discipline, credit utilization ratio, and risk flags lenders inspect.`;
+    }
+    return `Assessment completed on ${result.date} with a score of ${result.score}.`;
+  };
+
+  const getResultRecommendationText = (result: PastResult): string => {
+    const id = result.testId.toLowerCase();
+    if (id.includes("literacy")) {
+      return "Explore intermediate financial strategies to optimize tax savings and diversify investment returns.";
+    }
+    if (id.includes("emergency")) {
+      return "Aim to maintain at least 3 to 6 months of essential living costs in accessible liquid accounts.";
+    }
+    if (id.includes("loan")) {
+      return "Ensure monthly EMI repayments remain under 40% of net income before taking on new financial commitments.";
+    }
+    if (id.includes("debt")) {
+      return "Prioritize paying down high-cost personal debt first while building liquidity buffer reserves.";
+    }
+    if (id.includes("credit")) {
+      return "Keep credit card utilization below 30% and ensure zero late payment flags to strengthen your credit profile.";
+    }
+    return "Revisit this assessment periodically to track improvements in your overall financial health.";
+  };
 
   const fetchCustomTests = async () => {
     try {
@@ -199,6 +240,88 @@ export default function FinancialHealthTestCatalog({
             category: r.category,
             riskLevel: r.risk_level,
           });
+          try {
+            if (r.test_type === "financial_literacy") {
+              const testKey = `finheal_financial_literacy_test:${uid}`;
+              const existingTest = localStorage.getItem(testKey);
+              if (!existingTest || !JSON.parse(existingTest)?.currentAttempt?.isFinished) {
+                const mockTestAttempt = {
+                  attemptId: r.id || `backend-${Date.now()}`,
+                  createdAt: r.completed_at || new Date().toISOString(),
+                  updatedAt: r.completed_at || new Date().toISOString(),
+                  startedAt: r.completed_at || new Date().toISOString(),
+                  finishedAt: r.completed_at || new Date().toISOString(),
+                  isFinished: true,
+                  questions: [],
+                  selectedAnswers: {},
+                  level: 1,
+                };
+                localStorage.setItem(testKey, JSON.stringify({
+                  version: 1,
+                  currentAttempt: mockTestAttempt,
+                  history: [mockTestAttempt],
+                  selectedLevel: 1,
+                }));
+              }
+
+              const assessmentKey = `finheal_financial_literacy_assessment:${uid}`;
+              const existingAssessment = localStorage.getItem(assessmentKey);
+              if (!existingAssessment || !JSON.parse(existingAssessment)?.currentAttempt) {
+                const level1QuestionIds = ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14", "b15", "b16", "b17", "b18", "b19", "b20"];
+                const mockAnswers: Record<string, string> = {
+                  b1: "B", b2: "C", b3: "B", b4: "B", b5: "B",
+                  b6: "A", b7: "B", b8: "B", b9: "A", b10: "B",
+                };
+                const mockAttempt = {
+                  attemptId: r.id || `backend-${Date.now()}`,
+                  levelId: 1,
+                  questionIds: level1QuestionIds,
+                  currentQuestionIndex: 0,
+                  answers: mockAnswers,
+                  startedAt: r.completed_at || new Date().toISOString(),
+                  updatedAt: r.completed_at || new Date().toISOString(),
+                  submittedAt: r.completed_at || new Date().toISOString(),
+                  stage: "results",
+                };
+                localStorage.setItem(assessmentKey, JSON.stringify({
+                  version: 1,
+                  selectedLevel: 1,
+                  currentAttempt: mockAttempt,
+                  history: [mockAttempt],
+                }));
+              }
+            } else {
+              const keyMap: Record<string, string> = {
+                emergency_fund: `finheal_emergency_fund_check:${uid}`,
+                loan_fit: `finheal_loan_fit_test:${uid}`,
+                debt_balance: `finheal_debt_balance_review:${uid}`,
+                credit_readiness: `finheal_credit_readiness:${uid}`,
+              };
+              const key = keyMap[r.test_type];
+              if (key) {
+                const existing = localStorage.getItem(key);
+                if (!existing || !JSON.parse(existing)?.completed) {
+                  const scoreVal = r.percentage_score ?? r.score ?? 80;
+                  const resultObj = r.details || {
+                    rawScore: scoreVal,
+                    percentageScore: scoreVal,
+                    score: scoreVal,
+                    category: r.category || "Completed",
+                    riskLevel: r.risk_level || r.category || "Moderate Risk",
+                    risk: r.risk_level || "Moderate Risk",
+                    coverageProgressPercent: scoreVal,
+                  };
+                  localStorage.setItem(key, JSON.stringify({
+                    version: 1,
+                    completed: true,
+                    result: resultObj,
+                    completedAt: r.completed_at || new Date().toISOString(),
+                    updatedAt: r.completed_at || new Date().toISOString(),
+                  }));
+                }
+              }
+            }
+          } catch {}
         }
       } catch { }
 
@@ -345,12 +468,10 @@ export default function FinancialHealthTestCatalog({
                                 return;
                               }
                               if (typeof window === "undefined") return;
-                              const nextUrl = new URL(window.location.href);
                               const view = r.testId.replace(/_/g, "-");
-                              nextUrl.searchParams.set("view", view);
-                              window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
+                              window.location.href = `/tests/${view}`;
                             }}
-                            className="rounded-[999px] border border-[#d4d8fa] bg-white px-[9px] py-[4px] text-[10px] font-semibold text-primary transition hover:bg-[#f6f7fe]"
+                            className="rounded-[999px] border border-[#d4d8fa] bg-white px-[9px] py-[4px] text-[10px] font-semibold text-primary transition hover:bg-[#f6f7fe] cursor-pointer"
                           >
                             View Results
                           </button>
@@ -487,7 +608,6 @@ export default function FinancialHealthTestCatalog({
         </div>
       )}
 
-      {/* Dynamic quiz runner modal removed */}
     </main>
   );
 }
