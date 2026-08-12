@@ -25,9 +25,22 @@ import {
   CalendarCheck,
   PieChart,
   Hourglass,
-  Search
+  Search,
+  Download,
+  Landmark
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer
+} from "recharts";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount, getBureauPdfDownloadUrl } from "../services/cibil";
+import { getStoredAuthSession } from "../utils/authSession";
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
@@ -61,6 +74,32 @@ interface LenderProduct {
   pros: string[];
   cons: string[];
 }
+
+const formatDateRange = (rangeStr: string) => {
+  if (!rangeStr || rangeStr === 'N/A') return 'N/A';
+  const parts = rangeStr.split(' to ');
+  if (parts.length === 2) {
+    const formatPart = (p: string) => {
+      const match = p.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      if (match) {
+        const [_, day, month, year] = match;
+        const date = new Date(`${year}-${month}-${day}`);
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+      return p;
+    };
+    return `${formatPart(parts[0])} to ${formatPart(parts[1])}`;
+  }
+  return rangeStr;
+};
+
+const formatCurrency = (val: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0
+  }).format(val);
+};
 
 export default function CibilAnalyzerView({
   userId,
@@ -277,8 +316,22 @@ export default function CibilAnalyzerView({
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      
+      const session = getStoredAuthSession();
+      const activeUserId = userId || session?.userId;
+      if (activeUserId) {
+        headers["X-Requester-ID"] = activeUserId;
+      }
+
       const res = await fetch(`${apiBase}/cibil/bsa/upload`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
@@ -695,6 +748,9 @@ export default function CibilAnalyzerView({
   // Score Band Color Helper
   const scoreTheme = useMemo(() => {
     if (!report) return { color: "text-gray-400", border: "border-gray-200", bg: "bg-gray-50", fill: "#9ca3af" };
+    if (report.bureau?.toLowerCase() === "bsa_standalone") {
+      return { color: "text-gray-500", border: "border-gray-300", bg: "bg-gray-50", fill: "#9ca3af", gradient: "from-gray-400 to-gray-500" };
+    }
     const score = report.score;
     if (score >= 750) return { color: "text-emerald-500", border: "border-emerald-200", bg: "bg-emerald-50", fill: "#10b981", gradient: "from-emerald-500 to-teal-500" };
     if (score >= 700) return { color: "text-blue-500", border: "border-blue-200", bg: "bg-blue-50", fill: "#3b82f6", gradient: "from-blue-500 to-indigo-500" };
@@ -960,9 +1016,11 @@ export default function CibilAnalyzerView({
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block uppercase border shadow-xs ${(report.bureau || "").toLowerCase() === "experian"
                       ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : (report.bureau || "").toLowerCase() === "bsa_standalone"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : "bg-blue-50 text-blue-700 border-blue-200"
                     }`}>
-                    {report.bureau || "CIBIL"}
+                    {(report.bureau || "").toLowerCase() === "bsa_standalone" ? "BSA" : (report.bureau || "CIBIL")}
                   </span>
                 </>
               )}
@@ -1218,6 +1276,568 @@ export default function CibilAnalyzerView({
             )}
           </div>
         </div>
+      ) : report.bureau?.toLowerCase() === "bsa_standalone" ? (
+        // Render BSA Dashboard!
+        <ErrorBoundary moduleName="BSA Analyzer Dashboard" resetKeys={[report?.id, userId]}>
+          {(() => {
+            const r = report as any;
+            const bsaAnalysisData = r?.bsa_analysis || r?.bsa_json_data || (r?.report_data ? (r.report_data.bsa_analysis || r.report_data.bsa_json_data) : null);
+            
+            if (!bsaAnalysisData) {
+              return (
+                <div className="rounded-[20px] border border-gray-200 border-dashed bg-gray-50/30 p-8 flex flex-col items-center justify-center text-center min-h-[210px] gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-gray-700">No Statement Data Found</h3>
+                    <p className="text-[11.5px] text-gray-400 mt-1 max-w-[340px] leading-normal font-medium font-sans">
+                      This standalone BSA enquiry record does not contain parsed statement metrics.
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            const session = getStoredAuthSession() as any;
+            const isStaff = ["advisor", "admin", "employee", "manager", "system admin"].includes((session?.role || "").toLowerCase());
+            const bsaPeriod = "";
+
+            let bounceEventsCount = bsaAnalysisData.metrics?.bounce_events_count;
+            if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+              const bouncedData = bsaAnalysisData.raw_json_data?.bounced_transaction_data;
+              if (bouncedData) {
+                const txnsDict = bouncedData.trasactions || bouncedData.transactions;
+                if (txnsDict) {
+                  let count = 0;
+                  for (const k in txnsDict) {
+                    if (Array.isArray(txnsDict[k])) {
+                      count += txnsDict[k].length;
+                    }
+                  }
+                  if (count > 0) bounceEventsCount = count;
+                }
+                if (bounceEventsCount === undefined || bounceEventsCount === null || bounceEventsCount === 0) {
+                  const summary = bouncedData.bounces_summary;
+                  if (Array.isArray(summary)) {
+                    const totalItem = summary.find((s: any) => s?.month === 'Total');
+                    if (totalItem) {
+                      bounceEventsCount = (
+                        (totalItem.ecs_bounce?.count || 0) +
+                        (totalItem.ach_bounce?.count || 0) +
+                        (totalItem.cheque_inward_bounce?.count || 0) +
+                        (totalItem.cheque_outward_bounce?.count || 0)
+                      );
+                    }
+                  }
+                }
+              }
+            }
+            const finalBounceCount = bounceEventsCount || 0;
+
+            // Recalculate Average Monthly Salary
+            let calculatedSalary = 0;
+            try {
+              const salaryCredit = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.salary_credit || bsaAnalysisData.raw_json_data?.salary_credit || bsaAnalysisData.raw_json_data?.income_analysis?.salary_credit || bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.salary_credit;
+              let monthsCount = 6;
+              const durationStr = bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_duration;
+              if (durationStr && durationStr.includes('days')) {
+                const days = parseInt(durationStr);
+                monthsCount = Math.round(days / 30.44) || 1;
+              } else if (bsaPeriod || bsaAnalysisData?.metrics?.statement_period) {
+                const period = bsaPeriod || bsaAnalysisData?.metrics?.statement_period || "";
+                const parts = period.split('to').map((s: string) => s.trim());
+                if (parts.length === 2) {
+                  const d1 = new Date(parts[0].split('-').reverse().join('-'));
+                  const d2 = new Date(parts[1].split('-').reverse().join('-'));
+                  if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                    const diffTime = Math.abs(d2.getTime() - d1.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    monthsCount = Math.round(diffDays / 30.44) || 1;
+                  }
+                }
+              } else if (bsaAnalysisData?.months?.length) {
+                monthsCount = bsaAnalysisData.months.length;
+              }
+
+              if (salaryCredit?.amount?.Total) {
+                calculatedSalary = Math.round(salaryCredit.amount.Total / monthsCount);
+              } else {
+                calculatedSalary = bsaAnalysisData.metrics?.verified_monthly_salary || 
+                                   bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.insights?.key_insights?.income_insights?.total_income || 
+                                   0;
+              }
+            } catch (e) {
+              calculatedSalary = 0;
+            }
+
+            // Recalculate Average Monthly EMI
+            let calculatedEmi = 0;
+            try {
+              const emiData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.debits?.emi_and_loan;
+              if (emiData?.amount?.Total && emiData?.count?.Total > 0) {
+                calculatedEmi = Math.round(emiData.amount.Total / emiData.count.Total);
+              } else {
+                calculatedEmi = bsaAnalysisData.metrics?.total_existing_monthly_emi || 0;
+              }
+            } catch (e) {
+              calculatedEmi = 0;
+            }
+
+            // Calculate FOIR
+            let calculatedFoir = 0;
+            if (calculatedSalary > 0) {
+              calculatedFoir = (calculatedEmi / calculatedSalary) * 100;
+            } else {
+              try {
+                let rawFoirVal = bsaAnalysisData.metrics?.foir;
+                if (rawFoirVal === undefined || rawFoirVal === null) {
+                  const findFoir = (obj: any): any => {
+                    if (!obj || typeof obj !== 'object') return null;
+                    if (obj.monthwise_foir_score?.amount?.Total !== undefined && !Number.isNaN(obj.monthwise_foir_score?.amount?.Total)) {
+                      return obj.monthwise_foir_score.amount.Total;
+                    }
+                    for (const key in obj) {
+                      const res = findFoir(obj[key]);
+                      if (res !== null) return res;
+                    }
+                    return null;
+                  };
+                  if (bsaAnalysisData.raw_json_data) {
+                    rawFoirVal = findFoir(bsaAnalysisData.raw_json_data);
+                  }
+                }
+                if (rawFoirVal !== null && rawFoirVal !== undefined) {
+                  calculatedFoir = parseFloat(rawFoirVal) || 0;
+                }
+              } catch (e) {}
+            }
+
+            return (
+              <div className="flex flex-col gap-4 animate-fade-in w-full bg-transparent p-0">
+                {/* Statement Verification / Bank details */}
+                <div className="bg-white border border-gray-200 rounded-[16px] p-5 flex flex-col md:flex-row md:items-center md:justify-between shadow-xs gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-[10px] border border-gray-200 shadow-sm flex items-center justify-center bg-white shrink-0 overflow-hidden p-1 relative">
+                      {(() => {
+                        const bName = bsaAnalysisData?.bank_name || '';
+                        const BANK_DOMAINS: Record<string, string> = {
+                          "canara bank": "canarabank.com",
+                          "hdfc bank": "hdfcbank.com",
+                          "icici bank": "icicibank.com",
+                          "sbi": "sbi.co.in",
+                          "state bank of india": "sbi.co.in",
+                          "axis bank": "axisbank.com",
+                          "kotak mahindra bank": "kotak.com",
+                          "yes bank": "yesbank.in",
+                          "indusind bank": "indusind.com",
+                          "punjab national bank": "pnbindia.in",
+                          "pnb": "pnbindia.in",
+                          "bank of baroda": "bankofbaroda.in",
+                        };
+                        const domain = BANK_DOMAINS[bName.toLowerCase().trim()];
+                        if (domain) {
+                          return (
+                            <>
+                              <div className="absolute inset-0 flex items-center justify-center text-indigo-200">
+                                <Landmark className="h-5 w-5" />
+                              </div>
+                              <img 
+                                src={`https://unavatar.io/${domain}?fallback=false`} 
+                                alt={bName} 
+                                className="w-full h-full object-contain relative z-10 bg-white" 
+                                onError={(e) => { 
+                                  e.currentTarget.style.display = 'none'; 
+                                }} 
+                              />
+                            </>
+                          );
+                        }
+                        return <Landmark className="h-5 w-5 text-indigo-600" />;
+                      })()}
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-bold text-gray-900">{bsaAnalysisData?.bank_name || 'Unknown Bank'}</span>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" />
+                          Statement Verified
+                        </span>
+                      </div>
+                      <span className="text-[11.5px] text-gray-500 font-semibold mt-0.5">
+                        {bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.account_type || 'Savings'} Account
+                        {' • '}
+                        {(() => {
+                           const accStr = bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.bank_account_details?.account_number;
+                           return accStr ? 'XX' + String(accStr).slice(-4) : 'XX1234';
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-gray-150 pt-3 md:pt-0 md:pl-6">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Account Holder</span>
+                      <span className="text-[12px] font-extrabold text-gray-800">
+                        {bsaAnalysisData?.person_name || bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.personal_details?.name || report?.name || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Statement Period</span>
+                      <span className="text-[12px] font-extrabold text-gray-800">
+                        {formatDateRange(bsaAnalysisData?.metrics?.statement_period || '')}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Duration</span>
+                      <span className="text-[12px] font-extrabold text-gray-800">
+                        {(() => {
+                           const durationStr = bsaAnalysisData?.raw_json_data?.user_info_and_summary_data?.user_account_information?.account_statement_details?.statement_duration;
+                           if (durationStr && durationStr.includes('days')) {
+                             const days = parseInt(durationStr);
+                             return `${Math.round(days / 30.44)} Months`;
+                           }
+                           return `${bsaAnalysisData?.months?.length || 6} Months`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Metrics Grid */}
+                <div className="relative w-full overflow-visible">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-[15px]" />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Salary</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all consistent incoming salary credits across the analyzed period.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-l-[15px]" />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Credit</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Total incoming funds (excluding internal transfers and loan disbursals) divided by the number of months.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[18px] font-extrabold text-indigo-600">₹{
+                        (() => {
+                          try {
+                            const creditsData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits;
+                            if (creditsData?.total_credit?.amount && creditsData?.loan_disbursed?.amount) {
+                              const totalAmtDict = creditsData.total_credit.amount;
+                              const loanAmtDict = creditsData.loan_disbursed.amount;
+                              const months = Object.keys(totalAmtDict).filter(k => k.toLowerCase() !== 'total');
+                              if (months.length > 0) {
+                                let sum = 0;
+                                months.forEach(m => {
+                                  sum += Math.max(0, (totalAmtDict[m] || 0) - (loanAmtDict[m] || 0));
+                                });
+                                return Math.round(sum / months.length).toLocaleString('en-IN');
+                              }
+                            }
+                            return (bsaAnalysisData.monthly_credits?.amount?.length > 0 
+                              ? Math.round(bsaAnalysisData.monthly_credits.amount.reduce((a: number, b: number) => a + b, 0) / bsaAnalysisData.monthly_credits.amount.length)
+                              : 0).toLocaleString('en-IN');
+                          } catch(e) { return '0'; }
+                        })()
+                      }</span>
+                    </div>
+
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-l-[15px]" />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly EMI</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Average of all identified EMI and loan repayment transaction amounts.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-[15px]" />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Balance</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">The average end-of-day bank balance maintained throughout the statement period.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[18px] font-extrabold text-blue-600">₹{
+                        (bsaAnalysisData.metrics?.average_monthly_balance || 
+                        bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
+                        0).toLocaleString('en-IN')
+                      }</span>
+                    </div>
+
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className={`absolute top-[1px] bottom-[1px] left-[1px] w-1 rounded-l-[15px] ${finalBounceCount > 0 ? 'bg-gradient-to-b from-rose-400 to-rose-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`} />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Bounce Events</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Number of returned inward cheques or failed auto-debits (NACH/ECS) due to insufficient funds.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`text-[18px] font-extrabold ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {finalBounceCount}
+                      </span>
+                    </div>
+
+                    <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative bg-white/75 backdrop-blur-[16px]">
+                      <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 rounded-l-[15px]" />
+                      <div className="flex items-start justify-between gap-1.5 w-full">
+                        <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">FOIR</span>
+                        <div className="group shrink-0">
+                          <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors cursor-help" />
+                          <div className="absolute bottom-full right-0 mb-2 w-[220px] z-50 pointer-events-none opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-24 bg-[radial-gradient(ellipse,rgba(99,102,241,0.6)_0%,rgba(99,102,241,0)_70%)] rounded-full -z-10" />
+                            <div className="relative w-full p-3.5 shadow-xl rounded-[16px]">
+                              <div className="absolute inset-0 rounded-[16px] border border-white/20 bg-slate-900/40 backdrop-blur-xl transform-gpu -z-10" style={{ backdropFilter: 'blur(20px)' }} />
+                              <p className="relative z-10 text-white text-[11px] font-medium leading-[1.6] normal-case tracking-wide text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Fixed Obligation to Income Ratio. Calculated as (Total EMIs ÷ Net Salary) × 100. Lower is better.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Alerts */}
+                <div className="flex flex-col gap-3">
+                  {finalBounceCount > 0 && (
+                    <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                      <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[13px] font-bold text-rose-800">Cheque/EMI Bounces Detected</span>
+                        <span className="text-[11.5px] text-rose-600 leading-snug font-medium">
+                          We detected {finalBounceCount} bounce events in the last 6 months. This negatively impacts creditworthiness and loan eligibility.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {(() => {
+                    if (calculatedFoir > 0) {
+                      const numericFoir = calculatedFoir;
+                      if (!Number.isNaN(numericFoir)) {
+                        const displayFoir = numericFoir.toFixed(2);
+                        if (numericFoir > 70) {
+                          return (
+                            <div className="bg-rose-100 border border-rose-300 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[13px] font-bold text-rose-900">Extremely High FOIR ({displayFoir}%)</span>
+                                <span className="text-[11.5px] text-rose-700 leading-snug font-medium">
+                                  You are highly over-leveraged. Standard loans will likely be rejected outright. Focus on debt consolidation or clearing existing EMIs before applying for new credit.
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        } else if (numericFoir > 65) {
+                          return (
+                            <div className="bg-red-50 border border-red-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[13px] font-bold text-red-800">Critical FOIR Warning ({displayFoir}%)</span>
+                                <span className="text-[11.5px] text-red-600 leading-snug font-medium">
+                                  This is critically high. Most lenders cap FOIR at 60-65%. Approval chances are severely restricted without a strong co-applicant or collateral.
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        } else if (numericFoir > 50) {
+                          return (
+                            <div className="bg-orange-50 border border-orange-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[13px] font-bold text-orange-800">High FOIR Warning ({displayFoir}%)</span>
+                                <span className="text-[11.5px] text-orange-700 leading-snug font-medium">
+                                  A FOIR above 50% indicates a high debt burden. This may reduce the chances of loan approval or result in higher interest rates.
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        } else if (numericFoir > 30) {
+                          return (
+                            <div className="bg-amber-50 border border-amber-200 rounded-[12px] p-4 flex items-start gap-3 shadow-sm">
+                              <Info className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[13px] font-bold text-amber-800">Moderate FOIR ({displayFoir}%)</span>
+                                <span className="text-[11.5px] text-amber-700 leading-snug font-medium">
+                                  This is a moderate debt level. You still have room for additional credit, but banks will start analyzing your surplus income closer.
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }
+                      }
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="bg-white border border-gray-100 rounded-[20px] p-5 shadow-sm flex flex-col gap-4">
+                    <h4 className="text-[13px] font-bold text-black uppercase tracking-wider">Monthly Inflow Trend</h4>
+                    <div className="h-[200px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={(() => {
+                          if (!bsaAnalysisData?.months) return [];
+                          const totalAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.total_credit?.amount;
+                          const loanAmtDict = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits?.loan_disbursed?.amount;
+                          return bsaAnalysisData.months.map((month: string, i: number) => {
+                            let inflows = bsaAnalysisData.monthly_credits?.amount?.[i] || 0;
+                            if (totalAmtDict && loanAmtDict && totalAmtDict[month] !== undefined) {
+                              inflows = Math.max(0, (totalAmtDict[month] || 0) - (loanAmtDict[month] || 0));
+                            }
+                            return { month, inflows };
+                          });
+                        })()}>
+                          <defs>
+                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                              <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.8} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#000000', fontWeight: 500 }} angle={-45} textAnchor="end" interval={0} height={45} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#000000', fontWeight: 500 }} tickFormatter={(val) => `₹${val/1000}k`} width={35} />
+                          <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '12px', fontWeight: 600, color: '#1e293b' }} formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Inflows']} />
+                          <Bar dataKey="inflows" fill="url(#barGradient)" radius={[6, 6, 0, 0]} maxBarSize={28} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-100 rounded-[20px] p-5 shadow-sm flex flex-col gap-4">
+                    <h4 className="text-[13px] font-bold text-black uppercase tracking-wider">Average Bank Balance</h4>
+                    <div className="h-[200px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={bsaAnalysisData?.months?.map((month: string, i: number) => {
+                          let avgEodObj = null;
+                          const findAvg = (obj: any): any => {
+                            if (!obj || typeof obj !== 'object') return null;
+                            if (obj.average_eod_balance?.amount && obj.average_eod_balance?.amount[month] !== undefined) return obj.average_eod_balance.amount;
+                            for (const key in obj) {
+                              const res = findAvg(obj[key]);
+                              if (res) return res;
+                            }
+                            return null;
+                          };
+                          if (bsaAnalysisData?.raw_json_data) {
+                            avgEodObj = findAvg(bsaAnalysisData.raw_json_data);
+                          }
+                          const balance = (avgEodObj && avgEodObj[month]) || bsaAnalysisData.daily_balances?.["15th"]?.[i] || bsaAnalysisData.metrics?.average_monthly_balance || 0;
+                          return { month, balance };
+                        }) || []}>
+                          <defs>
+                            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#000000', fontWeight: 500 }} angle={-45} textAnchor="end" interval={0} height={45} padding={{ left: 20, right: 20 }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#000000', fontWeight: 500 }} tickFormatter={(val) => `₹${val/1000}k`} width={35} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '12px', fontWeight: 600, color: '#1e293b' }} formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Avg Balance']} />
+                          <Area type="monotone" dataKey="balance" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#areaGradient)" dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded EOD Balance View */}
+                {bsaAnalysisData.daily_balances && Object.keys(bsaAnalysisData.daily_balances).length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-[16px] p-5 shadow-sm flex flex-col gap-4 overflow-x-auto">
+                    <h4 className="text-[13px] font-extrabold text-gray-800">Expanded EOD Balance View</h4>
+                    <table className="w-full text-left border-collapse min-w-[500px]">
+                      <thead>
+                        <tr>
+                          <th className="py-2.5 px-3 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wide bg-gray-50/50">EOD Date</th>
+                          {bsaAnalysisData.months?.map((m: string) => (
+                            <th key={m} className="py-2.5 px-3 border-b border-gray-100 text-[11px] font-bold text-gray-500 uppercase tracking-wide text-right bg-gray-50/50">{m}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['5th', '10th', '15th', '20th', '25th', '30th'].map((day) => (
+                          <tr key={day} className="hover:bg-gray-50 transition-colors">
+                            <td className="py-2.5 px-3 border-b border-gray-50 text-[12px] font-bold text-gray-700">{day}</td>
+                            {bsaAnalysisData.months?.map((m: string, i: number) => {
+                              const bal = bsaAnalysisData.daily_balances[day]?.[i];
+                              return (
+                                <td key={m} className="py-2.5 px-3 border-b border-gray-50 text-[12px] font-medium text-gray-700 text-right">
+                                  {bal !== undefined && bal !== null ? `₹${bal.toLocaleString('en-IN')}` : '-'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Actions Excel Download inside Modal */}
+                {bsaAnalysisData.excel_report_url && (isStaff || isExemptRole(userEmail, report?.name)) && (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <a 
+                      href={bsaAnalysisData.excel_report_url} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="w-full bg-white border border-indigo-200 text-indigo-700 font-bold py-3.5 rounded-[14px] hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[13px] flex items-center justify-center gap-2 shadow-sm cibil-print-hide"
+                    >
+                      <Download className="w-[16px] h-[16px]" />
+                      Download Detailed BSA Excel Report
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </ErrorBoundary>
       ) : (
         // State B: CIBIL Report Dashboard + Loan Toolkit
         <ErrorBoundary moduleName="CIBIL Analyzer Dashboard" resetKeys={[report?.id, userId]}>
@@ -1274,9 +1894,11 @@ export default function CibilAnalyzerView({
 
                   {/* Score details centered */}
                   <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-[36px] font-black text-gray-800 leading-none">{report.score}</span>
+                    <span className="text-[36px] font-black text-gray-800 leading-none">
+                      {report.bureau?.toLowerCase() === "bsa_standalone" ? "N/A" : report.score}
+                    </span>
                     <span className={`text-[13px] font-bold mt-[6px] px-[12px] py-[3px] rounded-[20px] ${scoreTheme.bg} ${scoreTheme.color} border ${scoreTheme.border}`}>
-                      {report.band}
+                      {report.bureau?.toLowerCase() === "bsa_standalone" ? "BSA" : report.band}
                     </span>
                   </div>
                 </div>
@@ -1572,7 +2194,7 @@ export default function CibilAnalyzerView({
               {/* Tab 1: Credit Report & Tips */}
               {activeTab === "report" && (() => {
                 // Compute open accounts grouped by display category
-                const closedCount = report.accounts.length - openAccounts.length;
+                const closedCount = (report.accounts || []).length - openAccounts.length;
 
                 const CATEGORY_DEFS: { key: string; label: string; short: string; color: string; bg: string; border: string }[] = [
                   { key: "Credit Card", label: "Credit Card", short: "CC", color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
@@ -1619,7 +2241,7 @@ export default function CibilAnalyzerView({
                         <div>
                           <h3 className="text-[13px] font-bold text-gray-800">Bureau Open Accounts Summary</h3>
                           <p className="text-[11px] text-gray-400 mt-[1px]">
-                            {openAccounts.length} open · {closedCount} closed · {report.accounts.length} total accounts on file
+                            {openAccounts.length} open · {closedCount} closed · {(report.accounts || []).length} total accounts on file
                           </p>
                         </div>
                       </div>

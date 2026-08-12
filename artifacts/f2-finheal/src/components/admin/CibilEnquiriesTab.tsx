@@ -169,6 +169,7 @@ export default function CibilEnquiriesTab({
                   <option value="all">All Bureaus</option>
                   <option value="cibil">CIBIL</option>
                   <option value="experian">Experian</option>
+                  <option value="bsa_standalone">BSA</option>
                 </select>
               </div>
 
@@ -314,7 +315,11 @@ export default function CibilEnquiriesTab({
               paginatedEnquiries.map((enq) => {
                 let scoreColorClass = "text-red-500";
                 let bandText = "Poor";
-                if (enq.score >= 750) {
+                const isBsa = enq.bureau?.toLowerCase() === "bsa_standalone";
+                if (isBsa) {
+                  scoreColorClass = "text-gray-400";
+                  bandText = "N/A";
+                } else if (enq.score >= 750) {
                   scoreColorClass = "text-emerald-600";
                   bandText = "Excellent";
                 } else if (enq.score >= 700) {
@@ -379,9 +384,11 @@ export default function CibilEnquiriesTab({
                     <td className="p-[12px]">
                       <span className={`inline-flex px-[8px] py-[2px] rounded-full text-[9px] font-bold uppercase ${enq.bureau.toLowerCase() === "experian"
                         ? "bg-purple-100 text-purple-700 border border-purple-200"
-                        : "bg-blue-100 text-blue-700 border border-blue-200"
+                        : enq.bureau.toLowerCase() === "cibil"
+                        ? "bg-blue-100 text-blue-700 border border-blue-200"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-250"
                         }`}>
-                        {enq.bureau}
+                        {enq.bureau.toLowerCase() === "bsa_standalone" ? "BSA" : enq.bureau}
                       </span>
                     </td>
                     <td className="p-[12px] font-mono font-semibold text-gray-700 uppercase">
@@ -389,10 +396,10 @@ export default function CibilEnquiriesTab({
                     </td>
                     <td className="p-[12px]">
                       <span className={`text-[15px] font-extrabold ${scoreColorClass}`}>
-                        {enq.score}
+                        {isBsa ? "N/A" : enq.score}
                       </span>
                       <span className="text-[10px] text-gray-400 block font-medium">
-                        {bandText}
+                        {isBsa ? "N/A" : bandText}
                       </span>
                     </td>
                     <td className="p-[12px] text-gray-500">
@@ -409,7 +416,13 @@ export default function CibilEnquiriesTab({
                       {enq.report_data ? (
                         <button
                           onClick={() => {
-                            setViewingCibilReport({ ...(enq.report_data || {}), bureau: enq.bureau || "CIBIL" });
+                            setViewingCibilReport({
+                              ...(enq.report_data || {}),
+                              name: enq.name,
+                              phone: enq.phone,
+                              email: enq.email,
+                              bureau: enq.bureau || "CIBIL"
+                            });
                             setViewingCibilReportId(enq.id);
                             setViewingCibilReportUserId(enq.user_id);
                           }}
@@ -429,12 +442,23 @@ export default function CibilEnquiriesTab({
                       ) : (
                         <span className="text-gray-400 block">-</span>
                       )}
-                      <button
-                        onClick={() => handleGenerateCAM(enq.user_id, enq.name, enq.id)}
-                        className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
-                      >
-                        Generate CAM 📊
-                      </button>
+                      {((enq as any).bsa_excel_url || enq.report_data?.bsa_analysis?.excel_report_url) && (
+                        <a
+                          href={(enq as any).bsa_excel_url || enq.report_data?.bsa_analysis?.excel_report_url}
+                          download
+                          className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto"
+                        >
+                          Download BSA 📥
+                        </a>
+                      )}
+                      {!isBsa && (
+                        <button
+                          onClick={() => handleGenerateCAM(enq.user_id, enq.name, enq.id)}
+                          className="text-emerald-600 hover:underline font-bold text-[10px] block mt-1 ml-auto cursor-pointer border-none bg-transparent"
+                        >
+                          Generate CAM 📊
+                        </button>
+                      )}
                       {isAdmin && (
                         <button
                           onClick={() => handleDeleteEnquiry(enq.id)}

@@ -138,11 +138,16 @@ export default function TrashTab({
                     cibilTrash.map((enq) => {
                       const utcStr = enq.deleted_at ? (enq.deleted_at.endsWith("Z") || enq.deleted_at.includes("+") ? enq.deleted_at : `${enq.deleted_at}Z`) : "";
                       const delDate = utcStr ? new Date(utcStr).toLocaleString("en-IN") : "-";
+                      const isBsa = enq.bureau?.toLowerCase() === "bsa_standalone";
                       return (
                         <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50/50">
                           <td className="p-[10px] font-semibold text-gray-850">{enq.name || "Guest"}</td>
-                          <td className="p-[10px] text-gray-500">{enq.pan || "-"} ({enq.bureau || "CIBIL"})</td>
-                          <td className="p-[10px]"><span className="font-bold text-gray-700">{enq.score}</span></td>
+                          <td className="p-[10px] text-gray-500">{enq.pan || "-"} ({isBsa ? "BSA" : (enq.bureau || "CIBIL")})</td>
+                          <td className="p-[10px]">
+                            <span className="font-bold text-gray-700">
+                              {isBsa ? "N/A" : enq.score}
+                            </span>
+                          </td>
                           <td className="p-[10px] text-gray-450">{delDate}</td>
                           <td className="p-[10px] text-right">
                             <button

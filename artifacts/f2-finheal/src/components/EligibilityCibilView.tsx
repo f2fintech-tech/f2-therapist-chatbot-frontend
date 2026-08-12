@@ -27,6 +27,7 @@ import {
   Search
 } from "lucide-react";
 import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
+import { getStoredAuthSession } from "../utils/authSession";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
@@ -858,8 +859,22 @@ export default function EligibilityCibilView({
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
+      const headers: Record<string, string> = {};
+      if (configuredApiKey) {
+        headers["Authorization"] = `Bearer ${configuredApiKey}`;
+        headers["X-API-Key"] = configuredApiKey;
+      }
+      
+      const session = getStoredAuthSession();
+      const activeUserId = userId || session?.userId;
+      if (activeUserId) {
+        headers["X-Requester-ID"] = activeUserId;
+      }
+
       const response = await fetch(`${apiBase}/cibil/bsa/upload-stream`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
