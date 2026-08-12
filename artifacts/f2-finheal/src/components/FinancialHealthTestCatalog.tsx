@@ -302,7 +302,7 @@ export default function FinancialHealthTestCatalog({
                 const existing = localStorage.getItem(key);
                 if (!existing || !JSON.parse(existing)?.completed) {
                   const scoreVal = r.percentage_score ?? r.score ?? 80;
-                  const resultObj = r.details || {
+                  const resultObj = (r as any).details || {
                     rawScore: scoreVal,
                     percentageScore: scoreVal,
                     score: scoreVal,
