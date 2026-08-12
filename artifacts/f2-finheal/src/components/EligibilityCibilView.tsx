@@ -26,7 +26,7 @@ import {
   Hourglass,
   Search
 } from "lucide-react";
-import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl, downloadBureauPdf } from "../services/cibil";
 import { getStoredAuthSession } from "../utils/authSession";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
@@ -78,33 +78,7 @@ interface EligibilityCibilViewProps {
   onLoginRequired?: () => void;
 }
 
-export interface LenderProduct {
-  id: string;
-  name: string;
-  lenderType: string;
-  productType: string;
-  category: string;
-  minRate: number;
-  maxRate: number;
-  minTenureYears: number;
-  maxTenureYears: number;
-  minMonthlyIncome: number;
-  minCibil: number;
-  maxFoirPct: number;
-  minAmount: number;
-  maxAmount: number;
-  disbursalTime: string;
-  pros: string[];
-  cons: string[];
-  docsRequired: string[];
-  processingFee?: string;
-  emiPerLakhMin?: string;
-  extraParams?: {
-    eligibilityCriteria?: string;
-    abb_to_emi_factor?: number;
-    degreeCaps?: Record<string, number>;
-  };
-}
+
 
 const LOAN_TYPES = [
   {
@@ -2560,6 +2534,8 @@ export default function EligibilityCibilView({
                     {cibilReport.pdf_url && (
                       <a
                         href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                       >
                         <FileText className="w-[14px] h-[14px]" />

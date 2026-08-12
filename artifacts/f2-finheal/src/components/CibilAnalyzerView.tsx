@@ -39,7 +39,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from "recharts";
-import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount, getBureauPdfDownloadUrl } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, CibilAccount, getBureauPdfDownloadUrl, downloadBureauPdf } from "../services/cibil";
 import { getStoredAuthSession } from "../utils/authSession";
 import { isExemptRole, isReportFresh, getNextAvailableFetchDate, inlineCrossOriginStylesheets } from "../utils/cibilUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -1908,6 +1908,8 @@ export default function CibilAnalyzerView({
                 {report.pdf_url && (
                   <a
                     href={getBureauPdfDownloadUrl(report.pdf_url, `${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(report.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                   >
                     <FileText className="w-[14px] h-[14px]" />
