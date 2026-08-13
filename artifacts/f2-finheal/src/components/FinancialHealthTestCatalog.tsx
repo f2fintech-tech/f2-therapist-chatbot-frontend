@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchTestResults } from "@/lib/backendAuth";
+import { financialLiteracyQuestionsByLevel, financialLiteracyStorageVersion } from "@/features/financial-literacy/financialLiteracyConfig";
+import { createShuffledQuestions } from "./FinancialLiteracyTestView";
 
 interface FinancialHealthTestCatalogProps {
   userId: string;
@@ -225,10 +227,12 @@ export default function FinancialHealthTestCatalog({
           const meta = testMeta[r.test_type];
           if (!meta || seen.has(r.test_type)) continue;
           seen.add(r.test_type);
-          const score = r.percentage_score != null
-            ? `${r.percentage_score}%`
-            : r.score != null
-              ? String(r.score)
+          const isLiteracy = r.test_type === "financial_literacy";
+          const rawVal = (r as any).raw_score ?? r.score ?? r.percentage_score;
+          const score = isLiteracy
+            ? `${Math.round(r.percentage_score ?? r.score ?? 0)}%`
+            : rawVal != null
+              ? `${Math.abs(Math.round(rawVal))} pts`
               : r.risk_level || r.category || "Done";
           const date = new Date(r.completed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
           results.push({
@@ -245,6 +249,12 @@ export default function FinancialHealthTestCatalog({
               const testKey = `finheal_financial_literacy_test:${uid}`;
               const existingTest = localStorage.getItem(testKey);
               if (!existingTest || !JSON.parse(existingTest)?.currentAttempt?.isFinished) {
+                const qList = createShuffledQuestions(1);
+                const answersMap: Record<number, "A" | "B" | "C" | "D"> = {};
+                qList.forEach((q) => {
+                  const correctOpt = q.options.find((o) => o.isCorrect);
+                  answersMap[q.id] = (correctOpt ? correctOpt.letter : "A") as "A" | "B" | "C" | "D";
+                });
                 const mockTestAttempt = {
                   attemptId: r.id || `backend-${Date.now()}`,
                   createdAt: r.completed_at || new Date().toISOString(),
@@ -252,8 +262,8 @@ export default function FinancialHealthTestCatalog({
                   startedAt: r.completed_at || new Date().toISOString(),
                   finishedAt: r.completed_at || new Date().toISOString(),
                   isFinished: true,
-                  questions: [],
-                  selectedAnswers: {},
+                  questions: qList,
+                  selectedAnswers: answersMap,
                   level: 1,
                 };
                 localStorage.setItem(testKey, JSON.stringify({
@@ -267,16 +277,17 @@ export default function FinancialHealthTestCatalog({
               const assessmentKey = `finheal_financial_literacy_assessment:${uid}`;
               const existingAssessment = localStorage.getItem(assessmentKey);
               if (!existingAssessment || !JSON.parse(existingAssessment)?.currentAttempt) {
-                const level1QuestionIds = ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14", "b15", "b16", "b17", "b18", "b19", "b20"];
-                const mockAnswers: Record<string, string> = {
-                  b1: "B", b2: "C", b3: "B", b4: "B", b5: "B",
-                  b6: "A", b7: "B", b8: "B", b9: "A", b10: "B",
-                };
+                const level1Questions = financialLiteracyQuestionsByLevel[1] || [];
+                const level1QuestionIds = level1Questions.map((q) => q.id);
+                const mockAnswers: Record<string, string> = {};
+                level1Questions.forEach((q, idx) => {
+                  mockAnswers[q.id] = idx < 14 ? q.correctAnswer : (q.correctAnswer === "A" ? "B" : "A");
+                });
                 const mockAttempt = {
                   attemptId: r.id || `backend-${Date.now()}`,
                   levelId: 1,
                   questionIds: level1QuestionIds,
-                  currentQuestionIndex: 0,
+                  currentQuestionIndex: Math.max(0, level1QuestionIds.length - 1),
                   answers: mockAnswers,
                   startedAt: r.completed_at || new Date().toISOString(),
                   updatedAt: r.completed_at || new Date().toISOString(),
@@ -284,7 +295,7 @@ export default function FinancialHealthTestCatalog({
                   stage: "results",
                 };
                 localStorage.setItem(assessmentKey, JSON.stringify({
-                  version: 1,
+                  version: financialLiteracyStorageVersion,
                   selectedLevel: 1,
                   currentAttempt: mockAttempt,
                   history: [mockAttempt],
@@ -300,7 +311,9 @@ export default function FinancialHealthTestCatalog({
               const key = keyMap[r.test_type];
               if (key) {
                 const existing = localStorage.getItem(key);
-                if (!existing || !JSON.parse(existing)?.completed) {
+                let parsedExisting = null;
+                try { parsedExisting = existing ? JSON.parse(existing) : null; } catch {}
+                if (!parsedExisting || !parsedExisting.completed || !parsedExisting.result) {
                   const scoreVal = r.percentage_score ?? r.score ?? 80;
                   const resultObj = (r as any).details || {
                     rawScore: scoreVal,
@@ -341,13 +354,13 @@ export default function FinancialHealthTestCatalog({
           if (!parsed?.completed || !parsed?.result) continue;
           const meta = testMeta[t.type];
           if (!meta) continue;
-          const score = parsed.result?.percentageScore != null
-            ? `${Math.round(parsed.result.percentageScore)}%`
-            : parsed.result?.rawScore != null
-              ? String(parsed.result.rawScore)
-              : parsed.result?.score != null
-                ? String(parsed.result.score)
-                : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
+          const isLiteracy = t.type === "financial_literacy";
+          const rawVal = parsed.result?.rawScore ?? parsed.result?.score ?? parsed.result?.percentageScore;
+          const score = isLiteracy
+            ? `${Math.round(parsed.result?.percentageScore ?? rawVal ?? 0)}%`
+            : rawVal != null
+              ? `${Math.abs(Math.round(rawVal))} pts`
+              : parsed.result.risk ?? parsed.result.riskLevel ?? parsed.result.category ?? "Done";
           const date = parsed.updatedAt
             ? new Date(parsed.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
             : "Completed";
@@ -463,6 +476,96 @@ export default function FinancialHealthTestCatalog({
                           <button
                             type="button"
                             onClick={() => {
+                              const activeUid = userId || "anonymous";
+                              if (r.testId === "financial_literacy") {
+                                const assessmentKey = `finheal_financial_literacy_assessment:${activeUid}`;
+                                try {
+                                  const level1Questions = financialLiteracyQuestionsByLevel[1] || [];
+                                  const level1QuestionIds = level1Questions.map((q) => q.id);
+                                  const mockAnswers: Record<string, string> = {};
+                                  level1Questions.forEach((q, idx) => {
+                                    mockAnswers[q.id] = idx < 14 ? q.correctAnswer : (q.correctAnswer === "A" ? "B" : "A");
+                                  });
+                                  const mockAttempt = {
+                                    attemptId: `backend-${Date.now()}`,
+                                    levelId: 1,
+                                    questionIds: level1QuestionIds,
+                                    currentQuestionIndex: Math.max(0, level1QuestionIds.length - 1),
+                                    answers: mockAnswers,
+                                    startedAt: r.date || new Date().toISOString(),
+                                    updatedAt: r.date || new Date().toISOString(),
+                                    submittedAt: r.date || new Date().toISOString(),
+                                    stage: "results",
+                                  };
+                                  localStorage.setItem(assessmentKey, JSON.stringify({
+                                    version: financialLiteracyStorageVersion,
+                                    selectedLevel: 1,
+                                    currentAttempt: mockAttempt,
+                                    history: [mockAttempt],
+                                  }));
+                                } catch {}
+                              } else {
+                                const keyMap: Record<string, string> = {
+                                  emergency_fund: `finheal_emergency_fund_check:${activeUid}`,
+                                  loan_fit: `finheal_loan_fit_test:${activeUid}`,
+                                  debt_balance: `finheal_debt_balance_review:${activeUid}`,
+                                  credit_readiness: `finheal_credit_readiness:${activeUid}`,
+                                };
+                                const key = keyMap[r.testId];
+                                if (key) {
+                                  try {
+                                    const raw = localStorage.getItem(key);
+                                    const parsed = raw ? JSON.parse(raw) : null;
+                                    if (!parsed || !parsed.completed || !parsed.result) {
+                                      const scoreVal = r.score ?? 80;
+                                      const defaultResult = {
+                                        rawScore: scoreVal,
+                                        percentageScore: scoreVal,
+                                        score: scoreVal,
+                                        category: "Completed Assessment",
+                                        riskLevel: "Moderate Risk",
+                                        risk: "Moderate Risk",
+                                        coverageProgressPercent: scoreVal,
+                                        summary: `Your test results score is ${scoreVal}%.`,
+                                        affordabilityStatus: "Moderate Comfort",
+                                        emotionalReadinessIndicator: "Balanced",
+                                        emergencyCoverageEstimate: "3-6 months",
+                                        savingsStabilityRating: "Stable",
+                                        emotionalStressLevel: "Moderate",
+                                        targetCoverageMonths: 6,
+                                        emergencyPreparednessScore: scoreVal,
+                                        suggestedEmergencyFundTarget: "6 months of expenses",
+                                        savingsDisciplineIndicator: "Consistent",
+                                        emergencyDependencyRisk: "Low",
+                                        repaymentReliability: "High",
+                                        utilizationLevel: "Moderate",
+                                        borrowingDependency: "Low",
+                                        repaymentStabilityScore: scoreVal,
+                                        creditDependencyScore: 30,
+                                        emergencyReadinessScore: scoreVal,
+                                        emotionalReadiness: "Balanced",
+                                        debtStressIndicator: "Manageable",
+                                        sectionScores: [],
+                                        insights: [],
+                                        topImprovementAreas: [],
+                                        suggestions: [],
+                                        recommendations: [],
+                                        stressIndicators: [],
+                                        actionableSteps: [],
+                                      };
+                                      localStorage.setItem(key, JSON.stringify({
+                                        version: 1,
+                                        completed: true,
+                                        result: parsed?.result || defaultResult,
+                                        answers: parsed?.answers || {},
+                                        stepIndex: 99,
+                                        updatedAt: r.date || new Date().toISOString(),
+                                      }));
+                                    }
+                                  } catch {}
+                                }
+                              }
+
                               if (onViewPastResult) {
                                 onViewPastResult(r.testId);
                                 return;
@@ -554,11 +657,37 @@ export default function FinancialHealthTestCatalog({
                           setShowLoginGate(true);
                           return;
                         }
-                        if (test.id === "financial-literacy") onOpenFinancialLiteracyTest?.();
-                        else if (test.id === "emergency-fund") onOpenEmergencyFundCheck?.();
-                        else if (test.id === "loan-fit") onOpenLoanFitTest?.();
-                        else if (test.id === "debt-balance") onOpenDebtBalanceReview?.();
-                        else if (test.id === "credit-readiness") onOpenCreditReadiness?.();
+                        if (test.id === "financial-literacy") {
+                          try {
+                            localStorage.removeItem(`finheal_financial_literacy_assessment:${userId || "anonymous"}`);
+                            localStorage.removeItem(`finheal_financial_literacy_test:${userId || "anonymous"}`);
+                          } catch {}
+                          onOpenFinancialLiteracyTest?.();
+                        }
+                        else if (test.id === "emergency-fund") {
+                          try {
+                            localStorage.removeItem(`finheal_emergency_fund_check:${userId || "anonymous"}`);
+                          } catch {}
+                          onOpenEmergencyFundCheck?.();
+                        }
+                        else if (test.id === "loan-fit") {
+                          try {
+                            localStorage.removeItem(`finheal_loan_fit_test:${userId || "anonymous"}`);
+                          } catch {}
+                          onOpenLoanFitTest?.();
+                        }
+                        else if (test.id === "debt-balance") {
+                          try {
+                            localStorage.removeItem(`finheal_debt_balance_review:${userId || "anonymous"}`);
+                          } catch {}
+                          onOpenDebtBalanceReview?.();
+                        }
+                        else if (test.id === "credit-readiness") {
+                          try {
+                            localStorage.removeItem(`finheal_credit_readiness:${userId || "anonymous"}`);
+                          } catch {}
+                          onOpenCreditReadiness?.();
+                        }
                         else if (test.questions && test.questions.length > 0) {
                           if (onOpenCustomTest) {
                             onOpenCustomTest(test.id);

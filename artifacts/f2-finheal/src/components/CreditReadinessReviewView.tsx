@@ -290,8 +290,94 @@ export default function CreditReadinessReviewView({ userId, onToggleSidebar, onT
           </div>
 
           <section className="mt-6 grid gap-4 lg:grid-cols-2">
-            <Card><CardHeader><CardTitle>Personalized recommendations</CardTitle><CardDescription>Actions to improve credit readiness</CardDescription></CardHeader><CardContent>{currentResult.recommendations.map((r) => <div key={r} className="p-3 rounded-md border mb-2">{r}</div>)}</CardContent></Card>
-            <Card><CardHeader><CardTitle>Insights</CardTitle><CardDescription>What stood out from your answers</CardDescription></CardHeader><CardContent>{currentResult.insights.map((ins) => <div key={ins.title} className="p-3 rounded-md border mb-2"><div className="font-semibold">{ins.title}</div><div className="text-sm text-gray-600">{ins.description}</div></div>)}</CardContent></Card>
+            <Card><CardHeader><CardTitle>Personalized recommendations</CardTitle><CardDescription>Actions to improve credit readiness</CardDescription></CardHeader><CardContent>{(currentResult.recommendations || []).map((r) => <div key={r} className="p-3 rounded-md border mb-2">{r}</div>)}</CardContent></Card>
+          </section>
+
+          <section className="mt-6">
+            <Card className="overflow-hidden border-gray-200 shadow-[0_14px_34px_rgba(15,23,42,0.05)] rounded-[20px] dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-col gap-3 px-[18px] pb-0 pt-[18px] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-[18px] font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                    <span>📝</span> Detailed Question Review
+                  </CardTitle>
+                  <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400 mt-1">
+                    Review your selected responses for each scenario to understand your credit readiness status.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4 px-[18px] pb-[20px] pt-[16px]">
+                {creditReadinessQuestions.map((q, idx) => {
+                  const selectedOptionId = state.answers[q.id];
+                  const hasAnswer = Boolean(selectedOptionId);
+                  return (
+                    <div
+                      key={q.id}
+                      className="rounded-[20px] border border-gray-200 bg-white p-5 shadow-xs transition-all dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-gray-200/80 px-3 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                            Q{idx + 1}
+                          </span>
+                        </div>
+                        {hasAnswer ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-bold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
+                            <span>✓</span> Answered
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+                            Unanswered
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[14px] font-bold leading-relaxed text-gray-900 dark:text-slate-100 mb-4">
+                        {q.prompt}
+                      </div>
+
+                      <div className="grid gap-2.5">
+                        {q.options.map((opt, optIdx) => {
+                          const letter = String.fromCharCode(65 + optIdx);
+                          const isSelected = Boolean(selectedOptionId && (selectedOptionId === opt.label || selectedOptionId === (opt as any).id));
+
+                          let optionClass = "border-gray-200 bg-white text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300";
+                          if (isSelected) {
+                            optionClass = "border-2 border-cyan-500 bg-cyan-50/80 text-cyan-900 font-semibold dark:border-cyan-700 dark:bg-cyan-950 dark:text-cyan-200";
+                          }
+
+                          return (
+                            <div
+                              key={opt.label || letter}
+                              className={`flex items-center justify-between rounded-full border px-4 py-2.5 text-[13px] leading-snug transition-all ${optionClass}`}
+                            >
+                              <div className="flex items-center gap-3 pr-2">
+                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                                  isSelected
+                                    ? "bg-cyan-600 text-white"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400"
+                                }`}>
+                                  {letter}
+                                </span>
+                                <span className="font-medium">{opt.label}</span>
+                              </div>
+
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                {isSelected && (
+                                  <span className="rounded-full bg-cyan-600 px-3 py-1 text-[11px] font-bold text-white shadow-xs">
+                                    Your Response ✓
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
           </section>
 
           <section className="mt-6 flex gap-3"><button onClick={handleRestart} className="px-4 py-2 rounded bg-cyan-500 text-white">Retake assessment</button><button onClick={onBackToCatalog} className="px-4 py-2 rounded border">Back to tests</button>{onOpenFinancialWellnessAssistant && <button onClick={onOpenFinancialWellnessAssistant} className="px-4 py-2 rounded border bg-cyan-50">Talk to assistant</button>}</section>
