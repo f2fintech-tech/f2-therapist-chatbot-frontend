@@ -1459,16 +1459,34 @@ export default function Dashboard({
 
     const counts: Record<string, number> = {};
     bsaOnlyEnquiries.forEach(enq => {
-      const bankName = enq.bsa_json_data?.bank_name || "Unknown Bank";
+      const bsaAnalysis = enq.report_data?.bsa_analysis || enq.report_data?.bsa_json_data || enq.bsa_json_data;
+      const bankName = bsaAnalysis?.bank_name || "Unknown Bank";
       counts[bankName] = (counts[bankName] || 0) + 1;
     });
 
-    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
-    return Object.entries(counts).map(([name, val], idx) => ({
+    const sortedEntries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const top5 = sortedEntries.slice(0, 5);
+    const rest = sortedEntries.slice(5);
+
+    const resultData = top5.map(([name, val]) => ({
       name,
-      value: val,
+      value: val
+    }));
+
+    if (rest.length > 0) {
+      const othersVal = rest.reduce((acc, current) => acc + current[1], 0);
+      resultData.push({
+        name: "Others",
+        value: othersVal
+      });
+    }
+
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
+    return resultData.map((item, idx) => ({
+      name: item.name,
+      value: item.value,
       color: colors[idx % colors.length],
-      percent: Math.round((val / totalBsaFetched) * 100)
+      percent: Math.round((item.value / totalBsaFetched) * 100)
     }));
   })();
 
@@ -2155,7 +2173,7 @@ ${sheetDataXml}
                     {/* Donut Chart */}
                     <div className="relative flex items-center justify-center w-[130px] h-[130px] shrink-0 mx-auto">
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
+                        <PieChart key={selectedBureauTab}>
                           <Pie
                             data={selectedBureauTab === "cibil" ? cibilDistributionData : selectedBureauTab === "experian" ? experianDistributionData : bsaDistributionData}
                             cx="50%"
