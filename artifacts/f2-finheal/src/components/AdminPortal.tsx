@@ -312,7 +312,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"] as string[]
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[]
   });
 
   // Education form state
@@ -1817,7 +1817,7 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -1851,7 +1851,7 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
     });
     setExpertModalOpen(true);
   };
@@ -4119,7 +4119,6 @@ ${sheetDataXml}
                     { key: "cibil_view_all", label: "View All Credit Reports" },
                     { key: "scheduled_calls", label: "Manage Call Calendars" },
                     { key: "lenders_edit", label: "Edit Lenders Catalog" },
-                    { key: "education_edit", label: "Edit Education Content" },
                   ].map((perm) => {
                     const isChecked = expertForm.permissions?.includes(perm.key);
                     return (

@@ -67,7 +67,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     const loadPermissions = async () => {
       // Super admins have all permissions — no need to check
       if (isSuperAdmin) {
-        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]);
         return;
       }
 
