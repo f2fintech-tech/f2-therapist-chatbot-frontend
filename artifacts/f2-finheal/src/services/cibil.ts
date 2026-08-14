@@ -18,10 +18,37 @@ function getHeaders(userId?: string): Record<string, string> {
   return headers;
 }
 
-export function getBureauPdfDownloadUrl(pdfUrl: string, fileName: string): string {
+export function getBureauPdfDownloadUrl(pdfUrl?: string, fileName?: string): string {
+  if (!pdfUrl) return "#";
   const encodedUrl = encodeURIComponent(pdfUrl);
-  const encodedFileName = encodeURIComponent(fileName);
+  const encodedFileName = encodeURIComponent(fileName || "credit_report.pdf");
   return `${API_BASE_URL}/cibil/proxy-pdf?url=${encodedUrl}&filename=${encodedFileName}`;
+}
+
+export async function downloadBureauPdf(pdfUrl?: string, fileName?: string, e?: any): Promise<void> {
+  if (e && typeof e.preventDefault === "function") {
+    e.preventDefault();
+  }
+  if (!pdfUrl) return;
+  const proxyUrl = getBureauPdfDownloadUrl(pdfUrl, fileName || "credit_report.pdf");
+  try {
+    const resp = await fetch(proxyUrl);
+    if (!resp.ok) {
+      window.open(proxyUrl, "_blank");
+      return;
+    }
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName || "credit_report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch (err) {
+    window.open(proxyUrl, "_blank");
+  }
 }
 
 export interface CibilReportMetric {

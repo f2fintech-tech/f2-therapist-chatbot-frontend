@@ -67,7 +67,7 @@ function shuffleArray<T>(items: T[]): T[] {
   return next;
 }
 
-function createShuffledQuestions(level = 1): ShuffledQuestion[] {
+export function createShuffledQuestions(level = 1): ShuffledQuestion[] {
   const filtered = questions.filter((q) => q.level === level);
   const shuffledQuestions = shuffleArray(filtered);
 
@@ -546,7 +546,10 @@ export default function FinancialLiteracyTestView({ userId, isGuest, onLoginRequ
     writeStorage(userId, storageState);
   }, [storageState, userId]);
 
-  const currentAttempt = storageState.currentAttempt ?? storageState.history.find((a) => a.isFinished) ?? createNewAttempt(storageState.selectedLevel ?? 1);
+  const currentAttempt = (storageState.currentAttempt?.isFinished ? storageState.currentAttempt : null)
+    ?? storageState.history.find((a) => a.isFinished)
+    ?? storageState.currentAttempt
+    ?? createNewAttempt(storageState.selectedLevel ?? 1);
   const isTestStarted = Boolean(currentAttempt.startedAt);
   const elapsedSeconds = useMemo(() => {
     if (!currentAttempt.startedAt) {

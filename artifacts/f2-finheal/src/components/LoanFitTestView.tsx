@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import ConfirmDeleteDialog from "@/components/ConfirmDeleteDialog";
 // QuestionNavigator intentionally not used here — remove import
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   calculateLoanFitResult,
 } from "@/features/loan-fit/loanFitScoring";
@@ -280,6 +280,7 @@ export default function LoanFitTestView({
   }, [answers, result, userId]);
 
   useEffect(() => {
+    if (!hydrated) return;
     // Persist progress to localStorage whenever answers/step/result/loaded state changes.
     writeState(userId, {
       version: 1,
@@ -542,7 +543,7 @@ export default function LoanFitTestView({
               <CardTitle className="text-[18px] text-gray-900">Affordability snapshot</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-[10px] px-[18px] pb-[18px]">
-              {result.sectionScores.map((section) => (
+              {(result.sectionScores || []).map((section) => (
                 <div key={section.sectionId} className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px]">
                   <div className="flex items-center justify-between gap-[10px]">
                     <div>
@@ -567,7 +568,7 @@ export default function LoanFitTestView({
               <CardTitle className="text-[18px] text-gray-900">Financial stress indicators</CardTitle>
             </CardHeader>
             <CardContent className="space-y-[10px] px-[18px] pb-[18px]">
-              {result.insights.map((insight) => (
+              {(result.insights || []).map((insight) => (
                 <div key={insight.title} className="rounded-[16px] border border-gray-200 bg-white p-[14px] shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
                   <div className="flex items-center justify-between gap-[8px]">
                     <div className="text-[13px] font-semibold text-gray-800">{insight.title}</div>
@@ -586,7 +587,7 @@ export default function LoanFitTestView({
               <CardTitle className="text-[18px] text-gray-900">Top improvement areas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-[10px] px-[18px] pb-[18px]">
-              {result.topImprovementAreas.map((item, index) => (
+              {(result.topImprovementAreas || []).map((item, index) => (
                 <div key={`${item}-${index}`} className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] text-[13px] leading-[1.7] text-gray-700">
                   {item}
                 </div>
@@ -599,12 +600,104 @@ export default function LoanFitTestView({
               <CardTitle className="text-[18px] text-gray-900">Personalized suggestions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-[10px] px-[18px] pb-[18px]">
-              {result.suggestions.map((suggestion) => (
+              {(result.suggestions || []).map((suggestion) => (
                 <div key={suggestion} className="flex items-start gap-[10px] rounded-[16px] border border-gray-200 bg-white p-[14px] shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
                   <div className="mt-[2px] flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-[#eef0fd] text-[12px] font-bold text-primary">•</div>
                   <div className="text-[13px] leading-[1.7] text-gray-700">{suggestion}</div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mt-[18px]">
+          <Card className="overflow-hidden border-gray-200 shadow-[0_14px_34px_rgba(15,23,42,0.05)] rounded-[20px]">
+            <CardHeader className="flex flex-col gap-3 px-[18px] pb-0 pt-[18px] sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-[18px] font-bold text-gray-900 flex items-center gap-2">
+                  <span>📝</span> Detailed Question Review
+                </CardTitle>
+                <CardDescription className="text-[12px] text-gray-600 mt-1">
+                  Review your selected responses for each scenario to understand your loan comfort analysis.
+                </CardDescription>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 px-[18px] pb-[20px] pt-[16px]">
+              {loanFitQuestions.map((q, idx) => {
+                const selectedOptionId = answers[q.id];
+                const hasAnswer = Boolean(selectedOptionId);
+                return (
+                  <div
+                    key={q.id}
+                    className="rounded-[20px] border border-gray-200 bg-white p-5 shadow-xs transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-gray-200/80 px-3 py-0.5 text-[11px] font-bold text-gray-700">
+                          Q{idx + 1}
+                        </span>
+                        {q.sectionLabel && (
+                          <span className="rounded-full bg-[#eef0fd] px-3 py-0.5 text-[11px] font-semibold text-primary capitalize">
+                            {q.sectionLabel}
+                          </span>
+                        )}
+                      </div>
+                      {hasAnswer ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold text-blue-800">
+                          <span>✓</span> Answered
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-500">
+                          Unanswered
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-[14px] font-bold leading-relaxed text-gray-900 mb-4">
+                      {q.prompt}
+                    </div>
+
+                    <div className="grid gap-2.5">
+                      {q.options.map((opt, optIdx) => {
+                        const letter = String.fromCharCode(65 + optIdx);
+                        const isSelected = Boolean(selectedOptionId && (selectedOptionId === opt.id || selectedOptionId === opt.label));
+
+                        let optionClass = "border-gray-200 bg-white text-gray-700";
+                        if (isSelected) {
+                          optionClass = "border-2 border-primary bg-primary/10 text-primary font-semibold";
+                        }
+
+                        return (
+                          <div
+                            key={opt.id || opt.label || letter}
+                            className={`flex items-center justify-between rounded-full border px-4 py-2.5 text-[13px] leading-snug transition-all ${optionClass}`}
+                          >
+                            <div className="flex items-center gap-3 pr-2">
+                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                                isSelected
+                                  ? "bg-primary text-white"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}>
+                                {letter}
+                              </span>
+                              <span className="font-medium">{opt.label}</span>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              {isSelected && (
+                                <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white shadow-xs">
+                                  Your Response ✓
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         </section>
@@ -688,7 +781,7 @@ export default function LoanFitTestView({
             {onOpenFinancialWellnessAssistant && (
               <button type="button" onClick={onOpenFinancialWellnessAssistant} className="rounded-[14px] border border-primary/20 bg-[#eef0fd] px-[16px] py-[12px] text-[13px] font-semibold text-primary transition-all hover:bg-[#e3e7ff]">Talk to Financial Wellness Assistant</button>
             )}
-            <button type="button" onClick={onBackToCatalog} className="rounded-[14px] bg-primary px-[16px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]">Explore Safer EMI Plans</button>
+            <button type="button" onClick={onBackToCatalog} className="rounded-[14px] bg-primary px-[16px] py-[12px] text-[13px] font-semibold text-white shadow-[0_12px_24px_rgba(50,68,230,0.2)] transition-all hover:bg-[#1e2db8]">Back to tests</button>
           </div>
         )}
       </div>

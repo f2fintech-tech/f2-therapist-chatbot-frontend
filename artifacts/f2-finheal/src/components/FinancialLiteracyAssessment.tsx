@@ -145,14 +145,7 @@ function readStorage(userId: string): AssessmentStorage {
     }
 
     const history = Array.isArray(parsed.history) ? parsed.history : [];
-    let normalizedAttempt = normalizeAttempt(parsed.currentAttempt ?? null);
-
-    if (!normalizedAttempt || normalizedAttempt.stage !== "results") {
-      const finishedInHistory = history.find((a) => a.stage === "results");
-      if (finishedInHistory) {
-        normalizedAttempt = finishedInHistory;
-      }
-    }
+    const normalizedAttempt = normalizeAttempt(parsed.currentAttempt ?? null);
 
     return {
       version: financialLiteracyStorageVersion,
@@ -1049,7 +1042,7 @@ export default function FinancialLiteracyAssessment({ userId, isGuest = false, o
                               return (
                                 <div
                                   key={letter}
-                                  className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-[13px] leading-snug ${optionClass}`}
+                                  className={`flex items-center justify-between rounded-full border px-4 py-2.5 text-[13px] leading-snug ${optionClass}`}
                                 >
                                   <div className="flex items-center gap-2.5 pr-2">
                                     <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${

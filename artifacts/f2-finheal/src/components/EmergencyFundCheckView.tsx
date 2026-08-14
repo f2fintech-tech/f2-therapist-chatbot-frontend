@@ -604,7 +604,7 @@ export default function EmergencyFundCheckView({
                 <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400">Patterns that shape how your buffer behaves under pressure.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-[10px] px-[16px] pb-[16px] pt-[14px] sm:px-[18px]">
-                {currentResult.insights.map((insight) => (
+                {(currentResult.insights || []).map((insight) => (
                   <InsightCard key={`${insight.title}-${insight.description}`} title={insight.title} description={insight.description} tone={insight.tone} />
                 ))}
               </CardContent>
@@ -639,7 +639,7 @@ export default function EmergencyFundCheckView({
                 <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400">Simple actions that can make your cushion more reliable.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-[10px] px-[16px] pb-[16px] pt-[14px] sm:px-[18px]">
-                {currentResult.recommendations.map((recommendation) => (
+                {(currentResult.recommendations || []).map((recommendation) => (
                   <div key={recommendation} className="rounded-[16px] border border-gray-200 bg-gray-50 px-[14px] py-[12px] text-[13px] leading-[1.7] text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
                     {recommendation}
                   </div>
@@ -662,22 +662,93 @@ export default function EmergencyFundCheckView({
           </section>
 
           <section className="mt-[18px]">
-            <Card className="overflow-hidden border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-950">
-              <CardHeader className="space-y-2 px-[16px] pb-0 pt-[16px] sm:px-[18px]">
-                <CardTitle className="text-[16px] text-gray-900 dark:text-slate-100">Question review</CardTitle>
-                <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400">A quick record of how you answered each item.</CardDescription>
+            <Card className="overflow-hidden border-gray-200 shadow-[0_14px_34px_rgba(15,23,42,0.05)] rounded-[20px] dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-col gap-3 px-[18px] pb-0 pt-[18px] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-[18px] font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                    <span>📝</span> Detailed Question Review
+                  </CardTitle>
+                  <CardDescription className="text-[12px] text-gray-600 dark:text-slate-400 mt-1">
+                    Review your selected responses for each scenario to understand your emergency preparedness position.
+                  </CardDescription>
+                </div>
               </CardHeader>
-              <CardContent className="grid gap-[10px] px-[16px] pb-[16px] pt-[14px] sm:px-[18px] md:grid-cols-2">
-                {currentResult.questionReview.map((item, index) => (
-                  <div key={item.question.id} className="rounded-[16px] border border-gray-200 bg-gray-50 p-[14px] dark:border-slate-800 dark:bg-slate-900">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.8px] text-gray-400 dark:text-slate-400">Question {index + 1}</div>
-                    <div className="mt-[6px] text-[13px] leading-[1.7] text-gray-800 dark:text-slate-100">{item.question.prompt}</div>
-                    <div className="mt-[8px] flex items-center gap-[8px]">
-                      <Badge tone={item.isStrong ? "positive" : "warning"}>{item.isStrong ? "Strong" : "Needs support"}</Badge>
-                      <span className="text-[12px] text-gray-500 dark:text-slate-400">{item.selectedAnswer ?? "No answer"}</span>
+
+              <CardContent className="space-y-4 px-[18px] pb-[20px] pt-[16px]">
+                {emergencyFundQuestions.map((q, idx) => {
+                  const selectedOptionId = storageState.answers[q.id];
+                  const hasAnswer = Boolean(selectedOptionId);
+                  return (
+                    <div
+                      key={q.id}
+                      className="rounded-[20px] border border-gray-200 bg-white p-5 shadow-xs transition-all dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-gray-200/80 px-3 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                            Q{idx + 1}
+                          </span>
+                          {(q.sectionId || (q as any).title) && (
+                            <span className="rounded-full bg-[#eef0fd] px-3 py-0.5 text-[11px] font-semibold text-primary capitalize dark:bg-primary/20 dark:text-primary-foreground">
+                              {q.sectionId ? q.sectionId.replace(/-/g, " ") : (q as any).title}
+                            </span>
+                          )}
+                        </div>
+                        {hasAnswer ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-bold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
+                            <span>✓</span> Answered
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-[11px] font-medium text-gray-500 dark:bg-slate-800 dark:text-slate-400">
+                            Unanswered
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[14px] font-bold leading-relaxed text-gray-900 dark:text-slate-100 mb-4">
+                        {q.prompt}
+                      </div>
+
+                      <div className="grid gap-2.5">
+                        {q.options.map((opt, optIdx) => {
+                          const letter = String.fromCharCode(65 + optIdx);
+                          const isSelected = Boolean(selectedOptionId && (selectedOptionId === opt.label || selectedOptionId === (opt as any).id));
+
+                          let optionClass = "border-gray-200 bg-white text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300";
+                          if (isSelected) {
+                            optionClass = "border-2 border-cyan-500 bg-cyan-50/80 text-cyan-900 font-semibold dark:border-cyan-700 dark:bg-cyan-950 dark:text-cyan-200";
+                          }
+
+                          return (
+                            <div
+                              key={(opt as any).id || opt.label || letter}
+                              className={`flex items-center justify-between rounded-full border px-4 py-2.5 text-[13px] leading-snug transition-all ${optionClass}`}
+                            >
+                              <div className="flex items-center gap-3 pr-2">
+                                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                                  isSelected
+                                    ? "bg-cyan-600 text-white"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-400"
+                                }`}>
+                                  {letter}
+                                </span>
+                                <span className="font-medium">{opt.label}</span>
+                              </div>
+
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                {isSelected && (
+                                  <span className="rounded-full bg-cyan-600 px-3 py-1 text-[11px] font-bold text-white shadow-xs">
+                                    Your Response ✓
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           </section>
