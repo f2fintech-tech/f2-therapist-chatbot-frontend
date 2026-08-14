@@ -41,16 +41,26 @@ interface EduTrashItem {
   deletedAt?: string;
 }
 
+interface LenderTrashItem {
+  id: string;
+  name: string;
+  productType?: string;
+  category?: string;
+  deleted_at?: string;
+}
+
 interface TrashTabProps {
   trashLoading: boolean;
   cibilTrash: CibilTrashItem[];
   advisorsTrash: AdvisorTrashItem[];
   appointmentsTrash: AppointmentTrashItem[];
   educationTrash: EduTrashItem[];
+  lendersTrash: LenderTrashItem[];
   handleRestoreCibil: (id: string) => void;
   handleRestoreAdvisor: (id: string) => void;
   handleRestoreAppointment: (id: string) => void;
   handleRestoreEdu: (id: string) => void;
+  handleRestoreLender: (id: string) => void;
   handlePermanentDeleteEdu: (id: string) => void;
 }
 
@@ -60,10 +70,12 @@ export default function TrashTab({
   advisorsTrash,
   appointmentsTrash,
   educationTrash,
+  lendersTrash,
   handleRestoreCibil,
   handleRestoreAdvisor,
   handleRestoreAppointment,
   handleRestoreEdu,
+  handleRestoreLender,
   handlePermanentDeleteEdu,
 }: TrashTabProps) {
   return (
@@ -350,6 +362,85 @@ export default function TrashTab({
                               className="text-rose-500 hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
                             >
                               Delete Forever ❌
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Bins: Lenders Catalog */}
+          <div className="border border-gray-200 bg-white p-[20px] rounded-[20px] shadow-xs space-y-[12px]">
+            <h4 className="text-[13px] font-bold text-gray-800 flex items-center gap-[6px]">
+              🏦 Deleted Lenders Catalog ({lendersTrash.length})
+            </h4>
+            <div className="border border-gray-150 rounded-[12px] overflow-hidden bg-white">
+              <table className="w-full text-left text-[11.5px] border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-150 text-gray-600 font-semibold">
+                    <th className="p-[10px] w-2/5">Lender / Product</th>
+                    <th className="p-[10px]">Product Type</th>
+                    <th className="p-[10px]">Category</th>
+                    <th className="p-[10px]">Deleted Date</th>
+                    <th className="p-[10px] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lendersTrash.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-[20px] text-center text-gray-400 font-medium">
+                        No deleted lender products in Trash.
+                      </td>
+                    </tr>
+                  ) : (
+                    lendersTrash.map((item) => {
+                      let delDateStr = "N/A";
+                      let remainingStr = "";
+                      if (item.deleted_at) {
+                        const delDate = new Date(item.deleted_at);
+                        delDateStr = delDate.toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        });
+                        
+                        // Calculate remaining time
+                        const diff = (delDate.getTime() + 3 * 24 * 60 * 60 * 1000) - Date.now();
+                        if (diff > 0) {
+                          const hoursTotal = Math.floor(diff / (1000 * 60 * 60));
+                          const days = Math.floor(hoursTotal / 24);
+                          const hours = hoursTotal % 24;
+                          remainingStr = ` (${days}d ${hours}h left)`;
+                        } else {
+                          remainingStr = " (Expiring)";
+                        }
+                      }
+                      
+                      return (
+                        <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+                          <td className="p-[10px] font-semibold text-gray-850">
+                            {item.name}
+                          </td>
+                          <td className="p-[10px] text-gray-500">
+                            {item.productType || "N/A"}
+                          </td>
+                          <td className="p-[10px] text-gray-650">{item.category || "N/A"}</td>
+                          <td className="p-[10px] text-gray-450">
+                            {delDateStr}
+                            <span className="text-[10px] text-rose-500 font-bold block mt-[2px]">{remainingStr}</span>
+                          </td>
+                          <td className="p-[10px] text-right">
+                            <button
+                              onClick={() => handleRestoreLender(item.id)}
+                              className="text-primary hover:underline font-bold text-[10.5px] cursor-pointer bg-transparent border-none"
+                            >
+                              Restore ↺
                             </button>
                           </td>
                         </tr>

@@ -867,4 +867,12 @@ export async function restoreAdvisor(f2FintechId: string): Promise<any> {
   return authRequest<any>(`advisors/${encodeURIComponent(f2FintechId)}/restore`, { method: "POST" });
 }
 
+export async function fetchLendersTrash(): Promise<any[]> {
+  return authRequest<any[]>("lenders/trash", { method: "GET" });
+}
+
+export async function restoreLender(lenderId: string): Promise<any> {
+  return authRequest<any>(`lenders/${encodeURIComponent(lenderId)}/restore`, { method: "POST" });
+}
+
 

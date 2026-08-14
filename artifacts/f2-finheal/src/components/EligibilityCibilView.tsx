@@ -575,7 +575,7 @@ export default function EligibilityCibilView({
   const [lenderDeleteConfirmOpen, setLenderDeleteConfirmOpen] = useState(false);
   const [isDeletingLender, setIsDeletingLender] = useState(false);
 
-  const hasLendersEditPermission = userPermissions.includes("lenders_edit") || isSuperAdmin;
+  const hasLendersEditPermission = userPermissions.includes("lenders_edit") && !isSuperAdmin;
 
   const handleUpdateLenderField = (fields: Partial<typeof lenderForm>) => {
     setLenderForm(prev => ({ ...prev, ...fields }));

@@ -10,7 +10,7 @@ import AppointmentsTab from "./admin/AppointmentsTab";
 import LendersTab from "./admin/LendersTab";
 import TrashTab from "./admin/TrashTab";
 import CibilEnquiriesTab from "./admin/CibilEnquiriesTab";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -559,23 +559,37 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [cibilTrash, setCibilTrash] = useState<any[]>([]);
   const [advisorsTrash, setAdvisorsTrash] = useState<Advisor[]>([]);
   const [appointmentsTrash, setAppointmentsTrash] = useState<Appointment[]>([]);
+  const [lendersTrash, setLendersTrash] = useState<any[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
 
   const fetchTrashData = async () => {
     try {
       setTrashLoading(true);
-      const [cibilRes, advisorsRes, appointmentsRes] = await Promise.all([
+      const [cibilRes, advisorsRes, appointmentsRes, lendersRes] = await Promise.all([
         fetchCibilTrash(userId).catch(() => []),
         fetchAdvisorsTrash().catch(() => []),
-        fetchAppointmentsTrash().catch(() => [])
+        fetchAppointmentsTrash().catch(() => []),
+        fetchLendersTrash().catch(() => [])
       ]);
       setCibilTrash(cibilRes);
       setAdvisorsTrash(advisorsRes);
       setAppointmentsTrash(appointmentsRes);
+      setLendersTrash(lendersRes);
     } catch (err) {
       console.error("Error loading trash data:", err);
     } finally {
       setTrashLoading(false);
+    }
+  };
+
+  const handleRestoreLender = async (lenderId: string) => {
+    try {
+      await restoreLender(lenderId);
+      alert("Lender product successfully restored.");
+      fetchTrashData();
+      window.dispatchEvent(new CustomEvent("finheal:lenders_update"));
+    } catch (err: any) {
+      alert(err.message || "Failed to restore lender product.");
     }
   };
 
@@ -2938,10 +2952,12 @@ ${sheetDataXml}
                 advisorsTrash={advisorsTrash}
                 appointmentsTrash={appointmentsTrash}
                 educationTrash={educationTrash}
+                lendersTrash={lendersTrash}
                 handleRestoreCibil={handleRestoreCibil}
                 handleRestoreAdvisor={handleRestoreAdvisor}
                 handleRestoreAppointment={handleRestoreAppointment}
                 handleRestoreEdu={handleRestoreEdu}
+                handleRestoreLender={handleRestoreLender}
                 handlePermanentDeleteEdu={handlePermanentDeleteEdu}
               />
             )}
