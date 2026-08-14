@@ -1013,6 +1013,14 @@ export default function Dashboard({
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [lenderList, setLenderList] = useState<any[]>([]);
   const [cibilEnquiries, setCibilEnquiries] = useState<any[]>([]);
+  const [cibilCounts, setCibilCounts] = useState<{ cibil: number; experian: number; bsa_banks?: Record<string, number> } | null>(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("finheal_cibil_counts") : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [statsLoading, setStatsLoading] = useState(false);
   const [cibilLoading, setCibilLoading] = useState(false);
   const [selectedBureauTab, setSelectedBureauTab] = useState<"cibil" | "experian" | "bsa">("cibil");
@@ -1022,10 +1030,15 @@ export default function Dashboard({
   const [advisors, setAdvisors] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [summaryDeptFilter, setSummaryDeptFilter] = useState<string>("all");
+  const [summaryDateFilter, setSummaryDateFilter] = useState<string>("all");
+  const [summaryStartDate, setSummaryStartDate] = useState<string>("");
+  const [summaryEndDate, setSummaryEndDate] = useState<string>("");
 
   const loadCibilEnquiries = useCallback(() => {
     const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-    setCibilLoading(true);
+    if (!cibilCounts) {
+      setCibilLoading(true);
+    }
     const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (configuredApiKey) {
@@ -1035,12 +1048,35 @@ export default function Dashboard({
     if (userId) {
       headers["X-Requester-ID"] = userId;
     }
+
+    // 1. High-speed SQL counts & BSA bank distribution (<1ms)
+    fetch(`${apiBase}/cibil/counts`, { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.cibil_count === "number") {
+          const countsObj = {
+            cibil: data.cibil_count,
+            experian: data.experian_count,
+            bsa_banks: data.bsa_banks || {}
+          };
+          setCibilCounts(countsObj);
+          try { localStorage.setItem("finheal_cibil_counts", JSON.stringify(countsObj)); } catch {}
+          setCibilLoading(false);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Full enquiries query
     fetch(`${apiBase}/cibil/enquiries`, { headers })
       .then(res => res.json())
-      .then(data => setCibilEnquiries(data))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCibilEnquiries(data);
+        }
+      })
       .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
       .finally(() => setCibilLoading(false));
-  }, [userId]);
+  }, [cibilCounts, userId]);
 
   useEffect(() => {
     window.addEventListener("finheal:cibil_update", loadCibilEnquiries);
@@ -1447,22 +1483,34 @@ export default function Dashboard({
   const totalBsaFetched = bsaOnlyEnquiries.length;
 
   const bsaDistributionData = (() => {
-    if (totalBsaFetched === 0) {
-      // Mock data when no statement exists yet
-      return [
-        { name: "YES Bank", value: 2, color: "#10b981", percent: 40 },
-        { name: "HDFC Bank", value: 1, color: "#3b82f6", percent: 20 },
-        { name: "ICICI Bank", value: 1, color: "#f59e0b", percent: 20 },
-        { name: "State Bank of India", value: 1, color: "#a855f7", percent: 20 },
-      ];
-    }
+    // Read real bank counts from fast backend SQL bsa_banks (<1ms) if available
+    const bsaBanksObj = cibilCounts?.bsa_banks;
+    let counts: Record<string, number> = {};
 
-    const counts: Record<string, number> = {};
-    bsaOnlyEnquiries.forEach(enq => {
-      const bsaAnalysis = enq.report_data?.bsa_analysis || enq.report_data?.bsa_json_data || enq.bsa_json_data;
-      const bankName = bsaAnalysis?.bank_name || "Unknown Bank";
-      counts[bankName] = (counts[bankName] || 0) + 1;
-    });
+    if (bsaBanksObj && Object.keys(bsaBanksObj).length > 0) {
+      counts = { ...bsaBanksObj };
+    } else {
+      if (totalBsaFetched === 0) {
+        // Mock data when no statement exists yet
+        return [
+          { name: "YES Bank", value: 2, color: "#10b981", percent: 40 },
+          { name: "HDFC Bank", value: 1, color: "#3b82f6", percent: 20 },
+          { name: "ICICI Bank", value: 1, color: "#f59e0b", percent: 20 },
+          { name: "State Bank of India", value: 1, color: "#a855f7", percent: 20 },
+        ];
+      }
+      bsaOnlyEnquiries.forEach(enq => {
+        const bsaAnalysis = enq.report_data?.bsa_analysis || enq.report_data?.bsa_json_data || enq.bsa_json_data;
+        let bankName = enq.bank_name || bsaAnalysis?.bank_name || bsaAnalysis?.bank;
+        if (!bankName && enq.bureau && !["cibil", "experian", "crif", "equifax", "bsa_standalone", "bsa"].includes(enq.bureau.toLowerCase().trim())) {
+          bankName = enq.bureau;
+        }
+        if (!bankName || bankName === "Unknown Bank" || bankName.toLowerCase().includes("bsa") || bankName.toLowerCase().includes("standalone")) {
+          bankName = "Other Banks";
+        }
+        counts[bankName] = (counts[bankName] || 0) + 1;
+      });
+    }
 
     const sortedEntries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const top5 = sortedEntries.slice(0, 5);
@@ -1481,12 +1529,12 @@ export default function Dashboard({
       });
     }
 
-    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1"];
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ec4899", "#6366f1", "#06b6d4", "#64748b"];
     return resultData.map((item, idx) => ({
       name: item.name,
       value: item.value,
       color: colors[idx % colors.length],
-      percent: Math.round((item.value / totalBsaFetched) * 100)
+      percent: totalBsaFetched > 0 ? Math.round((item.value / totalBsaFetched) * 100) : 0
     }));
   })();
 
@@ -1522,8 +1570,53 @@ export default function Dashboard({
     return dept === summaryDeptFilter;
   });
 
+  const isDateInSummaryRange = (dateStr?: string) => {
+    if (summaryDateFilter === "all") return true;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+
+    if (summaryDateFilter === "today") {
+      return d.toDateString() === now.toDateString();
+    }
+    if (summaryDateFilter === "7days") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      return d >= sevenDaysAgo;
+    }
+    if (summaryDateFilter === "30days") {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      return d >= thirtyDaysAgo;
+    }
+    if (summaryDateFilter === "this_month") {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    if (summaryDateFilter === "custom") {
+      let matchesStart = true;
+      let matchesEnd = true;
+      if (summaryStartDate) {
+        const s = new Date(summaryStartDate);
+        s.setHours(0, 0, 0, 0);
+        matchesStart = d >= s;
+      }
+      if (summaryEndDate) {
+        const e = new Date(summaryEndDate);
+        e.setHours(23, 59, 59, 999);
+        matchesEnd = d <= e;
+      }
+      return matchesStart && matchesEnd;
+    }
+    return true;
+  };
+
+  const filteredCibilEnquiries = cibilEnquiries.filter(enq =>
+    isDateInSummaryRange(enq.fetched_at || enq.created_at || enq.completed_at)
+  );
+
   const getEmployeeReportCount = (emp: any) => {
-    return cibilEnquiries.filter(enq => {
+    return filteredCibilEnquiries.filter(enq => {
       const fb = (enq.fetched_by || "").toLowerCase().trim();
       const empId = (emp.id || "").toLowerCase().trim();
       const empF2Id = (emp.f2FintechId || "").toLowerCase().trim();
@@ -1562,7 +1655,7 @@ export default function Dashboard({
   };
 
   // 1. Calculate fetch count for System Admin specifically
-  const adminFetchCount = cibilEnquiries.filter(enq => {
+  const adminFetchCount = filteredCibilEnquiries.filter(enq => {
     return (
       enq.fetched_by === "admin" ||
       enq.fetched_by === "superadmin" ||
@@ -1572,7 +1665,7 @@ export default function Dashboard({
   }).length;
 
   // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
-  const userEnquiries = cibilEnquiries.filter(enq => {
+  const userEnquiries = filteredCibilEnquiries.filter(enq => {
     // Re-use the exact same matching logic we just built for employees
     const isFetchedByAnyEmployee = employees.some(emp => {
       const fb = (enq.fetched_by || "").toLowerCase().trim();
@@ -2484,7 +2577,7 @@ ${sheetDataXml}
               {/* CIBIL Report Fetch Summary Card */}
               <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
                 <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[16px]">
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-[16px]">
                     <div>
                       <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
                         📋 CIBIL Report Fetch Summary
@@ -2492,23 +2585,60 @@ ${sheetDataXml}
                       <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
                     </div>
 
-                    {/* Department Dropdown Filter */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
-                      <select
-                        value={summaryDeptFilter}
-                        onChange={(e) => setSummaryDeptFilter(e.target.value)}
-                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                      >
-                        <option value="all">All Departments</option>
-                        <option value="users">Users</option>
-                        {uniqueDepartments.map((dept) => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ))}
-                      </select>
+                    {/* Department & Date Filter Controls */}
+                    <div className="flex items-center gap-2 flex-wrap xl:justify-end shrink-0">
+                      <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-1 rounded-[12px] border border-gray-200/80">
+                        <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
+                        <select
+                          value={summaryDeptFilter}
+                          onChange={(e) => setSummaryDeptFilter(e.target.value)}
+                          className="h-[28px] px-[8px] rounded-[8px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                        >
+                          <option value="all">All Departments</option>
+                          <option value="users">Users</option>
+                          {uniqueDepartments.map((dept) => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-1 rounded-[12px] border border-gray-200/80">
+                        <span className="text-[11px] text-gray-500 font-semibold shrink-0">Date:</span>
+                        <select
+                          value={summaryDateFilter}
+                          onChange={(e) => setSummaryDateFilter(e.target.value)}
+                          className="h-[28px] px-[8px] rounded-[8px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                        >
+                          <option value="all">All Time</option>
+                          <option value="today">Today</option>
+                          <option value="7days">Last 7 Days</option>
+                          <option value="30days">Last 30 Days</option>
+                          <option value="this_month">This Month</option>
+                          <option value="custom">Custom Range</option>
+                        </select>
+
+                        {summaryDateFilter === "custom" && (
+                          <div className="flex items-center gap-1 pl-1 border-l border-gray-200">
+                            <input
+                              type="date"
+                              value={summaryStartDate}
+                              onChange={(e) => setSummaryStartDate(e.target.value)}
+                              className="h-[28px] px-[6px] rounded-[6px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary cursor-pointer"
+                            />
+                            <span className="text-[10px] text-gray-400">to</span>
+                            <input
+                              type="date"
+                              value={summaryEndDate}
+                              onChange={(e) => setSummaryEndDate(e.target.value)}
+                              className="h-[28px] px-[6px] rounded-[6px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary cursor-pointer"
+                            />
+                          </div>
+                        )}
+                      </div>
+
                       <button
                         onClick={handleExportSummaryExcel}
-                        className="h-[32px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1 shrink-0 ml-1"
+                        className="h-[34px] px-[12px] rounded-[10px] bg-primary text-white hover:bg-opacity-95 text-[11px] font-bold shadow-xs cursor-pointer transition flex items-center gap-1.5 shrink-0"
                         title="Export CIBIL Fetch Summary to Excel (.xlsx)"
                       >
                         📥 Export Excel
