@@ -290,6 +290,13 @@ export default function CibilAnalyzerView({
   const [bsaExcelUrl, setBsaExcelUrl] = useState<string | null>(null);
   const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
 
+  // Automatically reset attached file & BSA form state whenever active CIBIL report changes
+  useEffect(() => {
+    setSelectedBsaFile(null);
+    setBsaPassword("");
+    setBsaError(null);
+  }, [report?.id, report?.pan]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {

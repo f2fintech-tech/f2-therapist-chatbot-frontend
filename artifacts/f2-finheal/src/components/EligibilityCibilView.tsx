@@ -398,6 +398,14 @@ export default function EligibilityCibilView({
   const [selectedBsaFile, setSelectedBsaFile] = useState<File | null>(null);
   const [bsaAnalysisData, setBsaAnalysisData] = useState<any>(null);
 
+  // Automatically reset attached file & BSA form state whenever the active CIBIL report changes
+  useEffect(() => {
+    setSelectedBsaFile(null);
+    setBsaPassword("");
+    setBsaError(null);
+    setBsaAnalysisData(null);
+  }, [cibilReport?.id, cibilReport?.pan, cibilReport?.phone]);
+
   // Calculations for Tab 2: Eligibility
   const eligCalculations = useMemo(() => {
     const incomeVal = Number(eligIncome) || 0;
@@ -1171,6 +1179,7 @@ export default function EligibilityCibilView({
         setBsaAnalysisData(data);
       }
 
+      setSelectedBsaFile(null);
       window.dispatchEvent(new CustomEvent("finheal:wellness_update"));
 
       setTimeout(() => {
@@ -2920,7 +2929,13 @@ export default function EligibilityCibilView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCibilReport(null)}
+                      onClick={() => {
+                        setCibilReport(null);
+                        setSelectedBsaFile(null);
+                        setBsaPassword("");
+                        setBsaError(null);
+                        setBsaAnalysisData(null);
+                      }}
                       className="mt-[14px] text-[11px] font-bold text-primary hover:underline cursor-pointer cibil-print-hide"
                     >
                       Check Different PAN
