@@ -3991,7 +3991,7 @@ export default function EligibilityCibilView({
                       <div className="absolute top-1/2 right-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(16,185,129,0.12)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
                       
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
-                        <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Salary</span>
@@ -4007,9 +4007,9 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Credit</span>
@@ -4025,7 +4025,7 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-indigo-600">₹{
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-indigo-600">₹{
                           (() => {
                             try {
                               const creditsData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits;
@@ -4054,7 +4054,7 @@ export default function EligibilityCibilView({
                           })()
                         }</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly EMI</span>
@@ -4070,9 +4070,9 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Balance</span>
@@ -4088,13 +4088,13 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-blue-600">₹{
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-blue-600">₹{
                           (bsaAnalysisData.metrics?.average_monthly_balance || 
                           bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
                           0).toLocaleString('en-IN')
                         }</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className={`absolute top-[1px] bottom-[1px] left-[1px] w-1 rounded-l-[15px] ${finalBounceCount > 0 ? 'bg-gradient-to-b from-rose-400 to-rose-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`} />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Bounce Events</span>
@@ -4110,11 +4110,11 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className={`text-[18px] font-extrabold ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <span className={`text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {finalBounceCount}
                         </span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">FOIR</span>
@@ -4130,7 +4130,7 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
                       </div>
                     </div>
                   </div>
