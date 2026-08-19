@@ -1,15 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
-import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Lock, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import EmployeeDirectory from "./admin/EmployeeDirectory";
-import ExpertsTab from "./admin/ExpertsTab";
-import EducationTab from "./admin/EducationTab";
-import TestsTab from "./admin/TestsTab";
-import AppointmentsTab from "./admin/AppointmentsTab";
-import LendersTab from "./admin/LendersTab";
-import TrashTab from "./admin/TrashTab";
-import CibilEnquiriesTab from "./admin/CibilEnquiriesTab";
 import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -22,7 +14,26 @@ import { emergencyFundQuestions } from "@/features/emergency-fund/emergencyFundC
 import { financialLiteracyQuestions } from "@/features/financial-literacy/financialLiteracyConfig";
 import { loanFitQuestions } from "@/features/loan-fit/loanFitConfig";
 import { type LenderProduct } from "./LoanCalculatorView";
-import CibilAnalyzerView from "./CibilAnalyzerView";
+
+// Lazy-loaded Admin Sub-tab components for ~60% bundle size reduction
+const EmployeeDirectory = lazy(() => import("./admin/EmployeeDirectory"));
+const ExpertsTab = lazy(() => import("./admin/ExpertsTab"));
+const EducationTab = lazy(() => import("./admin/EducationTab"));
+const TestsTab = lazy(() => import("./admin/TestsTab"));
+const AppointmentsTab = lazy(() => import("./admin/AppointmentsTab"));
+const LendersTab = lazy(() => import("./admin/LendersTab"));
+const TrashTab = lazy(() => import("./admin/TrashTab"));
+const CibilEnquiriesTab = lazy(() => import("./admin/CibilEnquiriesTab"));
+const CibilAnalyzerView = lazy(() => import("./CibilAnalyzerView"));
+
+const AdminTabFallback = () => (
+  <div className="flex items-center justify-center p-12 bg-white rounded-[20px] border border-gray-200 shadow-xs">
+    <div className="flex items-center gap-2 text-gray-500 font-medium text-xs">
+      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+      <span>Loading module...</span>
+    </div>
+  </div>
+);
 interface AdminPortalProps {
   userId: string;
   userEmail: string;
@@ -2800,167 +2811,169 @@ ${sheetDataXml}
 
 
             {/* TAB: MANAGE EXPERTS */}
-            {activeTab === "experts" && (
-              <ExpertsTab
-                advisors={advisors}
-                advisorsLoading={advisorsLoading}
-                handleOpenAddExpert={handleOpenAddExpert}
-                handleToggleActive={handleToggleActive}
-                handleOpenEditExpert={handleOpenEditExpert}
-                handleDeleteExpert={handleDeleteExpert}
-              />
-            )}
+            <Suspense fallback={<AdminTabFallback />}>
+              {activeTab === "experts" && (
+                <ExpertsTab
+                  advisors={advisors}
+                  advisorsLoading={advisorsLoading}
+                  handleOpenAddExpert={handleOpenAddExpert}
+                  handleToggleActive={handleToggleActive}
+                  handleOpenEditExpert={handleOpenEditExpert}
+                  handleDeleteExpert={handleDeleteExpert}
+                />
+              )}
 
-            {/* TAB: MANAGE EDUCATION */}
-            {activeTab === "education" && (
-              <EducationTab
-                filteredEducation={filteredEducation}
-                filterEduType={filterEduType}
-                setFilterEduType={setFilterEduType}
-                educationLoading={educationLoading}
-                handleOpenAddEdu={handleOpenAddEdu}
-                handleOpenEditEdu={handleOpenEditEdu}
-                handleDeleteEdu={handleDeleteEdu}
-              />
-            )}
+              {/* TAB: MANAGE EDUCATION */}
+              {activeTab === "education" && (
+                <EducationTab
+                  filteredEducation={filteredEducation}
+                  filterEduType={filterEduType}
+                  setFilterEduType={setFilterEduType}
+                  educationLoading={educationLoading}
+                  handleOpenAddEdu={handleOpenAddEdu}
+                  handleOpenEditEdu={handleOpenEditEdu}
+                  handleDeleteEdu={handleDeleteEdu}
+                />
+              )}
 
-            {/* TAB: MANAGE HEALTH TESTS */}
-            {activeTab === "tests" && (
-              <TestsTab
-                testSubTab={testSubTab}
-                setTestSubTab={setTestSubTab}
-                filteredTests={filteredTests}
-                testCatalog={testCatalog}
-                filterTestName={filterTestName}
-                setFilterTestName={setFilterTestName}
-                testsLoading={testsLoading}
-                handleOpenAddTest={handleOpenAddTest}
-                handleOpenEditTest={handleOpenEditTest}
-                handleDeleteTest={handleDeleteTest}
-                testSubmissions={testSubmissions}
-                filteredSubmissions={filteredSubmissions}
-                paginatedSubmissions={paginatedSubmissions}
-                submissionsLoading={submissionsLoading}
-                submissionsSearch={submissionsSearch}
-                setSubmissionsSearch={setSubmissionsSearch}
-                setSubmissionsPage={setSubmissionsPage}
-                safeSubPage={safeSubPage}
-                totalSubPages={totalSubPages}
-                testAttemptCounts={testAttemptCounts}
-                handleDeleteTestLog={handleDeleteTestLog}
-              />
-            )}
+              {/* TAB: MANAGE HEALTH TESTS */}
+              {activeTab === "tests" && (
+                <TestsTab
+                  testSubTab={testSubTab}
+                  setTestSubTab={setTestSubTab}
+                  filteredTests={filteredTests}
+                  testCatalog={testCatalog}
+                  filterTestName={filterTestName}
+                  setFilterTestName={setFilterTestName}
+                  testsLoading={testsLoading}
+                  handleOpenAddTest={handleOpenAddTest}
+                  handleOpenEditTest={handleOpenEditTest}
+                  handleDeleteTest={handleDeleteTest}
+                  testSubmissions={testSubmissions}
+                  filteredSubmissions={filteredSubmissions}
+                  paginatedSubmissions={paginatedSubmissions}
+                  submissionsLoading={submissionsLoading}
+                  submissionsSearch={submissionsSearch}
+                  setSubmissionsSearch={setSubmissionsSearch}
+                  setSubmissionsPage={setSubmissionsPage}
+                  safeSubPage={safeSubPage}
+                  totalSubPages={totalSubPages}
+                  testAttemptCounts={testAttemptCounts}
+                  handleDeleteTestLog={handleDeleteTestLog}
+                />
+              )}
 
-            {/* TAB: SCHEDULED CALLS FEED */}
-            {activeTab === "appointments" && (
-              <AppointmentsTab
-                filteredAppointments={filteredAppointments}
-                advisors={advisors}
-                filterAdvisor={filterAdvisor}
-                setFilterAdvisor={setFilterAdvisor}
-                filterApptStatus={filterApptStatus}
-                setFilterApptStatus={setFilterApptStatus}
-                filterApptStartDate={filterApptStartDate}
-                setFilterApptStartDate={setFilterApptStartDate}
-                filterApptEndDate={filterApptEndDate}
-                setFilterApptEndDate={setFilterApptEndDate}
-                appointmentsLoading={appointmentsLoading}
-                handleDeleteAppointment={handleDeleteAppointment}
-                hasSessionEnded={hasSessionEnded}
-                renderApptNotes={renderApptNotes}
-              />
-            )}
+              {/* TAB: SCHEDULED CALLS FEED */}
+              {activeTab === "appointments" && (
+                <AppointmentsTab
+                  filteredAppointments={filteredAppointments}
+                  advisors={advisors}
+                  filterAdvisor={filterAdvisor}
+                  setFilterAdvisor={setFilterAdvisor}
+                  filterApptStatus={filterApptStatus}
+                  setFilterApptStatus={setFilterApptStatus}
+                  filterApptStartDate={filterApptStartDate}
+                  setFilterApptStartDate={setFilterApptStartDate}
+                  filterApptEndDate={filterApptEndDate}
+                  setFilterApptEndDate={setFilterApptEndDate}
+                  appointmentsLoading={appointmentsLoading}
+                  handleDeleteAppointment={handleDeleteAppointment}
+                  hasSessionEnded={hasSessionEnded}
+                  renderApptNotes={renderApptNotes}
+                />
+              )}
 
-            {/* TAB: MANAGE LENDERS */}
-            {activeTab === "lenders" && (
-              <LendersTab
-                filteredLenders={filteredLenders}
-                filterLenderSearch={filterLenderSearch}
-                setFilterLenderSearch={setFilterLenderSearch}
-                lendersLoading={lendersLoading}
-                handleOpenAddLender={handleOpenAddLender}
-                handleOpenEditLender={handleOpenEditLender}
-                handleDeleteLender={handleDeleteLender}
-              />
-            )}
+              {/* TAB: MANAGE LENDERS */}
+              {activeTab === "lenders" && (
+                <LendersTab
+                  filteredLenders={filteredLenders}
+                  filterLenderSearch={filterLenderSearch}
+                  setFilterLenderSearch={setFilterLenderSearch}
+                  lendersLoading={lendersLoading}
+                  handleOpenAddLender={handleOpenAddLender}
+                  handleOpenEditLender={handleOpenEditLender}
+                  handleDeleteLender={handleDeleteLender}
+                />
+              )}
 
-            {/* TAB: CIBIL ENQUIRIES */}
-            {activeTab === "cibil-enquiries" && (
-              <CibilEnquiriesTab
-                cibilTotal={cibilTotal}
-                getDateFilterDescription={getDateFilterDescription}
-                isAdmin={isAdmin}
-                setActiveTab={setActiveTab}
-                safeCibilPage={safeCibilPage}
-                setCibilPage={setCibilPage}
-                totalPages={totalPages}
-                filterSearch={filterSearch}
-                setFilterSearch={setFilterSearch}
-                filterBureau={filterBureau}
-                setFilterBureau={setFilterBureau}
-                filterRole={filterRole}
-                setFilterRole={setFilterRole}
-                allDepartments={allDepartments}
-                filterLoanType={filterLoanType}
-                setFilterLoanType={setFilterLoanType}
-                filterDate={filterDate}
-                setFilterDate={setFilterDate}
-                filterEndDate={filterEndDate}
-                setFilterEndDate={setFilterEndDate}
-                todayStr={todayStr}
-                handleExportExcel={handleExportExcel}
-                cibilLoading={cibilLoading}
-                cibilEnquiries={cibilEnquiries}
-                paginatedEnquiries={paginatedEnquiries}
-                advisors={advisors}
-                employees={employees}
-                animatingCibilRows={animatingCibilRows}
-                setViewingCibilReport={setViewingCibilReport}
-                setViewingCibilReportId={setViewingCibilReportId}
-                setViewingCibilReportUserId={setViewingCibilReportUserId}
-                handleGenerateCAM={handleGenerateCAM}
-                handleDeleteEnquiry={handleDeleteEnquiry}
-                classifyEnquiryRole={classifyEnquiryRole}
-              />
-            )}
+              {/* TAB: CIBIL ENQUIRIES */}
+              {activeTab === "cibil-enquiries" && (
+                <CibilEnquiriesTab
+                  cibilTotal={cibilTotal}
+                  getDateFilterDescription={getDateFilterDescription}
+                  isAdmin={isAdmin}
+                  setActiveTab={setActiveTab}
+                  safeCibilPage={safeCibilPage}
+                  setCibilPage={setCibilPage}
+                  totalPages={totalPages}
+                  filterSearch={filterSearch}
+                  setFilterSearch={setFilterSearch}
+                  filterBureau={filterBureau}
+                  setFilterBureau={setFilterBureau}
+                  filterRole={filterRole}
+                  setFilterRole={setFilterRole}
+                  allDepartments={allDepartments}
+                  filterLoanType={filterLoanType}
+                  setFilterLoanType={setFilterLoanType}
+                  filterDate={filterDate}
+                  setFilterDate={setFilterDate}
+                  filterEndDate={filterEndDate}
+                  setFilterEndDate={setFilterEndDate}
+                  todayStr={todayStr}
+                  handleExportExcel={handleExportExcel}
+                  cibilLoading={cibilLoading}
+                  cibilEnquiries={cibilEnquiries}
+                  paginatedEnquiries={paginatedEnquiries}
+                  advisors={advisors}
+                  employees={employees}
+                  animatingCibilRows={animatingCibilRows}
+                  setViewingCibilReport={setViewingCibilReport}
+                  setViewingCibilReportId={setViewingCibilReportId}
+                  setViewingCibilReportUserId={setViewingCibilReportUserId}
+                  handleGenerateCAM={handleGenerateCAM}
+                  handleDeleteEnquiry={handleDeleteEnquiry}
+                  classifyEnquiryRole={classifyEnquiryRole}
+                />
+              )}
 
-            {/* TAB: EMPLOYEES DIRECTORY */}
-            {activeTab === "employees" && (
-              <EmployeeDirectory
-                employees={employees}
-                employeesLoading={employeesLoading}
-                handleOpenAddExpert={handleOpenAddExpert}
-                handleToggleAdvisorRole={handleToggleAdvisorRole}
-                handleToggleActive={handleToggleActive}
-                handleOpenEditExpert={handleOpenEditExpert}
-                handleDeleteExpert={handleDeleteExpert}
-                onRenameDeptClick={(deptName) => {
-                  setRenameDeptError("");
-                  setRenameOldDept(deptName);
-                  setRenameNewDept("");
-                  setRenameDeptModalOpen(true);
-                }}
-                onOpenTrash={() => setActiveTab("trash")}
-              />
-            )}
+              {/* TAB: EMPLOYEES DIRECTORY */}
+              {activeTab === "employees" && (
+                <EmployeeDirectory
+                  employees={employees}
+                  employeesLoading={employeesLoading}
+                  handleOpenAddExpert={handleOpenAddExpert}
+                  handleToggleAdvisorRole={handleToggleAdvisorRole}
+                  handleToggleActive={handleToggleActive}
+                  handleOpenEditExpert={handleOpenEditExpert}
+                  handleDeleteExpert={handleDeleteExpert}
+                  onRenameDeptClick={(deptName) => {
+                    setRenameDeptError("");
+                    setRenameOldDept(deptName);
+                    setRenameNewDept("");
+                    setRenameDeptModalOpen(true);
+                  }}
+                  onOpenTrash={() => setActiveTab("trash")}
+                />
+              )}
 
-            {/* TAB: TRASH MANAGER */}
-            {activeTab === "trash" && (
-              <TrashTab
-                trashLoading={trashLoading}
-                cibilTrash={cibilTrash}
-                advisorsTrash={advisorsTrash}
-                appointmentsTrash={appointmentsTrash}
-                educationTrash={educationTrash}
-                lendersTrash={lendersTrash}
-                handleRestoreCibil={handleRestoreCibil}
-                handleRestoreAdvisor={handleRestoreAdvisor}
-                handleRestoreAppointment={handleRestoreAppointment}
-                handleRestoreEdu={handleRestoreEdu}
-                handleRestoreLender={handleRestoreLender}
-                handlePermanentDeleteEdu={handlePermanentDeleteEdu}
-              />
-            )}
+              {/* TAB: TRASH MANAGER */}
+              {activeTab === "trash" && (
+                <TrashTab
+                  trashLoading={trashLoading}
+                  cibilTrash={cibilTrash}
+                  advisorsTrash={advisorsTrash}
+                  appointmentsTrash={appointmentsTrash}
+                  educationTrash={educationTrash}
+                  lendersTrash={lendersTrash}
+                  handleRestoreCibil={handleRestoreCibil}
+                  handleRestoreAdvisor={handleRestoreAdvisor}
+                  handleRestoreAppointment={handleRestoreAppointment}
+                  handleRestoreEdu={handleRestoreEdu}
+                  handleRestoreLender={handleRestoreLender}
+                  handlePermanentDeleteEdu={handlePermanentDeleteEdu}
+                />
+              )}
+            </Suspense>
 
           </div>
         ) : (
@@ -5405,19 +5418,21 @@ ${sheetDataXml}
               </button>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
-              <CibilAnalyzerView 
-                userId={viewingCibilReportUserId || "anonymous"}
-                overrideReport={viewingCibilReport} 
-                reportId={viewingCibilReportId || undefined}
-                onToggleSidebar={() => {}} 
-                onToggleInsights={() => {}} 
-                onTalkToAdvisor={() => {
-                  setViewingCibilReport(null);
-                  setViewingCibilReportId(null);
-                  setViewingCibilReportUserId(null);
-                  setLocation("/advisor");
-                }}
-              />
+              <Suspense fallback={<AdminTabFallback />}>
+                <CibilAnalyzerView 
+                  userId={viewingCibilReportUserId || "anonymous"}
+                  overrideReport={viewingCibilReport} 
+                  reportId={viewingCibilReportId || undefined}
+                  onToggleSidebar={() => {}} 
+                  onToggleInsights={() => {}} 
+                  onTalkToAdvisor={() => {
+                    setViewingCibilReport(null);
+                    setViewingCibilReportId(null);
+                    setViewingCibilReportUserId(null);
+                    setLocation("/advisor");
+                  }}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import {
   ShieldCheck,
   CheckCircle,
@@ -39,7 +39,7 @@ import FactorCard from "./cibil/FactorCard";
 import LenderOfferCard from "./cibil/LenderOfferCard";
 import { LenderLogo } from "./cibil/LenderLogo";
 import type { LenderProduct } from "./LoanCalculatorView";
-import LendersTab from "./admin/LendersTab";
+const LendersTab = lazy(() => import("./admin/LendersTab"));
 
 
 const formatDateRange = (rangeStr: string) => {
@@ -1820,15 +1820,17 @@ export default function EligibilityCibilView({
         {/* ----------------- LENDERS CATALOG SUBTAB ----------------- */}
         {cibilSubTab === "lenders" && hasLendersEditPermission && (
           <div className="relative animate-fade-up max-w-5xl w-full mx-auto pb-12">
-            <LendersTab
-              filteredLenders={filteredLenders}
-              filterLenderSearch={filterLenderSearch}
-              setFilterLenderSearch={setFilterLenderSearch}
-              lendersLoading={isLoadingLenders}
-              handleOpenAddLender={handleOpenAddLender}
-              handleOpenEditLender={handleOpenEditLender}
-              handleDeleteLender={handleDeleteLender}
-            />
+            <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500 font-medium">Loading lenders catalog...</div>}>
+              <LendersTab
+                filteredLenders={filteredLenders}
+                filterLenderSearch={filterLenderSearch}
+                setFilterLenderSearch={setFilterLenderSearch}
+                lendersLoading={isLoadingLenders}
+                handleOpenAddLender={handleOpenAddLender}
+                handleOpenEditLender={handleOpenEditLender}
+                handleDeleteLender={handleDeleteLender}
+              />
+            </Suspense>
           </div>
         )}
         
