@@ -70,6 +70,317 @@ function extractPerks(card: any): string[] {
   return Array.from(new Set(perks)).filter(Boolean);
 }
 
+// Helper to extract and style credit card payment network (Visa, RuPay, Mastercard, Amex)
+function extractCardNetwork(card: any, titleStr: string = ""): { label: string; badgeClass: string } {
+  const parts: string[] = [];
+
+  const addPart = (val: any) => {
+    if (!val) return;
+    if (typeof val === "string" || typeof val === "number") {
+      parts.push(String(val).toLowerCase());
+    } else if (Array.isArray(val)) {
+      val.forEach((item) => addPart(item));
+    } else if (typeof val === "object") {
+      Object.values(val).forEach((item) => {
+        if (typeof item === "string" || typeof item === "number") {
+          parts.push(String(item).toLowerCase());
+        }
+      });
+    }
+  };
+
+  addPart(card?.network);
+  addPart(card?.networks);
+  addPart(card?.card_network);
+  addPart(card?.card_networks);
+  addPart(card?.payment_network);
+  addPart(card?.network_name);
+  addPart(card?.network_type);
+  addPart(card?.network_title);
+  addPart(card?.network_logo);
+  addPart(card?.network_icon);
+  addPart(card?.card_alias);
+  addPart(card?.seo_card_alias);
+  addPart(card?.tags);
+  addPart(card?.product_usps);
+  addPart(card?.highlights);
+  addPart(card?.title || card?.name || card?.card_name || titleStr);
+
+  const combined = parts.join(" ");
+
+  // 1. RuPay / UPI cards
+  if (combined.includes("rupay") || combined.includes("upi") || combined.includes("kiwi")) {
+    return {
+      label: "RuPay",
+      badgeClass: "bg-amber-50 text-amber-700 border border-amber-200/80",
+    };
+  }
+
+  // 2. Mastercard
+  if (combined.includes("mastercard") || combined.includes("master card")) {
+    return {
+      label: "Mastercard",
+      badgeClass: "bg-red-50 text-red-700 border border-red-200/80",
+    };
+  }
+
+  // 3. Amex
+  if (combined.includes("amex") || combined.includes("american express")) {
+    return {
+      label: "Amex",
+      badgeClass: "bg-sky-50 text-sky-700 border border-sky-200/80",
+    };
+  }
+
+  // 4. Diners Club
+  if (combined.includes("diners")) {
+    return {
+      label: "Diners Club",
+      badgeClass: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
+    };
+  }
+
+  // 5. Default/Standard Credit Cards: VISA
+  return {
+    label: "VISA",
+    badgeClass: "bg-blue-50 text-blue-700 border border-blue-200/80",
+  };
+}
+
+const CARD_THEMES = [
+  {
+    theme: "blue",
+    badge: "bg-blue-50/90 text-blue-600 border border-blue-100",
+    joiningText: "text-blue-600",
+    annualText: "text-emerald-600",
+    check: "text-blue-500",
+    button: "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/25",
+  },
+  {
+    theme: "purple",
+    badge: "bg-purple-50/90 text-purple-600 border border-purple-100",
+    joiningText: "text-purple-600",
+    annualText: "text-emerald-600",
+    check: "text-purple-500",
+    button: "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25",
+  },
+  {
+    theme: "emerald",
+    badge: "bg-emerald-50/90 text-emerald-600 border border-emerald-100",
+    joiningText: "text-blue-600",
+    annualText: "text-emerald-600",
+    check: "text-emerald-500",
+    button: "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25",
+  },
+  {
+    theme: "indigo",
+    badge: "bg-indigo-50/90 text-indigo-600 border border-indigo-100",
+    joiningText: "text-indigo-600",
+    annualText: "text-emerald-600",
+    check: "text-indigo-500",
+    button: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25",
+  },
+];
+
+function CardThumbnailImage({
+  src,
+  title,
+  className = "w-full aspect-[1.58/1]",
+}: {
+  src?: string;
+  title?: string;
+  className?: string;
+}) {
+  const [isVertical, setIsVertical] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div
+        className={`${className} rounded-2xl bg-gradient-to-tr from-slate-800 via-indigo-950 to-slate-900 flex flex-col items-center justify-center text-white p-4 shadow-md shrink-0 border border-slate-700/50`}
+      >
+        <span className="text-2xl">💳</span>
+        {title && (
+          <span className="text-[11px] font-bold tracking-wider uppercase text-slate-300 mt-1 line-clamp-1">
+            {title}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${className} relative rounded-2xl overflow-hidden shadow-lg border border-slate-200/80 bg-slate-950/10 shrink-0 flex items-center justify-center transition-transform duration-300 group-hover:scale-[1.02]`}
+    >
+      <img
+        src={src}
+        alt={title || "Credit Card"}
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          if (img.naturalHeight > img.naturalWidth * 1.1) {
+            setIsVertical(true);
+          }
+        }}
+        onError={() => setHasError(true)}
+        className={`w-full h-full transition-transform duration-300 ${
+          isVertical
+            ? "-rotate-90 scale-[1.55] object-cover"
+            : "object-cover"
+        }`}
+      />
+    </div>
+  );
+}
+
+interface GlassmorphismCardProps {
+  card?: any;
+  idx: number;
+  bankName?: string;
+  cardTitle: string;
+  joiningFee: string;
+  annualFee: string;
+  image?: string;
+  perks?: string[];
+  rankText?: string;
+  netSavingsText?: string;
+  badgeEligible?: boolean;
+  onApply: () => void;
+}
+
+function GlassmorphismCard({
+  card,
+  idx,
+  bankName = "PARTNER BANK",
+  cardTitle,
+  joiningFee,
+  annualFee,
+  image,
+  perks = [],
+  rankText,
+  netSavingsText,
+  badgeEligible,
+  onApply,
+}: GlassmorphismCardProps) {
+  const themeObj = useMemo(() => {
+    const bankLower = (bankName || "").toLowerCase();
+    const titleLower = (cardTitle || "").toLowerCase();
+
+    if (titleLower.includes("axis") || bankLower.includes("axis")) {
+      return CARD_THEMES[1];
+    }
+    if (
+      titleLower.includes("kiwi") ||
+      titleLower.includes("free") ||
+      joiningFee.toLowerCase().includes("free")
+    ) {
+      return CARD_THEMES[2];
+    }
+    if (titleLower.includes("hdfc") || bankLower.includes("hdfc")) {
+      return CARD_THEMES[3];
+    }
+    return CARD_THEMES[idx % CARD_THEMES.length];
+  }, [bankName, cardTitle, joiningFee, idx]);
+
+  const networkObj = useMemo(() => extractCardNetwork(card, cardTitle), [card, cardTitle]);
+
+  return (
+    <div className="group relative flex flex-col justify-between bg-white/85 backdrop-blur-md border border-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgb(0,0,0,0.09)] rounded-[26px] p-6 transition-all duration-300 hover:-translate-y-1">
+      <div className="space-y-4">
+        {/* Full-width Credit Card Image Section */}
+        <div className="relative">
+          <CardThumbnailImage src={image} title={cardTitle} className="w-full aspect-[1.58/1]" />
+
+          {/* Floating Overlay Badges for Status */}
+          {(badgeEligible || rankText) && (
+            <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+              {badgeEligible && (
+                <span className="inline-block px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-md backdrop-blur-sm">
+                  Eligible ✓
+                </span>
+              )}
+              {rankText && (
+                <span className="inline-block px-3 py-1 rounded-full bg-blue-600 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-md backdrop-blur-sm">
+                  {rankText}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Card Title & Compact Network Badge */}
+        <div className="flex items-start justify-between gap-2 pt-0.5">
+          <h3 className="text-base md:text-lg font-extrabold text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
+            {cardTitle}
+          </h3>
+          {networkObj && (
+            <span
+              className={`shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider mt-0.5 ${networkObj.badgeClass}`}
+            >
+              {networkObj.label}
+            </span>
+          )}
+        </div>
+
+        {/* Net Savings Badge if calculator tab */}
+        {netSavingsText && (
+          <div className="inline-block px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-extrabold">
+            Save ₹{netSavingsText}/yr
+          </div>
+        )}
+
+        {/* Side-by-Side Dual Fee Rectangles */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Joining Fee Box */}
+          <div className="bg-slate-50/90 border border-slate-200/60 rounded-2xl p-3 flex flex-col justify-center">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">
+              JOINING FEE
+            </span>
+            <span className={`text-xs md:text-sm font-extrabold ${themeObj.joiningText}`}>
+              {joiningFee}
+            </span>
+          </div>
+
+          {/* Annual Fee Box */}
+          <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-3 flex flex-col justify-center">
+            <span className="text-[10px] font-extrabold text-emerald-600/70 uppercase tracking-wider mb-0.5">
+              ANNUAL FEE
+            </span>
+            <span className={`text-xs md:text-sm font-extrabold ${themeObj.annualText}`}>
+              {annualFee}
+            </span>
+          </div>
+        </div>
+
+        {/* Highlights list with checkmark icons */}
+        {perks.length > 0 && (
+          <div className="pt-1 space-y-1.5">
+            <ul className="space-y-1.5 text-xs text-slate-600 font-medium">
+              {perks.slice(0, 3).map((p: string, pIdx: number) => (
+                <li key={pIdx} className="flex items-start gap-2">
+                  <span className={`${themeObj.check} font-bold text-sm leading-none mt-0.5`}>✓</span>
+                  <span className="line-clamp-2">{p}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Full-width solid pill button */}
+      <div className="pt-4 mt-4 border-t border-slate-100">
+        <button
+          onClick={onApply}
+          className={`w-full py-3 px-4 rounded-2xl font-bold text-xs md:text-sm text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md ${themeObj.button} hover:scale-[1.02] active:scale-[0.98]`}
+        >
+          <span>Apply Now</span>
+          <span className="text-base leading-none">➔</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CreditCardGeniusView() {
   const [activeTab, setActiveTab] = useState<"catalog" | "eligibility" | "calculator">("catalog");
 
@@ -335,7 +646,7 @@ export default function CreditCardGeniusView() {
   };
 
   return (
-    <div className="w-full h-full min-h-0 flex-1 overflow-y-auto bg-gray-50 text-gray-900 p-4 md:p-6 space-y-6">
+    <div className="w-full h-full min-h-0 flex-1 overflow-y-auto bg-slate-50/80 bg-gradient-to-br from-indigo-50/50 via-slate-50 to-blue-50/50 text-slate-900 p-4 md:p-6 space-y-6">
       {/* Top Banner Header (Blue Gradient Theme) */}
       <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-800 p-6 md:p-8 shadow-lg text-white">
         <div className="relative z-10 space-y-2">
@@ -441,77 +752,25 @@ export default function CreditCardGeniusView() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCards.map((card, idx) => {
                 const name = card?.title || card?.name || "Credit Card";
-                const bank = card?.bank_name || card?.bank || "Partner Bank";
+                const bank = card?.bank_name || card?.bank || "PARTNER BANK";
                 const joiningFee = formatFee(card?.joining_fee_text || card?.joiningFees || card?.joining_fee, "Free");
                 const annualFee = formatFee(card?.annual_fee_text || card?.annualFees || card?.annual_fee, "Nil");
                 const image = card?.card_image || card?.image || card?.logo;
                 const perks = extractPerks(card);
 
                 return (
-                  <div
+                  <GlassmorphismCard
                     key={card?.id || card?.alias || idx}
-                    className="flex flex-col justify-between bg-white border border-gray-200 hover:border-blue-400 rounded-[18px] p-5 shadow-sm hover:shadow-md transition-all duration-200 group"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
-                            {bank}
-                          </span>
-                          <h3 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                            {name}
-                          </h3>
-                        </div>
-                        {image && (
-                          <img
-                            src={image}
-                            alt={name}
-                            className="w-16 h-10 object-contain rounded-lg bg-gray-50 p-1 border border-gray-200 shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      {/* Fee Badges Bar */}
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                        <div className="bg-blue-50/70 p-2.5 rounded-xl border border-blue-100">
-                          <span className="block text-[10px] text-gray-500 font-medium uppercase">Joining Fee</span>
-                          <span className="text-xs font-bold text-blue-700">{joiningFee}</span>
-                        </div>
-                        <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100">
-                          <span className="block text-[10px] text-gray-500 font-medium uppercase">Annual Fee</span>
-                          <span className="text-xs font-bold text-emerald-700">{annualFee}</span>
-                        </div>
-                      </div>
-
-                      {/* Key Rewards / Feature Chips */}
-                      {perks.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Key Highlights:</span>
-                          <ul className="space-y-1.5 text-xs text-gray-700">
-                            {perks.slice(0, 3).map((p: string, pIdx: number) => (
-                              <li key={pIdx} className="flex items-start gap-1.5">
-                                <span className="text-emerald-500 font-bold">✓</span>
-                                <span className="line-clamp-2">{p}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-100 mt-4">
-                      <button
-                        onClick={() => openApplyModal(card)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
-                      >
-                        <span>Apply Now</span>
-                        <span>↗</span>
-                      </button>
-                    </div>
-                  </div>
+                    card={card}
+                    idx={idx}
+                    bankName={bank}
+                    cardTitle={name}
+                    joiningFee={joiningFee}
+                    annualFee={annualFee}
+                    image={image}
+                    perks={perks}
+                    onApply={() => openApplyModal(card)}
+                  />
                 );
               })}
             </div>
@@ -616,79 +875,32 @@ export default function CreditCardGeniusView() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {eligibleCardsList.map((item, idx) => {
-                    const card = item.matched;
-                    const alias = item.alias || `Card ${idx + 1}`;
-                    const cardName = card?.title || card?.name || alias.replace(/-/g, " ").toUpperCase();
-                    const bank = card?.bank_name || card?.bank || "Partner Bank";
-                    const joiningFee = formatFee(card?.joining_fee_text || card?.joiningFees || card?.joining_fee, "Free");
-                    const annualFee = formatFee(card?.annual_fee_text || card?.annualFees || card?.annual_fee, "Nil");
-                    const image = card?.card_image || card?.image || card?.logo;
-                    const perks = extractPerks(card);
+              {eligibleCardsList.map((item, idx) => {
+                const card = item.matched;
+                const alias = item.alias || `Card ${idx + 1}`;
+                const cardName = card?.title || card?.name || alias.replace(/-/g, " ").toUpperCase();
+                const bank = card?.bank_name || card?.bank || "PARTNER BANK";
+                const joiningFee = formatFee(card?.joining_fee_text || card?.joiningFees || card?.joining_fee, "Free");
+                const annualFee = formatFee(card?.annual_fee_text || card?.annualFees || card?.annual_fee, "Nil");
+                const image = card?.card_image || card?.image || card?.logo;
+                const perks = extractPerks(card);
 
-                    return (
-                      <div
-                        key={idx}
-                        className="flex flex-col justify-between bg-white border-2 border-emerald-300 rounded-[18px] p-5 shadow-sm hover:shadow-md transition-all group"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider">
-                              Eligible ✓
-                            </span>
-                            <span className="text-[11px] font-bold text-blue-600 uppercase">
-                              {bank}
-                            </span>
-                          </div>
-
-                          <div className="flex items-start justify-between gap-3 pt-1">
-                            <h4 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {cardName}
-                            </h4>
-                            {image && (
-                              <img
-                                src={image}
-                                alt={cardName}
-                                className="w-14 h-9 object-contain rounded bg-gray-50 p-1 border border-gray-200 shrink-0"
-                              />
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                            <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-100">
-                              <span className="block text-[9px] text-gray-500 font-medium uppercase">Joining</span>
-                              <span className="text-xs font-bold text-blue-700">{joiningFee}</span>
-                            </div>
-                            <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-100">
-                              <span className="block text-[9px] text-gray-500 font-medium uppercase">Annual</span>
-                              <span className="text-xs font-bold text-emerald-700">{annualFee}</span>
-                            </div>
-                          </div>
-
-                          {perks.length > 0 && (
-                            <ul className="space-y-1 text-xs text-gray-600 pt-1">
-                              {perks.slice(0, 2).map((p: string, pIdx: number) => (
-                                <li key={pIdx} className="flex items-start gap-1">
-                                  <span className="text-emerald-500 font-bold">✓</span>
-                                  <span className="line-clamp-1">{p}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-
-                        <div className="pt-4 border-t border-gray-100 mt-4">
-                          <button
-                            onClick={() => openApplyModal(card || { name: cardName, card_alias: alias })}
-                            className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
-                          >
-                            <span>Apply Now</span>
-                            <span>↗</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                return (
+                  <GlassmorphismCard
+                    key={idx}
+                    card={card || item.rawItem}
+                    idx={idx}
+                    bankName={bank}
+                    cardTitle={cardName}
+                    joiningFee={joiningFee}
+                    annualFee={annualFee}
+                    image={image}
+                    perks={perks}
+                    badgeEligible={true}
+                    onApply={() => openApplyModal(card || { name: cardName, card_alias: alias })}
+                  />
+                );
+              })}
                 </div>
               )}
             </div>
@@ -885,56 +1097,36 @@ export default function CreditCardGeniusView() {
                     const raw = item.rawItem;
                     const matchedCard = item.matched;
                     const cardName = raw?.card_name || matchedCard?.title || matchedCard?.name || "Credit Card";
-                    const joiningFee = formatFee(raw?.joining_fees || matchedCard?.joining_fee_text, "Free");
+                    const bank = matchedCard?.bank_name || matchedCard?.bank || "PARTNER BANK";
+                    const joiningFee = formatFee(raw?.joining_fees || matchedCard?.joining_fee_text || matchedCard?.joining_fee, "Free");
+                    const annualFee = formatFee(matchedCard?.annual_fee_text || matchedCard?.annual_fee || matchedCard?.annualFees, "Nil");
                     const netSavings = raw?.net_annual_savings || raw?.annual_cashback || raw?.ck_rewards || raw?.commission;
                     const image = matchedCard?.card_image || matchedCard?.image || raw?.image;
+                    const perks = extractPerks(matchedCard || raw);
 
                     return (
-                      <div
+                      <GlassmorphismCard
                         key={idx}
-                        className="flex flex-col justify-between bg-white border border-blue-200 hover:border-blue-400 rounded-[18px] p-5 shadow-sm hover:shadow-md transition-all group"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
-                              Rank #{idx + 1}
-                            </span>
-                            {netSavings && (
-                              <span className="text-xs font-black text-emerald-600">
-                                Save ₹{Number(netSavings).toLocaleString('en-IN')}/yr
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-start justify-between gap-3 pt-1">
-                            <h4 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {cardName}
-                            </h4>
-                            {image && (
-                              <img
-                                src={image}
-                                alt={cardName}
-                                className="w-14 h-9 object-contain rounded bg-gray-50 p-1 border border-gray-200 shrink-0"
-                              />
-                            )}
-                          </div>
-
-                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100">
-                            <span className="block text-[10px] text-gray-500 uppercase font-medium">Joining Fee</span>
-                            <span className="text-xs font-bold text-blue-700">{joiningFee}</span>
-                          </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-gray-100 mt-4">
-                          <button
-                            onClick={() => openApplyModal(matchedCard || { name: cardName, card_alias: item.alias, network_url: raw?.cg_network_url })}
-                            className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
-                          >
-                            <span>Apply Now</span>
-                            <span>↗</span>
-                          </button>
-                        </div>
-                      </div>
+                        card={matchedCard || raw}
+                        idx={idx}
+                        bankName={bank}
+                        cardTitle={cardName}
+                        joiningFee={joiningFee}
+                        annualFee={annualFee}
+                        image={image}
+                        perks={perks}
+                        rankText={`Rank #${idx + 1}`}
+                        netSavingsText={netSavings ? Number(netSavings).toLocaleString("en-IN") : undefined}
+                        onApply={() =>
+                          openApplyModal(
+                            matchedCard || {
+                              name: cardName,
+                              card_alias: item.alias,
+                              network_url: raw?.cg_network_url,
+                            }
+                          )
+                        }
+                      />
                     );
                   })}
                 </div>
@@ -968,13 +1160,11 @@ export default function CreditCardGeniusView() {
             <div className="p-6 overflow-y-auto space-y-5">
               {/* Card Mini Banner */}
               <div className="flex items-center gap-4 p-4 rounded-xl bg-blue-50/60 border border-blue-100">
-                {(selectedCardForApply?.card_image || selectedCardForApply?.image || selectedCardForApply?.logo) && (
-                  <img
-                    src={selectedCardForApply?.card_image || selectedCardForApply?.image || selectedCardForApply?.logo}
-                    alt="Card"
-                    className="w-16 h-10 object-contain rounded bg-white p-1 border border-gray-200 shrink-0"
-                  />
-                )}
+                <CardThumbnailImage
+                  src={selectedCardForApply?.card_image || selectedCardForApply?.image || selectedCardForApply?.logo}
+                  title={selectedCardForApply?.title || selectedCardForApply?.name}
+                  className="w-16 md:w-20 aspect-[1.58/1]"
+                />
                 <div>
                   <h4 className="text-sm font-bold text-gray-900">
                     {selectedCardForApply?.title || selectedCardForApply?.name || selectedCardForApply?.card_name || "Credit Card"}
