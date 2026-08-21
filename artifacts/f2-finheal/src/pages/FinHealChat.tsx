@@ -38,6 +38,7 @@ const CibilAnalyzerView = lazy(() => import("@/components/CibilAnalyzerView"));
 const EligibilityCibilView = lazy(() => import("@/components/EligibilityCibilView"));
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const RemindersView = lazy(() => import("@/components/RemindersView"));
+const CreditCardGeniusView = lazy(() => import("@/components/CreditCardGeniusView"));
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 
 const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -137,6 +138,7 @@ export default function FinHealChat() {
     if (location === "/loan-calculator" || location.startsWith("/loan-calculator/")) return "loan-calculator";
     if (location === "/cibil-analyzer") return "cibil-analyzer";
     if (location === "/eligibility-cibil") return "eligibility-cibil";
+    if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
     if (location === "/reminders") return "reminders";
@@ -152,6 +154,7 @@ export default function FinHealChat() {
 
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
+    else if (view === "credit-cards") setLocation("/credit-cards");
     else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
     else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
     else if (view === "loan-fit") setLocation("/tests/loan-fit");
@@ -680,6 +683,7 @@ export default function FinHealChat() {
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
   const openDashboard = () => setMainView("dashboard");
   const openReminders = () => setMainView("reminders");
+  const openCreditCards = () => setMainView("credit-cards");
 
 
   const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
@@ -782,7 +786,9 @@ export default function FinHealChat() {
                       ? "My Dashboard"
                       : mainView === "reminders"
                         ? "Reminders"
-                        : "Financial Health Test";
+                        : mainView === "credit-cards"
+                          ? "Credit Cards"
+                          : "Financial Health Test";
   const openFinancialLiteracyInNewTab = () => {
     if (typeof window === "undefined") return;
     const nextUrl = new URL(window.location.href);
@@ -1008,6 +1014,7 @@ export default function FinHealChat() {
           onOpenEligibilityCibil={openEligibilityCibil}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
+          onOpenCreditCards={openCreditCards}
         />
         <div className="relative flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           <ErrorBoundary
@@ -1215,6 +1222,8 @@ export default function FinHealChat() {
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onOpenFinancialWellnessAssistant={openChatView}
               />
+            ) : mainView === "credit-cards" ? (
+              <CreditCardGeniusView />
             ) : (
               <DebtBalanceReviewView
                 userId={userId}

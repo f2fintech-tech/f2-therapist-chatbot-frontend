@@ -29,9 +29,10 @@ interface SidebarProps {
   onOpenEligibilityCibil?: () => void;
   onOpenDashboard?: () => void;
   onOpenReminders?: () => void;
+  onOpenCreditCards?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard, onOpenReminders }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard, onOpenReminders, onOpenCreditCards }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -364,6 +365,15 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const handleOpenCreditCards = () => {
+    setActiveNav("Credit Cards");
+    onOpenCreditCards?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
   const handleOpenEducation = () => {
     setActiveNav("Financial Education");
     onOpenEducation?.();
@@ -657,6 +667,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
                 <NavBtn icon="🛡️" label="Eligibility, CIBIL & BSA" active={activeNav === "Eligibility, CIBIL & BSA"} onClick={handleOpenEligibilityCibil} />
               )}
               <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
+              <NavBtn icon="💳" label="Credit Cards" active={activeNav === "Credit Cards"} onClick={handleOpenCreditCards} />
 
               <div className="text-[9.5px] font-semibold text-gray-400 uppercase tracking-[0.9px] px-[8px] py-[4px] pb-[6px] mt-[10px]">Learn & Grow</div>
               <NavBtn icon="🧭" label="Financial Health Test" active={activeNav === "Financial Health Test"} onClick={handleOpenFinancialHealthTests} />
