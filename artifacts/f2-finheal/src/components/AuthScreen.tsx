@@ -621,6 +621,28 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
           <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: authMode === "signup" ? "16px 22px" : "24px 28px", width: "100%", maxWidth: "380px", minHeight: authMode === "signup" ? "auto" : "480px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "14px" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setLocation("/credit-cards");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                background: "none",
+                border: "none",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#3344e6",
+                cursor: "pointer",
+                padding: "0",
+                width: "fit-content",
+                marginBottom: "-2px"
+              }}
+            >
+              ← Back to Credit Cards
+            </button>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", flexWrap: "wrap" }}>
               <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
                 <button type="button" onClick={() => handleSetAuthMode("login")} style={{ padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>

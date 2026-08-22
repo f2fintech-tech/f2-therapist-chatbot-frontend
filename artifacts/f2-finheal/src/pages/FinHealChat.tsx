@@ -829,7 +829,8 @@ export default function FinHealChat() {
     }
   }, [chat]);
 
-  if (!authSession || !userProfile) {
+  const isAuthRoute = location === "/login" || location === "/signup";
+  if (!authSession || !userProfile || (isAuthRoute && authSession?.isGuest)) {
     return <AuthScreen currentSession={prevGuestSession || authSession} onAuthSuccess={persistSession} />;
   }
 
