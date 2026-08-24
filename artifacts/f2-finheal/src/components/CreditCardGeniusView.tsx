@@ -871,7 +871,7 @@ export default function CreditCardGeniusView() {
                   className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                 >
                   <option value="salaried">Salaried Employee</option>
-                  <option value="self-employed">Self-Employed / Business</option>
+                  <option value="self_employed">Self-Employed / Business</option>
                 </select>
               </div>
 
