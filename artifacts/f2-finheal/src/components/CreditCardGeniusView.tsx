@@ -463,8 +463,8 @@ export default function CreditCardGeniusView() {
     const incStr = String(eligibilityForm.inhandIncome || "").trim();
     const inc = Number(incStr);
 
-    if (!incStr || isNaN(inc) || inc < 10000) {
-      setEligibilityError("Please enter a monthly in-hand income of at least ₹10,000 to check credit card eligibility.");
+    if (!incStr || isNaN(inc) || inc <= 0) {
+      setEligibilityError("Please enter a valid positive monthly in-hand income.");
       return;
     }
 
@@ -483,7 +483,7 @@ export default function CreditCardGeniusView() {
     } catch (err: any) {
       const msg = err?.message || err?.detail || "";
       if (msg.includes("400") || msg.includes("Pincode") || msg.includes("Income")) {
-        setEligibilityError("Please verify that your monthly income is at least ₹10,000 and pincode is a valid 6-digit Indian area pincode.");
+        setEligibilityError("Please verify that your monthly income and 6-digit pincode are valid.");
       } else {
         setEligibilityError("Unable to verify eligibility right now. Please check your internet connection and try again.");
       }
