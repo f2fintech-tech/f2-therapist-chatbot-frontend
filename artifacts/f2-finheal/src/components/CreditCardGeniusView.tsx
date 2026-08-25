@@ -724,61 +724,85 @@ export default function CreditCardGeniusView() {
               ))}
             </div>
 
-            {/* Row 3: Horizontal Dropdown Filters (Fee, Network, Bank) */}
+            {/* Row 3: Horizontal Refined Dropdown Filters (Fee, Network, Bank) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-gray-100 pt-3">
               {/* Annual Fee Range Dropdown */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 px-1">
-                  Annual Fee Range
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1">
+                  <span>🏷️</span>
+                  <span>Annual Fee Range</span>
                 </label>
-                <select
-                  value={selectedFeeRange}
-                  onChange={(e) => setSelectedFeeRange(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  {feeRangeOptions.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={selectedFeeRange}
+                    onChange={(e) => setSelectedFeeRange(e.target.value)}
+                    className={`w-full appearance-none bg-white hover:bg-slate-50/90 border ${selectedFeeRange !== "all" ? "border-blue-500 bg-blue-50/30 text-blue-700 font-extrabold" : "border-slate-200/90 text-slate-800 font-bold"} rounded-full px-4 py-2.5 pr-9 text-xs shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer`}
+                  >
+                    {feeRangeOptions.map((f) => (
+                      <option key={f.id} value={f.id} className="text-slate-900 font-medium py-1">
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               {/* Card Network Dropdown */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 px-1">
-                  Card Network
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1">
+                  <span>💳</span>
+                  <span>Card Network</span>
                 </label>
-                <select
-                  value={selectedNetwork}
-                  onChange={(e) => setSelectedNetwork(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  {cardNetworks.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={selectedNetwork}
+                    onChange={(e) => setSelectedNetwork(e.target.value)}
+                    className={`w-full appearance-none bg-white hover:bg-slate-50/90 border ${selectedNetwork !== "all" ? "border-blue-500 bg-blue-50/30 text-blue-700 font-extrabold" : "border-slate-200/90 text-slate-800 font-bold"} rounded-full px-4 py-2.5 pr-9 text-xs shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer`}
+                  >
+                    {cardNetworks.map((n) => (
+                      <option key={n.id} value={n.id} className="text-slate-900 font-medium py-1">
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               {/* Bank Filter Dropdown */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 px-1">
-                  Issuing Bank
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1">
+                  <span>🏦</span>
+                  <span>Issuing Bank</span>
                 </label>
-                <select
-                  value={selectedBank}
-                  onChange={(e) => setSelectedBank(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-full px-4 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  <option value="all">All Issuing Banks</option>
-                  {bankOptions.map((bName) => (
-                    <option key={bName} value={bName}>
-                      {bName}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={selectedBank}
+                    onChange={(e) => setSelectedBank(e.target.value)}
+                    className={`w-full appearance-none bg-white hover:bg-slate-50/90 border ${selectedBank !== "all" ? "border-blue-500 bg-blue-50/30 text-blue-700 font-extrabold" : "border-slate-200/90 text-slate-800 font-bold"} rounded-full px-4 py-2.5 pr-9 text-xs shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer`}
+                  >
+                    <option value="all" className="text-slate-900 font-medium py-1">All Issuing Banks</option>
+                    {bankOptions.map((bName) => (
+                      <option key={bName} value={bName} className="text-slate-900 font-medium py-1">
+                        {bName}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
