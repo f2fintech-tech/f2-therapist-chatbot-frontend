@@ -64,51 +64,35 @@ interface Appointment {
 
 export function classifyEnquiryRole(email: string, name: string, advisors: any[] = []): "Admin" | "Manager" | "Senior Leadership" | "User" {
   const cleanEmail = (email || "").toLowerCase().trim();
-  const cleanName = (name || "").toLowerCase().trim();
 
-  // 1. Admin Classification
+  // 1. Admin Classification (Strict admin emails only)
   if (
     cleanEmail === "admin@finheal.com" ||
     cleanEmail === "admin@f2finheal.com" ||
-    cleanEmail.startsWith("admin@") ||
-    cleanName.includes("admin") ||
-    cleanName === "finheal admin"
+    cleanEmail.startsWith("admin@")
   ) {
     return "Admin";
   }
 
-  // 2. Senior Leadership Classification
-  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com") || cleanEmail.endsWith("@f2fintech.in");
-
-  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
-  const hasLeadershipName = cleanName.includes("ceo") || cleanName.includes("cto") || cleanName.includes("cfo") || cleanName.includes("coo") || cleanName.includes("vp") || cleanName.includes("president") || cleanName.includes("founder") || cleanName.includes("director") || cleanName.includes("executive");
-
-  if ((isInternalDomain && hasLeadershipEmail) || hasLeadershipName) {
+  // 2. Senior Leadership (Explicit leadership emails only)
+  if (["ceo@finheal.com", "cto@finheal.com", "cfo@finheal.com", "coo@finheal.com", "director@finheal.com"].includes(cleanEmail)) {
     return "Senior Leadership";
   }
 
-  // 3. Manager Classification
-  // Check against advisors list
+  // 3. Manager / Advisor (Strict Match by Unique ID or Registered Advisor Email ONLY - No Name Matching)
   const isAdvisor = advisors.some(adv => {
     const advId = (adv.f2FintechId || adv.id || "").toLowerCase().trim();
     const advEmail = (adv.email || "").toLowerCase().trim();
-    const advName = (adv.name || "").toLowerCase().trim();
     return (
-      (cleanEmail && (cleanEmail === advId || cleanEmail === advEmail)) ||
-      (cleanName && cleanName === advName)
+      cleanEmail && (cleanEmail === advId || cleanEmail === advEmail)
     );
   });
 
-  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
-  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
-  const hasManagerName = cleanName.includes("manager") || cleanName.includes("advisor") || cleanName.includes("lead") || cleanName.includes("head") || cleanName.includes("supervisor");
-
-  if (isAdvisor || hasManagerEmail || (isInternalDomain && hasManagerName)) {
+  if (isAdvisor) {
     return "Manager";
   }
 
-  // 4. Regular User / Lead
+  // 4. Default: Every other enquiry is strictly a User (Lead)
   return "User";
 }
 
