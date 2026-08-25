@@ -4,8 +4,8 @@ export function isExemptRole(email?: string, name?: string): boolean {
 
   // Admin Check
   if (
-    cleanEmail === "admin@finheal.com" || 
-    cleanEmail === "admin@f2finheal.com" || 
+    cleanEmail === "admin@finheal.com" ||
+    cleanEmail === "admin@f2finheal.com" ||
     cleanEmail.startsWith("admin@") ||
     cleanName.includes("admin") ||
     cleanName === "finheal admin"
@@ -16,7 +16,7 @@ export function isExemptRole(email?: string, name?: string): boolean {
   // Manager & Advisor Check
   const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
   const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
+  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com") || cleanEmail.endsWith("@f2fintech.in");
 
   const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
   const hasLeadershipName = leadershipPrefixes.some(pref => cleanName.includes(pref));
@@ -28,7 +28,7 @@ export function isExemptRole(email?: string, name?: string): boolean {
   }
 
   // If email domain is f2fintech.com, it is an advisor/employee
-  if (cleanEmail.endsWith("@f2fintech.com")) {
+  if (cleanEmail.endsWith("@f2fintech.com") || cleanEmail.endsWith("@f2fintech.in")) {
     return true;
   }
 

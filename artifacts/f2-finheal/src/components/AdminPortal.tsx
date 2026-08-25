@@ -79,7 +79,7 @@ export function classifyEnquiryRole(email: string, name: string, advisors: any[]
 
   // 2. Senior Leadership Classification
   const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
+  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com") || cleanEmail.endsWith("@f2fintech.in");
 
   const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
   const hasLeadershipName = cleanName.includes("ceo") || cleanName.includes("cto") || cleanName.includes("cfo") || cleanName.includes("coo") || cleanName.includes("vp") || cleanName.includes("president") || cleanName.includes("founder") || cleanName.includes("director") || cleanName.includes("executive");
@@ -129,7 +129,7 @@ const TEST_NAMES: Record<string, string> = {
 
 const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
   const hasAgenda = agenda && agenda.length > 0;
-  
+
   if (!hasAgenda) {
     if (!notes) return null;
     return (
@@ -138,7 +138,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
       </div>
     );
   }
-  
+
   // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
   if (agenda.length === 1 && agenda[0] === notes) {
     return (
@@ -147,7 +147,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
       </div>
     );
   }
-  
+
   return (
     <div className="mt-2 flex flex-col gap-1.5 text-left">
       <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[10px] p-2.5 flex flex-col gap-1">
@@ -161,7 +161,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
           ))}
         </div>
       </div>
-      
+
       {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
         <div className="text-[10.5px] text-gray-500 italic bg-gray-55/60 p-2 border border-gray-100 rounded-[8px] leading-relaxed whitespace-pre-wrap">
           &quot;{notes}&quot;
@@ -182,17 +182,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [matchWorkspace, paramsWorkspace] = useRoute("/advisor-workspace/:tab");
   const match = matchAdmin || matchWorkspace;
   const params = matchAdmin ? paramsAdmin : paramsWorkspace;
-  
+
   const [_, setLocation] = useLocation();
-  
+
   const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(params.tab))
     ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash")
     : null;
-    
-  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(initialTab) 
-    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") 
+
+  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(initialTab)
+    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash")
     : null;
-    
+
   const activeTab = activeTabUrl || validInitialTab || "experts";
 
   const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") => {
@@ -275,14 +275,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
-  
+
   // CIBIL Enquiry Deletion Modal States
   const [cibilDeleteConfirmOpen, setCibilDeleteConfirmOpen] = useState(false);
   const [cibilToDelete, setCibilToDelete] = useState<string | null>(null);
   const [isDeletingCibil, setIsDeletingCibil] = useState(false);
   const [cibilDeleteResult, setCibilDeleteResult] = useState<string | null>(null);
   const [animatingCibilRows, setAnimatingCibilRows] = useState<string[]>([]);
-  
+
   // Department Renaming Modal States
   const [renameDeptModalOpen, setRenameDeptModalOpen] = useState(false);
   const [renameOldDept, setRenameOldDept] = useState("");
@@ -368,7 +368,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [addedSlots, setAddedSlots] = useState<string[]>([]);
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  
+
   // Referrals State
   const [referrals, setReferrals] = useState<ReferralCode[]>([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
@@ -464,9 +464,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
   const currentExpertId = isEmployeeId ? userId : getExpertIdFromEmail(userEmail);
-  
+
   const foundAdvisor = currentExpertId ? advisors.find(a => (a.id === currentExpertId || a.f2FintechId === currentExpertId)) : null;
-  
+
   const activeExpert = foundAdvisor || (isEmployeeId ? (() => {
     try {
       const sessionStr = localStorage.getItem("finheal-auth-session");
@@ -491,7 +491,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
           fee: 899
         } as Advisor;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   })() : null);
 
@@ -674,11 +674,11 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [filterBureau, setFilterBureau] = useState<string>("all");
-  
+
   const allDepartments = useMemo(() => {
     return Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort() as string[];
   }, [employees]);
-  
+
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
 
@@ -899,7 +899,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const generateWorksheetXml = (data: any[]) => {
       const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
       const loanCols: { key: string; label: string; count: number }[] = [];
-      
+
       loanTypesConfig.forEach(cfg => {
         const count = maxLoanCounts[cfg.key] || 0;
         if (count > 0) {
@@ -914,7 +914,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       const lastColLetter = getColumnLetter(totalCols);
 
       let sheetDataXml = "";
-      
+
       // Header row
       sheetDataXml += `    <row r="1" spans="1:${totalCols}">\n`;
       headers.forEach((h, idx) => {
@@ -1089,7 +1089,7 @@ ${sheetDataXml}
         headers["X-API-Key"] = configuredApiKey;
       }
 
-      const requestUrl = reportId 
+      const requestUrl = reportId
         ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
         : `${apiBase}/cibil/cam/generate/${userId}`;
 
@@ -1130,7 +1130,7 @@ ${sheetDataXml}
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      
+
       const queryParams = new URLSearchParams({
         page: cibilPage.toString(),
         limit: cibilPageSize.toString()
@@ -1168,7 +1168,7 @@ ${sheetDataXml}
   const executeDeleteCibil = async () => {
     if (!cibilToDelete) return;
     setIsDeletingCibil(true);
-    
+
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
       const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
@@ -1216,15 +1216,15 @@ ${sheetDataXml}
   const getProductPrefix = (category: string, productType: string): string => {
     const cat = (category || "").toLowerCase().trim();
     const prod = (productType || "").toLowerCase().trim();
-    
+
     if (cat === "home") return "HL";
     if (cat === "personal") return "PL";
     if (cat === "professional") return "PR";
-    
+
     if (prod.includes("home")) return "HL";
     if (prod.includes("personal")) return "PL";
     if (prod.includes("professional") || prod.includes("prof")) return "PR";
-    
+
     const words = (productType || category || "").split(/\s+/).filter(Boolean);
     if (words.length >= 2) {
       return (words[0][0] + words[1][0]).toUpperCase();
@@ -1477,7 +1477,7 @@ ${sheetDataXml}
       });
       const newListStr = JSON.stringify(sortedList);
       const oldListStr = localStorage.getItem("finheal_advisors_list");
-      
+
       setAdvisors(sortedList);
       if (newListStr !== oldListStr) {
         localStorage.setItem("finheal_advisors_list", newListStr);
@@ -1623,7 +1623,7 @@ ${sheetDataXml}
   useEffect(() => {
     const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
     const shouldLoadEmployees = activeTab === "employees" || activeTab === "cibil-enquiries";
-    
+
     let intervalIdAdvisors: any = null;
     let intervalIdEmployees: any = null;
 
@@ -1648,7 +1648,7 @@ ${sheetDataXml}
 
     window.addEventListener("finheal:advisors_update", handleUpdate);
     window.addEventListener("storage", handleUpdate);
-    
+
     return () => {
       if (intervalIdAdvisors) clearInterval(intervalIdAdvisors);
       if (intervalIdEmployees) clearInterval(intervalIdEmployees);
@@ -1665,7 +1665,7 @@ ${sheetDataXml}
     const handleAppointmentsUpdate = () => {
       loadGlobalAppointments();
     };
-    
+
     if (shouldLoadAppointments) {
       loadGlobalAppointments(true);
       intervalId = setInterval(() => loadGlobalAppointments(false), 30000); // 30s interval for appointments (low impact)
@@ -1701,9 +1701,9 @@ ${sheetDataXml}
       setReferralsLoading(true);
       listReferrals(currentExpertId)
         .then(data => {
-           // Sort by latest first
-           const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-           setReferrals(sorted);
+          // Sort by latest first
+          const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setReferrals(sorted);
         })
         .catch(err => console.error("Error loading referrals", err))
         .finally(() => setReferralsLoading(false));
@@ -1765,11 +1765,11 @@ ${sheetDataXml}
         const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
         const dd = String(dateObj.getDate()).padStart(2, "0");
         setSlotDate(`${yyyy}-${mm}-${dd}`);
-        
+
         // Split by ampersand to load multiple slots
         const ranges = timeStr.split(/\s*&\s*/);
         setAddedSlots(ranges);
-        
+
         setSlotFromTime("09:00 AM");
         setSlotToTime("10:00 AM");
         return;
@@ -1854,8 +1854,8 @@ ${sheetDataXml}
     const normAvail = rawAvail.includes("meeting")
       ? "in meeting"
       : (rawAvail.includes("available") && !rawAvail.includes("not available") && !rawAvail.includes("unavailable"))
-      ? "available"
-      : "unavailable";
+        ? "available"
+        : "unavailable";
 
     setExpertForm({
       f2FintechId: adv.f2FintechId || adv.id,
@@ -1891,8 +1891,8 @@ ${sheetDataXml}
       return;
     }
     if (
-      expertForm.isAdvisor && 
-      expertForm.category === "manual" && 
+      expertForm.isAdvisor &&
+      expertForm.category === "manual" &&
       (!expertForm.customCategory.trim() || expertForm.customCategory.toLowerCase().trim() === "manual")
     ) {
       alert("Please write a valid custom category name (cannot be empty or 'manual').");
@@ -1962,13 +1962,13 @@ ${sheetDataXml}
       setDeleteError("Password is required.");
       return;
     }
-    
+
     setIsDeletingExpert(true);
     setDeleteError(null);
     try {
       // Verify Admin Password via signInUser check
       await signInUser(userEmail, adminPassword);
-      
+
       // If verification succeeds, execute deletion
       if (deleteTargetId) {
         await deleteAdvisor(deleteTargetId);
@@ -2171,7 +2171,7 @@ ${sheetDataXml}
   const handleOpenEditTest = (test: TestCard) => {
     setEditingTest(test);
     setSelectedEditLevel(1);
-    
+
     let initialQuestions = test.questions || [];
     if (test.id === "financial-literacy") {
       initialQuestions = (test.questions && test.questions.length > 0 ? test.questions : []).map((q, idx) => {
@@ -2544,14 +2544,14 @@ ${sheetDataXml}
     }
     try {
       await rescheduleAppointment(apptId, rescheduleDate, rescheduleTime);
-      
+
       // Save rescheduled apptId in localStorage
       const rescheduled = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
       if (!rescheduled.includes(apptId)) {
         rescheduled.push(apptId);
         localStorage.setItem("finheal_rescheduled_appts", JSON.stringify(rescheduled));
       }
-      
+
       setReschedulingApptId(null);
       setRescheduleDate("");
       setRescheduleTime("");
@@ -2597,11 +2597,11 @@ ${sheetDataXml}
       if (matchAdv) {
         const matchId = matchAdv.id;
         const matchF2Id = matchAdv.f2FintechId || "";
-        
+
         const apptAdvIdClean = (appt.advisorId || "").toLowerCase().trim();
         const selectIdClean = matchId.toLowerCase().trim();
         const selectF2IdClean = matchF2Id.toLowerCase().trim();
-        
+
         if (apptAdvIdClean !== selectIdClean && apptAdvIdClean !== selectF2IdClean) {
           return false;
         }
@@ -2611,18 +2611,18 @@ ${sheetDataXml}
         }
       }
     }
-    
+
     // Status Filter
     if (filterApptStatus !== "all") {
       const isCompleted = appt.completed || hasSessionEnded(appt.date, appt.time);
       const isCancelled = appt.cancelled;
       const isPending = !appt.completed && !appt.cancelled && !hasSessionEnded(appt.date, appt.time);
-      
+
       if (filterApptStatus === "completed" && !isCompleted) return false;
       if (filterApptStatus === "cancelled" && !isCancelled) return false;
       if (filterApptStatus === "pending" && !isPending) return false;
     }
-    
+
     // Date Range Filter
     if (filterApptStartDate) {
       if (appt.date < filterApptStartDate) return false;
@@ -2630,7 +2630,7 @@ ${sheetDataXml}
     if (filterApptEndDate) {
       if (appt.date > filterApptEndDate) return false;
     }
-    
+
     return true;
   });
 
@@ -2723,10 +2723,10 @@ ${sheetDataXml}
   try {
     const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
     hasSessionPermission = (session?.permissions || []).includes("cibil_view") || (session?.permissions || []).includes("cibil_view_all");
-  } catch (e) {}
+  } catch (e) { }
 
   const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
-    hasSessionPermission || 
+    hasSessionPermission ||
     (activeExpert?.permissions || []).some((p: string) => p === "cibil_view" || p === "cibil_view_all")
   ));
   console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
@@ -3017,7 +3017,7 @@ ${sheetDataXml}
                   <div className="text-center sm:text-left flex-1 min-w-0">
                     <h2 className="text-[20px] font-serif font-bold text-gray-900">Welcome Back, {activeExpert.name}!</h2>
                     <p className="text-[12px] text-gray-500 mt-[2px]">{activeExpert.designation}</p>
- 
+
                     <div className="flex flex-wrap gap-[6px] mt-[8px] justify-center sm:justify-start">
                       {activeExpert.expertise.map((exp, idx) => (
                         <span key={idx} className="bg-white border border-[#d4d8fa] text-primary text-[10px] font-bold px-[8px] py-[2px] rounded-full">
@@ -3418,7 +3418,7 @@ ${sheetDataXml}
                           <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
                             <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
                           </div>
-                                                ) : (
+                        ) : (
                           <div className="space-y-[8px]">
                             {expertPastAppointments.map((appt, idx) => (
                               <div key={idx} className="border border-gray-150 bg-gray-50/40 hover:bg-gray-50/80 transition-colors p-[16px] rounded-[16px] flex flex-col gap-[10px]">
@@ -3682,8 +3682,8 @@ ${sheetDataXml}
                       </div>
                     </div>
                   )
-                }
-              </div>
+                  }
+                </div>
 
                 {/* Section 3: Referral Engine */}
                 <div className="border border-[#e0e7ff] bg-gradient-to-r from-[#f8faff] to-[#f3f6ff] rounded-[20px] p-[20px] shadow-sm animate-fade-in mt-[20px]">
@@ -3825,31 +3825,31 @@ ${sheetDataXml}
                           </select>
                         </div>
 
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] text-gray-500 font-semibold">From:</span>
-                            <input
-                              type="date"
-                              value={filterDate}
-                              onChange={(e) => setFilterDate(e.target.value)}
-                              max={todayStr}
-                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                            />
-                            <span className="text-[11px] text-gray-500 font-semibold">To:</span>
-                            <input
-                              type="date"
-                              value={filterEndDate}
-                              onChange={(e) => setFilterEndDate(e.target.value)}
-                              max={todayStr}
-                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                            />
-                            {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
-                              <button
-                                onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
-                                className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                              >
-                                Reset Filters
-                              </button>
-                            )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                          <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                          <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                          <input
+                            type="date"
+                            value={filterEndDate}
+                            onChange={(e) => setFilterEndDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                          {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                            <button
+                              onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
                           {cibilEnquiries.length > 0 && (
                             <button
                               onClick={handleExportExcel}
@@ -3879,10 +3879,10 @@ ${sheetDataXml}
                           {cibilLoading ? (
                             <tr>
                               <td colSpan={6} className="text-center p-6 text-gray-400">
-                                {filterBureau === "experian" 
-                                  ? "Loading Experian enquiries..." 
-                                  : filterBureau === "cibil" 
-                                    ? "Loading CIBIL enquiries..." 
+                                {filterBureau === "experian"
+                                  ? "Loading Experian enquiries..."
+                                  : filterBureau === "cibil"
+                                    ? "Loading CIBIL enquiries..."
                                     : "Loading all enquiries..."}
                               </td>
                             </tr>
@@ -4179,138 +4179,138 @@ ${sheetDataXml}
               {expertForm.isAdvisor && (
                 <>
 
-              <div className="grid grid-cols-2 gap-[10px]">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Category</label>
-                  <select
-                    value={expertForm.category}
-                    onChange={(e) => setExpertForm({ ...expertForm, category: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  >
-                    <option value="wealth">Wealth & Investing</option>
-                    <option value="tax">Tax & Retirement</option>
-                    <option value="debt">Debt & Credit</option>
-                    <option value="property">Real Estate</option>
-                    <option value="insurance">Insurance</option>
-                    <option value="manual">Manual Type</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Initial Availability</label>
-                  <select
-                    value={expertForm.availability}
-                    onChange={(e) => setExpertForm({ ...expertForm, availability: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
-                  >
-                    <option value="available">Available (Green dot)</option>
-                    <option value="unavailable">Not Available (Red dot)</option>
-                    <option value="in meeting">In Meeting (Indigo dot)</option>
-                  </select>
-                </div>
-              </div>
-
-              {expertForm.category === "manual" && (
-                <div className="mt-[4px] border border-blue-50 bg-blue-50/20 p-[10px] rounded-[12px]">
-                  <label className="text-[11px] font-bold text-[#3344e6] uppercase tracking-[0.5px] block mb-[4px]">Write Own Category</label>
-                  <input
-                    type="text"
-                    value={expertForm.customCategory}
-                    onChange={(e) => setExpertForm({ ...expertForm, customCategory: e.target.value })}
-                    placeholder="e.g. Mutual Fund Consultant"
-                    autoFocus
-                    className="w-full px-[10px] py-[8px] border border-[#d4d8fa] rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
-                <input
-                  type="number"
-                  value={expertForm.fee}
-                  onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
-                  placeholder="e.g. 899"
-                  min={0}
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags</label>
-                <input
-                  type="text"
-                  value={expertForm.expertise}
-                  onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })}
-                  placeholder="e.g. Stock Markets, Tax, Debt repair"
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Core Strength</label>
-                <input
-                  type="text"
-                  value={expertForm.strength}
-                  onChange={(e) => setExpertForm({ ...expertForm, strength: e.target.value })}
-                  placeholder="e.g. Dynamic Asset allocation"
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Advisor Bio</label>
-                <textarea
-                  value={expertForm.bio}
-                  onChange={(e) => setExpertForm({ ...expertForm, bio: e.target.value })}
-                  placeholder="A short profile paragraph explaining their professional focus..."
-                  rows={3}
-                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="border border-amber-100 bg-amber-50/20 p-[12px] rounded-[16px] space-y-[6px]">
-                <label className="text-[12.5px] font-bold text-amber-700 uppercase tracking-[0.5px] block">
-                  Add a Comment
-                </label>
-
-                <div className="flex items-center gap-[6px] py-[2px]">
-                  <span className="text-[11px] font-bold text-amber-800 tracking-[0.3px]">Rating:</span>
-                  <div className="flex items-center gap-[4px]">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onMouseEnter={() => setTestReviewHoverRating(star)}
-                        onMouseLeave={() => setTestReviewHoverRating(0)}
-                        onClick={() => setExpertForm({ ...expertForm, testRating: star })}
-                        className="text-[20px] cursor-pointer transition-all duration-150 hover:scale-125 border-none bg-transparent outline-none focus:outline-none select-none p-0"
-                        aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                  <div className="grid grid-cols-2 gap-[10px]">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Category</label>
+                      <select
+                        value={expertForm.category}
+                        onChange={(e) => setExpertForm({ ...expertForm, category: e.target.value as any })}
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
                       >
-                        <span
-                          className={`transition-colors duration-150 ${star <= (testReviewHoverRating || expertForm.testRating)
-                            ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]"
-                            : "text-gray-200"
-                            }`}
-                        >
-                          ★
-                        </span>
-                      </button>
-                    ))}
+                        <option value="wealth">Wealth & Investing</option>
+                        <option value="tax">Tax & Retirement</option>
+                        <option value="debt">Debt & Credit</option>
+                        <option value="property">Real Estate</option>
+                        <option value="insurance">Insurance</option>
+                        <option value="manual">Manual Type</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Initial Availability</label>
+                      <select
+                        value={expertForm.availability}
+                        onChange={(e) => setExpertForm({ ...expertForm, availability: e.target.value as any })}
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
+                      >
+                        <option value="available">Available (Green dot)</option>
+                        <option value="unavailable">Not Available (Red dot)</option>
+                        <option value="in meeting">In Meeting (Indigo dot)</option>
+                      </select>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-100/50 px-[6px] py-[2px] rounded-full">
-                    {expertForm.testRating} Star{expertForm.testRating > 1 ? "s" : ""}
-                  </span>
-                </div>
 
-                <textarea
-                  value={expertForm.testComment}
-                  onChange={(e) => setExpertForm({ ...expertForm, testComment: e.target.value })}
-                  placeholder="e.g. Excellent advice! (Writing here creates a completed test appointment in the database with the selected Rating above)."
-                  rows={2}
-                  className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
-                />
-              </div>
-              </>
+                  {expertForm.category === "manual" && (
+                    <div className="mt-[4px] border border-blue-50 bg-blue-50/20 p-[10px] rounded-[12px]">
+                      <label className="text-[11px] font-bold text-[#3344e6] uppercase tracking-[0.5px] block mb-[4px]">Write Own Category</label>
+                      <input
+                        type="text"
+                        value={expertForm.customCategory}
+                        onChange={(e) => setExpertForm({ ...expertForm, customCategory: e.target.value })}
+                        placeholder="e.g. Mutual Fund Consultant"
+                        autoFocus
+                        className="w-full px-[10px] py-[8px] border border-[#d4d8fa] rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
+                    <input
+                      type="number"
+                      value={expertForm.fee}
+                      onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
+                      placeholder="e.g. 899"
+                      min={0}
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags</label>
+                    <input
+                      type="text"
+                      value={expertForm.expertise}
+                      onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })}
+                      placeholder="e.g. Stock Markets, Tax, Debt repair"
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Core Strength</label>
+                    <input
+                      type="text"
+                      value={expertForm.strength}
+                      onChange={(e) => setExpertForm({ ...expertForm, strength: e.target.value })}
+                      placeholder="e.g. Dynamic Asset allocation"
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Advisor Bio</label>
+                    <textarea
+                      value={expertForm.bio}
+                      onChange={(e) => setExpertForm({ ...expertForm, bio: e.target.value })}
+                      placeholder="A short profile paragraph explaining their professional focus..."
+                      rows={3}
+                      className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="border border-amber-100 bg-amber-50/20 p-[12px] rounded-[16px] space-y-[6px]">
+                    <label className="text-[12.5px] font-bold text-amber-700 uppercase tracking-[0.5px] block">
+                      Add a Comment
+                    </label>
+
+                    <div className="flex items-center gap-[6px] py-[2px]">
+                      <span className="text-[11px] font-bold text-amber-800 tracking-[0.3px]">Rating:</span>
+                      <div className="flex items-center gap-[4px]">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onMouseEnter={() => setTestReviewHoverRating(star)}
+                            onMouseLeave={() => setTestReviewHoverRating(0)}
+                            onClick={() => setExpertForm({ ...expertForm, testRating: star })}
+                            className="text-[20px] cursor-pointer transition-all duration-150 hover:scale-125 border-none bg-transparent outline-none focus:outline-none select-none p-0"
+                            aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                          >
+                            <span
+                              className={`transition-colors duration-150 ${star <= (testReviewHoverRating || expertForm.testRating)
+                                ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]"
+                                : "text-gray-200"
+                                }`}
+                            >
+                              ★
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-100/50 px-[6px] py-[2px] rounded-full">
+                        {expertForm.testRating} Star{expertForm.testRating > 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={expertForm.testComment}
+                      onChange={(e) => setExpertForm({ ...expertForm, testComment: e.target.value })}
+                      placeholder="e.g. Excellent advice! (Writing here creates a completed test appointment in the database with the selected Rating above)."
+                      rows={2}
+                      className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
+                    />
+                  </div>
+                </>
               )}
             </div>
 
@@ -4341,8 +4341,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
                 ⚠️ Verify Admin Password
               </h3>
-              <button 
-                onClick={() => setDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4351,10 +4351,10 @@ ${sheetDataXml}
 
             <div className="p-[20px] space-y-[14px]">
               <p className="text-[12px] leading-relaxed text-gray-600">
-                You are about to permanently delete this employee record. 
+                You are about to permanently delete this employee record.
                 This action cannot be undone. To authorize, please enter your Admin password:
               </p>
-              
+
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
                   Admin Password
@@ -4382,8 +4382,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4411,8 +4411,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
                 ⚠️ Delete Lender Product
               </h3>
-              <button 
-                onClick={() => setLenderDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setLenderDeleteConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4421,14 +4421,14 @@ ${sheetDataXml}
 
             <div className="p-[20px] space-y-[14px]">
               <p className="text-[12px] leading-relaxed text-gray-600">
-                Are you sure you want to permanently delete the loan product <strong className="text-gray-800">{lenderToDelete.name} — {lenderToDelete.productType}</strong>? 
+                Are you sure you want to permanently delete the loan product <strong className="text-gray-800">{lenderToDelete.name} — {lenderToDelete.productType}</strong>?
                 This action cannot be undone and will remove it from the catalogue.
               </p>
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setLenderDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setLenderDeleteConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4456,8 +4456,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[8px]">
                 🏢 Bulk Rename Department
               </h3>
-              <button 
-                onClick={() => setRenameDeptModalOpen(false)} 
+              <button
+                onClick={() => setRenameDeptModalOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4506,8 +4506,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setRenameDeptModalOpen(false)} 
+              <button
+                onClick={() => setRenameDeptModalOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4528,13 +4528,13 @@ ${sheetDataXml}
       {deactivateConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
           <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
               <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
                 🚫 Deactivate {deactivateTarget?.isAdvisor ? "Advisor" : "Employee"} Profile
               </h3>
-              <button 
-                onClick={() => setDeactivateConfirmOpen(false)} 
+              <button
+                onClick={() => setDeactivateConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4545,7 +4545,7 @@ ${sheetDataXml}
               <p className="text-[12px] leading-relaxed text-gray-600">
                 Please enter the reason for temporarily deactivating <strong>{deactivateTarget?.name}</strong>:
               </p>
-              
+
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
                   Deactivation Reason
@@ -4561,8 +4561,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setDeactivateConfirmOpen(false)} 
+              <button
+                onClick={() => setDeactivateConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4788,7 +4788,7 @@ ${sheetDataXml}
                       <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
                     </select>
                     {/* Live Gradient Color Ball Preview */}
-                    <div 
+                    <div
                       className={`w-[28px] h-[28px] rounded-full border border-gray-200 shrink-0 shadow-inner bg-gradient-to-r ${testForm.accent}`}
                       title="Selected Gradient Preview"
                     />
@@ -4925,19 +4925,18 @@ ${sheetDataXml}
                             }
                           }}
                           onDragEnd={() => setDraggedIndex(null)}
-                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${
-                            draggedIndex === qIndex 
-                              ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]" 
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
+                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${draggedIndex === qIndex
+                            ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]"
+                            : "border-gray-200 hover:border-gray-300"
+                            }`}
                         >
-                          
+
                           {/* Question Input */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-[6px]">
                               <div className="flex items-center gap-[6px]">
                                 {/* Drag Handle Dot Pattern */}
-                                <div 
+                                <div
                                   className="text-gray-400 cursor-grab active:cursor-grabbing font-bold text-[14px] select-none hover:text-gray-600 px-[4px] py-[2px] rounded hover:bg-gray-200/50 flex items-center justify-center transition"
                                   title="Drag to reorder question"
                                 >
@@ -5115,7 +5114,7 @@ ${sheetDataXml}
                     ))}
                     <option value="__other__">Other (Add new partner...)</option>
                   </select>
-                  
+
                   {isOtherSelected && (
                     <input
                       type="text"
@@ -5405,12 +5404,12 @@ ${sheetDataXml}
                   )}
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setViewingCibilReport(null);
                   setViewingCibilReportId(null);
                   setViewingCibilReportUserId(null);
-                }} 
+                }}
                 className="text-[22px] text-gray-400 hover:text-gray-600 cursor-pointer border-none bg-transparent transition font-bold leading-none p-1"
                 title="Close Report"
               >
@@ -5419,12 +5418,12 @@ ${sheetDataXml}
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
               <Suspense fallback={<AdminTabFallback />}>
-                <CibilAnalyzerView 
+                <CibilAnalyzerView
                   userId={viewingCibilReportUserId || "anonymous"}
-                  overrideReport={viewingCibilReport} 
+                  overrideReport={viewingCibilReport}
                   reportId={viewingCibilReportId || undefined}
-                  onToggleSidebar={() => {}} 
-                  onToggleInsights={() => {}} 
+                  onToggleSidebar={() => { }}
+                  onToggleInsights={() => { }}
                   onTalkToAdvisor={() => {
                     setViewingCibilReport(null);
                     setViewingCibilReportId(null);
@@ -5451,12 +5450,12 @@ ${sheetDataXml}
                   </span>
                 ) : '⚠️ Move to Trash'}
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setCibilDeleteConfirmOpen(false);
                   setCibilToDelete(null);
                   setCibilDeleteResult(null);
-                }} 
+                }}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
               >
                 ✕
@@ -5481,7 +5480,7 @@ ${sheetDataXml}
                     setCibilDeleteConfirmOpen(false);
                     setCibilToDelete(null);
                     setCibilDeleteResult(null);
-                    
+
                     if (idToAnimate && !cibilDeleteResult.includes("Error") && !cibilDeleteResult.includes("Failed")) {
                       setAnimatingCibilRows(prev => [...prev, idToAnimate]);
                       setTimeout(() => {
@@ -5498,11 +5497,11 @@ ${sheetDataXml}
                 </button>
               ) : (
                 <>
-                  <button 
+                  <button
                     onClick={() => {
                       setCibilDeleteConfirmOpen(false);
                       setCibilToDelete(null);
-                    }} 
+                    }}
                     className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[13px] font-bold text-gray-700 hover:bg-gray-100 transition-all active:scale-[0.98] cursor-pointer"
                   >
                     Cancel
