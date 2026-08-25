@@ -128,6 +128,83 @@ function extractPerks(card: any): string[] {
   return Array.from(new Set(perks)).filter(Boolean);
 }
 
+// Helper to extract eligibility requirements from BankKaro card JSON
+function extractEligibilityCriteria(card: any): {
+  minIncome?: string;
+  minAge?: string;
+  minCibil?: string;
+  empType?: string;
+  details?: string[];
+} {
+  const reqs: {
+    minIncome?: string;
+    minAge?: string;
+    minCibil?: string;
+    empType?: string;
+    details?: string[];
+  } = {};
+
+  const detailsList: string[] = [];
+
+  // Income
+  const rawIncome =
+    card?.min_monthly_income ||
+    card?.minimum_monthly_income ||
+    card?.min_income ||
+    card?.salaried_income ||
+    card?.income_criteria ||
+    card?.required_income ||
+    card?.inhand_income ||
+    card?.income;
+
+  if (rawIncome) {
+    if (typeof rawIncome === "number") {
+      reqs.minIncome = `₹${rawIncome.toLocaleString("en-IN")}/mo`;
+    } else {
+      const strInc = String(rawIncome).trim();
+      reqs.minIncome = strInc.startsWith("₹") ? strInc : `₹${strInc}/mo`;
+    }
+  }
+
+  // Age
+  const minAge = card?.min_age || card?.minimum_age;
+  const maxAge = card?.max_age || card?.maximum_age;
+  if (minAge && maxAge) {
+    reqs.minAge = `${minAge} - ${maxAge} Yrs`;
+  } else if (minAge) {
+    reqs.minAge = `Min ${minAge} Yrs`;
+  } else if (card?.age_criteria || card?.age_req || card?.age) {
+    reqs.minAge = String(card.age_criteria || card.age_req || card.age);
+  }
+
+  // CIBIL / Credit Score
+  const rawCibil = card?.min_cibil || card?.min_credit_score || card?.cibil_score || card?.cibil_req || card?.cibil;
+  if (rawCibil) {
+    const strCib = String(rawCibil).trim();
+    reqs.minCibil = strCib.includes("+") ? strCib : `${strCib}+`;
+  }
+
+  // Employment Type
+  const rawEmp = card?.emp_type || card?.employment_type || card?.eligible_employment || card?.emp_status;
+  if (rawEmp) {
+    reqs.empType = String(rawEmp);
+  }
+
+  // Text list criteria
+  const rawElig = card?.eligibility_criteria || card?.eligibility || card?.eligibility_text || card?.requirements;
+  if (Array.isArray(rawElig)) {
+    rawElig.forEach((item: any) => {
+      const txt = typeof item === "string" ? item : item?.text || item?.title || item?.criterion;
+      if (txt) detailsList.push(txt);
+    });
+  } else if (typeof rawElig === "string" && rawElig.trim()) {
+    detailsList.push(rawElig);
+  }
+
+  reqs.details = detailsList;
+  return reqs;
+}
+
 // Pre-curated list of major Indian Credit Card issuing banks
 const DEFAULT_INDIAN_BANKS = [
   "HDFC Bank",
@@ -214,6 +291,44 @@ export default function CreditCardGeniusView() {
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
   const [calcResults, setCalcResults] = useState<any | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
+
+  // Compare Feature State (Max 3 cards)
+  const [compareList, setCompareList] = useState<any[]>([]);
+  const [compareModalOpen, setCompareModalOpen] = useState<boolean>(false);
+  const [compareWarning, setCompareWarning] = useState<string | null>(null);
+
+  // Single Card Eligibility & Highlights Modal States
+  const [eligibilityModalCard, setEligibilityModalCard] = useState<any | null>(null);
+  const [highlightsModalCard, setHighlightsModalCard] = useState<any | null>(null);
+
+  const getCardId = (card: any) =>
+    card?.id || card?.alias || card?.card_alias || card?.seo_card_alias || card?.title || card?.name;
+
+  const isCardInCompare = (card: any) => {
+    const targetId = getCardId(card);
+    return compareList.some((c) => getCardId(c) === targetId);
+  };
+
+  const toggleCompareCard = (card: any) => {
+    if (!card) return;
+    const targetId = getCardId(card);
+    setCompareWarning(null);
+
+    setCompareList((prev) => {
+      const exists = prev.some((c) => getCardId(c) === targetId);
+      if (exists) {
+        return prev.filter((c) => getCardId(c) !== targetId);
+      }
+
+      if (prev.length >= 3) {
+        setCompareWarning("You can compare up to 3 credit cards at a time.");
+        setTimeout(() => setCompareWarning(null), 3500);
+        return prev;
+      }
+
+      return [...prev, card];
+    });
+  };
 
   // Load cards catalog on mount
   useEffect(() => {
@@ -735,8 +850,25 @@ export default function CreditCardGeniusView() {
                   return (
                     <div
                       key={card?.id || card?.alias || idx}
-                      className="flex flex-col justify-between bg-white border border-gray-200 hover:border-blue-400 rounded-[28px] p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
+                      className="relative flex flex-col justify-between bg-white border border-gray-200 hover:border-blue-400 rounded-[28px] p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
                     >
+                      {/* Plus / Compare Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompareCard(card);
+                        }}
+                        title={isCardInCompare(card) ? "Remove from Compare" : "Add to Compare (Up to 3)"}
+                        className={`absolute top-4 right-4 z-20 w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-sm transition-all duration-200 cursor-pointer shadow-md ${
+                          isCardInCompare(card)
+                            ? "bg-blue-600 text-white border-2 border-white shadow-blue-500/40 scale-105"
+                            : "bg-white text-slate-700 hover:text-blue-600 hover:bg-blue-50 border border-slate-200/90"
+                        }`}
+                      >
+                        {isCardInCompare(card) ? "✓" : "+"}
+                      </button>
+
                       <div className="space-y-4">
                         {/* Prominent Card Image Header */}
                         {image && (
@@ -796,15 +928,43 @@ export default function CreditCardGeniusView() {
                         )}
                       </div>
 
-                      {/* Vibrant Apply Now Pill Button */}
-                      <div className="pt-4 border-t border-gray-100 mt-4">
+                      {/* Apply Now & View Eligibility Buttons */}
+                      <div className="pt-4 border-t border-gray-100 mt-4 space-y-2">
                         <button
+                          type="button"
                           onClick={() => openApplyModal(card)}
                           className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-bold rounded-full transition-all shadow-md shadow-blue-600/25"
                         >
                           <span>Apply Now</span>
                           <span>➔</span>
                         </button>
+
+                        {/* Secondary Actions Row: View More & View Eligibility */}
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setHighlightsModalCard(card);
+                            }}
+                            className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                          >
+                            <span>View More</span>
+                            <span className="text-[11px]">📜</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEligibilityModalCard(card);
+                            }}
+                            className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                          >
+                            <span>View Eligibility</span>
+                            <span className="text-[11px]">ℹ️</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -927,8 +1087,25 @@ export default function CreditCardGeniusView() {
                     return (
                       <div
                         key={idx}
-                        className="flex flex-col justify-between bg-white border-2 border-blue-300 rounded-[28px] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
+                        className="relative flex flex-col justify-between bg-white border-2 border-blue-300 rounded-[28px] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
                       >
+                        {/* Plus / Compare Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCompareCard(card || item.rawItem);
+                          }}
+                          title={isCardInCompare(card || item.rawItem) ? "Remove from Compare" : "Add to Compare (Up to 3)"}
+                          className={`absolute top-4 right-4 z-20 w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-sm transition-all duration-200 cursor-pointer shadow-md ${
+                            isCardInCompare(card || item.rawItem)
+                              ? "bg-blue-600 text-white border-2 border-white shadow-blue-500/40 scale-105"
+                              : "bg-white text-slate-700 hover:text-blue-600 hover:bg-blue-50 border border-slate-200/90"
+                          }`}
+                        >
+                          {isCardInCompare(card || item.rawItem) ? "✓" : "+"}
+                        </button>
+
                         <div className="space-y-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
@@ -981,14 +1158,43 @@ export default function CreditCardGeniusView() {
                           )}
                         </div>
 
-                        <div className="pt-4 border-t border-gray-100 mt-4">
+                        {/* Apply Now & View Eligibility Buttons */}
+                        <div className="pt-4 border-t border-gray-100 mt-4 space-y-2">
                           <button
+                            type="button"
                             onClick={() => openApplyModal(card || { name: cardName, card_alias: alias })}
                             className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md shadow-blue-600/20"
                           >
                             <span>Apply Now</span>
                             <span>➔</span>
                           </button>
+
+                          {/* Secondary Actions Row: View More & View Eligibility */}
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHighlightsModalCard(card || item.rawItem);
+                              }}
+                              className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                            >
+                              <span>View More</span>
+                              <span className="text-[11px]">📜</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEligibilityModalCard(card || item.rawItem);
+                              }}
+                              className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                            >
+                              <span>View Eligibility</span>
+                              <span className="text-[11px]">ℹ️</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1197,8 +1403,25 @@ export default function CreditCardGeniusView() {
                     return (
                       <div
                         key={idx}
-                        className="flex flex-col justify-between bg-white border border-blue-200 hover:border-blue-400 rounded-[28px] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
+                        className="relative flex flex-col justify-between bg-white border border-blue-200 hover:border-blue-400 rounded-[28px] p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 group cursor-pointer"
                       >
+                        {/* Plus / Compare Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCompareCard(matchedCard || raw);
+                          }}
+                          title={isCardInCompare(matchedCard || raw) ? "Remove from Compare" : "Add to Compare (Up to 3)"}
+                          className={`absolute top-4 right-4 z-20 w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-sm transition-all duration-200 cursor-pointer shadow-md ${
+                            isCardInCompare(matchedCard || raw)
+                              ? "bg-blue-600 text-white border-2 border-white shadow-blue-500/40 scale-105"
+                              : "bg-white text-slate-700 hover:text-blue-600 hover:bg-blue-50 border border-slate-200/90"
+                          }`}
+                        >
+                          {isCardInCompare(matchedCard || raw) ? "✓" : "+"}
+                        </button>
+
                         <div className="space-y-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider">
@@ -1234,16 +1457,46 @@ export default function CreditCardGeniusView() {
                             <span className="block text-[10px] text-gray-400 font-bold uppercase">JOINING FEE</span>
                             <span className="text-xs font-bold text-blue-600">{joiningFee}</span>
                           </div>
+
                         </div>
 
-                        <div className="pt-4 border-t border-gray-100 mt-4">
+                        {/* Apply Now & View Eligibility Buttons */}
+                        <div className="pt-4 border-t border-gray-100 mt-4 space-y-2">
                           <button
+                            type="button"
                             onClick={() => openApplyModal(matchedCard || { name: cardName, card_alias: item.alias, network_url: raw?.cg_network_url })}
                             className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md shadow-blue-600/20"
                           >
                             <span>Apply Now</span>
                             <span>➔</span>
                           </button>
+
+                          {/* Secondary Actions Row: View More & View Eligibility */}
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHighlightsModalCard(matchedCard || raw);
+                              }}
+                              className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                            >
+                              <span>View More</span>
+                              <span className="text-[11px]">📜</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEligibilityModalCard(matchedCard || raw);
+                              }}
+                              className="w-full text-center text-xs font-semibold text-slate-600 hover:text-blue-600 py-1.5 px-2 transition-colors flex items-center justify-center gap-1 bg-slate-50 hover:bg-blue-50 border border-slate-200/70 rounded-xl"
+                            >
+                              <span>View Eligibility</span>
+                              <span className="text-[11px]">ℹ️</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1453,6 +1706,446 @@ export default function CreditCardGeniusView() {
                 className="w-1/2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5"
               >
                 <span>Log In Now</span>
+                <span>➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Warning if user tries > 3 cards */}
+      {compareWarning && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-slate-900 text-amber-400 border border-amber-500/40 text-xs font-bold rounded-full shadow-2xl animate-in fade-in slide-in-from-top duration-200 flex items-center gap-2">
+          <span className="text-base">⚠️</span>
+          <span>{compareWarning}</span>
+        </div>
+      )}
+
+      {/* Sticky Bottom Comparison Floating Bar */}
+      {compareList.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-xl text-white px-4 py-2.5 rounded-full shadow-2xl border border-slate-700/80 flex items-center gap-3 animate-in slide-in-from-bottom duration-300 max-w-[95vw] overflow-hidden">
+          <div className="flex items-center gap-2 pl-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400 whitespace-nowrap">
+              Compare ({compareList.length}/3)
+            </span>
+          </div>
+
+          {/* Selected Card Thumbnails */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 max-w-[260px] md:max-w-[340px]">
+            {compareList.map((c, cIdx) => {
+              const cName = c?.title || c?.name || c?.card_name || "Card";
+              const cImg = c?.card_image || c?.image || c?.logo;
+              return (
+                <div
+                  key={cIdx}
+                  className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-full px-2.5 py-1 text-xs text-slate-200 shrink-0"
+                >
+                  {cImg && (
+                    <img src={cImg} alt={cName} className="w-5 h-3.5 object-contain rounded shrink-0" />
+                  )}
+                  <span className="max-w-[75px] truncate font-semibold text-[10px]">{cName}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleCompareCard(c)}
+                    className="ml-0.5 text-slate-400 hover:text-red-400 font-bold transition-colors text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setCompareModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-full shadow-md transition-all active:scale-95 whitespace-nowrap"
+            >
+              <span>Compare Cards</span>
+              <span>➔</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCompareList([])}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-full transition-all whitespace-nowrap"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Side-by-Side Comparison Modal */}
+      {compareModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-5xl bg-white rounded-[28px] shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[88vh] my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/90 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-base font-bold shadow-md">
+                  📊
+                </span>
+                <div>
+                  <h3 className="text-base md:text-lg font-extrabold text-gray-900 leading-none">Side-by-Side Card Comparison</h3>
+                  <p className="text-xs text-gray-500 mt-1">Comparing {compareList.length} selected credit cards</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompareModalOpen(false)}
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center transition-all font-extrabold text-base shadow-sm"
+                title="Close Modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Comparison Matrix Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className={`grid grid-cols-1 ${compareList.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-6`}>
+                {compareList.map((card, idx) => {
+                  const name = card?.title || card?.name || "Credit Card";
+                  const bank = extractBankName(card);
+                  const joiningFee = formatFee(card?.joining_fee_text || card?.joiningFees || card?.joining_fee, "Free");
+                  const annualFee = formatFee(card?.annual_fee_text || card?.annualFees || card?.annual_fee, "Nil");
+                  const image = card?.card_image || card?.image || card?.logo;
+                  const perks = extractPerks(card);
+                  const networkBadge = extractCardNetwork(card);
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex flex-col justify-between bg-slate-50/80 border border-slate-200 rounded-[24px] p-5 space-y-4 shadow-sm relative"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCompareCard(card)}
+                        className="absolute top-3 right-3 text-slate-400 hover:text-red-500 font-bold text-sm bg-white rounded-full w-6 h-6 flex items-center justify-center shadow-sm"
+                        title="Remove from comparison"
+                      >
+                        ×
+                      </button>
+
+                      {/* Card Preview Header */}
+                      <div className="space-y-3">
+                        {/* 1. Card Preview & Title Header (Flexible Aligned Header) */}
+                        <div className="space-y-2 pt-1 min-h-[225px] flex flex-col justify-between">
+                          <div className="flex items-center justify-between gap-2 pr-6">
+                            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">{bank}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${networkBadge.colorClass}`}>
+                              {networkBadge.label}
+                            </span>
+                          </div>
+
+                          {image && (
+                            <div className="w-full aspect-[1.58/1] max-h-[130px] flex items-center justify-center overflow-hidden my-1">
+                              <img src={image} alt={name} className="w-full h-full object-contain rounded-2xl drop-shadow-md" />
+                            </div>
+                          )}
+
+                          <h4 className="text-base font-extrabold text-slate-900 line-clamp-2 leading-snug pt-1">{name}</h4>
+                        </div>
+
+                        {/* 2. Fee & Perks Matrix (Aligned Heights) */}
+                        <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                          {/* Joining Fee Box */}
+                          <div className="bg-white p-3 rounded-2xl border border-slate-200/70 h-[56px] flex flex-col justify-center">
+                            <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">JOINING FEE</span>
+                            <span className="text-sm font-extrabold text-blue-600">{joiningFee}</span>
+                          </div>
+
+                          {/* Annual Fee Box */}
+                          <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100 h-[56px] flex flex-col justify-center">
+                            <span className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ANNUAL FEE</span>
+                            <span className="text-sm font-extrabold text-emerald-700">{annualFee}</span>
+                          </div>
+
+                          {/* Eligibility Requirements Matrix Box */}
+                          <div className="bg-blue-50/60 p-3 rounded-2xl border border-blue-100/80 space-y-1.5 h-[96px] flex flex-col justify-center">
+                            <span className="block text-[10px] font-extrabold text-blue-900 uppercase tracking-wider">ELIGIBILITY REQUIREMENTS</span>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="block text-[9px] text-slate-400 font-bold uppercase">Min Income</span>
+                                <span className="font-extrabold text-blue-700">{extractEligibilityCriteria(card).minIncome || "₹25,000/mo"}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] text-slate-400 font-bold uppercase">Min CIBIL</span>
+                                <span className="font-extrabold text-blue-700">{extractEligibilityCriteria(card).minCibil || "750+"}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Key Highlights Box (Full Text Display from API) */}
+                          <div className="space-y-1.5 pt-1 min-h-[120px]">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">KEY HIGHLIGHTS:</span>
+                            {perks.length > 0 ? (
+                              <ul className="space-y-2 text-xs text-slate-600 leading-relaxed">
+                                {perks.map((p: string, pIdx: number) => (
+                                  <li key={pIdx} className="flex items-start gap-1.5">
+                                    <span className="text-emerald-500 font-bold shrink-0 mt-0.5">✓</span>
+                                    <span className="break-words">{p}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">Standard cashback & reward perks apply.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Action Button (Pinned at Bottom) */}
+                      <div className="pt-3 border-t border-slate-200 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompareModalOpen(false);
+                            openApplyModal(card);
+                          }}
+                          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md flex items-center justify-center gap-2"
+                        >
+                          <span>Apply Now</span>
+                          <span>➔</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompareList([]);
+                  setCompareModalOpen(false);
+                }}
+                className="text-xs font-bold text-red-600 hover:text-red-700"
+              >
+                Clear All Selection
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompareModalOpen(false)}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all"
+              >
+                Close Comparison
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Card Eligibility Criteria Modal */}
+      {eligibilityModalCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-[28px] shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[85vh] my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/80">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow-sm">
+                  📋
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 leading-snug">Eligibility Requirements</h3>
+                  <p className="text-xs text-blue-600 font-semibold line-clamp-1">{eligibilityModalCard?.title || eligibilityModalCard?.name || "Credit Card"}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEligibilityModalCard(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-all font-extrabold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              {/* Card Header Info */}
+              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                {(eligibilityModalCard?.card_image || eligibilityModalCard?.image) && (
+                  <img
+                    src={eligibilityModalCard?.card_image || eligibilityModalCard?.image}
+                    alt="Card"
+                    className="w-20 aspect-[1.58/1] object-contain rounded-lg drop-shadow-sm shrink-0"
+                  />
+                )}
+                <div>
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">{extractBankName(eligibilityModalCard)}</span>
+                  <h4 className="text-sm font-extrabold text-gray-900 line-clamp-1">{eligibilityModalCard?.title || eligibilityModalCard?.name}</h4>
+                </div>
+              </div>
+
+              {/* Eligibility Parameters Grid */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">KEY PARAMETERS</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-100/80">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase">MIN MONTHLY INCOME</span>
+                    <span className="text-base font-black text-blue-700">{extractEligibilityCriteria(eligibilityModalCard).minIncome || "₹25,000/mo"}</span>
+                  </div>
+
+                  <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-100/80">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase">MIN CIBIL SCORE</span>
+                    <span className="text-base font-black text-emerald-700">{extractEligibilityCriteria(eligibilityModalCard).minCibil || "750+"}</span>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase">AGE LIMIT</span>
+                    <span className="text-sm font-extrabold text-slate-800">{extractEligibilityCriteria(eligibilityModalCard).minAge || "21 - 65 Yrs"}</span>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase">EMPLOYMENT TYPE</span>
+                    <span className="text-sm font-extrabold text-slate-800 truncate block">{extractEligibilityCriteria(eligibilityModalCard).empType || "Salaried / Business"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Criteria if available */}
+              {extractEligibilityCriteria(eligibilityModalCard).details?.length ? (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">ADDITIONAL CRITERIA</span>
+                  <ul className="space-y-2 text-xs text-slate-600">
+                    {extractEligibilityCriteria(eligibilityModalCard).details?.map((d, dIdx) => (
+                      <li key={dIdx} className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                        <span className="text-blue-500 font-bold">✓</span>
+                        <span>{d}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/80">
+              <button
+                type="button"
+                onClick={() => setEligibilityModalCard(null)}
+                className="w-1/2 py-2.5 px-4 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-full border border-gray-200 transition-all"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const cardToApply = eligibilityModalCard;
+                  setEligibilityModalCard(null);
+                  openApplyModal(cardToApply);
+                }}
+                className="w-1/2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5"
+              >
+                <span>Apply Now</span>
+                <span>➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Card Detailed Highlights & Perks Modal */}
+      {highlightsModalCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-white rounded-[28px] shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[85vh] my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/80">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow-sm">
+                  ✨
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 leading-snug">Detailed Card Highlights</h3>
+                  <p className="text-xs text-blue-600 font-semibold line-clamp-1">{highlightsModalCard?.title || highlightsModalCard?.name || "Credit Card"}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHighlightsModalCard(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-all font-extrabold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              {/* Card Header Info */}
+              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                {(highlightsModalCard?.card_image || highlightsModalCard?.image) && (
+                  <img
+                    src={highlightsModalCard?.card_image || highlightsModalCard?.image}
+                    alt="Card"
+                    className="w-20 aspect-[1.58/1] object-contain rounded-lg drop-shadow-sm shrink-0"
+                  />
+                )}
+                <div>
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">{extractBankName(highlightsModalCard)}</span>
+                  <h4 className="text-sm font-extrabold text-gray-900 line-clamp-1">{highlightsModalCard?.title || highlightsModalCard?.name}</h4>
+                </div>
+              </div>
+
+              {/* Fees Summary Bar */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50/70 p-3 rounded-2xl border border-blue-100/80">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">JOINING FEE</span>
+                  <span className="text-sm font-extrabold text-blue-700">{formatFee(highlightsModalCard?.joining_fee_text || highlightsModalCard?.joiningFees || highlightsModalCard?.joining_fee, "Free")}</span>
+                </div>
+                <div className="bg-emerald-50/70 p-3 rounded-2xl border border-emerald-100/80">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase">ANNUAL FEE</span>
+                  <span className="text-sm font-extrabold text-emerald-700">{formatFee(highlightsModalCard?.annual_fee_text || highlightsModalCard?.annualFees || highlightsModalCard?.annual_fee, "Nil")}</span>
+                </div>
+              </div>
+
+              {/* Complete Features & Perks List */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">ALL HIGHLIGHTS & PERKS</span>
+                <ul className="space-y-2.5 text-xs text-slate-700">
+                  {extractPerks(highlightsModalCard).map((perk: string, pIdx: number) => (
+                    <li key={pIdx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/70 leading-relaxed">
+                      <span className="text-emerald-500 font-bold text-sm shrink-0 mt-0.5">✓</span>
+                      <span className="break-words font-medium">{perk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Fee Waiver Condition if present */}
+              {highlightsModalCard?.fee_waiver_condition && (
+                <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-xs space-y-1">
+                  <span className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider">ANNUAL FEE WAIVER CONDITION</span>
+                  <p className="text-amber-900 font-medium">{highlightsModalCard.fee_waiver_condition}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/80">
+              <button
+                type="button"
+                onClick={() => setHighlightsModalCard(null)}
+                className="w-1/2 py-2.5 px-4 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-full border border-gray-200 transition-all"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const cardToApply = highlightsModalCard;
+                  setHighlightsModalCard(null);
+                  openApplyModal(cardToApply);
+                }}
+                className="w-1/2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5"
+              >
+                <span>Apply Now</span>
                 <span>➔</span>
               </button>
             </div>
