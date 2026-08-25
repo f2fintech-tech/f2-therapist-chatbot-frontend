@@ -1036,9 +1036,7 @@ export default function Dashboard({
 
   const loadCibilEnquiries = useCallback(() => {
     const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-    if (!cibilCounts) {
-      setCibilLoading(true);
-    }
+    setCibilLoading(true);
     const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (configuredApiKey) {
@@ -1076,7 +1074,7 @@ export default function Dashboard({
       })
       .catch(err => console.error("Error loading CIBIL enquiries in dashboard", err))
       .finally(() => setCibilLoading(false));
-  }, [cibilCounts, userId]);
+  }, [userId]);
 
   useEffect(() => {
     window.addEventListener("finheal:cibil_update", loadCibilEnquiries);
