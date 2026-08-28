@@ -2266,7 +2266,15 @@ export default function EligibilityCibilView({
                       </ul>
                     </div>
                     <button
-                      onClick={() => { setCibilError(null); setCibilReport(null); }}
+                      onClick={() => {
+                        setCibilError(null);
+                        setCibilReport(null);
+                        setCibilPan("");
+                        setCibilName("");
+                        setCibilFirstName("");
+                        setCibilLastName("");
+                        setCibilPhone("");
+                      }}
                       className="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
                     >
                       Try Again with Different Details
@@ -2933,6 +2941,12 @@ export default function EligibilityCibilView({
                       type="button"
                       onClick={() => {
                         setCibilReport(null);
+                        setCibilPan("");
+                        setCibilName("");
+                        setCibilFirstName("");
+                        setCibilLastName("");
+                        setCibilPhone("");
+                        setCibilError(null);
                         setSelectedBsaFile(null);
                         setBsaPassword("");
                         setBsaError(null);
