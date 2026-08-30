@@ -1132,7 +1132,7 @@ export default function FinHealChat() {
                 userId={userId}
                 userProfile={userProfile}
                 email={authSession.email}
-                isAdvisor={isUserAdvisor(authSession.email)}
+                isAdvisor={isUserAdvisor(authSession.email) || Boolean(authSession.isAdvisor) || (!!userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId))}
                 onBackToChat={openChatView}
                 onSaveProfile={handleProfileSave}
               />
