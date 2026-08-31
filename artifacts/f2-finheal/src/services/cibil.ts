@@ -11,7 +11,7 @@ function getHeaders(userId?: string): Record<string, string> {
     headers["Authorization"] = `Bearer ${API_KEY}`;
   }
   const session = getStoredAuthSession();
-  const activeUserId = userId || session?.userId;
+  const activeUserId = session?.userId || userId;
   if (activeUserId) {
     headers["X-Requester-ID"] = activeUserId;
   }

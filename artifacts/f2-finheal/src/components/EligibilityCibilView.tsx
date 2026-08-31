@@ -1083,7 +1083,7 @@ export default function EligibilityCibilView({
       }
       
       const session = getStoredAuthSession();
-      const activeUserId = userId || session?.userId;
+      const activeUserId = session?.userId || userId;
       if (activeUserId) {
         headers["X-Requester-ID"] = activeUserId;
       }
