@@ -392,7 +392,7 @@ export default function TrashTab({
                 <tbody>
                   {lendersTrash.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-[20px] text-center text-gray-400 font-medium">
+                      <td colSpan={5} className="text-center p-[24px] text-gray-450 italic">
                         No deleted lender products in Trash.
                       </td>
                     </tr>

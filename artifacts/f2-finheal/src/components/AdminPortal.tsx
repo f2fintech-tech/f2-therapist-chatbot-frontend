@@ -657,6 +657,15 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
   const [filterSearch, setFilterSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+  // 300ms debounce on search input to prevent network request spam on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filterSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterSearch]);
   const [filterBureau, setFilterBureau] = useState<string>("all");
 
   const allDepartments = useMemo(() => {
@@ -677,7 +686,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Reset page when filters change (handled implicitly by backend if page exceeds total)
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
 
 
 
@@ -1119,7 +1128,7 @@ ${sheetDataXml}
         page: cibilPage.toString(),
         limit: cibilPageSize.toString()
       });
-      if (filterSearch) queryParams.append("search", filterSearch);
+      if (debouncedSearch) queryParams.append("search", debouncedSearch);
       if (filterRole !== "all") queryParams.append("role", filterRole);
       if (filterLoanType !== "all") queryParams.append("loan_type", filterLoanType);
       if (filterBureau !== "all") queryParams.append("bureau", filterBureau);
@@ -1194,7 +1203,7 @@ ${sheetDataXml}
         checkCibilFetchThreshold();
       }
     }
-  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
+  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
 
   // Lenders CRUD Handlers
   const getProductPrefix = (category: string, productType: string): string => {

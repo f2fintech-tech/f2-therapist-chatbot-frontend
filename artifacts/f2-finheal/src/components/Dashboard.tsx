@@ -2575,16 +2575,16 @@ ${sheetDataXml}
               {/* CIBIL Report Fetch Summary Card */}
               <div className="border border-gray-200 bg-white rounded-[20px] p-[20px] shadow-xs flex flex-col justify-between animate-fade-up">
                 <div>
-                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-[16px]">
-                    <div>
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px]">
+                  <div className="flex flex-col lg:flex-row lg:items-start xl:items-center justify-between gap-3 mb-[16px]">
+                    <div className="shrink-0 min-w-0">
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-[4px] flex items-center gap-[6px] whitespace-nowrap">
                         📋 CIBIL Report Fetch Summary
                       </h3>
                       <p className="text-[12px] text-gray-500">How many CIBIL reports have been fetched by each employee.</p>
                     </div>
 
                     {/* Department & Date Filter Controls */}
-                    <div className="flex items-center gap-2 flex-wrap xl:justify-end shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap justify-start lg:justify-end">
                       <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-1 rounded-[12px] border border-gray-200/80">
                         <span className="text-[11px] text-gray-500 font-semibold shrink-0">Department:</span>
                         <select
@@ -2600,30 +2600,32 @@ ${sheetDataXml}
                         </select>
                       </div>
 
-                      <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-1 rounded-[12px] border border-gray-200/80">
-                        <span className="text-[11px] text-gray-500 font-semibold shrink-0">Date:</span>
-                        <select
-                          value={summaryDateFilter}
-                          onChange={(e) => setSummaryDateFilter(e.target.value)}
-                          className="h-[28px] px-[8px] rounded-[8px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                        >
-                          <option value="all">All Time</option>
-                          <option value="today">Today</option>
-                          <option value="7days">Last 7 Days</option>
-                          <option value="30days">Last 30 Days</option>
-                          <option value="this_month">This Month</option>
-                          <option value="custom">Custom Range</option>
-                        </select>
+                      <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-1 rounded-[12px] border border-gray-200/80 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-gray-500 font-semibold shrink-0">Date:</span>
+                          <select
+                            value={summaryDateFilter}
+                            onChange={(e) => setSummaryDateFilter(e.target.value)}
+                            className="h-[28px] px-[8px] rounded-[8px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                          >
+                            <option value="all">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="7days">Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                            <option value="this_month">This Month</option>
+                            <option value="custom">Custom Range</option>
+                          </select>
+                        </div>
 
                         {summaryDateFilter === "custom" && (
-                          <div className="flex items-center gap-1 pl-1 border-l border-gray-200">
+                          <div className="flex items-center gap-1 pl-1 border-l border-gray-200 shrink-0">
                             <input
                               type="date"
                               value={summaryStartDate}
                               onChange={(e) => setSummaryStartDate(e.target.value)}
                               className="h-[28px] px-[6px] rounded-[6px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary cursor-pointer"
                             />
-                            <span className="text-[10px] text-gray-400">to</span>
+                            <span className="text-[10px] text-gray-400 font-medium">to</span>
                             <input
                               type="date"
                               value={summaryEndDate}
