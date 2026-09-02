@@ -2470,6 +2470,16 @@ export default function EligibilityCibilView({
                               : "Retrieve your credit score and bureau report securely."
                             }
                           </p>
+                          {quotaStats && (
+                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-semibold bg-primary/10 text-primary border border-primary/20 animate-fade-in">
+                              <span>
+                                📊 Monthly Quota: <strong>{quotaStats.monthly_count}</strong> / <strong>{quotaStats.is_unlimited ? "Unlimited" : quotaStats.effective_limit}</strong>
+                                {!quotaStats.is_unlimited && quotaStats.remaining !== null && (
+                                  <span className="text-gray-500 font-medium ml-1">({quotaStats.remaining} remaining)</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Report Type Selector */}
