@@ -142,7 +142,7 @@ export default function CibilEnquiriesTab({
                 {getDateFilterDescription()}
               </p>
             </div>
-            {quotaStats && (
+            {quotaStats && !isAdmin && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[8px] bg-primary/10 border border-primary/20 text-primary text-[11.5px] font-semibold">
                 <span>
                   📊 Monthly Quota: <strong>{quotaStats.monthly_count}</strong> / <strong>{quotaStats.is_unlimited ? "Unlimited" : quotaStats.effective_limit}</strong>
