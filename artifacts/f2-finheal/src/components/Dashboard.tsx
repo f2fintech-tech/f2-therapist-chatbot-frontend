@@ -1662,6 +1662,75 @@ export default function Dashboard({
     );
   }).length;
 
+  // Monthly fetch count and quota calculation for current calendar month
+  const getEmployeeMonthlyQuota = (emp: any) => {
+    const now = new Date();
+    const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const thisMonthCount = cibilEnquiries.filter(enq => {
+      const dateStr = enq.fetched_at || enq.created_at || enq.completed_at;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+      if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+
+      const fb = (enq.fetched_by || "").toLowerCase().trim();
+      const empId = (emp.id || "").toLowerCase().trim();
+      const empF2Id = (emp.f2FintechId || "").toLowerCase().trim();
+      const empEmail = (emp.email || "").toLowerCase().trim();
+      const empName = (emp.name || "").toLowerCase().trim();
+
+      if (fb && (fb === empId || fb === empF2Id)) return true;
+      if (fb && fb.includes("(") && fb.includes(")")) {
+        const idPart = fb.split("(")[1].split(")")[0].trim();
+        const namePart = fb.split(" (")[0].trim();
+        if (idPart === empId || idPart === empF2Id || namePart === empName) return true;
+      }
+      if (!fb || fb === (enq.user_id || "").toLowerCase() || fb === 'client' || fb === 'user lead') {
+        const cleanEmail = (enq.email || "").toLowerCase().trim();
+        if (cleanEmail && (cleanEmail === empId || cleanEmail === empEmail || cleanEmail.startsWith(empId + "@"))) return true;
+      }
+      if (fb && fb === empName) return true;
+      return false;
+    }).length;
+
+    let limitStr = "50";
+    const dept = (emp.department || "").toLowerCase().trim();
+    const desig = (emp.designation || "").toLowerCase().trim();
+
+    if (emp.creditReportTempMonth === currentYM && emp.creditReportTempLimit !== undefined && emp.creditReportTempLimit !== null) {
+      limitStr = emp.creditReportTempLimit === -1 ? "Unlimited" : String(emp.creditReportTempLimit);
+    } else if (emp.creditReportLimit !== undefined && emp.creditReportLimit !== null && emp.creditReportLimit !== "") {
+      limitStr = emp.creditReportLimit === -1 ? "Unlimited" : String(emp.creditReportLimit);
+    } else if (dept.includes("founder") || desig.includes("founder") || dept.includes("admin") || desig.includes("admin")) {
+      limitStr = "Unlimited";
+    } else if (dept.includes("credit") || dept.includes("ops") || dept.includes("operation")) {
+      limitStr = "300";
+    } else {
+      limitStr = "50";
+    }
+
+    return `${thisMonthCount} / ${limitStr}`;
+  };
+
+  const adminThisMonthCount = cibilEnquiries.filter(enq => {
+    const dateStr = enq.fetched_at || enq.created_at || enq.completed_at;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+
+    return (
+      enq.fetched_by === "admin" ||
+      enq.fetched_by === "superadmin" ||
+      (enq.fetched_by && enq.fetched_by.toLowerCase().includes("admin")) ||
+      (enq.email && (enq.email.toLowerCase() === "admin@finheal.com" || enq.email.toLowerCase() === "admin@f2finheal.com"))
+    );
+  }).length;
+
+  const adminMonthlyQuota = `${adminThisMonthCount} / Unlimited`;
+
   // 2. Group CIBIL fetches initiated by regular clients (non-advisors, non-admins)
   const userEnquiries = filteredCibilEnquiries.filter(enq => {
     // Re-use the exact same matching logic we just built for employees
@@ -1851,12 +1920,14 @@ export default function Dashboard({
         name: "System Admin",
         designation: "Platform Administrator",
         department: "Founder's Office",
+        monthlyQuota: adminMonthlyQuota,
         count: adminFetchCount
       },
       ...employees.map(emp => ({
         name: emp.name,
         designation: emp.designation || "Employee",
         department: emp.department || "General",
+        monthlyQuota: getEmployeeMonthlyQuota(emp),
         count: getEmployeeReportCount(emp)
       }))
     ];
@@ -1865,8 +1936,8 @@ export default function Dashboard({
       let sheetDataXml = "";
 
       // Header row
-      sheetDataXml += `    <row r="1" spans="1:4">\n`;
-      const headers = ["Employee Name", "Designation", "Department", "Reports Fetched"];
+      sheetDataXml += `    <row r="1" spans="1:5">\n`;
+      const headers = ["Employee Name", "Designation", "Department", "Monthly Quota", "Reports Fetched"];
       headers.forEach((h, idx) => {
         const r = `${getColumnLetter(idx + 1)}1`;
         sheetDataXml += `      <c r="${r}" s="1" t="inlineStr"><is><t>${escapeXml(h)}</t></is></c>\n`;
@@ -1876,18 +1947,19 @@ export default function Dashboard({
       // Data rows
       dataList.forEach((row, rowIdx) => {
         const rowIndex = rowIdx + 2;
-        sheetDataXml += `    <row r="${rowIndex}" spans="1:4">\n`;
+        sheetDataXml += `    <row r="${rowIndex}" spans="1:5">\n`;
 
         const fields = [
           row.name,
           row.designation,
           row.department,
+          row.monthlyQuota,
           String(row.count)
         ];
 
         fields.forEach((val, colIdx) => {
           const r = `${getColumnLetter(colIdx + 1)}${rowIndex}`;
-          const isNumber = colIdx === 3 && !isNaN(Number(val));
+          const isNumber = colIdx === 4 && !isNaN(Number(val));
           if (isNumber) {
             sheetDataXml += `      <c r="${r}" s="2" t="n"><v>${val}</v></c>\n`;
           } else {
@@ -1902,12 +1974,13 @@ export default function Dashboard({
       colsXml += `    <col min="1" max="1" width="25" customWidth="1"/>\n`; // Name
       colsXml += `    <col min="2" max="2" width="25" customWidth="1"/>\n`; // Designation
       colsXml += `    <col min="3" max="3" width="22" customWidth="1"/>\n`; // Department
-      colsXml += `    <col min="4" max="4" width="18" customWidth="1"/>\n`; // Reports Fetched
+      colsXml += `    <col min="4" max="4" width="20" customWidth="1"/>\n`; // Monthly Quota
+      colsXml += `    <col min="5" max="5" width="18" customWidth="1"/>\n`; // Reports Fetched
       colsXml += "  </cols>\n";
 
       return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:D${dataList.length + 1}"/>
+  <dimension ref="A1:E${dataList.length + 1}"/>
 ${colsXml}
   <sheetData>
 ${sheetDataXml}
@@ -2655,6 +2728,7 @@ ${sheetDataXml}
                           </th>
                           <th scope="col" className="px-3 py-2 font-bold">Designation</th>
                           <th scope="col" className="px-3 py-2 font-bold">Department</th>
+                          <th scope="col" className="px-3 py-2 font-bold text-center">Monthly Quota</th>
                           <th scope="col" className="px-3 py-2 font-bold text-right rounded-r-lg">Reports Fetched</th>
                         </tr>
                       </thead>
@@ -2662,7 +2736,7 @@ ${sheetDataXml}
                         {summaryDeptFilter === "users" ? (
                           userRows.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="text-center p-6 text-gray-400">
+                              <td colSpan={5} className="text-center p-6 text-gray-400">
                                 No user CIBIL enquiries found.
                               </td>
                             </tr>
@@ -2680,6 +2754,9 @@ ${sheetDataXml}
                                   <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
                                     User Base
                                   </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-center text-gray-400 font-medium text-[11px]">
+                                  1 / 30 days
                                 </td>
                                 <td className="px-3 py-2.5 text-right font-bold text-gray-950">
                                   {user.count}
@@ -2702,6 +2779,11 @@ ${sheetDataXml}
                                     Founder's Office
                                   </span>
                                 </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+                                    {adminMonthlyQuota}
+                                  </span>
+                                </td>
                                 <td className="px-3 py-2.5 text-right font-bold text-primary">
                                   {adminFetchCount}
                                 </td>
@@ -2709,7 +2791,7 @@ ${sheetDataXml}
                             )}
                             {filteredEmployeesSummary.length === 0 ? (
                               <tr>
-                                <td colSpan={4} className="text-center p-6 text-gray-400">
+                                <td colSpan={5} className="text-center p-6 text-gray-400">
                                   No employees found in this department.
                                 </td>
                               </tr>
@@ -2725,6 +2807,11 @@ ${sheetDataXml}
                                   <td className="px-3 py-2.5">
                                     <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10.5px] font-medium">
                                       {emp.department}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-center">
+                                    <span className="bg-gray-100 text-gray-800 border border-gray-200/60 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+                                      {getEmployeeMonthlyQuota(emp)}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5 text-right font-bold text-gray-950">
