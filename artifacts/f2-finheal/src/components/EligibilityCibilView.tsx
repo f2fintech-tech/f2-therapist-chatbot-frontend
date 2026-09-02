@@ -2470,7 +2470,7 @@ export default function EligibilityCibilView({
                               : "Retrieve your credit score and bureau report securely."
                             }
                           </p>
-                          {quotaStats && (!isSuperAdmin || Boolean(selectedEmployeeId)) && (
+                          {quotaStats && ((isStaff && !isSuperAdmin) || Boolean(selectedEmployeeId)) && (
                             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-semibold bg-primary/10 text-primary border border-primary/20 animate-fade-in">
                               <span>
                                 📊 Monthly Quota{selectedEmployeeId ? " (Selected Employee)" : ""}: <strong>{quotaStats.monthly_count}</strong> / <strong>{quotaStats.is_unlimited ? "Unlimited" : quotaStats.effective_limit}</strong>
