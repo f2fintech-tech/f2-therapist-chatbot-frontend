@@ -28,6 +28,10 @@ export interface Advisor {
   isActive?: boolean;
   deactivationReason?: string;
   permissions?: string[];
+  creditReportLimit?: number | null;
+  creditReportTempLimit?: number | null;
+  creditReportTempMonth?: string | null;
+  effectiveCreditLimit?: number | null;
   deleted_at?: string;
 }
 

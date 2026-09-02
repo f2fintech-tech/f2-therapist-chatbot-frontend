@@ -145,7 +145,9 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const isGuest = !isAdvisor && !email;
+  const isEmployeeId = Boolean(userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId));
+  const effectiveIsAdvisor = isAdvisor || isEmployeeId || (email ? (email.toLowerCase().endsWith("@f2fintech.com") || email.toLowerCase().endsWith("@finheal.com")) : false);
+  const isGuest = !effectiveIsAdvisor && !email;
 
   const readFileAsDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -741,8 +743,12 @@ export default function ProfilePage({ userId, userProfile, email, isAdvisor = fa
 
                             setIsChangingPassword(true);
                             try {
-                              if (isAdvisor) {
-                                await updateAdvisorPassword(userId, currentPassword, newPassword);
+                              if (effectiveIsAdvisor) {
+                                try {
+                                  await updateAdvisorPassword(userId, currentPassword, newPassword);
+                                } catch {
+                                  await changeUserPassword(userId, currentPassword, newPassword);
+                                }
                               } else {
                                 await changeUserPassword(userId, currentPassword, newPassword);
                               }

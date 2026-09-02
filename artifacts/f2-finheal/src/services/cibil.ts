@@ -11,7 +11,7 @@ function getHeaders(userId?: string): Record<string, string> {
     headers["Authorization"] = `Bearer ${API_KEY}`;
   }
   const session = getStoredAuthSession();
-  const activeUserId = userId || session?.userId;
+  const activeUserId = session?.userId || userId;
   if (activeUserId) {
     headers["X-Requester-ID"] = activeUserId;
   }
@@ -150,3 +150,33 @@ export async function getStoredCibilReport(userId: string): Promise<CibilReport>
   return response.json() as Promise<CibilReport>;
 }
 
+export async function checkAdvisorCibilLimit(advisorId?: string): Promise<{
+  advisor_id: string;
+  fetch_count: number;
+  monthly_count: number;
+  effective_limit: number;
+  base_limit: number;
+  is_unlimited: boolean;
+  remaining: number | null;
+  limit_reached: boolean;
+  trigger_warning: boolean;
+  message: string;
+}> {
+  const cleanId = (advisorId || "").trim();
+  const targetPath = cleanId ? `cibil/advisor-limit-check/${encodeURIComponent(cleanId)}` : "cibil/advisor-limit-check/current";
+  const response = await fetch(`${API_BASE_URL}/${targetPath}`, {
+    method: "GET",
+    headers: getHeaders(cleanId),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    let errMsg = "Failed to check advisor fetch limit";
+    if (errorData.detail) {
+      errMsg = typeof errorData.detail === "object" ? (errorData.detail.message || JSON.stringify(errorData.detail)) : errorData.detail;
+    }
+    throw new Error(errMsg);
+  }
+
+  return response.json();
+}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import {
   ShieldCheck,
   CheckCircle,
@@ -26,7 +26,7 @@ import {
   Hourglass,
   Search
 } from "lucide-react";
-import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl, downloadBureauPdf } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl, downloadBureauPdf, checkAdvisorCibilLimit } from "../services/cibil";
 import { getStoredAuthSession } from "../utils/authSession";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
@@ -39,7 +39,7 @@ import FactorCard from "./cibil/FactorCard";
 import LenderOfferCard from "./cibil/LenderOfferCard";
 import { LenderLogo } from "./cibil/LenderLogo";
 import type { LenderProduct } from "./LoanCalculatorView";
-import LendersTab from "./admin/LendersTab";
+const LendersTab = lazy(() => import("./admin/LendersTab"));
 
 
 const formatDateRange = (rangeStr: string) => {
@@ -371,6 +371,99 @@ export default function EligibilityCibilView({
       } catch (e) {}
     }
   }, [isSuperAdmin]);
+
+  // Quota & Rate Limit State for Target Employee / Advisor
+  const [quotaStats, setQuotaStats] = useState<{
+    monthly_count: number;
+    effective_limit: number;
+    limit_reached: boolean;
+    is_unlimited: boolean;
+    remaining: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkQuota = async () => {
+      // 1. If admin explicitly selected an employee in dropdown
+      let targetEmpId = selectedEmployeeId || "";
+
+      // 2. Otherwise identify active logged-in employee / advisor
+      if (!targetEmpId) {
+        const session = getStoredAuthSession();
+        const candidates = [
+          userId,
+          userEmail,
+          session?.userId,
+          session?.email,
+          session?.displayName
+        ].filter(Boolean) as string[];
+
+        for (const c of candidates) {
+          if (c.toLowerCase().startsWith("f2-")) {
+            targetEmpId = c;
+            break;
+          }
+        }
+
+        if (!targetEmpId) {
+          // Match from advisors list
+          const allAdvisors = employeeDirectory.length > 0 ? employeeDirectory : (() => {
+            try {
+              const stored = localStorage.getItem("finheal_advisors_list");
+              return stored ? JSON.parse(stored) : [];
+            } catch {
+              return [];
+            }
+          })();
+
+          for (const adv of allAdvisors) {
+            const advId = adv.f2FintechId || adv.id;
+            for (const c of candidates) {
+              const cleanC = c.toLowerCase().trim();
+              if (
+                (advId && advId.toLowerCase() === cleanC) ||
+                (adv.name && adv.name.toLowerCase() === cleanC) ||
+                (cleanC.includes("@") && advId && cleanC.split("@")[0] === advId.toLowerCase())
+              ) {
+                targetEmpId = advId;
+                break;
+              }
+            }
+            if (targetEmpId) break;
+          }
+        }
+
+        if (!targetEmpId) {
+          targetEmpId = userId || userEmail || session?.userId || session?.email || "current";
+        }
+      }
+
+      try {
+        const stats = await checkAdvisorCibilLimit(targetEmpId);
+        if (isMounted && stats) {
+          setQuotaStats({
+            monthly_count: stats.monthly_count ?? 0,
+            effective_limit: stats.effective_limit ?? 50,
+            limit_reached: Boolean(stats.limit_reached),
+            is_unlimited: Boolean(stats.is_unlimited),
+            remaining: stats.remaining ?? null
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to check quota stats for target employee:", err);
+      }
+    };
+
+    void checkQuota();
+    window.addEventListener("finheal:cibil_update", checkQuota);
+    window.addEventListener("finheal:advisors_update", checkQuota);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("finheal:cibil_update", checkQuota);
+      window.removeEventListener("finheal:advisors_update", checkQuota);
+    };
+  }, [selectedEmployeeId, userId, userEmail, isStaff, employeeDirectory, cibilSubTab]);
 
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
@@ -1083,7 +1176,7 @@ export default function EligibilityCibilView({
       }
       
       const session = getStoredAuthSession();
-      const activeUserId = userId || session?.userId;
+      const activeUserId = session?.userId || userId;
       if (activeUserId) {
         headers["X-Requester-ID"] = activeUserId;
       }
@@ -1238,6 +1331,15 @@ export default function EligibilityCibilView({
   const handleFetchCibilReport = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (quotaStats?.limit_reached) {
+      toast({
+        title: "Fetch Limit Reached",
+        description: `Monthly credit report fetching limit reached (${quotaStats.monthly_count}/${quotaStats.effective_limit}). Please wait until the 1st of next month for your limit to reset.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // For Experian: validate first + last name separately
     if (cibilBureau === "experian") {
       if (!cibilFirstName.trim()) {
@@ -1301,6 +1403,16 @@ export default function EligibilityCibilView({
       window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
       const errorMsg = err.message || "Failed to fetch score.";
+      if (errorMsg.includes("Monthly credit report fetching limit reached") || errorMsg.includes("limit reached")) {
+        const match = errorMsg.match(/\((\d+)\/(\d+)\)/);
+        setQuotaStats({
+          monthly_count: match ? parseInt(match[1], 10) : 1,
+          effective_limit: match ? parseInt(match[2], 10) : 1,
+          limit_reached: true,
+          is_unlimited: false,
+          remaining: 0
+        });
+      }
       if (errorMsg.toLowerCase().includes("no credit record") || errorMsg.toLowerCase().includes("no record")) {
         setCibilError(errorMsg);
         setCibilReport(null);
@@ -1820,15 +1932,17 @@ export default function EligibilityCibilView({
         {/* ----------------- LENDERS CATALOG SUBTAB ----------------- */}
         {cibilSubTab === "lenders" && hasLendersEditPermission && (
           <div className="relative animate-fade-up max-w-5xl w-full mx-auto pb-12">
-            <LendersTab
-              filteredLenders={filteredLenders}
-              filterLenderSearch={filterLenderSearch}
-              setFilterLenderSearch={setFilterLenderSearch}
-              lendersLoading={isLoadingLenders}
-              handleOpenAddLender={handleOpenAddLender}
-              handleOpenEditLender={handleOpenEditLender}
-              handleDeleteLender={handleDeleteLender}
-            />
+            <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500 font-medium">Loading lenders catalog...</div>}>
+              <LendersTab
+                filteredLenders={filteredLenders}
+                filterLenderSearch={filterLenderSearch}
+                setFilterLenderSearch={setFilterLenderSearch}
+                lendersLoading={isLoadingLenders}
+                handleOpenAddLender={handleOpenAddLender}
+                handleOpenEditLender={handleOpenEditLender}
+                handleDeleteLender={handleDeleteLender}
+              />
+            </Suspense>
           </div>
         )}
         
@@ -2264,7 +2378,15 @@ export default function EligibilityCibilView({
                       </ul>
                     </div>
                     <button
-                      onClick={() => { setCibilError(null); setCibilReport(null); }}
+                      onClick={() => {
+                        setCibilError(null);
+                        setCibilReport(null);
+                        setCibilPan("");
+                        setCibilName("");
+                        setCibilFirstName("");
+                        setCibilLastName("");
+                        setCibilPhone("");
+                      }}
                       className="mt-2 w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-[10px] text-[12.5px] transition-all cursor-pointer shadow-sm"
                     >
                       Try Again with Different Details
@@ -2348,6 +2470,16 @@ export default function EligibilityCibilView({
                               : "Retrieve your credit score and bureau report securely."
                             }
                           </p>
+                          {quotaStats && ((isStaff && !isSuperAdmin) || Boolean(selectedEmployeeId)) && (
+                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-semibold bg-primary/10 text-primary border border-primary/20 animate-fade-in">
+                              <span>
+                                📊 Monthly Quota{selectedEmployeeId ? " (Selected Employee)" : ""}: <strong>{quotaStats.monthly_count}</strong> / <strong>{quotaStats.is_unlimited ? "Unlimited" : quotaStats.effective_limit}</strong>
+                                {!quotaStats.is_unlimited && quotaStats.remaining !== null && (
+                                  <span className="text-gray-500 font-medium ml-1">({quotaStats.remaining} remaining)</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Report Type Selector */}
@@ -2389,6 +2521,17 @@ export default function EligibilityCibilView({
                     )}
 
                     <TooltipProvider delayDuration={0}>
+                      {quotaStats?.limit_reached && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-3.5 mb-4 text-rose-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[12.5px] font-bold text-rose-900">Monthly Fetch Limit Reached</p>
+                            <p className="text-[11.5px] text-rose-700 mt-0.5 leading-snug">
+                              Monthly credit report fetching limit reached ({quotaStats.monthly_count}/{quotaStats.effective_limit}). Please wait until the 1st of next month for your limit to reset.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <form onSubmit={handleFetchCibilReport} className="space-y-4">
                         {/* Experian: separate First + Last Name fields */}
                         {cibilBureau === "experian" ? (
@@ -2402,11 +2545,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilFirstName}
                                       onChange={(e) => setCibilFirstName(e.target.value)}
                                       placeholder="e.g. Rahul"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2424,11 +2568,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilLastName}
                                       onChange={(e) => setCibilLastName(e.target.value)}
                                       placeholder="e.g. Sharma"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2450,11 +2595,12 @@ export default function EligibilityCibilView({
                                   <input
                                     type="text"
                                     required
+                                    disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                     title=""
                                     value={cibilName}
                                     onChange={(e) => setCibilName(e.target.value)}
                                     placeholder={cibilReportType === "company" ? "e.g. F2 Fintech Private Limited" : "e.g. Rahul Sharma"}
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                   />
                                 </TooltipTrigger>
                                 <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2475,12 +2621,13 @@ export default function EligibilityCibilView({
                                   <input
                                     type="tel"
                                     required
+                                    disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                     title=""
                                     pattern="[0-9]{10}"
                                     value={cibilPhone}
                                     onChange={handlePhoneChange}
                                     placeholder="e.g. 98765XXXXX"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                   />
                                 </TooltipTrigger>
                                 <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2502,12 +2649,13 @@ export default function EligibilityCibilView({
                                     <input
                                       type="tel"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       pattern="[0-9]{10}"
                                       value={cibilPhone}
                                       onChange={handlePhoneChange}
                                       placeholder="e.g. 98765XXXXX"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2527,11 +2675,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilPan}
                                       onChange={handlePanChange}
                                       placeholder="e.g. AAAAA1111B"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2644,6 +2793,19 @@ export default function EligibilityCibilView({
                                 </div>
                               )}
                             </div>
+                            {selectedEmployeeId && (() => {
+                              const selectedEmp = employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId);
+                              if (!selectedEmp) return null;
+                              const isUnlimited = selectedEmp.effectiveCreditLimit === -1 || selectedEmp.creditReportLimit === -1;
+                              return (
+                                <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-500 px-1">
+                                  <span>Monthly Fetch Quota:</span>
+                                  <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                    {isUnlimited ? "Unlimited" : selectedEmp.creditReportTempLimit ? `${selectedEmp.creditReportTempLimit}/mo (Temp Override)` : `${selectedEmp.effectiveCreditLimit ?? selectedEmp.creditReportLimit ?? 50}/mo`}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
 
@@ -2719,10 +2881,19 @@ export default function EligibilityCibilView({
                         <div className="text-[15.5px] flex flex-col gap-2 pt-1">
                           <button
                             type="submit"
-                            disabled={cibilFetching || !cibilAgreed}
-                            className="w-full bg-primary text-white font-bold py-3 rounded-[14px] hover:bg-[#1e2db8] transition-all cursor-pointer shadow-md shadow-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={cibilFetching || !cibilAgreed || Boolean(quotaStats?.limit_reached)}
+                            className={`w-full text-white font-bold py-3 rounded-[14px] transition-all flex items-center justify-center gap-1.5 shadow-md shadow-primary/20 ${
+                              quotaStats?.limit_reached
+                                ? "bg-rose-600 cursor-not-allowed opacity-90"
+                                : "bg-primary hover:bg-[#1e2db8] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            }`}
                           >
-                            {cibilFetching ? (
+                            {quotaStats?.limit_reached ? (
+                              <>
+                                <Lock className="w-4.5 h-4.5" />
+                                <span>Monthly Limit Reached ({quotaStats.monthly_count}/{quotaStats.effective_limit})</span>
+                              </>
+                            ) : cibilFetching ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                 <span>Verifying Credit Record...</span>
@@ -2931,6 +3102,12 @@ export default function EligibilityCibilView({
                       type="button"
                       onClick={() => {
                         setCibilReport(null);
+                        setCibilPan("");
+                        setCibilName("");
+                        setCibilFirstName("");
+                        setCibilLastName("");
+                        setCibilPhone("");
+                        setCibilError(null);
                         setSelectedBsaFile(null);
                         setBsaPassword("");
                         setBsaError(null);
@@ -4006,7 +4183,7 @@ export default function EligibilityCibilView({
                       <div className="absolute top-1/2 right-[5%] -translate-y-1/2 w-[350px] h-32 bg-[radial-gradient(circle,rgba(16,185,129,0.12)_0%,transparent_75%)] rounded-full blur-[25px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
                       
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
-                        <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                        <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Salary</span>
@@ -4022,9 +4199,9 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-emerald-600">₹{calculatedSalary.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-indigo-400 to-indigo-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Credit</span>
@@ -4040,7 +4217,7 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-indigo-600">₹{
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-indigo-600">₹{
                           (() => {
                             try {
                               const creditsData = bsaAnalysisData.raw_json_data?.cam_analysis_data?.credits;
@@ -4069,7 +4246,7 @@ export default function EligibilityCibilView({
                           })()
                         }</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-amber-400 to-amber-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly EMI</span>
@@ -4085,9 +4262,9 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-amber-600">₹{calculatedEmi.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Average Monthly Balance</span>
@@ -4103,13 +4280,13 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-blue-600">₹{
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-blue-600">₹{
                           (bsaAnalysisData.metrics?.average_monthly_balance || 
                           bsaAnalysisData.raw_json_data?.user_info_and_summary_data?.financial_summary?.abb_summary?.abb_last_30_days || 
                           0).toLocaleString('en-IN')
                         }</span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className={`absolute top-[1px] bottom-[1px] left-[1px] w-1 rounded-l-[15px] ${finalBounceCount > 0 ? 'bg-gradient-to-b from-rose-400 to-rose-600' : 'bg-gradient-to-b from-emerald-400 to-emerald-600'}`} />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">Bounce Events</span>
@@ -4125,11 +4302,11 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className={`text-[18px] font-extrabold ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <span className={`text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight ${finalBounceCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {finalBounceCount}
                         </span>
                       </div>
-                      <div className="border border-white/75 rounded-[16px] p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
+                      <div className="border border-white/75 rounded-[16px] p-3 xl:p-4 shadow-[0_8px_32px_rgba(31,41,55,0.03)] hover:shadow-[0_16px_48px_rgba(99,102,241,0.08)] transition-all duration-300 flex flex-col justify-between gap-1.5 h-full relative" style={{ backgroundColor: 'rgba(255, 255, 255, 0.55)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)' }}>
                         <div className="absolute top-[1px] bottom-[1px] left-[1px] w-1 bg-gradient-to-b from-fuchsia-400 to-fuchsia-600 rounded-l-[15px]" />
                         <div className="flex items-start justify-between gap-1.5 w-full">
                           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider leading-snug">FOIR</span>
@@ -4145,7 +4322,7 @@ export default function EligibilityCibilView({
                             </div>
                           </div>
                         </div>
-                        <span className="text-[18px] font-extrabold text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
+                        <span className="text-[15px] xs:text-[16px] xl:text-[18px] font-extrabold tracking-tight text-fuchsia-600">{calculatedFoir.toFixed(2)}%</span>
                       </div>
                     </div>
                   </div>

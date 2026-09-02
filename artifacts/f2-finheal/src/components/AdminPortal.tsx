@@ -1,16 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
-import { Lock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Lock, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import EmployeeDirectory from "./admin/EmployeeDirectory";
-import ExpertsTab from "./admin/ExpertsTab";
-import EducationTab from "./admin/EducationTab";
-import TestsTab from "./admin/TestsTab";
-import AppointmentsTab from "./admin/AppointmentsTab";
-import LendersTab from "./admin/LendersTab";
-import TrashTab from "./admin/TrashTab";
-import CibilEnquiriesTab from "./admin/CibilEnquiriesTab";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender, getDefaultCreditLimitForEmployee } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -22,7 +14,26 @@ import { emergencyFundQuestions } from "@/features/emergency-fund/emergencyFundC
 import { financialLiteracyQuestions } from "@/features/financial-literacy/financialLiteracyConfig";
 import { loanFitQuestions } from "@/features/loan-fit/loanFitConfig";
 import { type LenderProduct } from "./LoanCalculatorView";
-import CibilAnalyzerView from "./CibilAnalyzerView";
+
+// Lazy-loaded Admin Sub-tab components for ~60% bundle size reduction
+const EmployeeDirectory = lazy(() => import("./admin/EmployeeDirectory"));
+const ExpertsTab = lazy(() => import("./admin/ExpertsTab"));
+const EducationTab = lazy(() => import("./admin/EducationTab"));
+const TestsTab = lazy(() => import("./admin/TestsTab"));
+const AppointmentsTab = lazy(() => import("./admin/AppointmentsTab"));
+const LendersTab = lazy(() => import("./admin/LendersTab"));
+const TrashTab = lazy(() => import("./admin/TrashTab"));
+const CibilEnquiriesTab = lazy(() => import("./admin/CibilEnquiriesTab"));
+const CibilAnalyzerView = lazy(() => import("./CibilAnalyzerView"));
+
+const AdminTabFallback = () => (
+  <div className="flex items-center justify-center p-12 bg-white rounded-[20px] border border-gray-200 shadow-xs">
+    <div className="flex items-center gap-2 text-gray-500 font-medium text-xs">
+      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+      <span>Loading module...</span>
+    </div>
+  </div>
+);
 interface AdminPortalProps {
   userId: string;
   userEmail: string;
@@ -53,51 +64,35 @@ interface Appointment {
 
 export function classifyEnquiryRole(email: string, name: string, advisors: any[] = []): "Admin" | "Manager" | "Senior Leadership" | "User" {
   const cleanEmail = (email || "").toLowerCase().trim();
-  const cleanName = (name || "").toLowerCase().trim();
 
-  // 1. Admin Classification
+  // 1. Admin Classification (Strict admin emails only)
   if (
     cleanEmail === "admin@finheal.com" ||
     cleanEmail === "admin@f2finheal.com" ||
-    cleanEmail.startsWith("admin@") ||
-    cleanName.includes("admin") ||
-    cleanName === "finheal admin"
+    cleanEmail.startsWith("admin@")
   ) {
     return "Admin";
   }
 
-  // 2. Senior Leadership Classification
-  const leadershipPrefixes = ["ceo", "cto", "cfo", "coo", "vp", "president", "founder", "director", "exec", "executive"];
-  const isInternalDomain = cleanEmail.endsWith("@finheal.com") || cleanEmail.endsWith("@f2finheal.com") || cleanEmail.endsWith("@f2fintech.com");
-
-  const hasLeadershipEmail = leadershipPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`) || cleanEmail.includes(`.${pref}@`) || cleanEmail.includes(`-${pref}@`));
-  const hasLeadershipName = cleanName.includes("ceo") || cleanName.includes("cto") || cleanName.includes("cfo") || cleanName.includes("coo") || cleanName.includes("vp") || cleanName.includes("president") || cleanName.includes("founder") || cleanName.includes("director") || cleanName.includes("executive");
-
-  if ((isInternalDomain && hasLeadershipEmail) || hasLeadershipName) {
+  // 2. Senior Leadership (Explicit leadership emails only)
+  if (["ceo@finheal.com", "cto@finheal.com", "cfo@finheal.com", "coo@finheal.com", "director@finheal.com"].includes(cleanEmail)) {
     return "Senior Leadership";
   }
 
-  // 3. Manager Classification
-  // Check against advisors list
+  // 3. Manager / Advisor (Strict Match by Unique ID or Registered Advisor Email ONLY - No Name Matching)
   const isAdvisor = advisors.some(adv => {
     const advId = (adv.f2FintechId || adv.id || "").toLowerCase().trim();
     const advEmail = (adv.email || "").toLowerCase().trim();
-    const advName = (adv.name || "").toLowerCase().trim();
     return (
-      (cleanEmail && (cleanEmail === advId || cleanEmail === advEmail)) ||
-      (cleanName && cleanName === advName)
+      cleanEmail && (cleanEmail === advId || cleanEmail === advEmail)
     );
   });
 
-  const managerPrefixes = ["manager", "advisor", "lead", "supervisor", "head"];
-  const hasManagerEmail = managerPrefixes.some(pref => cleanEmail.startsWith(`${pref}@`));
-  const hasManagerName = cleanName.includes("manager") || cleanName.includes("advisor") || cleanName.includes("lead") || cleanName.includes("head") || cleanName.includes("supervisor");
-
-  if (isAdvisor || hasManagerEmail || (isInternalDomain && hasManagerName)) {
+  if (isAdvisor) {
     return "Manager";
   }
 
-  // 4. Regular User / Lead
+  // 4. Default: Every other enquiry is strictly a User (Lead)
   return "User";
 }
 
@@ -118,7 +113,7 @@ const TEST_NAMES: Record<string, string> = {
 
 const renderApptNotes = (notes: string | undefined | null, agenda: string[] | undefined | null) => {
   const hasAgenda = agenda && agenda.length > 0;
-  
+
   if (!hasAgenda) {
     if (!notes) return null;
     return (
@@ -127,7 +122,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
       </div>
     );
   }
-  
+
   // If agenda has 1 item and it is exactly notes, render as plain notes instead of checkmarks
   if (agenda.length === 1 && agenda[0] === notes) {
     return (
@@ -136,7 +131,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
       </div>
     );
   }
-  
+
   return (
     <div className="mt-2 flex flex-col gap-1.5 text-left">
       <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-[10px] p-2.5 flex flex-col gap-1">
@@ -150,7 +145,7 @@ const renderApptNotes = (notes: string | undefined | null, agenda: string[] | un
           ))}
         </div>
       </div>
-      
+
       {notes && notes.trim() !== "" && notes !== agenda.join("\n") && (
         <div className="text-[10.5px] text-gray-500 italic bg-gray-55/60 p-2 border border-gray-100 rounded-[8px] leading-relaxed whitespace-pre-wrap">
           &quot;{notes}&quot;
@@ -171,17 +166,17 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [matchWorkspace, paramsWorkspace] = useRoute("/advisor-workspace/:tab");
   const match = matchAdmin || matchWorkspace;
   const params = matchAdmin ? paramsAdmin : paramsWorkspace;
-  
+
   const [_, setLocation] = useLocation();
-  
+
   const activeTabUrl = (match && params?.tab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(params.tab))
     ? (params.tab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash")
     : null;
-    
-  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(initialTab) 
-    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") 
+
+  const validInitialTab = initialTab && ["experts", "education", "tests", "appointments", "lenders", "cibil-enquiries", "employees", "trash"].includes(initialTab)
+    ? (initialTab as "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash")
     : null;
-    
+
   const activeTab = activeTabUrl || validInitialTab || "experts";
 
   const setActiveTab = (newTab: "experts" | "education" | "tests" | "appointments" | "lenders" | "cibil-enquiries" | "employees" | "trash") => {
@@ -264,14 +259,14 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [isDeletingExpert, setIsDeletingExpert] = useState(false);
-  
+
   // CIBIL Enquiry Deletion Modal States
   const [cibilDeleteConfirmOpen, setCibilDeleteConfirmOpen] = useState(false);
   const [cibilToDelete, setCibilToDelete] = useState<string | null>(null);
   const [isDeletingCibil, setIsDeletingCibil] = useState(false);
   const [cibilDeleteResult, setCibilDeleteResult] = useState<string | null>(null);
   const [animatingCibilRows, setAnimatingCibilRows] = useState<string[]>([]);
-  
+
   // Department Renaming Modal States
   const [renameDeptModalOpen, setRenameDeptModalOpen] = useState(false);
   const [renameOldDept, setRenameOldDept] = useState("");
@@ -312,7 +307,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[]
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[],
+    creditReportLimit: -1 as number | null,
+    creditReportTempLimit: "" as number | string | null,
+    creditReportTempMonth: "" as string | null
   });
 
   // Education form state
@@ -357,7 +355,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [addedSlots, setAddedSlots] = useState<string[]>([]);
   const [cancellingApptId, setCancellingApptId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  
+
   // Referrals State
   const [referrals, setReferrals] = useState<ReferralCode[]>([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
@@ -453,9 +451,9 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   const isEmployeeId = userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
   const currentExpertId = isEmployeeId ? userId : getExpertIdFromEmail(userEmail);
-  
+
   const foundAdvisor = currentExpertId ? advisors.find(a => (a.id === currentExpertId || a.f2FintechId === currentExpertId)) : null;
-  
+
   const activeExpert = foundAdvisor || (isEmployeeId ? (() => {
     try {
       const sessionStr = localStorage.getItem("finheal-auth-session");
@@ -480,7 +478,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
           fee: 899
         } as Advisor;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   })() : null);
 
@@ -662,12 +660,21 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
   const [filterSearch, setFilterSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+  // 300ms debounce on search input to prevent network request spam on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filterSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filterSearch]);
   const [filterBureau, setFilterBureau] = useState<string>("all");
-  
+
   const allDepartments = useMemo(() => {
     return Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort() as string[];
   }, [employees]);
-  
+
   const [cibilPage, setCibilPage] = useState<number>(1);
   const cibilPageSize = 15;
 
@@ -682,7 +689,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Reset page when filters change (handled implicitly by backend if page exceeds total)
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
+  }, [filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
 
 
 
@@ -888,7 +895,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     const generateWorksheetXml = (data: any[]) => {
       const headers = ["Name", "Phone", "PAN No.", "CIBIL Score", "Email", "Bureau", "Date Fetched"];
       const loanCols: { key: string; label: string; count: number }[] = [];
-      
+
       loanTypesConfig.forEach(cfg => {
         const count = maxLoanCounts[cfg.key] || 0;
         if (count > 0) {
@@ -903,7 +910,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
       const lastColLetter = getColumnLetter(totalCols);
 
       let sheetDataXml = "";
-      
+
       // Header row
       sheetDataXml += `    <row r="1" spans="1:${totalCols}">\n`;
       headers.forEach((h, idx) => {
@@ -1078,7 +1085,7 @@ ${sheetDataXml}
         headers["X-API-Key"] = configuredApiKey;
       }
 
-      const requestUrl = reportId 
+      const requestUrl = reportId
         ? `${apiBase}/cibil/cam/generate/${userId}?report_id=${reportId}`
         : `${apiBase}/cibil/cam/generate/${userId}`;
 
@@ -1119,12 +1126,12 @@ ${sheetDataXml}
       if (userId) {
         headers["X-Requester-ID"] = userId;
       }
-      
+
       const queryParams = new URLSearchParams({
         page: cibilPage.toString(),
         limit: cibilPageSize.toString()
       });
-      if (filterSearch) queryParams.append("search", filterSearch);
+      if (debouncedSearch) queryParams.append("search", debouncedSearch);
       if (filterRole !== "all") queryParams.append("role", filterRole);
       if (filterLoanType !== "all") queryParams.append("loan_type", filterLoanType);
       if (filterBureau !== "all") queryParams.append("bureau", filterBureau);
@@ -1157,7 +1164,7 @@ ${sheetDataXml}
   const executeDeleteCibil = async () => {
     if (!cibilToDelete) return;
     setIsDeletingCibil(true);
-    
+
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
       const configuredApiKey = import.meta.env.VITE_API_KEY?.trim();
@@ -1199,21 +1206,21 @@ ${sheetDataXml}
         checkCibilFetchThreshold();
       }
     }
-  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, filterSearch, filterBureau]);
+  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
 
   // Lenders CRUD Handlers
   const getProductPrefix = (category: string, productType: string): string => {
     const cat = (category || "").toLowerCase().trim();
     const prod = (productType || "").toLowerCase().trim();
-    
+
     if (cat === "home") return "HL";
     if (cat === "personal") return "PL";
     if (cat === "professional") return "PR";
-    
+
     if (prod.includes("home")) return "HL";
     if (prod.includes("personal")) return "PL";
     if (prod.includes("professional") || prod.includes("prof")) return "PR";
-    
+
     const words = (productType || category || "").split(/\s+/).filter(Boolean);
     if (words.length >= 2) {
       return (words[0][0] + words[1][0]).toUpperCase();
@@ -1466,7 +1473,7 @@ ${sheetDataXml}
       });
       const newListStr = JSON.stringify(sortedList);
       const oldListStr = localStorage.getItem("finheal_advisors_list");
-      
+
       setAdvisors(sortedList);
       if (newListStr !== oldListStr) {
         localStorage.setItem("finheal_advisors_list", newListStr);
@@ -1612,7 +1619,7 @@ ${sheetDataXml}
   useEffect(() => {
     const shouldLoadAdvisors = !isAdmin || activeTab === "experts" || activeTab === "cibil-enquiries";
     const shouldLoadEmployees = activeTab === "employees" || activeTab === "cibil-enquiries";
-    
+
     let intervalIdAdvisors: any = null;
     let intervalIdEmployees: any = null;
 
@@ -1637,7 +1644,7 @@ ${sheetDataXml}
 
     window.addEventListener("finheal:advisors_update", handleUpdate);
     window.addEventListener("storage", handleUpdate);
-    
+
     return () => {
       if (intervalIdAdvisors) clearInterval(intervalIdAdvisors);
       if (intervalIdEmployees) clearInterval(intervalIdEmployees);
@@ -1654,7 +1661,7 @@ ${sheetDataXml}
     const handleAppointmentsUpdate = () => {
       loadGlobalAppointments();
     };
-    
+
     if (shouldLoadAppointments) {
       loadGlobalAppointments(true);
       intervalId = setInterval(() => loadGlobalAppointments(false), 30000); // 30s interval for appointments (low impact)
@@ -1690,9 +1697,9 @@ ${sheetDataXml}
       setReferralsLoading(true);
       listReferrals(currentExpertId)
         .then(data => {
-           // Sort by latest first
-           const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-           setReferrals(sorted);
+          // Sort by latest first
+          const sorted = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setReferrals(sorted);
         })
         .catch(err => console.error("Error loading referrals", err))
         .finally(() => setReferralsLoading(false));
@@ -1754,11 +1761,11 @@ ${sheetDataXml}
         const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
         const dd = String(dateObj.getDate()).padStart(2, "0");
         setSlotDate(`${yyyy}-${mm}-${dd}`);
-        
+
         // Split by ampersand to load multiple slots
         const ranges = timeStr.split(/\s*&\s*/);
         setAddedSlots(ranges);
-        
+
         setSlotFromTime("09:00 AM");
         setSlotToTime("10:00 AM");
         return;
@@ -1831,7 +1838,10 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      creditReportLimit: -1,
+      creditReportTempLimit: "",
+      creditReportTempMonth: ""
     });
     setExpertModalOpen(true);
   };
@@ -1843,8 +1853,8 @@ ${sheetDataXml}
     const normAvail = rawAvail.includes("meeting")
       ? "in meeting"
       : (rawAvail.includes("available") && !rawAvail.includes("not available") && !rawAvail.includes("unavailable"))
-      ? "available"
-      : "unavailable";
+        ? "available"
+        : "unavailable";
 
     setExpertForm({
       f2FintechId: adv.f2FintechId || adv.id,
@@ -1865,7 +1875,10 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      creditReportLimit: adv.creditReportLimit !== undefined && adv.creditReportLimit !== null ? adv.creditReportLimit : getDefaultCreditLimitForEmployee(adv.department, adv.designation),
+      creditReportTempLimit: adv.creditReportTempLimit ?? "",
+      creditReportTempMonth: adv.creditReportTempMonth ?? ""
     });
     setExpertModalOpen(true);
   };
@@ -1880,8 +1893,8 @@ ${sheetDataXml}
       return;
     }
     if (
-      expertForm.isAdvisor && 
-      expertForm.category === "manual" && 
+      expertForm.isAdvisor &&
+      expertForm.category === "manual" &&
       (!expertForm.customCategory.trim() || expertForm.customCategory.toLowerCase().trim() === "manual")
     ) {
       alert("Please write a valid custom category name (cannot be empty or 'manual').");
@@ -1919,6 +1932,9 @@ ${sheetDataXml}
       department: (expertForm.department && expertForm.department.trim() !== "General") ? expertForm.department.trim() : "Founder's Office",
       isAdvisor: expertForm.isAdvisor,
       permissions: expertForm.permissions,
+      creditReportLimit: (expertForm.creditReportLimit !== undefined && expertForm.creditReportLimit !== null && String(expertForm.creditReportLimit).trim() !== "") ? Number(expertForm.creditReportLimit) : null,
+      creditReportTempLimit: (expertForm.creditReportTempLimit !== undefined && expertForm.creditReportTempLimit !== null && String(expertForm.creditReportTempLimit).trim() !== "") ? Number(expertForm.creditReportTempLimit) : null,
+      creditReportTempMonth: expertForm.creditReportTempMonth ? String(expertForm.creditReportTempMonth) : null,
       isActive: editingExpert ? editingExpert.isActive : true,
       deactivationReason: editingExpert ? editingExpert.deactivationReason : undefined
     };
@@ -1951,13 +1967,13 @@ ${sheetDataXml}
       setDeleteError("Password is required.");
       return;
     }
-    
+
     setIsDeletingExpert(true);
     setDeleteError(null);
     try {
       // Verify Admin Password via signInUser check
       await signInUser(userEmail, adminPassword);
-      
+
       // If verification succeeds, execute deletion
       if (deleteTargetId) {
         await deleteAdvisor(deleteTargetId);
@@ -2160,7 +2176,7 @@ ${sheetDataXml}
   const handleOpenEditTest = (test: TestCard) => {
     setEditingTest(test);
     setSelectedEditLevel(1);
-    
+
     let initialQuestions = test.questions || [];
     if (test.id === "financial-literacy") {
       initialQuestions = (test.questions && test.questions.length > 0 ? test.questions : []).map((q, idx) => {
@@ -2533,14 +2549,14 @@ ${sheetDataXml}
     }
     try {
       await rescheduleAppointment(apptId, rescheduleDate, rescheduleTime);
-      
+
       // Save rescheduled apptId in localStorage
       const rescheduled = JSON.parse(localStorage.getItem("finheal_rescheduled_appts") || "[]");
       if (!rescheduled.includes(apptId)) {
         rescheduled.push(apptId);
         localStorage.setItem("finheal_rescheduled_appts", JSON.stringify(rescheduled));
       }
-      
+
       setReschedulingApptId(null);
       setRescheduleDate("");
       setRescheduleTime("");
@@ -2586,11 +2602,11 @@ ${sheetDataXml}
       if (matchAdv) {
         const matchId = matchAdv.id;
         const matchF2Id = matchAdv.f2FintechId || "";
-        
+
         const apptAdvIdClean = (appt.advisorId || "").toLowerCase().trim();
         const selectIdClean = matchId.toLowerCase().trim();
         const selectF2IdClean = matchF2Id.toLowerCase().trim();
-        
+
         if (apptAdvIdClean !== selectIdClean && apptAdvIdClean !== selectF2IdClean) {
           return false;
         }
@@ -2600,18 +2616,18 @@ ${sheetDataXml}
         }
       }
     }
-    
+
     // Status Filter
     if (filterApptStatus !== "all") {
       const isCompleted = appt.completed || hasSessionEnded(appt.date, appt.time);
       const isCancelled = appt.cancelled;
       const isPending = !appt.completed && !appt.cancelled && !hasSessionEnded(appt.date, appt.time);
-      
+
       if (filterApptStatus === "completed" && !isCompleted) return false;
       if (filterApptStatus === "cancelled" && !isCancelled) return false;
       if (filterApptStatus === "pending" && !isPending) return false;
     }
-    
+
     // Date Range Filter
     if (filterApptStartDate) {
       if (appt.date < filterApptStartDate) return false;
@@ -2619,7 +2635,7 @@ ${sheetDataXml}
     if (filterApptEndDate) {
       if (appt.date > filterApptEndDate) return false;
     }
-    
+
     return true;
   });
 
@@ -2712,10 +2728,10 @@ ${sheetDataXml}
   try {
     const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
     hasSessionPermission = (session?.permissions || []).includes("cibil_view") || (session?.permissions || []).includes("cibil_view_all");
-  } catch (e) {}
+  } catch (e) { }
 
   const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
-    hasSessionPermission || 
+    hasSessionPermission ||
     (activeExpert?.permissions || []).some((p: string) => p === "cibil_view" || p === "cibil_view_all")
   ));
   console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
@@ -2800,167 +2816,169 @@ ${sheetDataXml}
 
 
             {/* TAB: MANAGE EXPERTS */}
-            {activeTab === "experts" && (
-              <ExpertsTab
-                advisors={advisors}
-                advisorsLoading={advisorsLoading}
-                handleOpenAddExpert={handleOpenAddExpert}
-                handleToggleActive={handleToggleActive}
-                handleOpenEditExpert={handleOpenEditExpert}
-                handleDeleteExpert={handleDeleteExpert}
-              />
-            )}
+            <Suspense fallback={<AdminTabFallback />}>
+              {activeTab === "experts" && (
+                <ExpertsTab
+                  advisors={advisors}
+                  advisorsLoading={advisorsLoading}
+                  handleOpenAddExpert={handleOpenAddExpert}
+                  handleToggleActive={handleToggleActive}
+                  handleOpenEditExpert={handleOpenEditExpert}
+                  handleDeleteExpert={handleDeleteExpert}
+                />
+              )}
 
-            {/* TAB: MANAGE EDUCATION */}
-            {activeTab === "education" && (
-              <EducationTab
-                filteredEducation={filteredEducation}
-                filterEduType={filterEduType}
-                setFilterEduType={setFilterEduType}
-                educationLoading={educationLoading}
-                handleOpenAddEdu={handleOpenAddEdu}
-                handleOpenEditEdu={handleOpenEditEdu}
-                handleDeleteEdu={handleDeleteEdu}
-              />
-            )}
+              {/* TAB: MANAGE EDUCATION */}
+              {activeTab === "education" && (
+                <EducationTab
+                  filteredEducation={filteredEducation}
+                  filterEduType={filterEduType}
+                  setFilterEduType={setFilterEduType}
+                  educationLoading={educationLoading}
+                  handleOpenAddEdu={handleOpenAddEdu}
+                  handleOpenEditEdu={handleOpenEditEdu}
+                  handleDeleteEdu={handleDeleteEdu}
+                />
+              )}
 
-            {/* TAB: MANAGE HEALTH TESTS */}
-            {activeTab === "tests" && (
-              <TestsTab
-                testSubTab={testSubTab}
-                setTestSubTab={setTestSubTab}
-                filteredTests={filteredTests}
-                testCatalog={testCatalog}
-                filterTestName={filterTestName}
-                setFilterTestName={setFilterTestName}
-                testsLoading={testsLoading}
-                handleOpenAddTest={handleOpenAddTest}
-                handleOpenEditTest={handleOpenEditTest}
-                handleDeleteTest={handleDeleteTest}
-                testSubmissions={testSubmissions}
-                filteredSubmissions={filteredSubmissions}
-                paginatedSubmissions={paginatedSubmissions}
-                submissionsLoading={submissionsLoading}
-                submissionsSearch={submissionsSearch}
-                setSubmissionsSearch={setSubmissionsSearch}
-                setSubmissionsPage={setSubmissionsPage}
-                safeSubPage={safeSubPage}
-                totalSubPages={totalSubPages}
-                testAttemptCounts={testAttemptCounts}
-                handleDeleteTestLog={handleDeleteTestLog}
-              />
-            )}
+              {/* TAB: MANAGE HEALTH TESTS */}
+              {activeTab === "tests" && (
+                <TestsTab
+                  testSubTab={testSubTab}
+                  setTestSubTab={setTestSubTab}
+                  filteredTests={filteredTests}
+                  testCatalog={testCatalog}
+                  filterTestName={filterTestName}
+                  setFilterTestName={setFilterTestName}
+                  testsLoading={testsLoading}
+                  handleOpenAddTest={handleOpenAddTest}
+                  handleOpenEditTest={handleOpenEditTest}
+                  handleDeleteTest={handleDeleteTest}
+                  testSubmissions={testSubmissions}
+                  filteredSubmissions={filteredSubmissions}
+                  paginatedSubmissions={paginatedSubmissions}
+                  submissionsLoading={submissionsLoading}
+                  submissionsSearch={submissionsSearch}
+                  setSubmissionsSearch={setSubmissionsSearch}
+                  setSubmissionsPage={setSubmissionsPage}
+                  safeSubPage={safeSubPage}
+                  totalSubPages={totalSubPages}
+                  testAttemptCounts={testAttemptCounts}
+                  handleDeleteTestLog={handleDeleteTestLog}
+                />
+              )}
 
-            {/* TAB: SCHEDULED CALLS FEED */}
-            {activeTab === "appointments" && (
-              <AppointmentsTab
-                filteredAppointments={filteredAppointments}
-                advisors={advisors}
-                filterAdvisor={filterAdvisor}
-                setFilterAdvisor={setFilterAdvisor}
-                filterApptStatus={filterApptStatus}
-                setFilterApptStatus={setFilterApptStatus}
-                filterApptStartDate={filterApptStartDate}
-                setFilterApptStartDate={setFilterApptStartDate}
-                filterApptEndDate={filterApptEndDate}
-                setFilterApptEndDate={setFilterApptEndDate}
-                appointmentsLoading={appointmentsLoading}
-                handleDeleteAppointment={handleDeleteAppointment}
-                hasSessionEnded={hasSessionEnded}
-                renderApptNotes={renderApptNotes}
-              />
-            )}
+              {/* TAB: SCHEDULED CALLS FEED */}
+              {activeTab === "appointments" && (
+                <AppointmentsTab
+                  filteredAppointments={filteredAppointments}
+                  advisors={advisors}
+                  filterAdvisor={filterAdvisor}
+                  setFilterAdvisor={setFilterAdvisor}
+                  filterApptStatus={filterApptStatus}
+                  setFilterApptStatus={setFilterApptStatus}
+                  filterApptStartDate={filterApptStartDate}
+                  setFilterApptStartDate={setFilterApptStartDate}
+                  filterApptEndDate={filterApptEndDate}
+                  setFilterApptEndDate={setFilterApptEndDate}
+                  appointmentsLoading={appointmentsLoading}
+                  handleDeleteAppointment={handleDeleteAppointment}
+                  hasSessionEnded={hasSessionEnded}
+                  renderApptNotes={renderApptNotes}
+                />
+              )}
 
-            {/* TAB: MANAGE LENDERS */}
-            {activeTab === "lenders" && (
-              <LendersTab
-                filteredLenders={filteredLenders}
-                filterLenderSearch={filterLenderSearch}
-                setFilterLenderSearch={setFilterLenderSearch}
-                lendersLoading={lendersLoading}
-                handleOpenAddLender={handleOpenAddLender}
-                handleOpenEditLender={handleOpenEditLender}
-                handleDeleteLender={handleDeleteLender}
-              />
-            )}
+              {/* TAB: MANAGE LENDERS */}
+              {activeTab === "lenders" && (
+                <LendersTab
+                  filteredLenders={filteredLenders}
+                  filterLenderSearch={filterLenderSearch}
+                  setFilterLenderSearch={setFilterLenderSearch}
+                  lendersLoading={lendersLoading}
+                  handleOpenAddLender={handleOpenAddLender}
+                  handleOpenEditLender={handleOpenEditLender}
+                  handleDeleteLender={handleDeleteLender}
+                />
+              )}
 
-            {/* TAB: CIBIL ENQUIRIES */}
-            {activeTab === "cibil-enquiries" && (
-              <CibilEnquiriesTab
-                cibilTotal={cibilTotal}
-                getDateFilterDescription={getDateFilterDescription}
-                isAdmin={isAdmin}
-                setActiveTab={setActiveTab}
-                safeCibilPage={safeCibilPage}
-                setCibilPage={setCibilPage}
-                totalPages={totalPages}
-                filterSearch={filterSearch}
-                setFilterSearch={setFilterSearch}
-                filterBureau={filterBureau}
-                setFilterBureau={setFilterBureau}
-                filterRole={filterRole}
-                setFilterRole={setFilterRole}
-                allDepartments={allDepartments}
-                filterLoanType={filterLoanType}
-                setFilterLoanType={setFilterLoanType}
-                filterDate={filterDate}
-                setFilterDate={setFilterDate}
-                filterEndDate={filterEndDate}
-                setFilterEndDate={setFilterEndDate}
-                todayStr={todayStr}
-                handleExportExcel={handleExportExcel}
-                cibilLoading={cibilLoading}
-                cibilEnquiries={cibilEnquiries}
-                paginatedEnquiries={paginatedEnquiries}
-                advisors={advisors}
-                employees={employees}
-                animatingCibilRows={animatingCibilRows}
-                setViewingCibilReport={setViewingCibilReport}
-                setViewingCibilReportId={setViewingCibilReportId}
-                setViewingCibilReportUserId={setViewingCibilReportUserId}
-                handleGenerateCAM={handleGenerateCAM}
-                handleDeleteEnquiry={handleDeleteEnquiry}
-                classifyEnquiryRole={classifyEnquiryRole}
-              />
-            )}
+              {/* TAB: CIBIL ENQUIRIES */}
+              {activeTab === "cibil-enquiries" && (
+                <CibilEnquiriesTab
+                  cibilTotal={cibilTotal}
+                  getDateFilterDescription={getDateFilterDescription}
+                  isAdmin={isAdmin}
+                  setActiveTab={setActiveTab}
+                  safeCibilPage={safeCibilPage}
+                  setCibilPage={setCibilPage}
+                  totalPages={totalPages}
+                  filterSearch={filterSearch}
+                  setFilterSearch={setFilterSearch}
+                  filterBureau={filterBureau}
+                  setFilterBureau={setFilterBureau}
+                  filterRole={filterRole}
+                  setFilterRole={setFilterRole}
+                  allDepartments={allDepartments}
+                  filterLoanType={filterLoanType}
+                  setFilterLoanType={setFilterLoanType}
+                  filterDate={filterDate}
+                  setFilterDate={setFilterDate}
+                  filterEndDate={filterEndDate}
+                  setFilterEndDate={setFilterEndDate}
+                  todayStr={todayStr}
+                  handleExportExcel={handleExportExcel}
+                  cibilLoading={cibilLoading}
+                  cibilEnquiries={cibilEnquiries}
+                  paginatedEnquiries={paginatedEnquiries}
+                  advisors={advisors}
+                  employees={employees}
+                  animatingCibilRows={animatingCibilRows}
+                  setViewingCibilReport={setViewingCibilReport}
+                  setViewingCibilReportId={setViewingCibilReportId}
+                  setViewingCibilReportUserId={setViewingCibilReportUserId}
+                  handleGenerateCAM={handleGenerateCAM}
+                  handleDeleteEnquiry={handleDeleteEnquiry}
+                  classifyEnquiryRole={classifyEnquiryRole}
+                />
+              )}
 
-            {/* TAB: EMPLOYEES DIRECTORY */}
-            {activeTab === "employees" && (
-              <EmployeeDirectory
-                employees={employees}
-                employeesLoading={employeesLoading}
-                handleOpenAddExpert={handleOpenAddExpert}
-                handleToggleAdvisorRole={handleToggleAdvisorRole}
-                handleToggleActive={handleToggleActive}
-                handleOpenEditExpert={handleOpenEditExpert}
-                handleDeleteExpert={handleDeleteExpert}
-                onRenameDeptClick={(deptName) => {
-                  setRenameDeptError("");
-                  setRenameOldDept(deptName);
-                  setRenameNewDept("");
-                  setRenameDeptModalOpen(true);
-                }}
-                onOpenTrash={() => setActiveTab("trash")}
-              />
-            )}
+              {/* TAB: EMPLOYEES DIRECTORY */}
+              {activeTab === "employees" && (
+                <EmployeeDirectory
+                  employees={employees}
+                  employeesLoading={employeesLoading}
+                  handleOpenAddExpert={handleOpenAddExpert}
+                  handleToggleAdvisorRole={handleToggleAdvisorRole}
+                  handleToggleActive={handleToggleActive}
+                  handleOpenEditExpert={handleOpenEditExpert}
+                  handleDeleteExpert={handleDeleteExpert}
+                  onRenameDeptClick={(deptName) => {
+                    setRenameDeptError("");
+                    setRenameOldDept(deptName);
+                    setRenameNewDept("");
+                    setRenameDeptModalOpen(true);
+                  }}
+                  onOpenTrash={() => setActiveTab("trash")}
+                />
+              )}
 
-            {/* TAB: TRASH MANAGER */}
-            {activeTab === "trash" && (
-              <TrashTab
-                trashLoading={trashLoading}
-                cibilTrash={cibilTrash}
-                advisorsTrash={advisorsTrash}
-                appointmentsTrash={appointmentsTrash}
-                educationTrash={educationTrash}
-                lendersTrash={lendersTrash}
-                handleRestoreCibil={handleRestoreCibil}
-                handleRestoreAdvisor={handleRestoreAdvisor}
-                handleRestoreAppointment={handleRestoreAppointment}
-                handleRestoreEdu={handleRestoreEdu}
-                handleRestoreLender={handleRestoreLender}
-                handlePermanentDeleteEdu={handlePermanentDeleteEdu}
-              />
-            )}
+              {/* TAB: TRASH MANAGER */}
+              {activeTab === "trash" && (
+                <TrashTab
+                  trashLoading={trashLoading}
+                  cibilTrash={cibilTrash}
+                  advisorsTrash={advisorsTrash}
+                  appointmentsTrash={appointmentsTrash}
+                  educationTrash={educationTrash}
+                  lendersTrash={lendersTrash}
+                  handleRestoreCibil={handleRestoreCibil}
+                  handleRestoreAdvisor={handleRestoreAdvisor}
+                  handleRestoreAppointment={handleRestoreAppointment}
+                  handleRestoreEdu={handleRestoreEdu}
+                  handleRestoreLender={handleRestoreLender}
+                  handlePermanentDeleteEdu={handlePermanentDeleteEdu}
+                />
+              )}
+            </Suspense>
 
           </div>
         ) : (
@@ -3004,7 +3022,7 @@ ${sheetDataXml}
                   <div className="text-center sm:text-left flex-1 min-w-0">
                     <h2 className="text-[20px] font-serif font-bold text-gray-900">Welcome Back, {activeExpert.name}!</h2>
                     <p className="text-[12px] text-gray-500 mt-[2px]">{activeExpert.designation}</p>
- 
+
                     <div className="flex flex-wrap gap-[6px] mt-[8px] justify-center sm:justify-start">
                       {activeExpert.expertise.map((exp, idx) => (
                         <span key={idx} className="bg-white border border-[#d4d8fa] text-primary text-[10px] font-bold px-[8px] py-[2px] rounded-full">
@@ -3405,7 +3423,7 @@ ${sheetDataXml}
                           <div className="text-center py-[24px] bg-gray-50 border border-dashed rounded-[16px]">
                             <div className="text-[11px] text-gray-400 mt-[4px]">No past sessions recorded.</div>
                           </div>
-                                                ) : (
+                        ) : (
                           <div className="space-y-[8px]">
                             {expertPastAppointments.map((appt, idx) => (
                               <div key={idx} className="border border-gray-150 bg-gray-50/40 hover:bg-gray-50/80 transition-colors p-[16px] rounded-[16px] flex flex-col gap-[10px]">
@@ -3669,8 +3687,8 @@ ${sheetDataXml}
                       </div>
                     </div>
                   )
-                }
-              </div>
+                  }
+                </div>
 
                 {/* Section 3: Referral Engine */}
                 <div className="border border-[#e0e7ff] bg-gradient-to-r from-[#f8faff] to-[#f3f6ff] rounded-[20px] p-[20px] shadow-sm animate-fade-in mt-[20px]">
@@ -3812,31 +3830,31 @@ ${sheetDataXml}
                           </select>
                         </div>
 
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] text-gray-500 font-semibold">From:</span>
-                            <input
-                              type="date"
-                              value={filterDate}
-                              onChange={(e) => setFilterDate(e.target.value)}
-                              max={todayStr}
-                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                            />
-                            <span className="text-[11px] text-gray-500 font-semibold">To:</span>
-                            <input
-                              type="date"
-                              value={filterEndDate}
-                              onChange={(e) => setFilterEndDate(e.target.value)}
-                              max={todayStr}
-                              className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
-                            />
-                            {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
-                              <button
-                                onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
-                                className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
-                              >
-                                Reset Filters
-                              </button>
-                            )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+                          <input
+                            type="date"
+                            value={filterDate}
+                            onChange={(e) => setFilterDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                          <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+                          <input
+                            type="date"
+                            value={filterEndDate}
+                            onChange={(e) => setFilterEndDate(e.target.value)}
+                            max={todayStr}
+                            className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                          />
+                          {(filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all") && (
+                            <button
+                              onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); }}
+                              className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
+                            >
+                              Reset Filters
+                            </button>
+                          )}
                           {cibilEnquiries.length > 0 && (
                             <button
                               onClick={handleExportExcel}
@@ -3866,10 +3884,10 @@ ${sheetDataXml}
                           {cibilLoading ? (
                             <tr>
                               <td colSpan={6} className="text-center p-6 text-gray-400">
-                                {filterBureau === "experian" 
-                                  ? "Loading Experian enquiries..." 
-                                  : filterBureau === "cibil" 
-                                    ? "Loading CIBIL enquiries..." 
+                                {filterBureau === "experian"
+                                  ? "Loading Experian enquiries..."
+                                  : filterBureau === "cibil"
+                                    ? "Loading CIBIL enquiries..."
                                     : "Loading all enquiries..."}
                               </td>
                             </tr>
@@ -4077,7 +4095,17 @@ ${sheetDataXml}
                   <input
                     type="text"
                     value={expertForm.designation}
-                    onChange={(e) => setExpertForm({ ...expertForm, designation: e.target.value })}
+                    onChange={(e) => {
+                      const newDesig = e.target.value;
+                      const defaultLimit = getDefaultCreditLimitForEmployee(expertForm.department, newDesig);
+                      setExpertForm({
+                        ...expertForm,
+                        designation: newDesig,
+                        creditReportLimit: expertForm.creditReportLimit === -1 || expertForm.creditReportLimit === 50 || expertForm.creditReportLimit === 300
+                          ? defaultLimit
+                          : expertForm.creditReportLimit
+                      });
+                    }}
                     placeholder="e.g. CFP / Portfolio Manager"
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
@@ -4086,7 +4114,15 @@ ${sheetDataXml}
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Department</label>
                   <select
                     value={expertForm.department}
-                    onChange={(e) => setExpertForm({ ...expertForm, department: e.target.value })}
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      const defaultLimit = getDefaultCreditLimitForEmployee(newDept, expertForm.designation);
+                      setExpertForm({
+                        ...expertForm,
+                        department: newDept,
+                        creditReportLimit: defaultLimit
+                      });
+                    }}
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
                   >
                     <option value="Founder's Office">Founder's Office</option>
@@ -4123,8 +4159,8 @@ ${sheetDataXml}
                 </label>
               </div>
 
-              {/* Permissions Checklist */}
-              <div className="border border-indigo-100 bg-[#f7f8ff] p-[16px] rounded-[16px] space-y-[8px]">
+              {/* Permissions Checklist & Quota Configuration */}
+              <div className="border border-indigo-100 bg-[#f7f8ff] p-[16px] rounded-[16px] space-y-[10px]">
                 <label className="text-[12px] font-bold text-indigo-800 uppercase tracking-[0.5px] block">
                   Permissions / Feature Access
                 </label>
@@ -4161,143 +4197,231 @@ ${sheetDataXml}
                     );
                   })}
                 </div>
+
+                {/* Monthly Credit Report Limits Configuration */}
+                {expertForm.permissions?.includes("cibil_fetch") && (
+                  <div className="mt-3 pt-3 border-t border-indigo-200/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-[0.5px]">
+                        Credit Report Monthly Limit
+                      </span>
+                      <span className="text-[9.5px] font-semibold text-indigo-700 bg-indigo-100/70 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        CIBIL + Experian Combined
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Base Recurring Monthly Limit */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-700 flex items-center justify-between">
+                          <span>Base Monthly Limit</span>
+                          <span className="text-[9.5px] text-gray-400 font-medium">
+                            {expertForm.department === "Founder's Office" ? "Default: Unlimited" : expertForm.department?.includes("Credit") ? "Default: 300" : "Default: 50"}
+                          </span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            value={expertForm.creditReportLimit === -1 ? "" : (expertForm.creditReportLimit ?? "")}
+                            disabled={expertForm.creditReportLimit === -1}
+                            onChange={(e) => {
+                              const val = e.target.value === "" ? 50 : Number(e.target.value);
+                              setExpertForm({ ...expertForm, creditReportLimit: val });
+                            }}
+                            placeholder={expertForm.creditReportLimit === -1 ? "Unlimited" : "e.g. 50, 300"}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px] focus:outline-none focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextLimit = expertForm.creditReportLimit === -1
+                                ? (getDefaultCreditLimitForEmployee(expertForm.department, expertForm.designation) === -1 ? 50 : getDefaultCreditLimitForEmployee(expertForm.department, expertForm.designation))
+                                : -1;
+                              setExpertForm({ ...expertForm, creditReportLimit: nextLimit });
+                            }}
+                            className={`px-2.5 py-1.5 rounded-[8px] text-[10px] font-bold border transition shrink-0 cursor-pointer ${
+                              expertForm.creditReportLimit === -1
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {expertForm.creditReportLimit === -1 ? "Unlimited ✓" : "Unlimited"}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          Resets every month automatically (Founder/Admin: Unlimited, Credit & Ops: 300, Sales: 50).
+                        </p>
+                      </div>
+
+                      {/* Current Month Active Override */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-700 flex items-center justify-between">
+                          <span>Current Month Override</span>
+                          <span className="text-[9.5px] text-amber-600 font-bold uppercase">
+                            {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })} Only
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={expertForm.creditReportTempLimit ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value === "" ? null : Number(e.target.value);
+                            const currentYm = new Date().toISOString().substring(0, 7);
+                            setExpertForm({
+                              ...expertForm,
+                              creditReportTempLimit: val,
+                              creditReportTempMonth: val !== null ? currentYm : null
+                            });
+                          }}
+                          placeholder="e.g. 55, 310"
+                          className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                        />
+                        <p className="text-[10px] text-amber-700/90 leading-tight">
+                          💡 Temporary boost for active month. Automatically reverts to base limit next month.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {expertForm.isAdvisor && (
                 <>
 
-              <div className="grid grid-cols-2 gap-[10px]">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Category</label>
-                  <select
-                    value={expertForm.category}
-                    onChange={(e) => setExpertForm({ ...expertForm, category: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
-                  >
-                    <option value="wealth">Wealth & Investing</option>
-                    <option value="tax">Tax & Retirement</option>
-                    <option value="debt">Debt & Credit</option>
-                    <option value="property">Real Estate</option>
-                    <option value="insurance">Insurance</option>
-                    <option value="manual">Manual Type</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Initial Availability</label>
-                  <select
-                    value={expertForm.availability}
-                    onChange={(e) => setExpertForm({ ...expertForm, availability: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
-                  >
-                    <option value="available">Available (Green dot)</option>
-                    <option value="unavailable">Not Available (Red dot)</option>
-                    <option value="in meeting">In Meeting (Indigo dot)</option>
-                  </select>
-                </div>
-              </div>
-
-              {expertForm.category === "manual" && (
-                <div className="mt-[4px] border border-blue-50 bg-blue-50/20 p-[10px] rounded-[12px]">
-                  <label className="text-[11px] font-bold text-[#3344e6] uppercase tracking-[0.5px] block mb-[4px]">Write Own Category</label>
-                  <input
-                    type="text"
-                    value={expertForm.customCategory}
-                    onChange={(e) => setExpertForm({ ...expertForm, customCategory: e.target.value })}
-                    placeholder="e.g. Mutual Fund Consultant"
-                    autoFocus
-                    className="w-full px-[10px] py-[8px] border border-[#d4d8fa] rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
-                <input
-                  type="number"
-                  value={expertForm.fee}
-                  onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
-                  placeholder="e.g. 899"
-                  min={0}
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags</label>
-                <input
-                  type="text"
-                  value={expertForm.expertise}
-                  onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })}
-                  placeholder="e.g. Stock Markets, Tax, Debt repair"
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Core Strength</label>
-                <input
-                  type="text"
-                  value={expertForm.strength}
-                  onChange={(e) => setExpertForm({ ...expertForm, strength: e.target.value })}
-                  placeholder="e.g. Dynamic Asset allocation"
-                  className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Advisor Bio</label>
-                <textarea
-                  value={expertForm.bio}
-                  onChange={(e) => setExpertForm({ ...expertForm, bio: e.target.value })}
-                  placeholder="A short profile paragraph explaining their professional focus..."
-                  rows={3}
-                  className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              <div className="border border-amber-100 bg-amber-50/20 p-[12px] rounded-[16px] space-y-[6px]">
-                <label className="text-[12.5px] font-bold text-amber-700 uppercase tracking-[0.5px] block">
-                  Add a Comment
-                </label>
-
-                <div className="flex items-center gap-[6px] py-[2px]">
-                  <span className="text-[11px] font-bold text-amber-800 tracking-[0.3px]">Rating:</span>
-                  <div className="flex items-center gap-[4px]">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onMouseEnter={() => setTestReviewHoverRating(star)}
-                        onMouseLeave={() => setTestReviewHoverRating(0)}
-                        onClick={() => setExpertForm({ ...expertForm, testRating: star })}
-                        className="text-[20px] cursor-pointer transition-all duration-150 hover:scale-125 border-none bg-transparent outline-none focus:outline-none select-none p-0"
-                        aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                  <div className="grid grid-cols-2 gap-[10px]">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Category</label>
+                      <select
+                        value={expertForm.category}
+                        onChange={(e) => setExpertForm({ ...expertForm, category: e.target.value as any })}
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
                       >
-                        <span
-                          className={`transition-colors duration-150 ${star <= (testReviewHoverRating || expertForm.testRating)
-                            ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]"
-                            : "text-gray-200"
-                            }`}
-                        >
-                          ★
-                        </span>
-                      </button>
-                    ))}
+                        <option value="wealth">Wealth & Investing</option>
+                        <option value="tax">Tax & Retirement</option>
+                        <option value="debt">Debt & Credit</option>
+                        <option value="property">Real Estate</option>
+                        <option value="insurance">Insurance</option>
+                        <option value="manual">Manual Type</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Initial Availability</label>
+                      <select
+                        value={expertForm.availability}
+                        onChange={(e) => setExpertForm({ ...expertForm, availability: e.target.value as any })}
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
+                      >
+                        <option value="available">Available (Green dot)</option>
+                        <option value="unavailable">Not Available (Red dot)</option>
+                        <option value="in meeting">In Meeting (Indigo dot)</option>
+                      </select>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-100/50 px-[6px] py-[2px] rounded-full">
-                    {expertForm.testRating} Star{expertForm.testRating > 1 ? "s" : ""}
-                  </span>
-                </div>
 
-                <textarea
-                  value={expertForm.testComment}
-                  onChange={(e) => setExpertForm({ ...expertForm, testComment: e.target.value })}
-                  placeholder="e.g. Excellent advice! (Writing here creates a completed test appointment in the database with the selected Rating above)."
-                  rows={2}
-                  className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
-                />
-              </div>
-              </>
+                  {expertForm.category === "manual" && (
+                    <div className="mt-[4px] border border-blue-50 bg-blue-50/20 p-[10px] rounded-[12px]">
+                      <label className="text-[11px] font-bold text-[#3344e6] uppercase tracking-[0.5px] block mb-[4px]">Write Own Category</label>
+                      <input
+                        type="text"
+                        value={expertForm.customCategory}
+                        onChange={(e) => setExpertForm({ ...expertForm, customCategory: e.target.value })}
+                        placeholder="e.g. Mutual Fund Consultant"
+                        autoFocus
+                        className="w-full px-[10px] py-[8px] border border-[#d4d8fa] rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white font-medium"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Consultation Fee / Hr (INR)</label>
+                    <input
+                      type="number"
+                      value={expertForm.fee}
+                      onChange={(e) => setExpertForm({ ...expertForm, fee: Number(e.target.value) })}
+                      placeholder="e.g. 899"
+                      min={0}
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Expertise Tags</label>
+                    <input
+                      type="text"
+                      value={expertForm.expertise}
+                      onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })}
+                      placeholder="e.g. Stock Markets, Tax, Debt repair"
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Core Strength</label>
+                    <input
+                      type="text"
+                      value={expertForm.strength}
+                      onChange={(e) => setExpertForm({ ...expertForm, strength: e.target.value })}
+                      placeholder="e.g. Dynamic Asset allocation"
+                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Advisor Bio</label>
+                    <textarea
+                      value={expertForm.bio}
+                      onChange={(e) => setExpertForm({ ...expertForm, bio: e.target.value })}
+                      placeholder="A short profile paragraph explaining their professional focus..."
+                      rows={3}
+                      className="w-full px-[12px] py-[10px] border border-gray-300 rounded-[12px] text-[12px] focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="border border-amber-100 bg-amber-50/20 p-[12px] rounded-[16px] space-y-[6px]">
+                    <label className="text-[12.5px] font-bold text-amber-700 uppercase tracking-[0.5px] block">
+                      Add a Comment
+                    </label>
+
+                    <div className="flex items-center gap-[6px] py-[2px]">
+                      <span className="text-[11px] font-bold text-amber-800 tracking-[0.3px]">Rating:</span>
+                      <div className="flex items-center gap-[4px]">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onMouseEnter={() => setTestReviewHoverRating(star)}
+                            onMouseLeave={() => setTestReviewHoverRating(0)}
+                            onClick={() => setExpertForm({ ...expertForm, testRating: star })}
+                            className="text-[20px] cursor-pointer transition-all duration-150 hover:scale-125 border-none bg-transparent outline-none focus:outline-none select-none p-0"
+                            aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                          >
+                            <span
+                              className={`transition-colors duration-150 ${star <= (testReviewHoverRating || expertForm.testRating)
+                                ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.3)]"
+                                : "text-gray-200"
+                                }`}
+                            >
+                              ★
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-100/50 px-[6px] py-[2px] rounded-full">
+                        {expertForm.testRating} Star{expertForm.testRating > 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={expertForm.testComment}
+                      onChange={(e) => setExpertForm({ ...expertForm, testComment: e.target.value })}
+                      placeholder="e.g. Excellent advice! (Writing here creates a completed test appointment in the database with the selected Rating above)."
+                      rows={2}
+                      className="w-full px-[12px] py-[8px] border border-amber-200 rounded-[10px] text-[12px] focus:outline-none focus:border-amber-500 bg-white placeholder-gray-400 text-gray-800"
+                    />
+                  </div>
+                </>
               )}
             </div>
 
@@ -4328,8 +4452,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
                 ⚠️ Verify Admin Password
               </h3>
-              <button 
-                onClick={() => setDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4338,10 +4462,10 @@ ${sheetDataXml}
 
             <div className="p-[20px] space-y-[14px]">
               <p className="text-[12px] leading-relaxed text-gray-600">
-                You are about to permanently delete this employee record. 
+                You are about to permanently delete this employee record.
                 This action cannot be undone. To authorize, please enter your Admin password:
               </p>
-              
+
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
                   Admin Password
@@ -4369,8 +4493,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4398,8 +4522,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-rose-950 flex items-center gap-[8px]">
                 ⚠️ Delete Lender Product
               </h3>
-              <button 
-                onClick={() => setLenderDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setLenderDeleteConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4408,14 +4532,14 @@ ${sheetDataXml}
 
             <div className="p-[20px] space-y-[14px]">
               <p className="text-[12px] leading-relaxed text-gray-600">
-                Are you sure you want to permanently delete the loan product <strong className="text-gray-800">{lenderToDelete.name} — {lenderToDelete.productType}</strong>? 
+                Are you sure you want to permanently delete the loan product <strong className="text-gray-800">{lenderToDelete.name} — {lenderToDelete.productType}</strong>?
                 This action cannot be undone and will remove it from the catalogue.
               </p>
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setLenderDeleteConfirmOpen(false)} 
+              <button
+                onClick={() => setLenderDeleteConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4443,8 +4567,8 @@ ${sheetDataXml}
               <h3 className="text-[13px] font-bold text-gray-900 flex items-center gap-[8px]">
                 🏢 Bulk Rename Department
               </h3>
-              <button 
-                onClick={() => setRenameDeptModalOpen(false)} 
+              <button
+                onClick={() => setRenameDeptModalOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4493,8 +4617,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setRenameDeptModalOpen(false)} 
+              <button
+                onClick={() => setRenameDeptModalOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4515,13 +4639,13 @@ ${sheetDataXml}
       {deactivateConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs transition-opacity">
           <div className="bg-white rounded-[24px] max-w-[400px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-gray-100 overflow-hidden flex flex-col">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 px-[20px] py-[16px] bg-amber-50/50">
               <h3 className="text-[13px] font-bold text-amber-950 flex items-center gap-[8px]">
                 🚫 Deactivate {deactivateTarget?.isAdvisor ? "Advisor" : "Employee"} Profile
               </h3>
-              <button 
-                onClick={() => setDeactivateConfirmOpen(false)} 
+              <button
+                onClick={() => setDeactivateConfirmOpen(false)}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 ✕
@@ -4532,7 +4656,7 @@ ${sheetDataXml}
               <p className="text-[12px] leading-relaxed text-gray-600">
                 Please enter the reason for temporarily deactivating <strong>{deactivateTarget?.name}</strong>:
               </p>
-              
+
               <div>
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[6px]">
                   Deactivation Reason
@@ -4548,8 +4672,8 @@ ${sheetDataXml}
             </div>
 
             <div className="border-t border-gray-100 p-[20px] bg-gray-50/50 flex gap-[10px]">
-              <button 
-                onClick={() => setDeactivateConfirmOpen(false)} 
+              <button
+                onClick={() => setDeactivateConfirmOpen(false)}
                 className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[12px] font-bold text-gray-700 hover:bg-gray-100 transition cursor-pointer"
               >
                 Cancel
@@ -4775,7 +4899,7 @@ ${sheetDataXml}
                       <option value="from-[#8b5cf6] to-[#a78bfa]">lavender Violet</option>
                     </select>
                     {/* Live Gradient Color Ball Preview */}
-                    <div 
+                    <div
                       className={`w-[28px] h-[28px] rounded-full border border-gray-200 shrink-0 shadow-inner bg-gradient-to-r ${testForm.accent}`}
                       title="Selected Gradient Preview"
                     />
@@ -4912,19 +5036,18 @@ ${sheetDataXml}
                             }
                           }}
                           onDragEnd={() => setDraggedIndex(null)}
-                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${
-                            draggedIndex === qIndex 
-                              ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]" 
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
+                          className={`p-[16px] bg-gray-50 border rounded-[18px] transition relative ${draggedIndex === qIndex
+                            ? "border-dashed border-primary opacity-40 bg-primary/5 scale-[0.98]"
+                            : "border-gray-200 hover:border-gray-300"
+                            }`}
                         >
-                          
+
                           {/* Question Input */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-[6px]">
                               <div className="flex items-center gap-[6px]">
                                 {/* Drag Handle Dot Pattern */}
-                                <div 
+                                <div
                                   className="text-gray-400 cursor-grab active:cursor-grabbing font-bold text-[14px] select-none hover:text-gray-600 px-[4px] py-[2px] rounded hover:bg-gray-200/50 flex items-center justify-center transition"
                                   title="Drag to reorder question"
                                 >
@@ -5102,7 +5225,7 @@ ${sheetDataXml}
                     ))}
                     <option value="__other__">Other (Add new partner...)</option>
                   </select>
-                  
+
                   {isOtherSelected && (
                     <input
                       type="text"
@@ -5392,12 +5515,12 @@ ${sheetDataXml}
                   )}
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setViewingCibilReport(null);
                   setViewingCibilReportId(null);
                   setViewingCibilReportUserId(null);
-                }} 
+                }}
                 className="text-[22px] text-gray-400 hover:text-gray-600 cursor-pointer border-none bg-transparent transition font-bold leading-none p-1"
                 title="Close Report"
               >
@@ -5405,19 +5528,21 @@ ${sheetDataXml}
               </button>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0 cibil-modal-scroll">
-              <CibilAnalyzerView 
-                userId={viewingCibilReportUserId || "anonymous"}
-                overrideReport={viewingCibilReport} 
-                reportId={viewingCibilReportId || undefined}
-                onToggleSidebar={() => {}} 
-                onToggleInsights={() => {}} 
-                onTalkToAdvisor={() => {
-                  setViewingCibilReport(null);
-                  setViewingCibilReportId(null);
-                  setViewingCibilReportUserId(null);
-                  setLocation("/advisor");
-                }}
-              />
+              <Suspense fallback={<AdminTabFallback />}>
+                <CibilAnalyzerView
+                  userId={viewingCibilReportUserId || "anonymous"}
+                  overrideReport={viewingCibilReport}
+                  reportId={viewingCibilReportId || undefined}
+                  onToggleSidebar={() => { }}
+                  onToggleInsights={() => { }}
+                  onTalkToAdvisor={() => {
+                    setViewingCibilReport(null);
+                    setViewingCibilReportId(null);
+                    setViewingCibilReportUserId(null);
+                    setLocation("/advisor");
+                  }}
+                />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -5436,12 +5561,12 @@ ${sheetDataXml}
                   </span>
                 ) : '⚠️ Move to Trash'}
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setCibilDeleteConfirmOpen(false);
                   setCibilToDelete(null);
                   setCibilDeleteResult(null);
-                }} 
+                }}
                 className="text-[20px] text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
               >
                 ✕
@@ -5466,7 +5591,7 @@ ${sheetDataXml}
                     setCibilDeleteConfirmOpen(false);
                     setCibilToDelete(null);
                     setCibilDeleteResult(null);
-                    
+
                     if (idToAnimate && !cibilDeleteResult.includes("Error") && !cibilDeleteResult.includes("Failed")) {
                       setAnimatingCibilRows(prev => [...prev, idToAnimate]);
                       setTimeout(() => {
@@ -5483,11 +5608,11 @@ ${sheetDataXml}
                 </button>
               ) : (
                 <>
-                  <button 
+                  <button
                     onClick={() => {
                       setCibilDeleteConfirmOpen(false);
                       setCibilToDelete(null);
-                    }} 
+                    }}
                     className="flex-1 py-[11px] border border-gray-300 rounded-[12px] text-[13px] font-bold text-gray-700 hover:bg-gray-100 transition-all active:scale-[0.98] cursor-pointer"
                   >
                     Cancel

@@ -336,6 +336,32 @@ export interface BackendAdvisor {
   is_active?: boolean;
   deactivation_reason?: string | null;
   permissions?: string[] | null;
+  credit_report_limit?: number | null;
+  credit_report_temp_limit?: number | null;
+  credit_report_temp_month?: string | null;
+  effective_credit_limit?: number | null;
+}
+
+export function getDefaultCreditLimitForEmployee(department?: string, designation?: string): number {
+  const dept = (department || "").toLowerCase().trim();
+  const desig = (designation || "").toLowerCase().trim();
+
+  if (dept.includes("founder") || desig.includes("founder") || dept.includes("admin") || desig.includes("admin")) {
+    return -1; // -1 represents Unlimited
+  }
+  if (
+    dept.includes("credit") || dept.includes("ops") || dept.includes("operation") ||
+    desig.includes("credit") || desig.includes("ops") || desig.includes("operation")
+  ) {
+    return 300;
+  }
+  if (
+    dept.includes("sales") || desig.includes("sales") ||
+    dept.includes("manager") || desig.includes("manager")
+  ) {
+    return 50;
+  }
+  return 50;
 }
 
 export interface Advisor {
@@ -362,6 +388,10 @@ export interface Advisor {
   isActive?: boolean;
   deactivationReason?: string;
   permissions?: string[];
+  creditReportLimit?: number | null;
+  creditReportTempLimit?: number | null;
+  creditReportTempMonth?: string | null;
+  effectiveCreditLimit?: number | null;
 }
 
 export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
@@ -388,7 +418,11 @@ export function mapBackendAdvisorToFrontend(a: BackendAdvisor): any {
     isAdvisor: a.is_advisor ?? false,
     isActive: a.is_active ?? true,
     deactivationReason: a.deactivation_reason || undefined,
-    permissions: a.permissions || []
+    permissions: a.permissions || [],
+    creditReportLimit: a.credit_report_limit,
+    creditReportTempLimit: a.credit_report_temp_limit,
+    creditReportTempMonth: a.credit_report_temp_month,
+    effectiveCreditLimit: a.effective_credit_limit
   };
 }
 
@@ -413,7 +447,10 @@ export function mapFrontendAdvisorToBackend(a: any): BackendAdvisor {
     is_advisor: a.isAdvisor ?? false,
     is_active: a.isActive ?? true,
     deactivation_reason: a.deactivationReason || undefined,
-    permissions: a.permissions || []
+    permissions: a.permissions || [],
+    credit_report_limit: a.creditReportLimit !== undefined && a.creditReportLimit !== null && a.creditReportLimit !== "" ? Number(a.creditReportLimit) : null,
+    credit_report_temp_limit: a.creditReportTempLimit !== undefined && a.creditReportTempLimit !== null && a.creditReportTempLimit !== "" ? Number(a.creditReportTempLimit) : null,
+    credit_report_temp_month: a.creditReportTempMonth || null
   };
 }
 

@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { getStoredAuthSession } from "../../utils/authSession";
+import { checkAdvisorCibilLimit } from "../../services/cibil";
 
 interface CibilEnquiry {
   id: string;
@@ -90,12 +92,48 @@ export default function CibilEnquiriesTab({
 }: CibilEnquiriesTabProps) {
   const hasActiveFilters = filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all";
 
+  const [quotaStats, setQuotaStats] = useState<{
+    monthly_count: number;
+    effective_limit: number;
+    limit_reached: boolean;
+    is_unlimited: boolean;
+    remaining: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadQuota = async () => {
+      try {
+        const session = getStoredAuthSession();
+        const activeId = session?.userId || session?.email || "current";
+        const stats = await checkAdvisorCibilLimit(activeId);
+        if (isMounted && stats) {
+          setQuotaStats({
+            monthly_count: stats.monthly_count ?? 0,
+            effective_limit: stats.effective_limit ?? 50,
+            limit_reached: Boolean(stats.limit_reached),
+            is_unlimited: Boolean(stats.is_unlimited),
+            remaining: stats.remaining ?? null
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to load quota stats in CibilEnquiriesTab", err);
+      }
+    };
+    void loadQuota();
+    window.addEventListener("finheal:cibil_update", loadQuota);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("finheal:cibil_update", loadQuota);
+    };
+  }, []);
+
   return (
     <div className="space-y-[16px] animate-fade-in">
       <div className="border-b border-gray-100 pb-3 space-y-3">
         {/* Row 1: Title & Pagination */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <div>
               <h3 className="text-[14px] font-bold text-gray-900">
                 CIBIL Credit Score Enquiries ({cibilTotal})
@@ -104,6 +142,16 @@ export default function CibilEnquiriesTab({
                 {getDateFilterDescription()}
               </p>
             </div>
+            {quotaStats && !isAdmin && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[8px] bg-primary/10 border border-primary/20 text-primary text-[11.5px] font-semibold">
+                <span>
+                  📊 Monthly Quota: <strong>{quotaStats.monthly_count}</strong> / <strong>{quotaStats.is_unlimited ? "Unlimited" : quotaStats.effective_limit}</strong>
+                  {!quotaStats.is_unlimited && quotaStats.remaining !== null && (
+                    <span className="text-gray-500 font-medium ml-1">({quotaStats.remaining} remaining)</span>
+                  )}
+                </span>
+              </div>
+            )}
             {isAdmin && (
               <button
                 onClick={() => setActiveTab("trash")}

@@ -197,6 +197,20 @@ export default function EmployeeDirectory({
                       {emp.isActive !== false ? 'Active' : 'Deactivated'}
                     </span>
                   </div>
+                  {emp.permissions?.includes("cibil_fetch") && (
+                    <div className="flex justify-between items-center text-[10.5px]">
+                      <span className="text-gray-400">Credit Limit</span>
+                      <span className="font-semibold text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-1.5 py-[1px] rounded-[5px]">
+                        {emp.effectiveCreditLimit === -1 || emp.creditReportLimit === -1 ? (
+                          "Unlimited"
+                        ) : emp.creditReportTempLimit ? (
+                          `${emp.creditReportTempLimit}/mo (Temp)`
+                        ) : (
+                          `${emp.effectiveCreditLimit ?? emp.creditReportLimit ?? 50}/mo`
+                        )}
+                      </span>
+                    </div>
+                  )}
                   {emp.isActive === false && emp.deactivationReason && (
                      <div className="flex justify-between text-[10px]">
                        <span className="text-gray-400">Reason</span>
