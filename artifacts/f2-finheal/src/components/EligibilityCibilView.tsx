@@ -26,7 +26,7 @@ import {
   Hourglass,
   Search
 } from "lucide-react";
-import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl, downloadBureauPdf } from "../services/cibil";
+import { fetchCibilReport, getStoredCibilReport, CibilReport, getBureauPdfDownloadUrl, downloadBureauPdf, checkAdvisorCibilLimit } from "../services/cibil";
 import { getStoredAuthSession } from "../utils/authSession";
 import { useToast } from "@/hooks/use-toast";
 import PolicyModal from "./PolicyModal";
@@ -371,6 +371,99 @@ export default function EligibilityCibilView({
       } catch (e) {}
     }
   }, [isSuperAdmin]);
+
+  // Quota & Rate Limit State for Target Employee / Advisor
+  const [quotaStats, setQuotaStats] = useState<{
+    monthly_count: number;
+    effective_limit: number;
+    limit_reached: boolean;
+    is_unlimited: boolean;
+    remaining: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkQuota = async () => {
+      // 1. If admin explicitly selected an employee in dropdown
+      let targetEmpId = selectedEmployeeId || "";
+
+      // 2. Otherwise identify active logged-in employee / advisor
+      if (!targetEmpId) {
+        const session = getStoredAuthSession();
+        const candidates = [
+          userId,
+          userEmail,
+          session?.userId,
+          session?.email,
+          session?.displayName
+        ].filter(Boolean) as string[];
+
+        for (const c of candidates) {
+          if (c.toLowerCase().startsWith("f2-")) {
+            targetEmpId = c;
+            break;
+          }
+        }
+
+        if (!targetEmpId) {
+          // Match from advisors list
+          const allAdvisors = employeeDirectory.length > 0 ? employeeDirectory : (() => {
+            try {
+              const stored = localStorage.getItem("finheal_advisors_list");
+              return stored ? JSON.parse(stored) : [];
+            } catch {
+              return [];
+            }
+          })();
+
+          for (const adv of allAdvisors) {
+            const advId = adv.f2FintechId || adv.id;
+            for (const c of candidates) {
+              const cleanC = c.toLowerCase().trim();
+              if (
+                (advId && advId.toLowerCase() === cleanC) ||
+                (adv.name && adv.name.toLowerCase() === cleanC) ||
+                (cleanC.includes("@") && advId && cleanC.split("@")[0] === advId.toLowerCase())
+              ) {
+                targetEmpId = advId;
+                break;
+              }
+            }
+            if (targetEmpId) break;
+          }
+        }
+
+        if (!targetEmpId) {
+          targetEmpId = userId || userEmail || session?.userId || session?.email || "current";
+        }
+      }
+
+      try {
+        const stats = await checkAdvisorCibilLimit(targetEmpId);
+        if (isMounted && stats) {
+          setQuotaStats({
+            monthly_count: stats.monthly_count ?? 0,
+            effective_limit: stats.effective_limit ?? 50,
+            limit_reached: Boolean(stats.limit_reached),
+            is_unlimited: Boolean(stats.is_unlimited),
+            remaining: stats.remaining ?? null
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to check quota stats for target employee:", err);
+      }
+    };
+
+    void checkQuota();
+    window.addEventListener("finheal:cibil_update", checkQuota);
+    window.addEventListener("finheal:advisors_update", checkQuota);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("finheal:cibil_update", checkQuota);
+      window.removeEventListener("finheal:advisors_update", checkQuota);
+    };
+  }, [selectedEmployeeId, userId, userEmail, isStaff, employeeDirectory, cibilSubTab]);
 
   // Privacy Policy state
   const [cibilAgreed, setCibilAgreed] = useState<boolean>(false);
@@ -1238,6 +1331,15 @@ export default function EligibilityCibilView({
   const handleFetchCibilReport = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (quotaStats?.limit_reached) {
+      toast({
+        title: "Fetch Limit Reached",
+        description: `Monthly credit report fetching limit reached (${quotaStats.monthly_count}/${quotaStats.effective_limit}). Please wait until the 1st of next month for your limit to reset.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // For Experian: validate first + last name separately
     if (cibilBureau === "experian") {
       if (!cibilFirstName.trim()) {
@@ -1301,6 +1403,16 @@ export default function EligibilityCibilView({
       window.dispatchEvent(new CustomEvent("finheal:cibil_update"));
     } catch (err: any) {
       const errorMsg = err.message || "Failed to fetch score.";
+      if (errorMsg.includes("Monthly credit report fetching limit reached") || errorMsg.includes("limit reached")) {
+        const match = errorMsg.match(/\((\d+)\/(\d+)\)/);
+        setQuotaStats({
+          monthly_count: match ? parseInt(match[1], 10) : 1,
+          effective_limit: match ? parseInt(match[2], 10) : 1,
+          limit_reached: true,
+          is_unlimited: false,
+          remaining: 0
+        });
+      }
       if (errorMsg.toLowerCase().includes("no credit record") || errorMsg.toLowerCase().includes("no record")) {
         setCibilError(errorMsg);
         setCibilReport(null);
@@ -2399,6 +2511,17 @@ export default function EligibilityCibilView({
                     )}
 
                     <TooltipProvider delayDuration={0}>
+                      {quotaStats?.limit_reached && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-[12px] p-3.5 mb-4 text-rose-800 flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[12.5px] font-bold text-rose-900">Monthly Fetch Limit Reached</p>
+                            <p className="text-[11.5px] text-rose-700 mt-0.5 leading-snug">
+                              Monthly credit report fetching limit reached ({quotaStats.monthly_count}/{quotaStats.effective_limit}). Please wait until the 1st of next month for your limit to reset.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <form onSubmit={handleFetchCibilReport} className="space-y-4">
                         {/* Experian: separate First + Last Name fields */}
                         {cibilBureau === "experian" ? (
@@ -2412,11 +2535,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilFirstName}
                                       onChange={(e) => setCibilFirstName(e.target.value)}
                                       placeholder="e.g. Rahul"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2434,11 +2558,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilLastName}
                                       onChange={(e) => setCibilLastName(e.target.value)}
                                       placeholder="e.g. Sharma"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2460,11 +2585,12 @@ export default function EligibilityCibilView({
                                   <input
                                     type="text"
                                     required
+                                    disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                     title=""
                                     value={cibilName}
                                     onChange={(e) => setCibilName(e.target.value)}
                                     placeholder={cibilReportType === "company" ? "e.g. F2 Fintech Private Limited" : "e.g. Rahul Sharma"}
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                   />
                                 </TooltipTrigger>
                                 <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2485,12 +2611,13 @@ export default function EligibilityCibilView({
                                   <input
                                     type="tel"
                                     required
+                                    disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                     title=""
                                     pattern="[0-9]{10}"
                                     value={cibilPhone}
                                     onChange={handlePhoneChange}
                                     placeholder="e.g. 98765XXXXX"
-                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                    className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                   />
                                 </TooltipTrigger>
                                 <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2512,12 +2639,13 @@ export default function EligibilityCibilView({
                                     <input
                                       type="tel"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       pattern="[0-9]{10}"
                                       value={cibilPhone}
                                       onChange={handlePhoneChange}
                                       placeholder="e.g. 98765XXXXX"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2537,11 +2665,12 @@ export default function EligibilityCibilView({
                                     <input
                                       type="text"
                                       required
+                                      disabled={cibilFetching || Boolean(quotaStats?.limit_reached)}
                                       title=""
                                       value={cibilPan}
                                       onChange={handlePanChange}
                                       placeholder="e.g. AAAAA1111B"
-                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
+                                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-[10px] text-[13px] font-semibold focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase disabled:opacity-60 disabled:cursor-not-allowed"
                                     />
                                   </TooltipTrigger>
                                   <TooltipContent className="bg-white text-gray-700 border border-gray-200 shadow-sm font-medium">
@@ -2654,6 +2783,19 @@ export default function EligibilityCibilView({
                                 </div>
                               )}
                             </div>
+                            {selectedEmployeeId && (() => {
+                              const selectedEmp = employeeDirectory.find(e => (e.f2FintechId || e.id) === selectedEmployeeId);
+                              if (!selectedEmp) return null;
+                              const isUnlimited = selectedEmp.effectiveCreditLimit === -1 || selectedEmp.creditReportLimit === -1;
+                              return (
+                                <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-500 px-1">
+                                  <span>Monthly Fetch Quota:</span>
+                                  <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                                    {isUnlimited ? "Unlimited" : selectedEmp.creditReportTempLimit ? `${selectedEmp.creditReportTempLimit}/mo (Temp Override)` : `${selectedEmp.effectiveCreditLimit ?? selectedEmp.creditReportLimit ?? 50}/mo`}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
 
@@ -2729,10 +2871,19 @@ export default function EligibilityCibilView({
                         <div className="text-[15.5px] flex flex-col gap-2 pt-1">
                           <button
                             type="submit"
-                            disabled={cibilFetching || !cibilAgreed}
-                            className="w-full bg-primary text-white font-bold py-3 rounded-[14px] hover:bg-[#1e2db8] transition-all cursor-pointer shadow-md shadow-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={cibilFetching || !cibilAgreed || Boolean(quotaStats?.limit_reached)}
+                            className={`w-full text-white font-bold py-3 rounded-[14px] transition-all flex items-center justify-center gap-1.5 shadow-md shadow-primary/20 ${
+                              quotaStats?.limit_reached
+                                ? "bg-rose-600 cursor-not-allowed opacity-90"
+                                : "bg-primary hover:bg-[#1e2db8] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            }`}
                           >
-                            {cibilFetching ? (
+                            {quotaStats?.limit_reached ? (
+                              <>
+                                <Lock className="w-4.5 h-4.5" />
+                                <span>Monthly Limit Reached ({quotaStats.monthly_count}/{quotaStats.effective_limit})</span>
+                              </>
+                            ) : cibilFetching ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                 <span>Verifying Credit Record...</span>

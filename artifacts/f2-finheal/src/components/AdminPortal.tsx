@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender, getDefaultCreditLimitForEmployee } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -307,7 +307,10 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[]
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[],
+    creditReportLimit: -1 as number | null,
+    creditReportTempLimit: "" as number | string | null,
+    creditReportTempMonth: "" as string | null
   });
 
   // Education form state
@@ -1835,7 +1838,10 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      creditReportLimit: -1,
+      creditReportTempLimit: "",
+      creditReportTempMonth: ""
     });
     setExpertModalOpen(true);
   };
@@ -1869,7 +1875,10 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      creditReportLimit: adv.creditReportLimit !== undefined && adv.creditReportLimit !== null ? adv.creditReportLimit : getDefaultCreditLimitForEmployee(adv.department, adv.designation),
+      creditReportTempLimit: adv.creditReportTempLimit ?? "",
+      creditReportTempMonth: adv.creditReportTempMonth ?? ""
     });
     setExpertModalOpen(true);
   };
@@ -1923,6 +1932,9 @@ ${sheetDataXml}
       department: (expertForm.department && expertForm.department.trim() !== "General") ? expertForm.department.trim() : "Founder's Office",
       isAdvisor: expertForm.isAdvisor,
       permissions: expertForm.permissions,
+      creditReportLimit: (expertForm.creditReportLimit !== undefined && expertForm.creditReportLimit !== null && String(expertForm.creditReportLimit).trim() !== "") ? Number(expertForm.creditReportLimit) : null,
+      creditReportTempLimit: (expertForm.creditReportTempLimit !== undefined && expertForm.creditReportTempLimit !== null && String(expertForm.creditReportTempLimit).trim() !== "") ? Number(expertForm.creditReportTempLimit) : null,
+      creditReportTempMonth: expertForm.creditReportTempMonth ? String(expertForm.creditReportTempMonth) : null,
       isActive: editingExpert ? editingExpert.isActive : true,
       deactivationReason: editingExpert ? editingExpert.deactivationReason : undefined
     };
@@ -4083,7 +4095,17 @@ ${sheetDataXml}
                   <input
                     type="text"
                     value={expertForm.designation}
-                    onChange={(e) => setExpertForm({ ...expertForm, designation: e.target.value })}
+                    onChange={(e) => {
+                      const newDesig = e.target.value;
+                      const defaultLimit = getDefaultCreditLimitForEmployee(expertForm.department, newDesig);
+                      setExpertForm({
+                        ...expertForm,
+                        designation: newDesig,
+                        creditReportLimit: expertForm.creditReportLimit === -1 || expertForm.creditReportLimit === 50 || expertForm.creditReportLimit === 300
+                          ? defaultLimit
+                          : expertForm.creditReportLimit
+                      });
+                    }}
                     placeholder="e.g. CFP / Portfolio Manager"
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
@@ -4092,7 +4114,15 @@ ${sheetDataXml}
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Department</label>
                   <select
                     value={expertForm.department}
-                    onChange={(e) => setExpertForm({ ...expertForm, department: e.target.value })}
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      const defaultLimit = getDefaultCreditLimitForEmployee(newDept, expertForm.designation);
+                      setExpertForm({
+                        ...expertForm,
+                        department: newDept,
+                        creditReportLimit: defaultLimit
+                      });
+                    }}
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
                   >
                     <option value="Founder's Office">Founder's Office</option>
@@ -4129,8 +4159,8 @@ ${sheetDataXml}
                 </label>
               </div>
 
-              {/* Permissions Checklist */}
-              <div className="border border-indigo-100 bg-[#f7f8ff] p-[16px] rounded-[16px] space-y-[8px]">
+              {/* Permissions Checklist & Quota Configuration */}
+              <div className="border border-indigo-100 bg-[#f7f8ff] p-[16px] rounded-[16px] space-y-[10px]">
                 <label className="text-[12px] font-bold text-indigo-800 uppercase tracking-[0.5px] block">
                   Permissions / Feature Access
                 </label>
@@ -4167,6 +4197,94 @@ ${sheetDataXml}
                     );
                   })}
                 </div>
+
+                {/* Monthly Credit Report Limits Configuration */}
+                {expertForm.permissions?.includes("cibil_fetch") && (
+                  <div className="mt-3 pt-3 border-t border-indigo-200/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-[0.5px]">
+                        Credit Report Monthly Limit
+                      </span>
+                      <span className="text-[9.5px] font-semibold text-indigo-700 bg-indigo-100/70 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        CIBIL + Experian Combined
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Base Recurring Monthly Limit */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-700 flex items-center justify-between">
+                          <span>Base Monthly Limit</span>
+                          <span className="text-[9.5px] text-gray-400 font-medium">
+                            {expertForm.department === "Founder's Office" ? "Default: Unlimited" : expertForm.department?.includes("Credit") ? "Default: 300" : "Default: 50"}
+                          </span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            value={expertForm.creditReportLimit === -1 ? "" : (expertForm.creditReportLimit ?? "")}
+                            disabled={expertForm.creditReportLimit === -1}
+                            onChange={(e) => {
+                              const val = e.target.value === "" ? 50 : Number(e.target.value);
+                              setExpertForm({ ...expertForm, creditReportLimit: val });
+                            }}
+                            placeholder={expertForm.creditReportLimit === -1 ? "Unlimited" : "e.g. 50, 300"}
+                            className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px] focus:outline-none focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextLimit = expertForm.creditReportLimit === -1
+                                ? (getDefaultCreditLimitForEmployee(expertForm.department, expertForm.designation) === -1 ? 50 : getDefaultCreditLimitForEmployee(expertForm.department, expertForm.designation))
+                                : -1;
+                              setExpertForm({ ...expertForm, creditReportLimit: nextLimit });
+                            }}
+                            className={`px-2.5 py-1.5 rounded-[8px] text-[10px] font-bold border transition shrink-0 cursor-pointer ${
+                              expertForm.creditReportLimit === -1
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {expertForm.creditReportLimit === -1 ? "Unlimited ✓" : "Unlimited"}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          Resets every month automatically (Founder/Admin: Unlimited, Credit & Ops: 300, Sales: 50).
+                        </p>
+                      </div>
+
+                      {/* Current Month Active Override */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-gray-700 flex items-center justify-between">
+                          <span>Current Month Override</span>
+                          <span className="text-[9.5px] text-amber-600 font-bold uppercase">
+                            {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })} Only
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={expertForm.creditReportTempLimit ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value === "" ? null : Number(e.target.value);
+                            const currentYm = new Date().toISOString().substring(0, 7);
+                            setExpertForm({
+                              ...expertForm,
+                              creditReportTempLimit: val,
+                              creditReportTempMonth: val !== null ? currentYm : null
+                            });
+                          }}
+                          placeholder="e.g. 55, 310"
+                          className="w-full px-[10px] py-[6px] border border-gray-300 rounded-[8px] text-[12px] focus:outline-none focus:border-primary bg-white"
+                        />
+                        <p className="text-[10px] text-amber-700/90 leading-tight">
+                          💡 Temporary boost for active month. Automatically reverts to base limit next month.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {expertForm.isAdvisor && (
