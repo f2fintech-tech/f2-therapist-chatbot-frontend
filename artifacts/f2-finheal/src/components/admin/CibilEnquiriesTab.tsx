@@ -46,12 +46,12 @@ interface CibilEnquiriesTabProps {
   advisors: any[];
   employees: any[];
   animatingCibilRows: string[];
-  setViewingCibilReport: (report: any) => void;
-  setViewingCibilReportId: (id: string | null) => void;
-  setViewingCibilReportUserId: (userId: string | null) => void;
-  handleGenerateCAM: (enquiry: CibilEnquiry) => void;
+  setViewingCibilReport: (data: any) => void;
+  setViewingCibilReportId: (id: string) => void;
+  setViewingCibilReportUserId: (id: string) => void;
+  handleGenerateCAM: (userId: string, name: string, enqId?: string) => void;
   handleDeleteEnquiry: (id: string) => void;
-  classifyEnquiryRole: (enquiry: CibilEnquiry) => string;
+  classifyEnquiryRole: (email: string, name: string, advisors?: any[]) => "Admin" | "Manager" | "Senior Leadership" | "User";
 }
 
 export default function CibilEnquiriesTab({
