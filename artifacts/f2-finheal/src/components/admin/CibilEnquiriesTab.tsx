@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { getStoredAuthSession } from "../../utils/authSession";
 import { checkAdvisorCibilLimit } from "../../services/cibil";
 
@@ -31,6 +31,8 @@ interface CibilEnquiriesTabProps {
   setFilterBureau: (val: string) => void;
   filterRole: string;
   setFilterRole: (val: string) => void;
+  filterEmployee: string;
+  setFilterEmployee: (val: string) => void;
   allDepartments: string[];
   filterLoanType: string;
   setFilterLoanType: (val: string) => void;
@@ -68,6 +70,8 @@ export default function CibilEnquiriesTab({
   setFilterBureau,
   filterRole,
   setFilterRole,
+  filterEmployee,
+  setFilterEmployee,
   allDepartments,
   filterLoanType,
   setFilterLoanType,
@@ -90,7 +94,14 @@ export default function CibilEnquiriesTab({
   handleDeleteEnquiry,
   classifyEnquiryRole,
 }: CibilEnquiriesTabProps) {
-  const hasActiveFilters = filterDate || filterEndDate || filterRole !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all";
+  const hasActiveFilters = filterDate || filterEndDate || filterRole !== "all" || filterEmployee !== "all" || filterLoanType !== "all" || filterSearch !== "" || filterBureau !== "all";
+
+  const departmentEmployees = useMemo(() => {
+    if (!filterRole || filterRole === "all" || filterRole === "Client") return [];
+    return (employees || []).filter(
+      (emp) => (emp.department || "").trim().toLowerCase() === filterRole.trim().toLowerCase()
+    );
+  }, [employees, filterRole]);
 
   const [quotaStats, setQuotaStats] = useState<{
     monthly_count: number;
@@ -190,10 +201,10 @@ export default function CibilEnquiriesTab({
         </div>
 
         {/* Row 2 & 3: Filters & Export */}
-        <div className="flex flex-col gap-3 pt-1 w-full overflow-x-auto pb-1">
+        <div className="flex flex-col gap-3 pt-1 w-full pb-1">
           {/* Top Filters Row */}
-          <div className="flex items-center justify-between gap-3 min-w-max">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               {/* Search Input */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
@@ -237,6 +248,33 @@ export default function CibilEnquiriesTab({
                 </select>
               </div>
 
+              {/* Dynamic Employee Filter Selector (Appears when a specific department is chosen in Enquirer) */}
+              {filterRole !== "all" && filterRole !== "Client" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-500 font-semibold">Employee:</span>
+                  <select
+                    value={filterEmployee}
+                    onChange={(e) => setFilterEmployee(e.target.value)}
+                    className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                  >
+                    <option value="all">All Employees</option>
+                    {departmentEmployees.map((emp) => {
+                      const empId = emp.f2FintechId || emp.id;
+                      return (
+                        <option key={empId} value={empId}>
+                          {emp.name} ({empId})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Filters Row */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               {/* Active Loan Type Filter Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-gray-500 font-semibold">Active Loan Type:</span>
@@ -258,12 +296,7 @@ export default function CibilEnquiriesTab({
                   <option value="other">Other Loans</option>
                 </select>
               </div>
-            </div>
-          </div>
 
-          {/* Bottom Filters Row */}
-          <div className="flex items-center justify-between gap-3 min-w-max">
-            <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-gray-500 font-semibold">From:</span>
                 <input
@@ -290,7 +323,7 @@ export default function CibilEnquiriesTab({
             <div className="flex items-center gap-3">
               {hasActiveFilters && (
                 <button
-                  onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
+                  onClick={() => { setFilterDate(""); setFilterEndDate(""); setFilterRole("all"); setFilterEmployee("all"); setFilterLoanType("all"); setFilterSearch(""); setFilterBureau("all"); }}
                   className="h-[32px] px-[10px] rounded-[10px] border border-gray-200 bg-gray-50 hover:bg-gray-100 text-[11px] font-bold text-gray-650 cursor-pointer transition"
                 >
                   Reset Filters

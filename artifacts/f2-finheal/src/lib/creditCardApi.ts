@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
+const envBackend = import.meta.env.VITE_BACKEND_URL?.trim();
+const envApiBase = import.meta.env.VITE_API_BASE_URL?.trim()?.replace(/\/api\/v1\/?$/, "");
+const API_BASE = (envBackend || envApiBase || "http://localhost:8000").replace(/\/$/, "");
 
 export interface CreditCardItem {
   id?: string;
