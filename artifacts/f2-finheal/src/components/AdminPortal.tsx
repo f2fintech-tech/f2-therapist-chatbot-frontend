@@ -658,6 +658,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterEmployee, setFilterEmployee] = useState<string>("all");
   const [filterLoanType, setFilterLoanType] = useState<string>("all");
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -689,7 +690,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
   // Reset page when filters change (handled implicitly by backend if page exceeds total)
   useEffect(() => {
     setCibilPage(1);
-  }, [filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
+  }, [filterDate, filterEndDate, filterRole, filterEmployee, filterLoanType, debouncedSearch, filterBureau]);
 
 
 
@@ -1133,6 +1134,7 @@ ${sheetDataXml}
       });
       if (debouncedSearch) queryParams.append("search", debouncedSearch);
       if (filterRole !== "all") queryParams.append("role", filterRole);
+      if (filterEmployee !== "all") queryParams.append("employee_id", filterEmployee);
       if (filterLoanType !== "all") queryParams.append("loan_type", filterLoanType);
       if (filterBureau !== "all") queryParams.append("bureau", filterBureau);
       if (filterDate) queryParams.append("start_date", filterDate);
@@ -1206,7 +1208,7 @@ ${sheetDataXml}
         checkCibilFetchThreshold();
       }
     }
-  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterLoanType, debouncedSearch, filterBureau]);
+  }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterEmployee, filterLoanType, debouncedSearch, filterBureau]);
 
   // Lenders CRUD Handlers
   const getProductPrefix = (category: string, productType: string): string => {
@@ -2916,7 +2918,9 @@ ${sheetDataXml}
                   filterBureau={filterBureau}
                   setFilterBureau={setFilterBureau}
                   filterRole={filterRole}
-                  setFilterRole={setFilterRole}
+                  setFilterRole={(val) => { setFilterRole(val); setFilterEmployee("all"); }}
+                  filterEmployee={filterEmployee}
+                  setFilterEmployee={setFilterEmployee}
                   allDepartments={allDepartments}
                   filterLoanType={filterLoanType}
                   setFilterLoanType={setFilterLoanType}
