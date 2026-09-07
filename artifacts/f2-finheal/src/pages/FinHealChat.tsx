@@ -33,6 +33,7 @@ import WelcomeSplash from "@/components/WelcomeSplash";
 const FinancialEducation = lazy(() => import("@/components/FinancialEducation"));
 const AdvisorPanel = lazy(() => import("@/components/AdvisorPanel"));
 const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const ApplyForLoanView = lazy(() => import("@/components/ApplyForLoanView"));
 const LoanCalculatorView = lazy(() => import("@/components/LoanCalculatorView"));
 const CibilAnalyzerView = lazy(() => import("@/components/CibilAnalyzerView"));
 const EligibilityCibilView = lazy(() => import("@/components/EligibilityCibilView"));
@@ -138,6 +139,7 @@ export default function FinHealChat() {
     if (location === "/loan-calculator" || location.startsWith("/loan-calculator/")) return "loan-calculator";
     if (location === "/cibil-analyzer") return "cibil-analyzer";
     if (location === "/eligibility-cibil") return "eligibility-cibil";
+    if (location === "/apply-loan" || location.startsWith("/apply-loan/")) return "apply-loan";
     if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
@@ -154,6 +156,7 @@ export default function FinHealChat() {
 
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
+    else if (view === "apply-loan") setLocation("/apply-loan");
     else if (view === "credit-cards") setLocation("/credit-cards");
     else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
     else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
@@ -681,6 +684,7 @@ export default function FinHealChat() {
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
+  const openApplyLoan = () => setMainView("apply-loan");
   const openDashboard = () => setMainView("dashboard");
   const openReminders = () => setMainView("reminders");
   const openCreditCards = () => setMainView("credit-cards");
@@ -782,6 +786,8 @@ export default function FinHealChat() {
                   ? "CIBIL Analyzer"
                   : mainView === "eligibility-cibil"
                     ? "Eligibility, CIBIL & BSA"
+                  : mainView === "apply-loan"
+                    ? "Apply for Loan"
                     : mainView === "dashboard"
                       ? "My Dashboard"
                       : mainView === "reminders"
@@ -1013,6 +1019,7 @@ export default function FinHealChat() {
           onSelectMood={handleSelectMood}
           onOpenLoanCalculator={openLoanCalculator}
           onOpenEligibilityCibil={openEligibilityCibil}
+          onOpenApplyLoan={openApplyLoan}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
           onOpenCreditCards={openCreditCards}
@@ -1225,6 +1232,14 @@ export default function FinHealChat() {
               />
             ) : mainView === "credit-cards" ? (
               <CreditCardGeniusView />
+            ) : mainView === "apply-loan" ? (
+              <ApplyForLoanView
+                userId={userId}
+                userEmail={authSession?.email}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onOpenLoanCalculator={openLoanCalculator}
+              />
             ) : (
               <DebtBalanceReviewView
                 userId={userId}
