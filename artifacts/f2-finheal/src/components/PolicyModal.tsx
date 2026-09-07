@@ -555,7 +555,7 @@ export default function PolicyModal({
                   </div>
                 ) : (
                   <div className="text-[11px] text-gray-400 font-semibold tracking-wide uppercase">
-                    FinHeal Premium Legal Dashboard
+                    F2 Fintech Policy Center
                   </div>
                 )}
 

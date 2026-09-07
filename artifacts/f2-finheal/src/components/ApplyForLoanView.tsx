@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
+import PolicyModal from "./PolicyModal";
 import {
   Menu,
   CheckCircle,
@@ -21,7 +22,15 @@ import {
   MessageSquare,
   Calculator,
   ExternalLink,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Lock,
+  Shield,
+  Info,
+  Banknote,
+  Calendar,
+  Mail,
+  Wallet,
+  BarChart2
 } from "lucide-react";
 
 interface ApplyForLoanViewProps {
@@ -86,7 +95,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
       "Quick disbursal directly to bank account"
     ],
     f2Advantages: [
-      "Access to 30+ leading partner Banks & NBFCs in one application",
+      "Access to 100+ leading partner Banks & NBFCs in one application",
       "Single application pre-screening to prevent multiple hard queries",
       "Dedicated F2 Fintech Relationship Manager assigned to your file",
       "Special rate discounts for salaried employees in Tier 1 & MNC companies",
@@ -115,7 +124,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     faq: [
       {
         q: "What is the maximum Personal Loan amount I can get through F2 Fintech?",
-        a: "Depending on your net monthly salary and existing obligations, you can get unsecured personal loans up to ₹40 Lakhs across our 30+ partner banks."
+        a: "Depending on your net monthly salary and existing obligations, you can get unsecured personal loans up to ₹40 Lakhs across our 100+ partner banks."
       },
       {
         q: "Can I apply for a personal loan if I am self-employed?",
@@ -371,6 +380,9 @@ export default function ApplyForLoanView({
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<string>(initialCategory);
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [activePolicyTab, setActivePolicyTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("privacy-policy");
+  const [showEmiInfoTooltip, setShowEmiInfoTooltip] = useState(false);
 
   // Form State for Inline Quick Application
   const [formData, setFormData] = useState({
@@ -381,6 +393,7 @@ export default function ApplyForLoanView({
     desiredAmount: 500000,
     tenureYears: 3,
     employmentType: "salaried",
+    monthlyIncome: "",
     purpose: "",
     acceptTerms: true
   });
@@ -506,14 +519,14 @@ export default function ApplyForLoanView({
               Get Your Loan Disbursed Hassle-Free with <span className="text-primary-300 bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-indigo-200">F2 Fintech</span>
             </h2>
             <p className="text-sm sm:text-base text-gray-300 leading-relaxed">
-              We connect your loan application with 30+ leading partner Banks & NBFCs, negotiating the lowest interest rates and managing end-to-end documentation for guaranteed quick disbursal.
+              We connect your loan application with 100+ leading partner Banks & NBFCs, negotiating the lowest interest rates and managing end-to-end documentation for guaranteed quick disbursal.
             </p>
 
             {/* Trust Highlights */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-white/10 text-xs font-medium">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>30+ Bank Partners</span>
+                <span>100+ Bank Partners</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -697,49 +710,8 @@ export default function ApplyForLoanView({
             </div>
           </div>
 
-          {/* 4. FAQs Accordion */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs space-y-4">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-primary" /> Frequently Asked Questions
-            </h4>
-
-            <div className="space-y-2.5">
-              {currentCategory.faq.map((item, idx) => {
-                const isExpanded = expandedFaqIndex === idx;
-                return (
-                  <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden transition-colors">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedFaqIndex(isExpanded ? null : idx)}
-                      className="w-full px-4 py-3 text-left font-semibold text-xs text-gray-800 bg-gray-50/50 hover:bg-gray-100 flex items-center justify-between gap-3 cursor-pointer"
-                    >
-                      <span>{item.q}</span>
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />}
-                    </button>
-                    {isExpanded && (
-                      <div className="px-4 py-3 text-xs text-gray-600 bg-white border-t border-gray-100 leading-relaxed">
-                        {item.a}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 5. INLINE Application Form (Positioned AT THE VERY END / LAST) */}
-          <div className="bg-white rounded-xl border-2 border-primary/30 shadow-xl p-6 sm:p-8 relative overflow-hidden space-y-6">
-            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary via-indigo-500 to-blue-600" />
-
-            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-              <span className="p-2.5 bg-primary/10 text-primary rounded-xl">
-                <Send className="w-6 h-6" />
-              </span>
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900">Apply for {currentCategory.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-500">Fill in your details below for a quick callback and disbursal assistance from F2 Fintech</p>
-              </div>
-            </div>
+          {/* 4. INLINE Application Form */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-6 sm:p-8 space-y-6">
 
             {isSubmittedSuccess ? (
               <div className="text-center py-10 space-y-5 animate-in fade-in zoom-in duration-300 max-w-lg mx-auto">
@@ -775,46 +747,76 @@ export default function ApplyForLoanView({
               </div>
             ) : (
               <form onSubmit={handleSubmitApplication} className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Side: Loan Amount & Tenure Configurator */}
-                  <div className="space-y-5 bg-slate-50/80 p-5 rounded-xl border border-slate-200/80">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Configure Desired Loan</h4>
-
-                    {/* Slider & Display */}
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between text-xs font-medium text-gray-700">
-                        <label htmlFor="desiredAmountInput">Desired Loan Amount</label>
-                        <span className="text-base font-extrabold text-primary">₹{formData.desiredAmount.toLocaleString("en-IN")}</span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+                  {/* LEFT COLUMN: 1. Configure Your Loan */}
+                  <div className="space-y-6">
+                    {/* Step 1 Header */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
+                        1
                       </div>
-                      <input
-                        id="desiredAmountInput"
-                        type="range"
-                        min={currentCategory.minAmountNum}
-                        max={currentCategory.maxAmountNum}
-                        step={currentCategory.stepAmountNum}
-                        value={formData.desiredAmount}
-                        onChange={(e) => setFormData({ ...formData, desiredAmount: Number(e.target.value) })}
-                        className="w-full accent-primary h-2 bg-gray-200 rounded-lg cursor-pointer"
-                      />
-                      <div className="flex justify-between text-[11px] text-gray-400 font-medium">
-                        <span>Min: ₹{(currentCategory.minAmountNum / 100000).toFixed(1)}L</span>
-                        <span>Max: ₹{(currentCategory.maxAmountNum / 100000).toFixed(0)}L</span>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Configure Your Loan</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Adjust the loan amount and tenure to see your estimated EMI.</p>
                       </div>
                     </div>
 
-                    {/* Tenure Options */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-gray-700 block">Preferred Tenure (Years)</label>
-                      <div className="grid grid-cols-4 gap-2">
+                    {/* Loan Amount Block */}
+                    <div className="space-y-3 bg-slate-50/40 p-4 rounded-2xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                            <Banknote className="w-4 h-4" />
+                          </span>
+                          <label htmlFor="desiredAmountInput" className="text-xs sm:text-sm font-semibold text-gray-800">
+                            Loan Amount
+                          </label>
+                        </div>
+                        <span className="text-sm sm:text-base font-extrabold text-blue-600 bg-blue-50/80 px-3.5 py-1 rounded-xl border border-blue-100/80">
+                          ₹{formData.desiredAmount.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+
+                      {/* Range Slider */}
+                      <div className="space-y-1.5 pt-1">
+                        <input
+                          id="desiredAmountInput"
+                          type="range"
+                          min={currentCategory.minAmountNum}
+                          max={currentCategory.maxAmountNum}
+                          step={currentCategory.stepAmountNum}
+                          value={formData.desiredAmount}
+                          onChange={(e) => setFormData({ ...formData, desiredAmount: Number(e.target.value) })}
+                          className="w-full accent-blue-600 h-2 bg-gray-200 rounded-lg cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[11px] text-gray-400 font-medium px-0.5">
+                          <span>₹{currentCategory.minAmountNum.toLocaleString("en-IN")}</span>
+                          <span>₹{currentCategory.maxAmountNum.toLocaleString("en-IN")}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preferred Tenure Block */}
+                    <div className="space-y-3 bg-slate-50/40 p-4 rounded-2xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                          <Calendar className="w-4 h-4" />
+                        </span>
+                        <label className="text-xs sm:text-sm font-semibold text-gray-800">
+                          Preferred Tenure
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2.5">
                         {[1, 3, 5, 7].map((yrs) => (
                           <button
                             key={yrs}
                             type="button"
                             onClick={() => setFormData({ ...formData, tenureYears: yrs })}
-                            className={`py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                            className={`py-2.5 px-2 text-xs font-bold rounded-2xl border transition-all cursor-pointer text-center ${
                               formData.tenureYears === yrs
-                                ? "bg-primary text-white border-primary shadow-sm"
-                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+                                ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                             }`}
                           >
                             {yrs} {yrs === 1 ? "Year" : "Years"}
@@ -823,62 +825,144 @@ export default function ApplyForLoanView({
                       </div>
                     </div>
 
-                    {/* Estimated EMI Summary Box */}
-                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-150 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs font-semibold text-indigo-900">Estimated Monthly EMI (Starting @ {currentCategory.startRate})</div>
-                        <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">Base Estimate</span>
-                      </div>
-                      <div className="text-2xl font-black text-primary">₹{emiCalc.monthlyEmi.toLocaleString("en-IN")} <span className="text-xs font-normal text-gray-500">/ month</span></div>
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-100 text-[11px] text-gray-600">
-                        <div>Principal: <strong className="text-gray-900">₹{formData.desiredAmount.toLocaleString("en-IN")}</strong></div>
-                        <div>Total Pay: <strong className="text-gray-900">₹{emiCalc.totalPayment.toLocaleString("en-IN")}</strong></div>
-                      </div>
-
-                      {/* Full Loan Calculator & Amortization / Prepayment Toggle Banner */}
-                      <div className="pt-2 border-t border-indigo-100/80">
-                        <div className="bg-white/90 backdrop-blur-xs p-3 rounded-lg border border-indigo-150 space-y-2.5 shadow-2xs">
-                          <div className="space-y-1">
-                            <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                              <Calculator className="w-3.5 h-3.5 text-primary" />
-                              <span>Get Full Detailed Loan Calculation</span>
-                            </div>
-                            <p className="text-[11px] text-gray-600 leading-snug">
-                              Want in-depth repayment insights? Download your complete month-by-month <strong>Amortization Schedule</strong> and analyze smart <strong>Prepayment & Tenure Reduction tools</strong>.
-                            </p>
+                    {/* Estimated Monthly EMI Card */}
+                    <div className="bg-gradient-to-br from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-150 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs relative overflow-hidden">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="p-2 bg-blue-600 text-white rounded-lg shadow-2xs">
+                            <Calculator className="w-4 h-4" />
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-900">
+                            <span>Estimated Monthly EMI</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowEmiInfoTooltip(!showEmiInfoTooltip)}
+                              className="text-blue-500 hover:text-blue-700 cursor-pointer p-0.5 rounded transition-colors"
+                              title="Click for EMI calculation formula & ROI info"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
                           </div>
+                        </div>
+                        <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200/60">
+                          Base Estimate
+                        </span>
+                      </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onOpenLoanCalculator) {
-                                onOpenLoanCalculator(currentCategory.id);
-                              } else {
-                                setLocation(`/loan-calculator/${currentCategory.id}`);
-                              }
-                            }}
-                            className="w-full py-2 px-3 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                          >
-                            <FileSpreadsheet className="w-3.5 h-3.5" />
-                            <span>Open Loan & Prepayment Calculator</span>
-                            <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
-                          </button>
+                      {showEmiInfoTooltip && (
+                        <div className="bg-white/95 backdrop-blur-xs p-3.5 rounded-xl border border-blue-200 text-[11px] text-gray-600 space-y-1.5 animate-in fade-in duration-200 shadow-xs">
+                          <div className="font-bold text-blue-900 flex items-center justify-between">
+                            <span>EMI Calculation Formula</span>
+                            <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md border border-blue-100">Reducing Balance</span>
+                          </div>
+                          <p className="leading-relaxed text-gray-700">
+                            Calculated at <strong>{currentCategory.defaultRateNum}% p.a.</strong> interest rate for <strong>₹{formData.desiredAmount.toLocaleString("en-IN")}</strong> over <strong>{formData.tenureYears * 12} months</strong> ({formData.tenureYears} {formData.tenureYears === 1 ? "Year" : "Years"}).
+                          </p>
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-[10px] text-slate-700 font-mono">
+                            EMI = [P × R × (1+R)^N] / [(1+R)^N - 1]
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <div className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight">
+                            ₹{emiCalc.monthlyEmi.toLocaleString("en-IN")}
+                            <span className="text-xs font-medium text-gray-500 ml-1">/ month</span>
+                          </div>
+                        </div>
+
+                        {/* 3D Calculator Illustration Icon Graphic */}
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 p-2.5 text-white flex items-center justify-center shadow-md relative shrink-0">
+                          <Calculator className="w-7 h-7" />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-xs">
+                            ₹
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-blue-200/60 text-xs">
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Interest Rate (ROI)</div>
+                          <div className="font-bold text-blue-700 mt-0.5">{currentCategory.defaultRateNum}% p.a.</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Principal Amount</div>
+                          <div className="font-bold text-gray-900 mt-0.5">₹{formData.desiredAmount.toLocaleString("en-IN")}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Total Payable</div>
+                          <div className="font-bold text-gray-900 mt-0.5">₹{emiCalc.totalPayment.toLocaleString("en-IN")}</div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Get Detailed Loan Calculation Card */}
+                    <div className="bg-gradient-to-r from-amber-50/80 to-orange-50/50 border border-amber-200/70 rounded-2xl p-4 space-y-3 shadow-2xs">
+                      <div className="flex items-start gap-3">
+                        <span className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                          <BarChart2 className="w-4 h-4" />
+                        </span>
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs sm:text-sm font-bold text-gray-900">Get Detailed Loan Calculation</h4>
+                          <p className="text-[11px] text-gray-600 leading-snug">
+                            View month-by-month amortization, interest breakdown and smart prepayment recommendations.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onOpenLoanCalculator) {
+                            onOpenLoanCalculator(currentCategory.id);
+                          } else {
+                            setLocation(`/loan-calculator/${currentCategory.id}`);
+                          }
+                        }}
+                        className="w-full py-2.5 px-4 bg-white hover:bg-gray-50 text-blue-600 font-bold text-xs rounded-xl border border-blue-200 shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Open Loan & Prepayment Calculator</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Right Side: Applicant Details Form */}
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Applicant Details</h4>
+                  {/* RIGHT COLUMN: 2. Applicant Details */}
+                  <div className="space-y-6">
+                    {/* Step 2 Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
+                          2
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Applicant Details</h3>
+                          <p className="text-xs text-gray-500 mt-0.5 leading-normal">Enter your details to proceed. We will use this to get in touch with you.</p>
+                        </div>
+                      </div>
 
-                    {/* User Full Name */}
-                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActivePolicyTab("privacy-policy");
+                          setIsPolicyModalOpen(true);
+                        }}
+                        className="hidden xl:flex items-center gap-1.5 px-3 py-1 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200/60 rounded-full text-[10px] text-slate-500 font-medium shrink-0 max-w-[210px] leading-tight transition-colors cursor-pointer text-left"
+                      >
+                        <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>Your information is secure and will be used only for your loan application.</span>
+                      </button>
+                    </div>
+
+                    {/* Full Name Input */}
+                    <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantFullName">
-                        Full Name (As per PAN Card) *
+                        Full Name (As per PAN Card) <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                        <UserIcon className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                         <input
                           id="applicantFullName"
                           type="text"
@@ -886,94 +970,209 @@ export default function ApplyForLoanView({
                           value={formData.fullName}
                           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                           placeholder="Enter your full name"
-                          className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                          className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
                         />
                       </div>
                     </div>
 
-                    {/* Mobile Number */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantMobile">
-                        Mobile Number *
-                      </label>
-                      <div className="relative">
-                        <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                        <input
-                          id="applicantMobile"
-                          type="tel"
-                          required
-                          maxLength={10}
-                          value={formData.mobileNumber}
-                          onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value.replace(/\D/g, "") })}
-                          placeholder="10-digit mobile number"
-                          className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
-                        />
+                    {/* Mobile & Email Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantMobile">
+                          Mobile Number <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantMobile"
+                            type="tel"
+                            required
+                            maxLength={10}
+                            value={formData.mobileNumber}
+                            onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value.replace(/\D/g, "") })}
+                            placeholder="10-digit mobile number"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
+                          Email (Optional)
+                        </label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantEmail"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            placeholder="Enter your email address"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* City */}
-                    <div className="space-y-1">
+                    {/* City Input */}
+                    <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantCity">
                         City / Location
                       </label>
                       <div className="relative">
-                        <MapPin className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                        <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                         <input
                           id="applicantCity"
                           type="text"
                           value={formData.city}
                           onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                           placeholder="e.g. Mumbai, Delhi, Bengaluru"
-                          className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                          className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
                         />
                       </div>
                     </div>
 
-                    {/* Employment Type */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-gray-700 block">Employment Profile</label>
-                      <select
-                        value={formData.employmentType}
-                        onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white cursor-pointer"
+                    {/* Employment & Monthly Income Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block">
+                          Employment Profile
+                        </label>
+                        <div className="relative">
+                          <Briefcase className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <select
+                            value={formData.employmentType}
+                            onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                          >
+                            <option value="salaried">Salaried (Private / Public / MNC)</option>
+                            <option value="self-employed">Self-Employed / Business Owner</option>
+                            <option value="doctor">Doctor / Certified Professional</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block">
+                          Monthly Income (Approx.)
+                        </label>
+                        <div className="relative">
+                          <Wallet className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <select
+                            value={formData.monthlyIncome}
+                            onChange={(e) => setFormData({ ...formData, monthlyIncome: e.target.value })}
+                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                          >
+                            <option value="">Select range</option>
+                            <option value="below_25k">Below ₹25,000</option>
+                            <option value="25k_50k">₹25,000 - ₹50,000</option>
+                            <option value="50k_1lakh">₹50,000 - ₹1,00,000</option>
+                            <option value="above_1lakh">Above ₹1,00,000</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Consent Checkbox */}
+                    <div className="flex items-start gap-2.5 pt-1">
+                      <input
+                        id="acceptTermsCheckbox"
+                        type="checkbox"
+                        checked={formData.acceptTerms}
+                        onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 accent-blue-600 cursor-pointer shrink-0"
+                      />
+                      <label htmlFor="acceptTermsCheckbox" className="text-xs text-gray-600 leading-snug cursor-pointer select-none">
+                        I authorize F2 Fintech and its partner lenders to contact me via call, SMS, email or WhatsApp regarding my loan application.
+                      </label>
+                    </div>
+
+                    {/* Security / Privacy Banner Card */}
+                    <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-start gap-2 text-blue-950">
+                        <Shield className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <span className="text-[11px] sm:text-xs text-slate-700 leading-tight">
+                          Your data is safe with us. We follow industry-standard security practices and will never share your information without your consent.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActivePolicyTab("privacy-policy");
+                          setIsPolicyModalOpen(true);
+                        }}
+                        className="text-blue-600 font-bold text-xs whitespace-nowrap hover:underline cursor-pointer shrink-0"
                       >
-                        <option value="salaried">Salaried (Private / Public / MNC)</option>
-                        <option value="self-employed">Self-Employed / Business Owner</option>
-                        <option value="doctor">Doctor / Certified Professional</option>
-                      </select>
+                        Learn more →
+                      </button>
+                    </div>
+
+                    {/* Submit Loan Application Button */}
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || !formData.acceptTerms}
+                        className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Submitting Application...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Submit Loan Application via F2 Fintech</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Submit Button */}
-                <div className="pt-2 border-t border-gray-100">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-3.5 px-6 bg-primary hover:bg-primary/90 text-white font-bold text-sm rounded-xl shadow-lg shadow-primary/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Submitting Application...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Submit Loan Application via F2 Fintech</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  <p className="text-[11px] text-gray-400 text-center mt-2">
-                    🔒 By submitting, you authorize F2 Fintech advisors to contact you regarding loan disbursal options.
-                  </p>
                 </div>
               </form>
             )}
           </div>
+
+          {/* 5. FAQs Accordion (Positioned AT THE VERY END / LAST) */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs space-y-4">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-primary" /> Frequently Asked Questions
+            </h4>
+
+            <div className="space-y-2.5">
+              {currentCategory.faq.map((item, idx) => {
+                const isExpanded = expandedFaqIndex === idx;
+                return (
+                  <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedFaqIndex(isExpanded ? null : idx)}
+                      className="w-full px-4 py-3 text-left font-semibold text-xs text-gray-800 bg-gray-50/50 hover:bg-gray-100 flex items-center justify-between gap-3 cursor-pointer"
+                    >
+                      <span>{item.q}</span>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />}
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 py-3 text-xs text-gray-600 bg-white border-t border-gray-100 leading-relaxed">
+                        {item.a}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Terms, Privacy Policy & DPDP Consent Modal */}
+      <PolicyModal
+        isOpen={isPolicyModalOpen}
+        onClose={() => setIsPolicyModalOpen(false)}
+        defaultTab={activePolicyTab}
+      />
     </div>
   );
 }
