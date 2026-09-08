@@ -109,7 +109,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
       "Quick disbursal directly to bank account"
     ],
     f2Advantages: [
-      "Access to 30+ leading partner Banks & NBFCs in one application",
+      "Access to 100+ leading partner Banks & NBFCs in one application",
       "Single application pre-screening to prevent multiple hard queries",
       "Dedicated F2 Fintech Relationship Manager assigned to your file",
       "Special rate discounts for salaried employees in Tier 1 & MNC companies",
