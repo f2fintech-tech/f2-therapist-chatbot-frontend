@@ -1609,7 +1609,13 @@ export default function Dashboard({
     return true;
   };
 
+  const isCreditReportEntry = (enq: any) => {
+    const b = (enq.bureau || "").toLowerCase().trim();
+    return b !== "bsa_standalone" && b !== "bsa";
+  };
+
   const filteredCibilEnquiries = cibilEnquiries.filter(enq =>
+    isCreditReportEntry(enq) &&
     isDateInSummaryRange(enq.fetched_at || enq.created_at || enq.completed_at)
   );
 
@@ -1668,6 +1674,7 @@ export default function Dashboard({
     const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const thisMonthCount = cibilEnquiries.filter(enq => {
+      if (!isCreditReportEntry(enq)) return false;
       const dateStr = enq.fetched_at || enq.created_at || enq.completed_at;
       if (!dateStr) return false;
       const d = new Date(dateStr);
@@ -1714,6 +1721,7 @@ export default function Dashboard({
   };
 
   const adminThisMonthCount = cibilEnquiries.filter(enq => {
+    if (!isCreditReportEntry(enq)) return false;
     const dateStr = enq.fetched_at || enq.created_at || enq.completed_at;
     if (!dateStr) return false;
     const d = new Date(dateStr);

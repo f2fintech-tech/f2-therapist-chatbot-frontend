@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { touchAuthSession } from "@/utils/authSession";
 
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   "mousemove",
@@ -19,6 +20,7 @@ export function useIdleTimeout(onTimeout: () => void, timeoutMs: number) {
   onTimeoutRef.current = onTimeout;
 
   const resetTimer = useCallback(() => {
+    touchAuthSession();
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       onTimeoutRef.current();
