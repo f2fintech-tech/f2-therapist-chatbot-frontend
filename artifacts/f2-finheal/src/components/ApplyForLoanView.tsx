@@ -993,4 +993,4 @@ export default function ApplyForLoanView({
     </div>
   );
 }
-// added new comment at the bottom for sync
+// added new comment at the bottom for sync 2.0
