@@ -388,14 +388,14 @@ export default function ApplyForLoanView({
   const [formData, setFormData] = useState({
     fullName: "",
     mobileNumber: "",
-    email: userEmail || "",
+    email: "",
     city: "",
     desiredAmount: 500000,
     tenureYears: 3,
     employmentType: "salaried",
     monthlyIncome: "",
     purpose: "",
-    acceptTerms: true
+    acceptTerms: false
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -749,6 +749,7 @@ export default function ApplyForLoanView({
               <form onSubmit={handleSubmitApplication} className="space-y-6 max-w-4xl mx-auto">
                   {/* Applicant Details Form */}
                   <div className="space-y-6">
+<<<<<<< HEAD
                     {/* Form Header */}
                     <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4">
                       <div className="flex items-center gap-3">
@@ -772,6 +773,198 @@ export default function ApplyForLoanView({
                         <Lock className="w-3 h-3 text-slate-400 shrink-0" />
                         <span>Your information is secure & encrypted.</span>
                       </button>
+=======
+                    {/* Step 1 Header */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs">
+                          1
+                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Configure Your Loan</h3>
+                      </div>
+                      <p className="text-xs text-gray-500 pl-10">Adjust the loan amount and tenure to see your estimated EMI.</p>
+                    </div>
+
+                    {/* Loan Amount Block */}
+                    <div className="space-y-3 bg-slate-50/40 p-4 rounded-2xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                            <Banknote className="w-4 h-4" />
+                          </span>
+                          <label htmlFor="desiredAmountInput" className="text-xs sm:text-sm font-semibold text-gray-800">
+                            Loan Amount
+                          </label>
+                        </div>
+                        <span className="text-sm sm:text-base font-extrabold text-blue-600 bg-blue-50/80 px-3.5 py-1 rounded-xl border border-blue-100/80">
+                          ₹{formData.desiredAmount.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+
+                      {/* Range Slider */}
+                      <div className="space-y-1.5 pt-1">
+                        <input
+                          id="desiredAmountInput"
+                          type="range"
+                          min={currentCategory.minAmountNum}
+                          max={currentCategory.maxAmountNum}
+                          step={currentCategory.stepAmountNum}
+                          value={formData.desiredAmount}
+                          onChange={(e) => setFormData({ ...formData, desiredAmount: Number(e.target.value) })}
+                          className="w-full accent-blue-600 h-2 bg-gray-200 rounded-lg cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[11px] text-gray-400 font-medium px-0.5">
+                          <span>₹{currentCategory.minAmountNum.toLocaleString("en-IN")}</span>
+                          <span>₹{currentCategory.maxAmountNum.toLocaleString("en-IN")}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preferred Tenure Block */}
+                    <div className="space-y-3 bg-slate-50/40 p-4 rounded-2xl border border-slate-200/70 shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                          <Calendar className="w-4 h-4" />
+                        </span>
+                        <label className="text-xs sm:text-sm font-semibold text-gray-800">
+                          Preferred Tenure
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2.5">
+                        {[1, 3, 5, 7].map((yrs) => (
+                          <button
+                            key={yrs}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, tenureYears: yrs })}
+                            className={`py-2.5 px-2 text-xs font-bold rounded-2xl border transition-all cursor-pointer text-center ${
+                              formData.tenureYears === yrs
+                                ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            {yrs} {yrs === 1 ? "Year" : "Years"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Estimated Monthly EMI Card */}
+                    <div className="bg-gradient-to-br from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-150 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs relative overflow-hidden">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="p-2 bg-blue-600 text-white rounded-lg shadow-2xs">
+                            <Calculator className="w-4 h-4" />
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-900">
+                            <span>Estimated Monthly EMI</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowEmiInfoTooltip(!showEmiInfoTooltip)}
+                              className="text-blue-500 hover:text-blue-700 cursor-pointer p-0.5 rounded transition-colors"
+                              title="Click for EMI calculation formula & ROI info"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200/60">
+                          Base Estimate
+                        </span>
+                      </div>
+
+                      {showEmiInfoTooltip && (
+                        <div className="bg-white/95 backdrop-blur-xs p-3.5 rounded-xl border border-blue-200 text-[11px] text-gray-600 space-y-1.5 animate-in fade-in duration-200 shadow-xs">
+                          <div className="font-bold text-blue-900 flex items-center justify-between">
+                            <span>EMI Calculation Formula</span>
+                            <span className="text-[10px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md border border-blue-100">Reducing Balance</span>
+                          </div>
+                          <p className="leading-relaxed text-gray-700">
+                            Calculated at <strong>{currentCategory.defaultRateNum}% p.a.</strong> interest rate for <strong>₹{formData.desiredAmount.toLocaleString("en-IN")}</strong> over <strong>{formData.tenureYears * 12} months</strong> ({formData.tenureYears} {formData.tenureYears === 1 ? "Year" : "Years"}).
+                          </p>
+                          <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-[10px] text-slate-700 font-mono">
+                            EMI = [P × R × (1+R)^N] / [(1+R)^N - 1]
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <div className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight">
+                            ₹{emiCalc.monthlyEmi.toLocaleString("en-IN")}
+                            <span className="text-xs font-medium text-gray-500 ml-1">/ month</span>
+                          </div>
+                        </div>
+
+                        {/* 3D Calculator Illustration Icon Graphic */}
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 p-2.5 text-white flex items-center justify-center shadow-md relative shrink-0">
+                          <Calculator className="w-7 h-7" />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-xs">
+                            ₹
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-3 border-t border-blue-200/60 text-xs">
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Interest Rate (ROI)</div>
+                          <div className="font-bold text-blue-700 mt-0.5">{currentCategory.defaultRateNum}% p.a.</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Principal Amount</div>
+                          <div className="font-bold text-gray-900 mt-0.5">₹{formData.desiredAmount.toLocaleString("en-IN")}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-[11px] font-medium">Total Payable</div>
+                          <div className="font-bold text-gray-900 mt-0.5">₹{emiCalc.totalPayment.toLocaleString("en-IN")}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Get Detailed Loan Calculation Card */}
+                    <div className="bg-gradient-to-r from-amber-50/80 to-orange-50/50 border border-amber-200/70 rounded-2xl p-4 space-y-3 shadow-2xs">
+                      <div className="flex items-start gap-3">
+                        <span className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                          <BarChart2 className="w-4 h-4" />
+                        </span>
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs sm:text-sm font-bold text-gray-900">Get Detailed Loan Calculation</h4>
+                          <p className="text-[11px] text-gray-600 leading-snug">
+                            View month-by-month amortization, interest breakdown and smart prepayment recommendations.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onOpenLoanCalculator) {
+                            onOpenLoanCalculator(currentCategory.id);
+                          } else {
+                            setLocation(`/loan-calculator/${currentCategory.id}`);
+                          }
+                        }}
+                        className="w-full py-2.5 px-4 bg-white hover:bg-gray-50 text-blue-600 font-bold text-xs rounded-xl border border-blue-200 shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Open Loan & Prepayment Calculator</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* RIGHT COLUMN: 2. Applicant Details */}
+                  <div className="space-y-6">
+                    {/* Step 2 Header */}
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
+                        2
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Applicant Details</h3>
+                        <p className="text-xs text-gray-500 leading-relaxed">Enter your details to proceed. We will use this to get in touch with you.</p>
+                      </div>
+>>>>>>> 39c3771792e402ef939733f049fea79d07f15bb2
                     </div>
 
                     {/* Full Name Input */}
@@ -857,17 +1050,17 @@ export default function ApplyForLoanView({
                           Employment Profile
                         </label>
                         <div className="relative">
-                          <Briefcase className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <Briefcase className="w-4 h-4 text-gray-400 absolute left-2.5 top-3.5 pointer-events-none" />
                           <select
                             value={formData.employmentType}
                             onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                            className="w-full pl-8 pr-7 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer truncate"
                           >
-                            <option value="salaried">Salaried (Private / Public / MNC)</option>
-                            <option value="self-employed">Self-Employed / Business Owner</option>
-                            <option value="doctor">Doctor / Certified Professional</option>
+                            <option value="salaried">Salaried (Pvt / Govt / MNC)</option>
+                            <option value="self-employed">Self-Employed / Business</option>
+                            <option value="doctor">Doctor / Professional</option>
                           </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3.5 pointer-events-none" />
                         </div>
                       </div>
 
@@ -876,11 +1069,11 @@ export default function ApplyForLoanView({
                           Monthly Income (Approx.)
                         </label>
                         <div className="relative">
-                          <Wallet className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <Wallet className="w-4 h-4 text-gray-400 absolute left-2.5 top-3.5 pointer-events-none" />
                           <select
                             value={formData.monthlyIncome}
                             onChange={(e) => setFormData({ ...formData, monthlyIncome: e.target.value })}
-                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                            className="w-full pl-8 pr-7 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer truncate"
                           >
                             <option value="">Select range</option>
                             <option value="below_25k">Below ₹25,000</option>
@@ -888,7 +1081,7 @@ export default function ApplyForLoanView({
                             <option value="50k_1lakh">₹50,000 - ₹1,00,000</option>
                             <option value="above_1lakh">Above ₹1,00,000</option>
                           </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3.5 pointer-events-none" />
                         </div>
                       </div>
                     </div>
