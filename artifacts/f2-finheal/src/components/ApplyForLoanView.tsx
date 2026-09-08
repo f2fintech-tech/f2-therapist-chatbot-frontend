@@ -2213,3 +2213,4 @@ export default function ApplyForLoanView({
     </div>
   );
 }
+// added new comment at the bottom for sync
