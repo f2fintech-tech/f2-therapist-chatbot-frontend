@@ -103,6 +103,31 @@ export default function CibilEnquiriesTab({
     );
   }, [employees, filterRole]);
 
+  const canFilterEnquirers = useMemo(() => {
+    if (isAdmin) return true;
+    try {
+      const session = getStoredAuthSession();
+      const activeId = (session?.userId || session?.email || "").toLowerCase();
+      const permissions = session?.permissions || [];
+      if (permissions.includes("cibil_view_all") || permissions.includes("admin")) return true;
+
+      const currentEmp = (employees || []).find((e: any) => {
+        const idMatches = (e.f2FintechId || e.f2_fintech_id || e.id || "").toLowerCase() === activeId;
+        const emailMatches = session?.email && (e.email || "").toLowerCase() === session.email.toLowerCase();
+        return idMatches || emailMatches;
+      });
+
+      if (currentEmp) {
+        const dept = (currentEmp.department || "").trim().toLowerCase();
+        const privilegedDepts = ["founder's office", "credit & operations", "credit", "operations", "ops"];
+        if (privilegedDepts.includes(dept)) return true;
+      }
+    } catch (err) {
+      console.warn("Failed to check advisor filter permissions", err);
+    }
+    return false;
+  }, [isAdmin, employees]);
+
   const [quotaStats, setQuotaStats] = useState<{
     monthly_count: number;
     effective_limit: number;
@@ -232,45 +257,49 @@ export default function CibilEnquiriesTab({
                 </select>
               </div>
 
-              {/* Department Filter Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
-                <select
-                  value={filterRole}
-                  onChange={(e) => {
-                    setFilterRole(e.target.value);
-                    setFilterEmployee("all");
-                  }}
-                  className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                >
-                  <option value="all">All Enquirers</option>
-                  <option value="Client">Users (Leads)</option>
-                  {allDepartments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Department & Employee Filter Selectors (Only shown to Admins or Privileged Departments) */}
+              {canFilterEnquirers && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
+                    <select
+                      value={filterRole}
+                      onChange={(e) => {
+                        setFilterRole(e.target.value);
+                        setFilterEmployee("all");
+                      }}
+                      className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                    >
+                      <option value="all">All Enquirers</option>
+                      <option value="Client">Users (Leads)</option>
+                      {allDepartments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Dynamic Employee Filter Selector (Appears when a specific department is chosen in Enquirer) */}
-              {filterRole !== "all" && filterRole !== "Client" && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-gray-500 font-semibold">Employee:</span>
-                  <select
-                    value={filterEmployee}
-                    onChange={(e) => setFilterEmployee(e.target.value)}
-                    className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
-                  >
-                    <option value="all">All Employees</option>
-                    {departmentEmployees.map((emp, index) => {
-                      const empId = emp.f2FintechId || emp.f2_fintech_id || emp.id || emp.name;
-                      return (
-                        <option key={empId || index} value={empId}>
-                          {emp.name}{empId && empId !== emp.name ? ` (${empId})` : ""}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                  {/* Dynamic Employee Filter Selector (Appears when a specific department is chosen in Enquirer) */}
+                  {filterRole !== "all" && filterRole !== "Client" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500 font-semibold">Employee:</span>
+                      <select
+                        value={filterEmployee}
+                        onChange={(e) => setFilterEmployee(e.target.value)}
+                        className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
+                      >
+                        <option value="all">All Employees</option>
+                        {departmentEmployees.map((emp, index) => {
+                          const empId = emp.f2FintechId || emp.f2_fintech_id || emp.id || emp.name;
+                          return (
+                            <option key={empId || index} value={empId}>
+                              {emp.name}{empId && empId !== emp.name ? ` (${empId})` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -502,6 +531,7 @@ export default function CibilEnquiriesTab({
                           onClick={() => {
                             setViewingCibilReport({
                               ...(enq.report_data || {}),
+                              id: enq.id,
                               name: enq.name,
                               phone: enq.phone,
                               email: enq.email,
