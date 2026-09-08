@@ -138,7 +138,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     faq: [
       {
         q: "What is the maximum Personal Loan amount I can get through F2 Fintech?",
-        a: "Depending on your net monthly salary and existing obligations, you can get unsecured personal loans up to ₹40 Lakhs across our 30+ partner banks."
+        a: "Depending on your net monthly salary and existing obligations, you can get unsecured personal loans up to ₹40 Lakhs across our 100+ partner banks."
       },
       {
         q: "Can I apply for a personal loan if I am self-employed?",
@@ -820,14 +820,14 @@ export default function ApplyForLoanView({
               Get Your Loan Disbursed Hassle-Free with <span className="text-primary-300 bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-indigo-200">F2 Fintech</span>
             </h2>
             <p className="text-sm sm:text-base text-gray-300 leading-relaxed">
-              We connect your loan application with 30+ leading partner Banks & NBFCs, negotiating the lowest interest rates and managing end-to-end documentation for guaranteed quick disbursal.
+              We connect your loan application with 100+ leading partner Banks & NBFCs, negotiating the lowest interest rates and managing end-to-end documentation for guaranteed quick disbursal.
             </p>
 
             {/* Trust Highlights */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-white/10 text-xs font-medium">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>30+ Bank Partners</span>
+                <span>100+ Bank Partners</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
