@@ -388,14 +388,14 @@ export default function ApplyForLoanView({
   const [formData, setFormData] = useState({
     fullName: "",
     mobileNumber: "",
-    email: userEmail || "",
+    email: "",
     city: "",
     desiredAmount: 500000,
     tenureYears: 3,
     employmentType: "salaried",
     monthlyIncome: "",
     purpose: "",
-    acceptTerms: true
+    acceptTerms: false
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -751,14 +751,14 @@ export default function ApplyForLoanView({
                   {/* LEFT COLUMN: 1. Configure Your Loan */}
                   <div className="space-y-6">
                     {/* Step 1 Header */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
-                        1
-                      </div>
-                      <div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs">
+                          1
+                        </div>
                         <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Configure Your Loan</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Adjust the loan amount and tenure to see your estimated EMI.</p>
                       </div>
+                      <p className="text-xs text-gray-500 pl-10">Adjust the loan amount and tenure to see your estimated EMI.</p>
                     </div>
 
                     {/* Loan Amount Block */}
@@ -932,28 +932,14 @@ export default function ApplyForLoanView({
                   {/* RIGHT COLUMN: 2. Applicant Details */}
                   <div className="space-y-6">
                     {/* Step 2 Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
-                          2
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Applicant Details</h3>
-                          <p className="text-xs text-gray-500 mt-0.5 leading-normal">Enter your details to proceed. We will use this to get in touch with you.</p>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
+                        2
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivePolicyTab("privacy-policy");
-                          setIsPolicyModalOpen(true);
-                        }}
-                        className="hidden xl:flex items-center gap-1.5 px-3 py-1 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200/60 rounded-full text-[10px] text-slate-500 font-medium shrink-0 max-w-[210px] leading-tight transition-colors cursor-pointer text-left"
-                      >
-                        <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span>Your information is secure and will be used only for your loan application.</span>
-                      </button>
+                      <div className="space-y-1">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">Applicant Details</h3>
+                        <p className="text-xs text-gray-500 leading-relaxed">Enter your details to proceed. We will use this to get in touch with you.</p>
+                      </div>
                     </div>
 
                     {/* Full Name Input */}
@@ -1039,17 +1025,17 @@ export default function ApplyForLoanView({
                           Employment Profile
                         </label>
                         <div className="relative">
-                          <Briefcase className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <Briefcase className="w-4 h-4 text-gray-400 absolute left-2.5 top-3.5 pointer-events-none" />
                           <select
                             value={formData.employmentType}
                             onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                            className="w-full pl-8 pr-7 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer truncate"
                           >
-                            <option value="salaried">Salaried (Private / Public / MNC)</option>
-                            <option value="self-employed">Self-Employed / Business Owner</option>
-                            <option value="doctor">Doctor / Certified Professional</option>
+                            <option value="salaried">Salaried (Pvt / Govt / MNC)</option>
+                            <option value="self-employed">Self-Employed / Business</option>
+                            <option value="doctor">Doctor / Professional</option>
                           </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3.5 pointer-events-none" />
                         </div>
                       </div>
 
@@ -1058,11 +1044,11 @@ export default function ApplyForLoanView({
                           Monthly Income (Approx.)
                         </label>
                         <div className="relative">
-                          <Wallet className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <Wallet className="w-4 h-4 text-gray-400 absolute left-2.5 top-3.5 pointer-events-none" />
                           <select
                             value={formData.monthlyIncome}
                             onChange={(e) => setFormData({ ...formData, monthlyIncome: e.target.value })}
-                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer"
+                            className="w-full pl-8 pr-7 py-2.5 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none cursor-pointer truncate"
                           >
                             <option value="">Select range</option>
                             <option value="below_25k">Below ₹25,000</option>
@@ -1070,7 +1056,7 @@ export default function ApplyForLoanView({
                             <option value="50k_1lakh">₹50,000 - ₹1,00,000</option>
                             <option value="above_1lakh">Above ₹1,00,000</option>
                           </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2.5 top-3.5 pointer-events-none" />
                         </div>
                       </div>
                     </div>

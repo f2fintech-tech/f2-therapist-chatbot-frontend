@@ -1134,7 +1134,7 @@ ${sheetDataXml}
       });
       if (debouncedSearch) queryParams.append("search", debouncedSearch);
       if (filterRole !== "all") queryParams.append("role", filterRole);
-      if (filterEmployee !== "all") queryParams.append("employee_id", filterEmployee);
+      if (filterEmployee !== "all" && filterEmployee.trim() !== "") queryParams.append("employee_id", filterEmployee);
       if (filterLoanType !== "all") queryParams.append("loan_type", filterLoanType);
       if (filterBureau !== "all") queryParams.append("bureau", filterBureau);
       if (filterDate) queryParams.append("start_date", filterDate);

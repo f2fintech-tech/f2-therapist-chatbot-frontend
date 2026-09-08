@@ -237,7 +237,10 @@ export default function CibilEnquiriesTab({
                 <span className="text-[11px] text-gray-500 font-semibold">Enquirer:</span>
                 <select
                   value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
+                  onChange={(e) => {
+                    setFilterRole(e.target.value);
+                    setFilterEmployee("all");
+                  }}
                   className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
                 >
                   <option value="all">All Enquirers</option>
@@ -258,11 +261,11 @@ export default function CibilEnquiriesTab({
                     className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
                   >
                     <option value="all">All Employees</option>
-                    {departmentEmployees.map((emp) => {
-                      const empId = emp.f2FintechId || emp.id;
+                    {departmentEmployees.map((emp, index) => {
+                      const empId = emp.f2FintechId || emp.f2_fintech_id || emp.id || emp.name;
                       return (
-                        <option key={empId} value={empId}>
-                          {emp.name} ({empId})
+                        <option key={empId || index} value={empId}>
+                          {emp.name}{empId && empId !== emp.name ? ` (${empId})` : ""}
                         </option>
                       );
                     })}
