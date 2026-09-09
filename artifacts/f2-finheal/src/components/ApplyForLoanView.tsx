@@ -845,9 +845,9 @@ export default function ApplyForLoanView({
           </div>
         </div>
 
-        {/* Loan Category Selector Tabs (5 Tabs - Floating Options with Hover Popups) */}
+        {/* Loan Category Selector Tabs (5 Tabs with Glassmorphism Effect & Theme Blue Palette) */}
         <div className="py-1">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-2.5 overflow-visible">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2.5 overflow-visible">
             {LOAN_CATEGORIES.map((cat) => {
               const isActive = activeTab === cat.id;
               return (
@@ -855,10 +855,10 @@ export default function ApplyForLoanView({
                   <button
                     type="button"
                     onClick={() => handleTabChange(cat.id)}
-                    className={`w-full flex flex-col items-center text-center p-3.5 rounded-xl transition-all duration-300 cursor-pointer relative ${
+                    className={`w-full flex flex-col items-center text-center p-3.5 rounded-2xl transition-all duration-300 cursor-pointer relative backdrop-blur-xl ${
                       isActive
-                        ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-lg shadow-blue-600/30 font-bold scale-[1.02] ring-2 ring-blue-500/20 border border-blue-400/40"
-                        : "bg-white hover:bg-blue-50/90 text-slate-700 hover:text-blue-900 border border-slate-200/80 hover:border-blue-300 shadow-2xs hover:shadow-md"
+                        ? "bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-700/90 text-white shadow-xl shadow-blue-600/35 font-bold scale-[1.03] ring-2 ring-blue-400/40 border border-white/40"
+                        : "bg-white/50 hover:bg-white/85 text-slate-800 hover:text-blue-950 border border-white/70 hover:border-blue-300/80 shadow-xs hover:shadow-lg hover:shadow-blue-500/10 backdrop-saturate-150"
                     }`}
                   >
                     <span className="text-2xl mb-1.5 transition-transform duration-200 group-hover:scale-110">{cat.icon}</span>
@@ -866,10 +866,10 @@ export default function ApplyForLoanView({
 
                     {cat.badge && (
                       <span
-                        className={`absolute -top-2.5 -right-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-md z-20 whitespace-nowrap transition-all ${
+                        className={`absolute -top-2.5 -right-1 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md z-20 whitespace-nowrap transition-all backdrop-blur-md ${
                           isActive
-                            ? "bg-amber-400 text-slate-900 border border-amber-200"
-                            : "bg-gradient-to-r from-amber-500 to-orange-500 text-white border border-amber-300/40"
+                            ? "bg-amber-400/95 text-slate-950 border border-amber-200/90 shadow-amber-400/20"
+                            : "bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white border border-amber-300/50 shadow-orange-500/20"
                         }`}
                       >
                         {cat.badge}
