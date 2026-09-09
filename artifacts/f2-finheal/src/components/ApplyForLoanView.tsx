@@ -885,7 +885,7 @@ export default function ApplyForLoanView({
         {/* Selected Category Details */}
         <div className="space-y-6">
           {/* 1. Category Header & Key Metrics Card */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs space-y-4 relative mb-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300 space-y-4 relative mb-8">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -951,7 +951,7 @@ export default function ApplyForLoanView({
           </div>
 
           {/* 2. Why Choose F2 Fintech Card */}
-          <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-950 text-white rounded-xl p-6 shadow-md border border-indigo-800/50 space-y-4">
+          <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-950 text-white rounded-xl p-6 border border-indigo-800/50 hover:shadow-lg transition-shadow duration-300 space-y-4">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-primary/20 rounded-lg text-primary-300">
                 <Award className="w-5 h-5 text-indigo-300" />
@@ -975,7 +975,7 @@ export default function ApplyForLoanView({
           </div>
 
           {/* RESTORED PREVIOUS FORMAT: REQUIRED DOCUMENTS SIDE-BY-SIDE CARDS */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300 space-y-4">
             <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-2xs">
                 <FileText className="w-5 h-5" />
@@ -1044,7 +1044,7 @@ export default function ApplyForLoanView({
           </div>
 
           {/* 3-STEP INTERACTIVE APPLICATION WIZARD CARD */}
-          <div ref={wizardFormRef} id="applicantFormWizardSection" className="bg-white rounded-2xl border-2 border-blue-500/30 shadow-xl p-6 sm:p-8 relative overflow-hidden space-y-6">
+          <div ref={wizardFormRef} id="applicantFormWizardSection" className="bg-white rounded-2xl border-2 border-blue-500/30 hover:shadow-xl transition-shadow duration-300 p-6 sm:p-8 relative overflow-hidden space-y-6">
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 via-indigo-500 to-primary animate-gradient" />
 
             {/* Saved Draft Progress Restored Notice */}
@@ -1358,6 +1358,7 @@ export default function ApplyForLoanView({
                         100% Encrypted & Safe
                       </span>
                     </div>
+                    
 
                     <div className="space-y-5">
                       {/* 1. AADHAAR CARD */}
@@ -2064,10 +2065,22 @@ export default function ApplyForLoanView({
                 )}
               </form>
             )}
+
+            {/* Bottom Inverted Blue Gradient Strip */}
+            <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-primary via-indigo-500 to-blue-600 animate-gradient" />
+          </div>
+
+          {/* Clean Section Partition Divider in the Gap Between Wizard Form & FAQs */}
+          <div className="my-2 flex items-center gap-4">
+            <div className="flex-1 border-t border-slate-300/80" />
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest px-3.5 py-1 bg-slate-100/90 rounded-full border border-slate-200/80 shadow-2xs">
+              Help & Support
+            </span>
+            <div className="flex-1 border-t border-slate-300/80" />
           </div>
 
           {/* FAQs Accordion */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xs space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow duration-300 space-y-4">
             <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-primary" /> Frequently Asked Questions
             </h4>

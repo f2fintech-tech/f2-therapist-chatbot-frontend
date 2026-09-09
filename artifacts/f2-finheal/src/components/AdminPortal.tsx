@@ -4134,6 +4134,7 @@ ${sheetDataXml}
                     <option value="Credit & Operations">Credit & Operations</option>
                     <option value="Sales">Sales</option>
                     <option value="Human Resource">Human Resource</option>
+                    <option value="Marketing">Marketing</option>
                   </select>
                 </div>
               </div>
