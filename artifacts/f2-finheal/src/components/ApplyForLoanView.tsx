@@ -224,7 +224,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     maxAmount: "Up to ₹10 Crore",
     startRate: "8.35% p.a.",
     maxTenure: "Up to 30 Years",
-    processingTime: "3 - 7 Days",
+    processingTime: "4 - 7 Days",
     defaultAmountNum: 5000000,
     minAmountNum: 500000,
     maxAmountNum: 30000000,
@@ -400,6 +400,75 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
       { id: "medical_degree", label: "Medical Degree Certificate (MBBS / MD / BDS / MS)", description: "Copy of qualification certificate", required: true },
       { id: "council_reg", label: "Medical Council Registration Certificate", description: "State or MCI registration certificate", required: true }
     ]
+  },
+  {
+    id: "education",
+    name: "Education Loan",
+    icon: "🎓",
+    badge: "100% Studies Financing",
+    heroTagline: "Fund Higher Education in India & Abroad with Flexible Repayment",
+    description: "Comprehensive financial support for Premier Domestic Colleges and Abroad Universities covering tuition fees, accommodation, travel, & study expenses.",
+    maxAmount: "Up to ₹1.5 Crore",
+    startRate: "8.85% p.a.",
+    maxTenure: "Up to 15 Years",
+    processingTime: "4 - 7 Days",
+    defaultAmountNum: 1500000,
+    minAmountNum: 100000,
+    maxAmountNum: 15000000,
+    stepAmountNum: 50000,
+    defaultRateNum: 9.2,
+    defaultTenureNum: 10,
+    features: [
+      "Collateral-free loans available up to ₹40 Lakhs for top premier universities",
+      "Moratorium period (Course duration + 1 year grace period before EMI starts)",
+      "Covers tuition fees, hostel fees, books, laptops, and travel tickets",
+      "Tax deduction benefits on interest paid under Section 80E without upper cap",
+      "Pre-admission loan sanction letter for visa & university application"
+    ],
+    f2Advantages: [
+      "Direct tie-ups with 20+ specialized Education Loan Lenders & International Lenders",
+      "Fast-track pre-visa sanction letters within 48 hours for overseas studies",
+      "Flexible co-borrower criteria (parents, siblings, or spouse)",
+      "Doorstep guidance by dedicated F2 Overseas & Domestic Education Loan Experts",
+      "Zero processing fee offers for top-ranked STEM & Management programs"
+    ],
+    requiredDocs: {
+      salaried: [
+        "KYC: Student & Co-Applicant PAN & Aadhaar Card",
+        "Admission Offer Letter / I-20 Form from College / University",
+        "Mark Sheets / Passing Certificates of 10th, 12th & Graduation",
+        "Co-Applicant Income Proofs: Last 3 Months Salary Slips & 6 Months Bank Statement"
+      ],
+      selfEmployed: [
+        "KYC: Student & Co-Applicant PAN & Aadhaar Card",
+        "Admission Offer Letter & Fee Structure from Institution",
+        "Past Academic Certificates (Mark sheets, Entrance Exam Scorecard)",
+        "Co-Applicant Income Proofs: Last 2 Years ITR & 12 Months Bank Statement"
+      ]
+    },
+    eligibilityCriteria: [
+      "Indian citizen with confirmed admission in recognized Indian or foreign institution",
+      "Solid academic track record in 10th, 12th, or undergraduate degree",
+      "Earning co-borrower (Parent, Spouse, or Relative) with stable income source"
+    ],
+    faq: [
+      {
+        q: "What is the Moratorium Period in an Education Loan?",
+        a: "The moratorium period is a repayment holiday during your course duration plus an additional 6 to 12 months grace period. Full EMI repayment starts only after your course completion!"
+      },
+      {
+        q: "Can I get an Education Loan without collateral?",
+        a: "Yes! F2 Fintech offers collateral-free education loans up to ₹40 Lakhs for leading Indian premier institutes (IITs, IIMs, NITs) and top foreign universities."
+      },
+      {
+        q: "Is there any tax benefit on Education Loans?",
+        a: "Yes! Under Section 80E of the Income Tax Act, the entire interest paid on an education loan is 100% tax deductible without any maximum cap!"
+      }
+    ],
+    additionalDocFields: [
+      { id: "admission_letter", label: "University Admission Offer Letter / I-20 / Fee Structure", description: "Official acceptance letter from institution", required: true },
+      { id: "academic_records", label: "Academic Marksheets (10th, 12th, Graduation)", description: "Pass certificates and entrance test scorecards", required: true }
+    ]
   }
 ];
 
@@ -455,7 +524,12 @@ export default function ApplyForLoanView({
     motherName: "",
     mobileNumber: "",
     email: "",
+    officialEmail: "",
     city: "",
+    currentAddress: "",
+    permanentAddress: "",
+    sameAsCurrentAddress: false,
+    workingAddress: "",
     desiredAmount: 500000,
     tenureYears: 3,
     employmentType: "salaried",
@@ -470,6 +544,9 @@ export default function ApplyForLoanView({
   const [salarySlipsDoc, setSalarySlipsDoc] = useState(initialDraft?.salarySlipsDoc || {});
   const [idCardDoc, setIdCardDoc] = useState(initialDraft?.idCardDoc || {});
   const [bankStatementDoc, setBankStatementDoc] = useState(initialDraft?.bankStatementDoc || {});
+  const [currentAddressProofDoc, setCurrentAddressProofDoc] = useState(initialDraft?.currentAddressProofDoc || {});
+  const [permanentAddressProofDoc, setPermanentAddressProofDoc] = useState(initialDraft?.permanentAddressProofDoc || {});
+  const [form26ASDoc, setForm26ASDoc] = useState(initialDraft?.form26ASDoc || {});
   const [additionalUploaded, setAdditionalUploaded] = useState<Record<string, { fileName?: string; fileList?: string[] }>>(initialDraft?.additionalUploaded || {});
 
   // Auto-save form & stage progress to localStorage whenever state updates
@@ -485,6 +562,9 @@ export default function ApplyForLoanView({
         salarySlipsDoc,
         idCardDoc,
         bankStatementDoc,
+        currentAddressProofDoc,
+        permanentAddressProofDoc,
+        form26ASDoc,
         additionalUploaded,
         updatedAt: new Date().toISOString()
       };
@@ -492,7 +572,7 @@ export default function ApplyForLoanView({
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, additionalUploaded]);
+  }, [activeTab, currentStep, formData, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded]);
 
   const handleClearDraft = () => {
     if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
@@ -507,7 +587,12 @@ export default function ApplyForLoanView({
         motherName: "",
         mobileNumber: "",
         email: "",
+        officialEmail: "",
         city: "",
+        currentAddress: "",
+        permanentAddress: "",
+        sameAsCurrentAddress: false,
+        workingAddress: "",
         desiredAmount: 500000,
         tenureYears: 3,
         employmentType: "salaried",
@@ -520,6 +605,9 @@ export default function ApplyForLoanView({
       setSalarySlipsDoc({});
       setIdCardDoc({});
       setBankStatementDoc({});
+      setCurrentAddressProofDoc({});
+      setPermanentAddressProofDoc({});
+      setForm26ASDoc({});
       setAdditionalUploaded({});
     }
   };
@@ -592,11 +680,24 @@ export default function ApplyForLoanView({
 
   const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab) || LOAN_CATEGORIES[0];
 
-  // Bank Statement Notice Example
-  const bankStatementNotice = {
-    subtext: "Please upload your updated 6 months bank statement",
-    exampleText: "For Example: As today is 8 Sep, please upload the bank statement from 8 March to 6 Sep"
-  };
+  // Dynamic Real-Time Bank Statement Notice Date Calculation
+  const bankStatementNotice = useMemo(() => {
+    const today = new Date();
+    const day = today.getDate();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentMonthStr = months[today.getMonth()];
+    const todayFormatted = `${day} ${currentMonthStr}`;
+
+    // Calculate 6 months prior, starting from the 1st of that month
+    const sixMonthsAgoDate = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const startMonthStr = months[sixMonthsAgoDate.getMonth()];
+    const startDateFormatted = `1 ${startMonthStr}`;
+
+    return {
+      subtext: "Please upload your updated 6 months bank statement",
+      exampleText: `For Example: As today is ${todayFormatted}, please upload the bank statement from ${startDateFormatted} to ${todayFormatted}. (Note: Bank statements must start from the 1st date of the month, not mid-month).`
+    };
+  }, []);
 
   const handleTabChange = (catId: string) => {
     setActiveTab(catId);
@@ -628,11 +729,27 @@ export default function ApplyForLoanView({
       return;
     }
     if (!formData.email.trim() || !formData.email.includes("@")) {
-      alert("Please enter a valid Email Address.");
+      alert("Please enter a valid Personal Email ID.");
+      return;
+    }
+    if (formData.officialEmail?.trim() && !formData.officialEmail.includes("@")) {
+      alert("Please enter a valid Official Email Address.");
       return;
     }
     if (!formData.city.trim()) {
       alert("Please enter your City / Location.");
+      return;
+    }
+    if (!formData.currentAddress?.trim()) {
+      alert("Please enter your Current Address.");
+      return;
+    }
+    if (!formData.permanentAddress?.trim()) {
+      alert("Please enter your Permanent Address.");
+      return;
+    }
+    if (!formData.workingAddress?.trim()) {
+      alert("Please enter your Working Address.");
       return;
     }
 
@@ -658,8 +775,18 @@ export default function ApplyForLoanView({
       return;
     }
 
-    if (!bankStatementDoc.fileName) {
+    if (!bankStatementDoc.fileName && getDocFiles(bankStatementDoc).length === 0) {
       alert("Please upload your 6 Months Bank Statement.");
+      return;
+    }
+
+    if (!currentAddressProofDoc.fileName && getDocFiles(currentAddressProofDoc).length === 0) {
+      alert("Please upload Address Proof for Current Address (Electricity bill, LPG bill, or Rent agreement).");
+      return;
+    }
+
+    if (!permanentAddressProofDoc.fileName && getDocFiles(permanentAddressProofDoc).length === 0) {
+      alert("Please upload Address Proof for Permanent Address (Electricity bill, LPG bill, Home Tax, Water Tax, or Govt issued document).");
       return;
     }
 
@@ -845,9 +972,9 @@ export default function ApplyForLoanView({
           </div>
         </div>
 
-        {/* Loan Category Selector Tabs (5 Tabs with Glassmorphism Effect & Theme Blue Palette) */}
+        {/* Loan Category Selector Tabs (6 Tabs with Glassmorphism Effect & Theme Blue Palette) */}
         <div className="py-1">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2.5 overflow-visible">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2.5 overflow-visible">
             {LOAN_CATEGORIES.map((cat) => {
               const isActive = activeTab === cat.id;
               return (
@@ -1044,7 +1171,7 @@ export default function ApplyForLoanView({
           </div>
 
           {/* 3-STEP INTERACTIVE APPLICATION WIZARD CARD */}
-          <div ref={wizardFormRef} id="applicantFormWizardSection" className="bg-white rounded-2xl border-2 border-blue-500/30 hover:shadow-xl transition-shadow duration-300 p-6 sm:p-8 relative overflow-hidden space-y-6">
+          <div ref={wizardFormRef} id="applicantFormWizardSection" className="bg-white rounded-2xl border-2 border-blue-500/30 hover:shadow-xl transition-shadow duration-300 p-5 sm:p-6 pb-4 sm:pb-5 relative overflow-hidden space-y-4">
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-600 via-indigo-500 to-primary animate-gradient" />
 
             {/* Saved Draft Progress Restored Notice */}
@@ -1165,10 +1292,10 @@ export default function ApplyForLoanView({
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmitFinal} className="space-y-6">
+              <form onSubmit={handleSubmitFinal} className="space-y-4">
                 {/* STEP 1: APPLICANT DETAILS */}
                 {currentStep === 1 && (
-                  <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="space-y-4 animate-in fade-in duration-300">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                       <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                         <UserIcon className="w-4 h-4 text-primary" /> Step 1: Personal & Applicant Details
@@ -1254,10 +1381,10 @@ export default function ApplyForLoanView({
                         </div>
                       </div>
 
-                      {/* Email (Mandatory) */}
+                      {/* Personal Email (Mandatory) */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
-                          Email Address *
+                          Personal Email ID *
                         </label>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
@@ -1267,7 +1394,25 @@ export default function ApplyForLoanView({
                             required
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            placeholder="Enter your email address"
+                            placeholder="Enter your personal email ID"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Official Email ID (Optional) */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantOfficialEmail">
+                          Official Email ID <span className="text-gray-400 font-normal">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantOfficialEmail"
+                            type="email"
+                            value={formData.officialEmail || ""}
+                            onChange={(e) => setFormData({ ...formData, officialEmail: e.target.value })}
+                            placeholder="Enter work / official email (optional)"
                             className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
                           />
                         </div>
@@ -1329,9 +1474,102 @@ export default function ApplyForLoanView({
                           <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
                         </div>
                       </div>
+
+                      {/* Address Details Sub-heading */}
+                      <div className="pt-2 border-t border-gray-100 sm:col-span-2">
+                        <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                          <MapPin className="w-4 h-4 text-blue-600" /> Residential & Working Address Details
+                        </h5>
+                        <p className="text-[11px] text-gray-500">Provide complete addresses for physical verification & documentation</p>
+                      </div>
+
+                      {/* Current Address */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantCurrentAddress">
+                          Current Address *
+                        </label>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantCurrentAddress"
+                            type="text"
+                            required
+                            value={formData.currentAddress || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                currentAddress: val,
+                                permanentAddress: prev.sameAsCurrentAddress ? val : prev.permanentAddress
+                              }));
+                            }}
+                            placeholder="Enter current residential address (House/Flat No., Street, Area, Landmark, Pincode)"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Permanent Address */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantPermanentAddress">
+                            Permanent Address *
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs text-blue-600 font-medium cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={formData.sameAsCurrentAddress || false}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  sameAsCurrentAddress: checked,
+                                  permanentAddress: checked ? prev.currentAddress : prev.permanentAddress
+                                }));
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Same as Current Address</span>
+                          </label>
+                        </div>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantPermanentAddress"
+                            type="text"
+                            required
+                            disabled={formData.sameAsCurrentAddress}
+                            value={formData.permanentAddress || ""}
+                            onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
+                            placeholder="Enter permanent address as per Aadhaar / Passport"
+                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                              formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Working Address */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantWorkingAddress">
+                          Working / Office Address *
+                        </label>
+                        <div className="relative">
+                          <Building className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantWorkingAddress"
+                            type="text"
+                            required
+                            value={formData.workingAddress || ""}
+                            onChange={(e) => setFormData({ ...formData, workingAddress: e.target.value })}
+                            placeholder="Enter office / company / business location address"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="pt-4 flex justify-end">
+                    <div className="pt-2 flex justify-end">
                       <button
                         type="button"
                         onClick={handleNextStep1}
@@ -1910,9 +2148,165 @@ export default function ApplyForLoanView({
                           </div>
                         </div>
                       </div>
+
+                      {/* 7. ADDRESS PROOF FOR CURRENT ADDRESS (MANDATORY) */}
+                      <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                              <MapPin className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-bold text-gray-900">
+                                7. Address Proof for Current Address <span className="text-red-500">* (Mandatory)</span>
+                              </h5>
+                              <p className="text-[11px] text-gray-500">Electricity Bill, LPG Bill, Rent Agreement, etc.</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3.5 rounded-xl border border-gray-200">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <input
+                              id="currentAddressProofInput"
+                              type="file"
+                              multiple
+                              accept=".pdf, image/*"
+                              onChange={(e) => addFilesToDoc(setCurrentAddressProofDoc, e.target.files)}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="currentAddressProofInput"
+                              className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+                            >
+                              <Upload className="w-4 h-4" />
+                              <span>{getDocFiles(currentAddressProofDoc).length > 0 ? "Add More File" : "Upload Current Address Proof"}</span>
+                            </label>
+
+                            {getDocFiles(currentAddressProofDoc).map((name, idx) => (
+                              <div key={idx} className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs text-blue-950 shadow-2xs">
+                                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                                <span className="font-bold truncate max-w-[180px] sm:max-w-xs">{name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFileFromDoc(setCurrentAddressProofDoc, idx)}
+                                  className="p-0.5 text-red-600 hover:text-white hover:bg-red-600 rounded-full transition-all cursor-pointer shrink-0 ml-1"
+                                  title="Remove this file"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 8. ADDRESS PROOF FOR PERMANENT ADDRESS (MANDATORY) */}
+                      <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                              <Building className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-bold text-gray-900">
+                                8. Address Proof for Permanent Address <span className="text-red-500">* (Mandatory)</span>
+                              </h5>
+                              <p className="text-[11px] text-gray-500">Electricity Bill, LPG Bill, Home Tax, Water Tax, or Govt issued document</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3.5 rounded-xl border border-gray-200">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <input
+                              id="permanentAddressProofInput"
+                              type="file"
+                              multiple
+                              accept=".pdf, image/*"
+                              onChange={(e) => addFilesToDoc(setPermanentAddressProofDoc, e.target.files)}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="permanentAddressProofInput"
+                              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-200 flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+                            >
+                              <Upload className="w-4 h-4" />
+                              <span>{getDocFiles(permanentAddressProofDoc).length > 0 ? "Add More File" : "Upload Permanent Address Proof"}</span>
+                            </label>
+
+                            {getDocFiles(permanentAddressProofDoc).map((name, idx) => (
+                              <div key={idx} className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs text-indigo-950 shadow-2xs">
+                                <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                                <span className="font-bold truncate max-w-[180px] sm:max-w-xs">{name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFileFromDoc(setPermanentAddressProofDoc, idx)}
+                                  className="p-0.5 text-red-600 hover:text-white hover:bg-red-600 rounded-full transition-all cursor-pointer shrink-0 ml-1"
+                                  title="Remove this file"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 9. FORM 26AS (LAST TWO YEARS) (OPTIONAL) */}
+                      <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                              <FileSpreadsheet className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-bold text-gray-900">
+                                9. Form 26AS (Last 2 Financial Years) <span className="text-gray-400 font-normal">(Optional)</span>
+                              </h5>
+                              <p className="text-[11px] text-gray-500">Upload Form 26AS for last 2 years for income & tax verification</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3.5 rounded-xl border border-gray-200">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <input
+                              id="form26ASInput"
+                              type="file"
+                              multiple
+                              accept=".pdf, image/*"
+                              onChange={(e) => addFilesToDoc(setForm26ASDoc, e.target.files)}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="form26ASInput"
+                              className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200 flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+                            >
+                              <Upload className="w-4 h-4" />
+                              <span>{getDocFiles(form26ASDoc).length > 0 ? "Add More Form 26AS" : "Upload Form 26AS"}</span>
+                            </label>
+
+                            {getDocFiles(form26ASDoc).map((name, idx) => (
+                              <div key={idx} className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs text-emerald-950 shadow-2xs">
+                                <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span className="font-bold truncate max-w-[180px] sm:max-w-xs">{name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFileFromDoc(setForm26ASDoc, idx)}
+                                  className="p-0.5 text-red-600 hover:text-white hover:bg-red-600 rounded-full transition-all cursor-pointer shrink-0 ml-1"
+                                  title="Remove this file"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="pt-4 flex justify-between">
+                    <div className="pt-2 flex justify-between">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(1)}
@@ -2033,7 +2427,7 @@ export default function ApplyForLoanView({
                     </div>
 
                     {/* Final Submit & Back Buttons */}
-                    <div className="pt-4 flex justify-between items-center">
+                    <div className="pt-2 flex justify-between items-center">
                       <button
                         type="button"
                         onClick={() => setCurrentStep(2)}
