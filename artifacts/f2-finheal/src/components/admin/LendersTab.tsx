@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { LenderProduct } from "@/components/LoanCalculatorView";
+import LenderVersionHistoryModal from "./LenderVersionHistoryModal";
 
 interface LendersTabProps {
   filteredLenders: LenderProduct[];
@@ -8,6 +10,7 @@ interface LendersTabProps {
   handleOpenAddLender: () => void;
   handleOpenEditLender: (l: LenderProduct) => void;
   handleDeleteLender: (l: LenderProduct) => void;
+  onRefreshLenders?: () => void;
 }
 
 export default function LendersTab({
@@ -18,31 +21,62 @@ export default function LendersTab({
   handleOpenAddLender,
   handleOpenEditLender,
   handleDeleteLender,
+  onRefreshLenders,
 }: LendersTabProps) {
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedLenderId, setSelectedLenderId] = useState<string | null>(null);
+  const [selectedLenderName, setSelectedLenderName] = useState<string | null>(null);
+
+  const handleOpenGlobalHistory = () => {
+    setSelectedLenderId(null);
+    setSelectedLenderName(null);
+    setHistoryModalOpen(true);
+  };
+
+  const handleOpenLenderHistory = (l: LenderProduct) => {
+    setSelectedLenderId(l.id);
+    setSelectedLenderName(l.name);
+    setHistoryModalOpen(true);
+  };
+
   return (
     <div className="space-y-[16px] animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-100 pb-3.5 pt-1">
         <div>
-          <h3 className="text-[14px] font-bold text-gray-900">Manage Lenders Catalog ({filteredLenders.length})</h3>
-          <p className="text-[10px] text-gray-400 mt-[2px]">Administer and customize bank loan products catalog list.</p>
+          <h3 className="text-[15px] font-bold text-gray-900 flex items-center gap-2">
+            Manage Lenders Catalog
+            <span className="bg-primary/10 text-primary text-[11px] font-extrabold px-2 py-0.5 rounded-full">
+              {filteredLenders.length}
+            </span>
+          </h3>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Administer bank loan products catalog & track policy version history.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Lender Search Input */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500 font-semibold">Search:</span>
+          <div className="flex items-center gap-2 bg-gray-50/80 border border-gray-200 rounded-[10px] px-2.5 h-[36px]">
+            <span className="text-[11px] text-gray-400 font-semibold select-none">Search:</span>
             <input
               type="text"
               placeholder="Search Bank/Product..."
               value={filterLenderSearch}
               onChange={(e) => setFilterLenderSearch(e.target.value)}
-              className="h-[32px] px-[12px] w-[180px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white shadow-inner focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+              className="w-[140px] sm:w-[160px] text-[11px] font-medium text-gray-700 bg-transparent focus:outline-none placeholder:text-gray-400"
             />
           </div>
 
           <button
+            onClick={handleOpenGlobalHistory}
+            className="h-[36px] bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold px-[12px] rounded-[10px] text-[11px] cursor-pointer transition flex items-center gap-1.5 whitespace-nowrap shadow-2xs"
+          >
+            <span>📜</span> Catalog Audit Trail
+          </button>
+
+          <button
             onClick={handleOpenAddLender}
-            className="bg-primary text-white hover:opacity-90 font-bold py-[8px] px-[16px] rounded-[10px] text-[12px] cursor-pointer"
+            className="h-[36px] bg-primary text-white hover:opacity-95 font-bold px-[14px] rounded-[10px] text-[11px] cursor-pointer transition whitespace-nowrap shadow-2xs"
           >
             + Add Lender Product
           </button>
@@ -109,7 +143,14 @@ export default function LendersTab({
                     <span>CIBIL: ≥{l.minCibil}</span>
                     <span className="block text-[10px] text-gray-400">Min Income: ₹{l.minMonthlyIncome.toLocaleString("en-IN")}</span>
                   </td>
-                  <td className="p-[12px] text-right space-x-[6px]">
+                  <td className="p-[12px] text-right space-x-[8px]">
+                    <button
+                      onClick={() => handleOpenLenderHistory(l)}
+                      className="text-amber-600 hover:text-amber-700 hover:underline font-bold cursor-pointer text-[11px]"
+                      title="View Version History & Field Diffs"
+                    >
+                      📜 History
+                    </button>
                     <button
                       onClick={() => handleOpenEditLender(l)}
                       className="text-primary hover:underline font-bold cursor-pointer"
@@ -129,6 +170,17 @@ export default function LendersTab({
           </tbody>
         </table>
       </div>
+
+      {/* Version History Modal */}
+      <LenderVersionHistoryModal
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        lenderId={selectedLenderId}
+        lenderName={selectedLenderName}
+        onRollbackSuccess={() => {
+          if (onRefreshLenders) onRefreshLenders();
+        }}
+      />
     </div>
   );
 }

@@ -1364,10 +1364,30 @@ ${sheetDataXml}
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      let empId = (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-ADMIN");
+      let empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Admin User";
+      let empDesignation = userEmail && userEmail.toLowerCase().includes("admin") ? "System Administrator" : "Credit & Ops Staff";
+
+      try {
+        const rawAuth = localStorage.getItem("finheal_auth_session");
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth);
+          if (parsed.userId) empId = parsed.userId;
+          if (parsed.userName) empName = parsed.userName;
+          if (parsed.designation) empDesignation = parsed.designation;
+        }
+      } catch (e) {}
+
+      let empMeta = { employee_id: empId, name: empName, designation: empDesignation };
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empMeta.employee_id,
+          "X-Employee-Name": empMeta.name,
+          "X-Designation": empMeta.designation,
+          "X-Change-Reason": editingLender ? `Updated policy criteria for ${editingLender.name}` : `Added new lender product ${item.name}`
         },
         body: JSON.stringify(updatedList),
       });
@@ -1397,10 +1417,30 @@ ${sheetDataXml}
     const updatedList = lenderList.filter(l => l.id !== lenderToDelete.id);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      let empId = (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-ADMIN");
+      let empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Admin User";
+      let empDesignation = userEmail && userEmail.toLowerCase().includes("admin") ? "System Administrator" : "Credit & Ops Staff";
+
+      try {
+        const rawAuth = localStorage.getItem("finheal_auth_session");
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth);
+          if (parsed.userId) empId = parsed.userId;
+          if (parsed.userName) empName = parsed.userName;
+          if (parsed.designation) empDesignation = parsed.designation;
+        }
+      } catch (e) {}
+
+      let empMeta = { employee_id: empId, name: empName, designation: empDesignation };
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empMeta.employee_id,
+          "X-Employee-Name": empMeta.name,
+          "X-Designation": empDesignation,
+          "X-Change-Reason": `Deleted lender product ${lenderToDelete.name}`
         },
         body: JSON.stringify(updatedList),
       });

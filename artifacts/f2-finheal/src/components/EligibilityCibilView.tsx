@@ -789,10 +789,18 @@ export default function EligibilityCibilView({
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const empId = selectedEmployeeId || (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-STAFF"));
+      const empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Staff User";
+      const empDesignation = isSuperAdmin ? "System Administrator" : "Credit & Ops Staff";
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empId,
+          "X-Employee-Name": empName,
+          "X-Designation": empDesignation,
+          "X-Change-Reason": editingLender ? `Updated policy criteria for ${editingLender.name}` : `Added new lender product ${item.name}`
         },
         body: JSON.stringify(updatedList),
       });
@@ -821,10 +829,18 @@ export default function EligibilityCibilView({
     const updatedList = lenders.filter(l => l.id !== lenderToDelete.id);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const empId = selectedEmployeeId || (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-STAFF"));
+      const empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Staff User";
+      const empDesignation = isSuperAdmin ? "System Administrator" : "Credit & Ops Staff";
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empId,
+          "X-Employee-Name": empName,
+          "X-Designation": empDesignation,
+          "X-Change-Reason": `Deleted lender product ${lenderToDelete.name}`
         },
         body: JSON.stringify(updatedList),
       });
