@@ -740,6 +740,10 @@ export default function ApplyForLoanView({
       alert("Please enter your City / Location.");
       return;
     }
+    if (!formData.monthlyIncome?.trim()) {
+      alert("Please enter your Monthly Income.");
+      return;
+    }
     if (!formData.currentAddress?.trim()) {
       alert("Please enter your Current Address.");
       return;
@@ -1456,22 +1460,21 @@ export default function ApplyForLoanView({
                       </div>
 
                       {/* Monthly Income */}
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <label className="text-xs font-semibold text-gray-700 block">Monthly Income Range (Approx.)</label>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantMonthlyIncome">
+                          Monthly Income (₹) *
+                        </label>
                         <div className="relative">
-                          <Wallet className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
-                          <select
-                            value={formData.monthlyIncome}
+                          <Wallet className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <input
+                            id="applicantMonthlyIncome"
+                            type="text"
+                            required
+                            value={formData.monthlyIncome || ""}
                             onChange={(e) => setFormData({ ...formData, monthlyIncome: e.target.value })}
-                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white appearance-none cursor-pointer"
-                          >
-                            <option value="">Select income range</option>
-                            <option value="below_25k">Below ₹25,000</option>
-                            <option value="25k_50k">₹25,000 - ₹50,000</option>
-                            <option value="50k_1lakh">₹50,000 - ₹1,00,000</option>
-                            <option value="above_1lakh">Above ₹1,00,000</option>
-                          </select>
-                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                            placeholder="e.g. 75,000"
+                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                          />
                         </div>
                       </div>
 
