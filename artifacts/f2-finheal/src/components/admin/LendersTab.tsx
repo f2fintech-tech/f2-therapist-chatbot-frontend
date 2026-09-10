@@ -54,29 +54,29 @@ export default function LendersTab({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           {/* Lender Search Input */}
-          <div className="flex items-center gap-2 bg-gray-50/80 border border-gray-200 rounded-[10px] px-2.5 h-[36px]">
+          <div className="flex items-center gap-1.5 bg-gray-50/90 border border-gray-200 rounded-[10px] px-2.5 h-[34px] shrink-0">
             <span className="text-[11px] text-gray-400 font-semibold select-none">Search:</span>
             <input
               type="text"
               placeholder="Search Bank/Product..."
               value={filterLenderSearch}
               onChange={(e) => setFilterLenderSearch(e.target.value)}
-              className="w-[140px] sm:w-[160px] text-[11px] font-medium text-gray-700 bg-transparent focus:outline-none placeholder:text-gray-400"
+              className="w-[125px] sm:w-[145px] text-[11px] font-medium text-gray-700 bg-transparent focus:outline-none placeholder:text-gray-400"
             />
           </div>
 
           <button
             onClick={handleOpenGlobalHistory}
-            className="h-[36px] bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold px-[12px] rounded-[10px] text-[11px] cursor-pointer transition flex items-center gap-1.5 whitespace-nowrap shadow-2xs"
+            className="h-[34px] bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 font-bold px-[11px] rounded-[10px] text-[11px] cursor-pointer transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
           >
-            <span>📜</span> Catalog Audit Trail
+            <span>📜</span> Audit Trail
           </button>
 
           <button
             onClick={handleOpenAddLender}
-            className="h-[36px] bg-primary text-white hover:opacity-95 font-bold px-[14px] rounded-[10px] text-[11px] cursor-pointer transition whitespace-nowrap shadow-2xs"
+            className="h-[34px] bg-primary text-white hover:opacity-95 font-bold px-[13px] rounded-[10px] text-[11px] cursor-pointer transition shrink-0 whitespace-nowrap shadow-2xs"
           >
             + Add Lender Product
           </button>

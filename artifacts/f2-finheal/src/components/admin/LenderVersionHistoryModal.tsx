@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export interface VersionRecord {
   id: string;
@@ -22,7 +23,6 @@ interface LenderVersionHistoryModalProps {
   onClose: () => void;
   lenderId: string | null;
   lenderName: string | null;
-  onRollbackSuccess?: () => void;
 }
 
 export default function LenderVersionHistoryModal({
@@ -30,14 +30,12 @@ export default function LenderVersionHistoryModal({
   onClose,
   lenderId,
   lenderName,
-  onRollbackSuccess,
 }: LenderVersionHistoryModalProps) {
   const [history, setHistory] = useState<VersionRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [searchEmployee, setSearchEmployee] = useState<string>("");
   const [filterDate, setFilterDate] = useState<string>("");
-  const [rollingBackVer, setRollingBackVer] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -65,42 +63,6 @@ export default function LenderVersionHistoryModal({
       setError(err.message || "Failed to load version history.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRollback = async (ver: number) => {
-    if (!lenderId) return;
-    const confirm = window.confirm(
-      `Are you sure you want to rollback ${lenderName || lenderId} to Version ${ver}? This will create a new audit entry and restore all policy settings from Version ${ver}.`
-    );
-    if (!confirm) return;
-
-    setRollingBackVer(ver);
-    try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/lenders/${lenderId}/rollback/${ver}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Employee-ID": "f2-369-012",
-          "X-Employee-Name": "Admin User",
-          "X-Designation": "System Administrator",
-        },
-      });
-
-      if (res.ok) {
-        alert(`Successfully rolled back to Version ${ver}!`);
-        fetchHistory();
-        if (onRollbackSuccess) onRollbackSuccess();
-      } else {
-        const errData = await res.json();
-        alert("Rollback failed: " + (errData.detail || JSON.stringify(errData)));
-      }
-    } catch (err) {
-      console.error("Error performing rollback:", err);
-      alert("Network error executing rollback.");
-    } finally {
-      setRollingBackVer(null);
     }
   };
 
@@ -132,9 +94,9 @@ export default function LenderVersionHistoryModal({
     return true;
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="bg-white rounded-[20px] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100">
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+      <div className="bg-white rounded-[20px] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 my-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/80">
           <div>
@@ -148,7 +110,7 @@ export default function LenderVersionHistoryModal({
             </div>
             <p className="text-[11px] text-gray-500 mt-1">
               {lenderId
-                ? `Track all employee edits, criteria changes, and rollbacks for Product ID: ${lenderId}`
+                ? `Track all employee edits and criteria changes for Product ID: ${lenderId}`
                 : "Full audit log of policy updates across all lender products."}
             </p>
           </div>
@@ -274,16 +236,6 @@ export default function LenderVersionHistoryModal({
                           ? new Date(item.created_at.endsWith("Z") || item.created_at.includes("+") ? item.created_at : item.created_at + "Z").toLocaleString()
                           : ""}
                       </span>
-
-                      {lenderId && item.version > 1 && (
-                        <button
-                          onClick={() => handleRollback(item.version)}
-                          disabled={rollingBackVer === item.version}
-                          className="px-2.5 py-1 rounded-[8px] bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
-                        >
-                          {rollingBackVer === item.version ? "Rolling back..." : `↺ Rollback to V${item.version}`}
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -363,4 +315,6 @@ export default function LenderVersionHistoryModal({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modalContent, document.body) : null;
 }
