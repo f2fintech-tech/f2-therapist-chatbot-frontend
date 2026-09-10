@@ -21,7 +21,7 @@ interface SidebarProps {
   onOpenProfile: () => void;
   onOpenEducation?: () => void;
   onOpenAdvisor?: () => void;
-  onOpenAdmin?: () => void;
+  onOpenAdmin?: (tab?: string) => void;
   onLogout?: () => void;
   initialActiveNav: string;
   onSelectMood?: (moodEmoji: string, moodTitle: string) => void;
@@ -69,7 +69,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     const loadPermissions = async () => {
       // Super admins have all permissions — no need to check
       if (isSuperAdmin) {
-        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]);
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
         return;
       }
 
@@ -324,6 +324,15 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   const handleOpenAdmin = () => {
     setActiveNav(isStaff && !isSuperAdmin ? "Advisor Workspace" : "Admin Portal");
     onOpenAdmin?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenManageEducation = () => {
+    setActiveNav("Manage Education");
+    onOpenAdmin?.("education");
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -697,6 +706,11 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               {/* If Expert/Advisor/Staff — show Workspace if they are a front-facing advisor */}
               {isUserAdvisor(userEmail) && !isSuperAdmin && (
                 <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
+              )}
+
+              {/* If Employee/Advisor has education_edit permission and is not Super Admin */}
+              {(hasPermission("education_edit") || userPermissions.includes("education_edit")) && !isSuperAdmin && (
+                <NavBtn icon="📚" label="Manage Education" active={activeNav === "Manage Education"} onClick={handleOpenManageEducation} />
               )}
 
 

@@ -11,7 +11,7 @@ import { listUserGoals, type Goal } from "@/utils/localGoals";
 import { getConversations } from "@/lib/backendChat";
 import { listLocalConversations } from "@/utils/localConversations";
 import { getStoredAuthSession } from "@/utils/authSession";
-import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, generateOnDemandReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults } from "@/lib/backendAuth";
+import { fetchAdvisors, fetchUserProfile, isAdvisorSlotActive, fetchUserReports, type UserReport, generateOnDemandReport, fetchAdvisorAppointments, fetchAdminStats, fetchAllAppointments, authRequest, fetchTestResults, fetchEducationContent } from "@/lib/backendAuth";
 import { classifyEnquiryRole } from "./AdminPortal";
 import { hasSessionEnded } from "./AdvisorPanel";
 import { getEffectiveAvailability } from "@/utils/availability";
@@ -991,24 +991,48 @@ export default function Dashboard({
   useEffect(() => {
     if (!isAdmin) return;
 
-    // Read local education items managed by Admin
-    const storedContent = localStorage.getItem("finheal_education_content");
-    const eduList = storedContent ? JSON.parse(storedContent) : null;
-    const articlesActive = eduList
-      ? eduList.filter((c: any) => c.type === "article").length
-      : CONTENT.filter(c => c.type === "article").length;
-    const videosActive = eduList
-      ? eduList.filter((c: any) => c.type === "video").length
-      : CONTENT.filter(c => c.type === "video").length;
+    let isMounted = true;
+    const loadEduCounts = async () => {
+      try {
+        const backendItems = await fetchEducationContent();
+        if (isMounted && backendItems && backendItems.length > 0) {
+          const articlesActive = backendItems.filter((c: any) => c.type === "article").length;
+          const videosActive = backendItems.filter((c: any) => c.type === "video").length;
+          const testsActive = backendStats?.active_tests_count ?? 5;
+          setActiveCounts({
+            articles: articlesActive,
+            videos: videosActive,
+            tests: testsActive
+          });
+          return;
+        }
+      } catch (e) {}
 
-    // Read tests count dynamically from backend stats
-    const testsActive = backendStats?.active_tests_count ?? 5;
+      // Fallback
+      const storedContent = localStorage.getItem("finheal_education_content");
+      const eduList = storedContent ? JSON.parse(storedContent) : null;
+      const articlesActive = eduList
+        ? eduList.filter((c: any) => c.type === "article").length
+        : CONTENT.filter(c => c.type === "article").length;
+      const videosActive = eduList
+        ? eduList.filter((c: any) => c.type === "video").length
+        : CONTENT.filter(c => c.type === "video").length;
+      const testsActive = backendStats?.active_tests_count ?? 5;
 
-    setActiveCounts({
-      articles: articlesActive,
-      videos: videosActive,
-      tests: testsActive
-    });
+      if (isMounted) {
+        setActiveCounts({
+          articles: articlesActive,
+          videos: videosActive,
+          tests: testsActive
+        });
+      }
+    };
+
+    void loadEduCounts();
+
+    return () => {
+      isMounted = false;
+    };
   }, [backendStats, isAdmin]);
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [lenderList, setLenderList] = useState<any[]>([]);

@@ -580,8 +580,17 @@ export default function FinHealChat() {
       // 2. Secure Admin Portal route
       if (mainView.startsWith("admin")) {
         if (!isSuperAdmin) {
-          if (isStaff && location === "/admin/cibil-enquiries") {
+          let userPerms = authSession.permissions || [];
+          if (!userPerms.length) {
+            try {
+              const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
+              userPerms = session?.permissions || [];
+            } catch (e) { }
+          }
+          if (isStaff && location === "/admin/cibil-enquiries" && (userPerms.includes("cibil_view") || userPerms.includes("cibil_view_all") || userPerms.length === 0)) {
             // Allow authorized staff to view the specific CIBIL Enquiries admin tab
+          } else if (isStaff && location === "/admin/education" && (userPerms.includes("education_edit") || userPerms.length === 0)) {
+            // Allow authorized staff to view the specific Education admin tab
           } else {
             setLocation("/chat", { replace: true });
             return;
@@ -678,7 +687,7 @@ export default function FinHealChat() {
   const openAdvisor = () => setMainView("advisor");
   const openAdmin = (tab?: string) => {
     const isSuperAdmin = authSession?.email ? ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase()) : false;
-    const basePath = (isSuperAdmin || tab === "cibil-enquiries") ? "admin" : "advisor-workspace";
+    const basePath = (isSuperAdmin || tab === "cibil-enquiries" || tab === "education") ? "admin" : "advisor-workspace";
     setMainView(tab ? `${basePath}/${tab}` : basePath);
   };
   const openLoanCalculator = () => setMainView("loan-calculator");

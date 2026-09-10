@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Lock, AlertTriangle, ShieldCheck, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender, getDefaultCreditLimitForEmployee } from "@/lib/backendAuth";
+import { fetchAdminStats, type BackendStats, fetchAdvisors, saveAdvisor, deleteAdvisor, updateAdvisorAvailability, updateAdvisorNextSlot, fetchAllAppointments, uploadAdvisorAvatar, updateAppointmentStatus, rescheduleAppointment, updateAdvisorPassword, isAdvisorSlotActive, generateReferral, listReferrals, type ReferralCode, updateAdvisorRole, signInUser, joinAppointment, updateAdvisorActiveStatus, checkAdvisorCibilLimit, fetchAllTestResults, type AdminTestResult, deleteAdminTestResult, fetchCibilTrash, restoreCibilEnquiry, fetchAdvisorsTrash, restoreAdvisor, deleteAppointment, restoreAppointment, permanentlyDeleteAppointment, fetchAppointmentsTrash, fetchLendersTrash, restoreLender, getDefaultCreditLimitForEmployee, fetchEducationContent, saveEducationItem, updateEducationItem, deleteEducationItem, fetchEducationTrash, restoreEducationItem, permanentlyDeleteEducationItem, syncLocalEducationToBackend, extractYoutubeId, extractShortOrReel } from "@/lib/backendAuth";
 import { advisorsData, type Advisor, hasSessionEnded } from "@/components/AdvisorPanel";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -307,7 +307,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
     testRating: 5,
     department: "Founder's Office",
     isAdvisor: false,
-    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"] as string[],
+    permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"] as string[],
     creditReportLimit: -1 as number | null,
     creditReportTempLimit: "" as number | string | null,
     creditReportTempMonth: "" as string | null
@@ -315,7 +315,7 @@ export default function AdminPortal({ userId, userEmail, onToggleSidebar, onTogg
 
   // Education form state
   const [eduForm, setEduForm] = useState({
-    type: "article" as "article" | "video",
+    type: "article" as "article" | "video" | "short",
     title: "",
     level: "Beginner" as "Beginner" | "Intermediate" | "Advanced",
     category: "Loans",
@@ -1567,59 +1567,57 @@ ${sheetDataXml}
     }
   };
 
-  // Load local storage states (static content with zero network cost)
+  // Load educational content from backend and synchronize local storage items
   useEffect(() => {
-    // 1. Educational content & Trash
-    const storedContent = localStorage.getItem("finheal_education_content");
-    let activeList: ContentItem[] = [];
-    if (storedContent) {
+    let isMounted = true;
+
+    const loadEducationData = async () => {
       try {
-        activeList = JSON.parse(storedContent);
+        setEducationLoading(true);
+        // Check if there are local storage items to sync to backend first
+        const storedContent = localStorage.getItem("finheal_education_content");
+        if (storedContent) {
+          try {
+            const parsed = JSON.parse(storedContent);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              await syncLocalEducationToBackend(parsed).catch(() => {});
+            }
+          } catch {}
+        }
+
+        const [backendActive, backendTrash] = await Promise.all([
+          fetchEducationContent().catch(() => []),
+          fetchEducationTrash().catch(() => [])
+        ]);
+
+        if (isMounted) {
+          if (backendActive && backendActive.length > 0) {
+            setEducationContent(backendActive as ContentItem[]);
+            localStorage.setItem("finheal_education_content", JSON.stringify(backendActive));
+          } else {
+            setEducationContent(CONTENT);
+          }
+
+          if (backendTrash) {
+            setEducationTrash(backendTrash as ContentItem[]);
+            localStorage.setItem("finheal_education_trash", JSON.stringify(backendTrash));
+          }
+        }
       } catch (e) {
-        activeList = [...CONTENT];
+        console.error("Error loading education data from backend:", e);
+      } finally {
+        if (isMounted) setEducationLoading(false);
       }
-    } else {
-      activeList = [...CONTENT];
-    }
+    };
 
-    const storedTrash = localStorage.getItem("finheal_education_trash");
-    let trashList: ContentItem[] = [];
-    if (storedTrash) {
-      try {
-        const parsedTrash = JSON.parse(storedTrash);
-        const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000; // 3 days
-        // Prune expired trash items
-        trashList = parsedTrash.filter((item: any) => {
-          const deletedAtTime = new Date(item.deletedAt).getTime();
-          return deletedAtTime >= cutoff;
-        });
-      } catch (e) {
-        trashList = [];
-      }
-    }
-
-    // Check if any default CONTENT items are missing (Self-healing)
-    let missingDefaults: ContentItem[] = [];
-    CONTENT.forEach((defItem) => {
-      const existsInActive = activeList.some(item => item.id === defItem.id);
-      const existsInTrash = trashList.some(item => item.id === defItem.id);
-      if (!existsInActive && !existsInTrash) {
-        missingDefaults.push(defItem);
-      }
-    });
-
-    if (missingDefaults.length > 0) {
-      activeList = [...activeList, ...missingDefaults];
-      localStorage.setItem("finheal_education_content", JSON.stringify(activeList));
-    }
-
-    setEducationContent(activeList);
-    setEducationTrash(trashList);
-    localStorage.setItem("finheal_education_trash", JSON.stringify(trashList));
-    setEducationLoading(false);
+    void loadEducationData();
 
     // 2. Tests List
     setTestCatalog(testCards);
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchCustomTests = async (showLoading: boolean = false) => {
@@ -1880,7 +1878,7 @@ ${sheetDataXml}
       testRating: 5,
       department: "Founder's Office",
       isAdvisor: false,
-      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      permissions: ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"],
       creditReportLimit: -1,
       creditReportTempLimit: "",
       creditReportTempMonth: ""
@@ -1917,7 +1915,7 @@ ${sheetDataXml}
       testRating: 5,
       department: (adv.department && adv.department !== "General") ? adv.department : "Founder's Office",
       isAdvisor: adv.isAdvisor ?? false,
-      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"],
+      permissions: adv.permissions || ["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"],
       creditReportLimit: adv.creditReportLimit !== undefined && adv.creditReportLimit !== null ? adv.creditReportLimit : getDefaultCreditLimitForEmployee(adv.department, adv.designation),
       creditReportTempLimit: adv.creditReportTempLimit ?? "",
       creditReportTempMonth: adv.creditReportTempMonth ?? ""
@@ -2115,10 +2113,38 @@ ${sheetDataXml}
     setEducationModalOpen(true);
   };
 
-  const handleSaveEdu = () => {
+  const handleSaveEdu = async () => {
     if (!eduForm.title.trim() || !eduForm.description.trim()) {
       alert("Title and description are required!");
       return;
+    }
+
+    let finalYoutubeId: string | undefined = undefined;
+    let finalArticleUrl: string | undefined = undefined;
+    let finalSource = eduForm.source.trim() || "f2fintech.com";
+    let finalEmoji = eduForm.emoji.trim() || "📚";
+    let finalBgColor = eduForm.bgColor.trim() || "#E6F1FB";
+
+    if (eduForm.type === "video") {
+      finalYoutubeId = extractYoutubeId(eduForm.youtubeId);
+    } else if (eduForm.type === "article") {
+      finalArticleUrl = eduForm.articleUrl.trim();
+    } else if (eduForm.type === "short") {
+      const parsedShort = extractShortOrReel(eduForm.youtubeId || eduForm.articleUrl);
+      const isIg = parsedShort.platform === "instagram" || (eduForm.articleUrl && eduForm.articleUrl.includes("instagram.com"));
+      if (isIg) {
+        finalYoutubeId = parsedShort.id || eduForm.youtubeId.trim();
+        finalArticleUrl = parsedShort.url || eduForm.articleUrl.trim();
+        finalSource = "Instagram Reel";
+        if (finalEmoji === "📚") finalEmoji = "📸";
+        if (finalBgColor === "#E6F1FB") finalBgColor = "#bc1888";
+      } else {
+        finalYoutubeId = parsedShort.id || extractYoutubeId(eduForm.youtubeId);
+        finalArticleUrl = finalYoutubeId ? `https://www.youtube.com/shorts/${finalYoutubeId}` : undefined;
+        finalSource = "YouTube Short";
+        if (finalEmoji === "📚") finalEmoji = "💡";
+        if (finalBgColor === "#E6F1FB") finalBgColor = "#1e1b4b";
+      }
     }
 
     const item: ContentItem = {
@@ -2127,32 +2153,50 @@ ${sheetDataXml}
       title: eduForm.title.trim(),
       level: eduForm.level,
       category: eduForm.category,
-      emoji: eduForm.emoji.trim(),
-      bgColor: eduForm.bgColor.trim(),
-      youtubeId: eduForm.type === "video" ? eduForm.youtubeId.trim() : undefined,
-      articleUrl: eduForm.type === "article" ? eduForm.articleUrl.trim() : undefined,
+      emoji: finalEmoji,
+      bgColor: finalBgColor,
+      youtubeId: finalYoutubeId,
+      articleUrl: finalArticleUrl,
       description: eduForm.description.trim(),
-      source: eduForm.source.trim() || "f2fintech.com",
+      source: finalSource,
       readTime: eduForm.type === "article" ? eduForm.readTime : undefined,
-      duration: eduForm.type === "video" ? eduForm.duration : undefined
+      duration: (eduForm.type === "video" || eduForm.type === "short") ? (eduForm.duration || "1 min") : undefined
     };
 
-    let updatedList;
-    if (editingContent) {
-      updatedList = educationContent.map(c => c.id === editingContent.id ? item : c);
-    } else {
-      updatedList = [...educationContent, item];
+    try {
+      if (editingContent) {
+        await updateEducationItem(editingContent.id, item);
+        const updatedList = educationContent.map(c => c.id === editingContent.id ? item : c);
+        setEducationContent(updatedList);
+        localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
+      } else {
+        const saved = await saveEducationItem(item);
+        const updatedList = [...educationContent, saved as ContentItem];
+        setEducationContent(updatedList);
+        localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
+      }
+      dispatchUpdateEvent("finheal:education_update");
+      setEducationModalOpen(false);
+    } catch (err) {
+      console.error("Error saving education item to backend, using optimistic update:", err);
+      const updatedList = editingContent
+        ? educationContent.map(c => c.id === editingContent.id ? item : c)
+        : [...educationContent, item];
+      setEducationContent(updatedList);
+      localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
+      dispatchUpdateEvent("finheal:education_update");
+      setEducationModalOpen(false);
     }
-
-    setEducationContent(updatedList);
-    localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
-    dispatchUpdateEvent("finheal:education_update");
-    setEducationModalOpen(false);
   };
 
-  const handleDeleteEdu = (id: string) => {
+  const handleDeleteEdu = async (id: string) => {
     const itemToDelete = educationContent.find(c => c.id === id);
     if (itemToDelete && confirm("Are you sure you want to move this educational content to Trash?")) {
+      try {
+        await deleteEducationItem(id);
+      } catch (err) {
+        console.warn("Backend soft delete failed, updating local state:", err);
+      }
       const updatedList = educationContent.filter(c => c.id !== id);
       setEducationContent(updatedList);
       localStorage.setItem("finheal_education_content", JSON.stringify(updatedList));
@@ -2170,9 +2214,14 @@ ${sheetDataXml}
     }
   };
 
-  const handleRestoreEdu = (id: string) => {
+  const handleRestoreEdu = async (id: string) => {
     const itemToRestore = educationTrash.find(c => c.id === id);
     if (itemToRestore) {
+      try {
+        await restoreEducationItem(id);
+      } catch (err) {
+        console.warn("Backend restore failed, updating local state:", err);
+      }
       // 1. Remove from trash
       const updatedTrash = educationTrash.filter(c => c.id !== id);
       setEducationTrash(updatedTrash);
@@ -2190,8 +2239,13 @@ ${sheetDataXml}
     }
   };
 
-  const handlePermanentDeleteEdu = (id: string) => {
+  const handlePermanentDeleteEdu = async (id: string) => {
     if (confirm("Are you sure you want to permanently delete this content? This action cannot be undone.")) {
+      try {
+        await permanentlyDeleteEducationItem(id);
+      } catch (err) {
+        console.warn("Backend permanent delete failed, updating local state:", err);
+      }
       const updatedTrash = educationTrash.filter(c => c.id !== id);
       setEducationTrash(updatedTrash);
       localStorage.setItem("finheal_education_trash", JSON.stringify(updatedTrash));
@@ -2766,18 +2820,23 @@ ${sheetDataXml}
   });
 
   // ==================== RENDERING WORKSPACE ====================
-  let hasSessionPermission = false;
+  let hasCibilSessionPermission = false;
+  let hasEducationSessionPermission = false;
   try {
     const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
-    hasSessionPermission = (session?.permissions || []).includes("cibil_view") || (session?.permissions || []).includes("cibil_view_all");
+    const perms = session?.permissions || [];
+    hasCibilSessionPermission = perms.includes("cibil_view") || perms.includes("cibil_view_all");
+    hasEducationSessionPermission = perms.includes("education_edit");
   } catch (e) { }
 
+  const hasEducationPermission = hasEducationSessionPermission || ((activeExpert?.permissions || []).includes("education_edit"));
+
   const showAdminView = isAdmin || (activeTab === "cibil-enquiries" && (
-    hasSessionPermission ||
+    hasCibilSessionPermission ||
     (activeExpert?.permissions || []).some((p: string) => p === "cibil_view" || p === "cibil_view_all")
-  ));
+  )) || (activeTab === "education" && hasEducationPermission);
   console.log("DEBUG ADMIN PORTAL", { isAdmin, activeExpert, userId, isEmployeeId, currentExpertId, showAdminView });
-  if (!isAdmin && !isEmployeeId) {
+  if (!isAdmin && !isEmployeeId && !hasEducationPermission) {
     return (
       <main className="admin-view flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden bg-white rounded-[20px] shadow-sm border border-gray-200 justify-center items-center p-6 text-center animate-fade-in">
         <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[400px] w-full shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
@@ -4216,6 +4275,7 @@ ${sheetDataXml}
                     { key: "cibil_view_all", label: "View All Credit Reports" },
                     { key: "scheduled_calls", label: "Manage Call Calendars" },
                     { key: "lenders_edit", label: "Edit Lenders Catalog" },
+                    { key: "education_edit", label: "Manage Educational Content" },
                   ].map((perm) => {
                     const isChecked = expertForm.permissions?.includes(perm.key);
                     return (
@@ -4758,11 +4818,20 @@ ${sheetDataXml}
                   <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Resource Type</label>
                   <select
                     value={eduForm.type}
-                    onChange={(e) => setEduForm({ ...eduForm, type: e.target.value as any })}
+                    onChange={(e) => {
+                      const newType = e.target.value as any;
+                      setEduForm({
+                        ...eduForm,
+                        type: newType,
+                        emoji: newType === "short" ? "💡" : (newType === "video" ? "🎥" : "📚"),
+                        duration: newType === "short" ? "1 min" : "5 min"
+                      });
+                    }}
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white"
                   >
                     <option value="article">📄 Article</option>
-                    <option value="video">🎥 YouTube Video</option>
+                    <option value="video">🎥 YouTube Video (Full 16:9)</option>
+                    <option value="short">📱 Short Video / Reel (Vertical 9:16)</option>
                   </select>
                 </div>
                 <div>
@@ -4785,7 +4854,7 @@ ${sheetDataXml}
                   type="text"
                   value={eduForm.title}
                   onChange={(e) => setEduForm({ ...eduForm, title: e.target.value })}
-                  placeholder="e.g. 5 Strategies to cut your tax"
+                  placeholder={eduForm.type === "short" ? "e.g. Quick Finance Tip #5" : "e.g. 5 Strategies to cut your tax"}
                   className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                 />
               </div>
@@ -4800,6 +4869,7 @@ ${sheetDataXml}
                   >
                     <option value="Loans">Loans</option>
                     <option value="Credit">Credit</option>
+                    <option value="Financial Tips">Financial Tips</option>
                     <option value="Savings">Savings</option>
                     <option value="Debt">Debt</option>
                     <option value="Tax">Tax</option>
@@ -4812,7 +4882,7 @@ ${sheetDataXml}
                     type="text"
                     value={eduForm.emoji}
                     onChange={(e) => setEduForm({ ...eduForm, emoji: e.target.value })}
-                    placeholder="e.g. 📚"
+                    placeholder={eduForm.type === "short" ? "💡 or 📸" : "e.g. 📚"}
                     className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -4841,28 +4911,132 @@ ${sheetDataXml}
                     />
                   </div>
                 </div>
+              ) : eduForm.type === "short" ? (
+                <div>
+                  <div className="grid grid-cols-2 gap-[10px]">
+                    <div>
+                      <div className="flex items-center justify-between mb-[4px]">
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px]">Short or Reel Link</label>
+                        {(() => {
+                          const val = eduForm.youtubeId || eduForm.articleUrl;
+                          if (!val) return null;
+                          const p = extractShortOrReel(val);
+                          return (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${p.platform === "instagram" ? "bg-fuchsia-50 text-fuchsia-600" : "bg-red-50 text-red-600"}`}>
+                              {p.platform === "instagram" ? "📸 Instagram Reel" : "🔴 YouTube Short"}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <input
+                        type="text"
+                        value={eduForm.youtubeId || eduForm.articleUrl}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const p = extractShortOrReel(val);
+                          if (p.platform === "instagram") {
+                            setEduForm({ ...eduForm, youtubeId: p.id, articleUrl: p.url, emoji: "📸", bgColor: "#bc1888" });
+                          } else {
+                            setEduForm({ ...eduForm, youtubeId: p.id || val, articleUrl: p.url, emoji: "💡", bgColor: "#1e1b4b" });
+                          }
+                        }}
+                        placeholder="https://youtube.com/shorts/... or https://instagram.com/reel/..."
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Duration</label>
+                      <input
+                        type="text"
+                        value={eduForm.duration}
+                        onChange={(e) => setEduForm({ ...eduForm, duration: e.target.value })}
+                        placeholder="e.g. 1 min or 30s"
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    const val = eduForm.youtubeId || eduForm.articleUrl;
+                    if (!val) return null;
+                    const p = extractShortOrReel(val);
+                    if (!p.id) return null;
+                    return (
+                      <div className="mt-[8px] p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3">
+                        {p.platform === "instagram" ? (
+                          <div className="w-14 h-14 rounded-lg bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] flex flex-col items-center justify-center text-white text-[10px] font-bold shadow-xs">
+                            <span className="text-[14px]">📸</span>
+                            <span>REEL</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={`https://img.youtube.com/vi/${p.id}/mqdefault.jpg`}
+                            alt="Short Preview"
+                            className="w-14 h-14 object-cover rounded-lg shadow-xs border border-gray-200"
+                            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <div className="text-[11px] text-gray-600">
+                          <span className="font-semibold text-gray-800 flex items-center gap-1">
+                            <span className={`w-1.5 h-1.5 rounded-full ${p.platform === "instagram" ? "bg-fuchsia-500" : "bg-emerald-500"}`}></span>
+                            {p.platform === "instagram" ? "Instagram Reel Ready" : "YouTube Short Ready"}
+                          </span>
+                          <span className="text-[10px] text-gray-500 block truncate max-w-[280px]">ID: {p.id}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               ) : (
-                <div className="grid grid-cols-2 gap-[10px]">
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">YouTube Video ID</label>
-                    <input
-                      type="text"
-                      value={eduForm.youtubeId}
-                      onChange={(e) => setEduForm({ ...eduForm, youtubeId: e.target.value })}
-                      placeholder="YouTube ID (e.g., _efmpZ5k9S8)"
-                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                    />
+                <div>
+                  <div className="grid grid-cols-2 gap-[10px]">
+                    <div>
+                      <div className="flex items-center justify-between mb-[4px]">
+                        <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px]">YouTube Link or ID</label>
+                        {eduForm.youtubeId && extractYoutubeId(eduForm.youtubeId) && (
+                          <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                            ID: {extractYoutubeId(eduForm.youtubeId)}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={eduForm.youtubeId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const parsed = extractYoutubeId(val);
+                          setEduForm({ ...eduForm, youtubeId: parsed || val });
+                        }}
+                        placeholder="Paste URL or ID (e.g. https://youtu.be/...)"
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Video Duration</label>
+                      <input
+                        type="text"
+                        value={eduForm.duration}
+                        onChange={(e) => setEduForm({ ...eduForm, duration: e.target.value })}
+                        placeholder="e.g. 5 min"
+                        className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.5px] block mb-[4px]">Video Duration</label>
-                    <input
-                      type="text"
-                      value={eduForm.duration}
-                      onChange={(e) => setEduForm({ ...eduForm, duration: e.target.value })}
-                      placeholder="e.g. 5 min"
-                      className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                    />
-                  </div>
+                  {eduForm.youtubeId && extractYoutubeId(eduForm.youtubeId) && (
+                    <div className="mt-[8px] p-2 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3">
+                      <img
+                        src={`https://img.youtube.com/vi/${extractYoutubeId(eduForm.youtubeId)}/hqdefault.jpg`}
+                        alt="Thumbnail Preview"
+                        className="w-16 h-10 object-cover rounded shadow-xs border border-gray-200"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                      <div className="text-[11px] text-gray-600">
+                        <span className="font-semibold text-gray-800 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Thumbnail Ready
+                        </span>
+                        <span className="text-[10px] text-gray-500">ID: {extractYoutubeId(eduForm.youtubeId)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

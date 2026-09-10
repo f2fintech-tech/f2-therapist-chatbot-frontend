@@ -912,4 +912,144 @@ export async function restoreLender(lenderId: string): Promise<any> {
   return authRequest<any>(`lenders/${encodeURIComponent(lenderId)}/restore`, { method: "POST" });
 }
 
+export interface EducationContentItem {
+  id: string;
+  type: "video" | "article" | "short";
+  title: string;
+  level: "Beginner" | "Intermediate" | "Advanced";
+  category: string;
+  emoji: string;
+  bgColor: string;
+  youtubeId?: string;
+  articleUrl?: string;
+  date?: string;
+  description: string;
+  source: string;
+  readTime?: string;
+  duration?: string;
+  views?: string;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+}
+
+export async function fetchEducationContent(): Promise<EducationContentItem[]> {
+  return authRequest<EducationContentItem[]>("education", { method: "GET" });
+}
+
+export async function saveEducationItem(item: Partial<EducationContentItem>): Promise<EducationContentItem> {
+  return authRequest<EducationContentItem>("education", {
+    method: "POST",
+    body: JSON.stringify(item),
+  });
+}
+
+export async function updateEducationItem(id: string, item: Partial<EducationContentItem>): Promise<EducationContentItem> {
+  return authRequest<EducationContentItem>(`education/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(item),
+  });
+}
+
+export async function deleteEducationItem(id: string): Promise<any> {
+  return authRequest<any>(`education/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchEducationTrash(): Promise<EducationContentItem[]> {
+  return authRequest<EducationContentItem[]>("education/trash", { method: "GET" });
+}
+
+export async function restoreEducationItem(id: string): Promise<EducationContentItem> {
+  return authRequest<EducationContentItem>(`education/restore/${encodeURIComponent(id)}`, {
+    method: "POST",
+  });
+}
+
+export async function permanentlyDeleteEducationItem(id: string): Promise<any> {
+  return authRequest<any>(`education/permanent/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function syncLocalEducationToBackend(items: EducationContentItem[]): Promise<any> {
+  return authRequest<any>("education/sync", {
+    method: "POST",
+    body: JSON.stringify(items),
+  });
+}
+
+/**
+ * Universal YouTube ID extractor supporting:
+ * - https://www.youtube.com/watch?v=VIDEO_ID
+ * - https://youtu.be/VIDEO_ID
+ * - https://www.youtube.com/shorts/VIDEO_ID
+ * - https://www.youtube.com/embed/VIDEO_ID
+ * - https://www.youtube.com/live/VIDEO_ID
+ * - Raw 11-character Video ID
+ */
+export function extractYoutubeId(input?: string | null): string {
+  if (!input) return "";
+  const trimmed = input.trim();
+
+  // If already an 11-char ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Regex patterns for various YouTube URL structures
+  const patterns = [
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/v\/([a-zA-Z0-9_-]{11})/
+  ];
+
+  for (const regex of patterns) {
+    const match = trimmed.match(regex);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  // Generic fallback match for 11-char ID after standard tokens
+  const genericMatch = trimmed.match(/(?:v=|\/embed\/|\/shorts\/|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (genericMatch && genericMatch[1]) {
+    return genericMatch[1];
+  }
+
+  return trimmed;
+}
+
+/**
+ * Parses YouTube Shorts or Instagram Reels link/ID into structured metadata
+ */
+export function extractShortOrReel(input?: string | null): { platform: "youtube" | "instagram"; id: string; url: string } {
+  if (!input) return { platform: "youtube", id: "", url: "" };
+  const trimmed = input.trim();
+
+  // Instagram Reel detection
+  const igMatch = trimmed.match(/(?:instagram\.com\/reel\/|instagram\.com\/p\/)([a-zA-Z0-9_-]+)/);
+  if (igMatch && igMatch[1]) {
+    const code = igMatch[1];
+    return {
+      platform: "instagram",
+      id: code,
+      url: `https://www.instagram.com/reel/${code}/`
+    };
+  }
+
+  // YouTube Shorts detection
+  const ytId = extractYoutubeId(trimmed);
+  return {
+    platform: "youtube",
+    id: ytId,
+    url: ytId ? `https://www.youtube.com/shorts/${ytId}` : trimmed
+  };
+}
+
+
+
 

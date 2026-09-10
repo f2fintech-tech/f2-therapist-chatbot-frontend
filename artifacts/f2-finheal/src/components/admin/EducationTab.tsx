@@ -32,14 +32,15 @@ export default function EducationTab({
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-gray-500 font-semibold">Filter Type:</span>
-            <select
+              <select
               value={filterEduType}
               onChange={(e) => setFilterEduType(e.target.value)}
               className="h-[32px] px-[8px] rounded-[10px] border border-gray-200 text-[11px] font-medium text-gray-700 bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer transition"
             >
               <option value="all">All Content</option>
               <option value="article">Articles</option>
-              <option value="video">Videos</option>
+              <option value="video">Full Videos</option>
+              <option value="short">Shorts & Reels</option>
             </select>
           </div>
           <button
@@ -107,6 +108,8 @@ export default function EducationTab({
                   <td className="p-[12px]">
                     {item.type === "article" ? (
                       <span className="bg-blue-50 text-blue-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-blue-100">📄 Article</span>
+                    ) : item.type === "short" ? (
+                      <span className="bg-fuchsia-50 text-fuchsia-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-fuchsia-100">📱 Short / Reel</span>
                     ) : (
                       <span className="bg-purple-50 text-purple-700 px-[8px] py-[3px] rounded-full text-[10px] font-bold border border-purple-100">🎥 Video</span>
                     )}

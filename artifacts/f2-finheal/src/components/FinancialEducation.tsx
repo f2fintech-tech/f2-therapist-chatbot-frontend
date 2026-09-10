@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Confetti from "react-confetti";
 import { motion, AnimatePresence } from "framer-motion";
+import { fetchEducationContent, extractYoutubeId, extractShortOrReel } from "@/lib/backendAuth";
 
 export interface ContentItem {
   id: string;
-  type: "video" | "article";
+  type: "video" | "article" | "short";
   title: string;
   level: "Beginner" | "Intermediate" | "Advanced";
   category: string;
@@ -33,6 +34,11 @@ export const CONTENT: ContentItem[] = [
   { id: "v2", type: "video", title: "F2 Fintech - Loan Guide", source: "F2 Fintech", duration: "5 min", level: "Intermediate", category: "Loans", emoji: "💼", bgColor: "#0f6e56", youtubeId: "xcsIh2fA7w0", views: "", date: "Recent", description: "Complete guide to getting the right loan for your needs with F2 Fintech." },
   { id: "v3", type: "video", title: "F2 Fintech - Credit Score Tips", source: "F2 Fintech", duration: "5 min", level: "Beginner", category: "Credit", emoji: "⭐", bgColor: "#633806", youtubeId: "_efmpZ5k9S8", views: "", date: "Recent", description: "Learn how to improve your credit score and get better loan terms from F2 Fintech experts." },
   { id: "v4", type: "video", title: "F2 Fintech - Business Finance", source: "F2 Fintech", duration: "5 min", level: "Intermediate", category: "Business", emoji: "🏢", bgColor: "#3b0764", youtubeId: "cRRmxll1tGE", views: "", date: "Recent", description: "Business finance strategies and funding options explained by F2 Fintech professionals." },
+  { id: "s1", type: "short", title: "Quick Finance Tip #1", source: "F2 Fintech", duration: "1 min", level: "Beginner", category: "Financial Tips", emoji: "💡", bgColor: "#1e1b4b", youtubeId: "Rlyw_vt7748", articleUrl: "https://www.youtube.com/shorts/Rlyw_vt7748", date: "Recent", description: "Quick Finance Tip on managing your daily budget." },
+  { id: "s2", type: "short", title: "Quick Finance Tip #2", source: "F2 Fintech", duration: "1 min", level: "Beginner", category: "Financial Tips", emoji: "💡", bgColor: "#1e1b4b", youtubeId: "2XnoYTeA1bA", articleUrl: "https://www.youtube.com/shorts/2XnoYTeA1bA", date: "Recent", description: "Quick Finance Tip on improving savings rate." },
+  { id: "s3", type: "short", title: "Quick Finance Tip #3", source: "F2 Fintech", duration: "1 min", level: "Beginner", category: "Financial Tips", emoji: "💡", bgColor: "#1e1b4b", youtubeId: "o8TrS5Hu3tE", articleUrl: "https://www.youtube.com/shorts/o8TrS5Hu3tE", date: "Recent", description: "Quick Finance Tip on credit card payments." },
+  { id: "s4", type: "short", title: "Quick Finance Tip #4", source: "F2 Fintech", duration: "1 min", level: "Beginner", category: "Financial Tips", emoji: "💡", bgColor: "#1e1b4b", youtubeId: "et_R-v_qwVM", articleUrl: "https://www.youtube.com/shorts/et_R-v_qwVM", date: "Recent", description: "Quick Finance Tip on smart investing." },
+  { id: "s5", type: "short", title: "Understanding Personal Loans & Credit", source: "F2 Fintech", duration: "1 min", level: "Beginner", category: "Financial Tips", emoji: "📸", bgColor: "#bc1888", youtubeId: "DZ7TcesyLIV", articleUrl: "https://www.instagram.com/reel/DZ7TcesyLIV/?igsh=c3pncjRjanpzYWd6", date: "Recent", description: "Instagram Reel on understanding personal loans and credit health." }
 ];
 
 interface ShortItem {
@@ -102,27 +108,52 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("finheal_education_content");
-    if (stored) {
-      try {
-        setContentItems(JSON.parse(stored));
-      } catch (e) {
-        setContentItems(CONTENT);
-      }
-    } else {
-      localStorage.setItem("finheal_education_content", JSON.stringify(CONTENT));
-      setContentItems(CONTENT);
-    }
+    let isMounted = true;
 
-    const handleUpdate = () => {
-      const nextStored = localStorage.getItem("finheal_education_content");
-      if (nextStored) {
-        try { setContentItems(JSON.parse(nextStored)); } catch {}
+    const sortNewestFirst = (items: ContentItem[]) => {
+      return [...items].sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || "").localeCompare(a.id || "");
+      });
+    };
+
+    const loadContent = async () => {
+      try {
+        const backendItems = await fetchEducationContent();
+        if (isMounted && backendItems && backendItems.length > 0) {
+          const sorted = sortNewestFirst(backendItems as ContentItem[]);
+          setContentItems(sorted);
+          localStorage.setItem("finheal_education_content", JSON.stringify(sorted));
+          return;
+        }
+      } catch (e) {
+        console.warn("Could not fetch education content from backend, falling back to local storage:", e);
+      }
+
+      const stored = localStorage.getItem("finheal_education_content");
+      if (stored) {
+        try {
+          if (isMounted) setContentItems(sortNewestFirst(JSON.parse(stored)));
+        } catch {
+          if (isMounted) setContentItems(sortNewestFirst(CONTENT));
+        }
+      } else {
+        if (isMounted) setContentItems(sortNewestFirst(CONTENT));
       }
     };
+
+    void loadContent();
+
+    const handleUpdate = () => {
+      void loadContent();
+    };
+
     window.addEventListener("storage", handleUpdate);
     window.addEventListener("finheal:education_update", handleUpdate);
     return () => {
+      isMounted = false;
       window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("finheal:education_update", handleUpdate);
     };
@@ -187,7 +218,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     const payload = {
       title: item.title,
       description: item.description,
-      url: item.articleUrl || ("https://www.youtube.com/watch?v=" + item.youtubeId),
+      url: item.articleUrl || ("https://www.youtube.com/watch?v=" + extractYoutubeId(item.youtubeId)),
       type: item.type,
       category: item.category,
     };
@@ -210,8 +241,25 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     const [playingShort, setPlayingShort] = React.useState<string | null>(null);
     const touchStartY = React.useRef<number>(0);
     const wheelTimeout = React.useRef<any>(null);
-    const currentIdx = SHORTS.findIndex(s => s.id === playingShort);
-    const currentShort = currentIdx !== -1 ? SHORTS[currentIdx] : null;
+
+    // Dynamically derive live shorts from database items with fallback to initial constants
+    const dbShorts: ShortItem[] = (contentItems.length > 0 ? contentItems : CONTENT)
+      .filter(c => c.type === "short")
+      .map(c => {
+        const isIg = c.articleUrl?.includes("instagram.com") || c.emoji === "📸" || (c.source && c.source.toLowerCase().includes("instagram"));
+        const extracted = extractShortOrReel(c.youtubeId || c.articleUrl);
+        return {
+          id: extracted.id || c.youtubeId || c.id,
+          title: c.title,
+          platform: (isIg || extracted.platform === "instagram") ? "instagram" : "youtube",
+          reelUrl: c.articleUrl || extracted.url,
+          thumbnailUrl: isIg ? undefined : (extracted.id ? `https://img.youtube.com/vi/${extracted.id}/mqdefault.jpg` : undefined)
+        };
+      });
+
+    const liveShorts = dbShorts.length > 0 ? dbShorts : SHORTS;
+    const currentIdx = liveShorts.findIndex(s => s.id === playingShort);
+    const currentShort = currentIdx !== -1 ? liveShorts[currentIdx] : null;
     const isYoutube = !currentShort || currentShort.platform === "youtube";
 
     React.useEffect(() => {
@@ -231,8 +279,19 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
       }
     }, [playingShort]);
 
-    const goNext = () => setPlayingShort(SHORTS[currentIdx < SHORTS.length - 1 ? currentIdx + 1 : 0].id);
-    const goPrev = () => setPlayingShort(SHORTS[currentIdx > 0 ? currentIdx - 1 : SHORTS.length - 1].id);
+    const goNext = () => setPlayingShort(liveShorts[currentIdx < liveShorts.length - 1 ? currentIdx + 1 : 0].id);
+    const goPrev = () => setPlayingShort(liveShorts[currentIdx > 0 ? currentIdx - 1 : liveShorts.length - 1].id);
+
+    const [page, setPage] = React.useState(0);
+    const PAGE_SIZE = 6;
+    const totalPages = Math.max(1, Math.ceil(liveShorts.length / PAGE_SIZE));
+    const pagedShorts = liveShorts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+    React.useEffect(() => {
+      if (page >= totalPages) {
+        setPage(Math.max(0, totalPages - 1));
+      }
+    }, [totalPages, page]);
 
     const handleTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
     const handleTouchEnd = (e: React.TouchEvent) => {
@@ -252,8 +311,79 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
         <div style={{ background: "linear-gradient(135deg,#1e1b4b,#3344e6)", borderRadius: "12px 12px 0 0", padding: "10px 14px", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "14px" }}>💡</span>
           <div style={{ fontSize: "13px", fontWeight: 700, color: "white" }}>Financial Tips</div>
-          <div style={{ marginLeft: "auto", background: "rgba(255,255,255,0.2)", borderRadius: "20px", padding: "2px 8px" }}>
-            <span style={{ fontSize: "10px", color: "white", fontWeight: 600 }}>{SHORTS.length} Videos</span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: "20px", padding: "3px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "10px", color: "white", fontWeight: 600 }}>{liveShorts.length} Videos</span>
+              {totalPages > 1 && (
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.9)", fontWeight: 500, borderLeft: "1px solid rgba(255,255,255,0.3)", paddingLeft: "6px" }}>
+                  {page + 1}/{totalPages}
+                </span>
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  title="Previous 6 videos"
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "6px",
+                    background: page === 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.25)",
+                    border: "none",
+                    color: "white",
+                    cursor: page === 0 ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    opacity: page === 0 ? 0.35 : 1,
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={e => {
+                    if (page > 0) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.45)";
+                  }}
+                  onMouseLeave={e => {
+                    if (page > 0) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.25)";
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  title="Next 6 videos"
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "6px",
+                    background: page >= totalPages - 1 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.25)",
+                    border: "none",
+                    color: "white",
+                    cursor: page >= totalPages - 1 ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    opacity: page >= totalPages - 1 ? 0.35 : 1,
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={e => {
+                    if (page < totalPages - 1) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.45)";
+                  }}
+                  onMouseLeave={e => {
+                    if (page < totalPages - 1) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.25)";
+                  }}
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <div style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "0 0 12px 12px", padding: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
@@ -302,7 +432,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     <a href={"https://www.youtube.com/shorts/" + playingShort} target="_blank" rel="noopener noreferrer"
                       style={{ position: "absolute", bottom: "8px", right: "8px", display: "flex", alignItems: "center", gap: "4px", background: "rgba(255,0,0,0.92)", borderRadius: "6px", padding: "4px 8px", zIndex: 10, textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
                       <svg width="14" height="10" viewBox="0 0 24 17" fill="white" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z" />
+                        <path d="M23.5 2.5C23.2 1.4 22.3 0.5 21.2 0.2 19.4 0 12 0S4.6 0 2.8.2C1.7.5.8 1.4.5 2.5 0 4.3 0 8.5 0 8.5s0 4.2.5 6c.3 1.1 1.2 2 2.3 2.3C4.6 17 12 17 12 17s7.4 0 9.2-.2c1.1-.3 2-1.2 2.3-2.3.5-1.8.5-6 .5-6s0-4.2-.5-6z" />
                         <path d="M9.5 12l6.5-3.5L9.5 5v7z" fill="#ff0000" />
                       </svg>
                       <span style={{ fontSize: "10px", color: "white", fontWeight: 700 }}>YouTube</span>
@@ -316,7 +446,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                   )}
                 </div>
                 <div style={{ padding: "6px 8px", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
-                  <div style={{ textAlign: "center", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {SHORTS.length} · {currentShort?.title}</div>
+                  <div style={{ textAlign: "center", fontSize: "11px", color: "#1e1b4b", fontWeight: 700 }}>{currentIdx + 1} / {liveShorts.length} · {currentShort?.title}</div>
                   {!isYoutube && (
                     <div style={{ textAlign: "center", fontSize: "9.5px", color: "#6b7280", marginTop: "3px", fontStyle: "italic" }}>
                       *Tip: If the video doesn't play inline, click the Instagram button above to watch it.
@@ -331,19 +461,19 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
               </div>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
-            {SHORTS.map((s) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pagedShorts.map((s) => (
               <div key={s.id} onClick={() => setPlayingShort(playingShort === s.id ? null : s.id)}
-                style={{ borderRadius: "8px", overflow: "hidden", border: playingShort === s.id ? "2px solid #3344e6" : "1px solid #e5e7eb", cursor: "pointer", background: "white", transition: "all 0.2s" }}>
+                style={{ borderRadius: "10px", overflow: "hidden", border: playingShort === s.id ? "2px solid #3344e6" : "1px solid #e5e7eb", cursor: "pointer", background: "white", transition: "all 0.2s", boxShadow: playingShort === s.id ? "0 4px 12px rgba(51, 68, 230, 0.2)" : "0 1px 4px rgba(0,0,0,0.03)" }}>
                 <div style={{ position: "relative" }}>
                   {s.platform === "instagram" ? (
                     s.thumbnailUrl ? (
                       <img src={s.thumbnailUrl} alt={s.title}
-                        style={{ width: "100%", height: "72px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
+                        style={{ width: "100%", height: "86px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
                     ) : (
                       <div style={{
                         width: "100%",
-                        height: "72px",
+                        height: "86px",
                         background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
                         display: "flex",
                         flexDirection: "column",
@@ -354,26 +484,28 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                         fontWeight: "bold",
                         position: "relative"
                       }}>
-                        <span style={{ fontSize: "16px", marginBottom: "2px" }}>📸</span>
+                        <span style={{ fontSize: "18px", marginBottom: "2px" }}>📸</span>
                         <span style={{ letterSpacing: "0.5px" }}>INSTAGRAM REEL</span>
                       </div>
                     )
                   ) : (
                     <img src={"https://img.youtube.com/vi/" + s.id + "/mqdefault.jpg"} alt={s.title}
-                      style={{ width: "100%", height: "72px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
+                      style={{ width: "100%", height: "86px", objectFit: "cover", display: "block", opacity: playingShort === s.id ? 0.75 : 1 }} />
                   )}
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: "26px", height: "26px", background: playingShort === s.id ? "rgba(51,68,230,0.9)" : (s.platform === "instagram" ? "rgba(188,24,136,0.95)" : "rgba(255,0,0,0.85)"), borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "28px", height: "28px", background: playingShort === s.id ? "rgba(51,68,230,0.92)" : (s.platform === "instagram" ? "rgba(188,24,136,0.95)" : "rgba(255,0,0,0.88)"), borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>
                       {playingShort === s.id
-                        ? <div style={{ width: "7px", height: "7px", background: "white", borderRadius: "1px" }} />
+                        ? <div style={{ width: "8px", height: "8px", background: "white", borderRadius: "1px" }} />
                         : <div style={{ width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "9px solid white", marginLeft: "2px" }} />}
                     </div>
                   </div>
-                  <span style={{ position: "absolute", top: "4px", right: "4px", background: playingShort === s.id ? "#3344e6" : (s.platform === "instagram" ? "#c13584" : "rgba(0,0,0,0.65)"), color: "white", fontSize: "7px", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>{playingShort === s.id ? "▶ NOW" : (s.platform === "instagram" ? "REEL" : "SHORT")}</span>
+                  <span style={{ position: "absolute", top: "4px", right: "4px", background: playingShort === s.id ? "#3344e6" : (s.platform === "instagram" ? "#c13584" : "rgba(0,0,0,0.7)"), color: "white", fontSize: "8px", padding: "2px 5px", borderRadius: "4px", fontWeight: 700, backdropFilter: "blur(4px)" }}>{playingShort === s.id ? "▶ NOW" : (s.platform === "instagram" ? "REEL" : "SHORT")}</span>
                 </div>
-                <div style={{ padding: "5px 7px" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, color: playingShort === s.id ? "#3344e6" : "#1e1b4b", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                  <div style={{ fontSize: "8px", color: "#9ca3af", marginTop: "2px" }}>F2 Fintech</div>
+                <div style={{ padding: "8px 9px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: playingShort === s.id ? "#3344e6" : "#1e1b4b", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                  <div style={{ fontSize: "9px", color: "#9ca3af", marginTop: "2px", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>{s.platform === "instagram" ? "📸 Instagram" : "⚡ YouTube Short"}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -383,49 +515,106 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
     );
   };
 
-  const VideoCard = ({ item, delay = 0 }: { item: ContentItem; delay?: number }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
-      transition={{ type: "spring", stiffness: 80, damping: 12, delay }}
-      style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-      {playingVideoId === item.id && item.youtubeId ? (
-        <div style={{ width: "100%", aspectRatio: "16/9" }}>
-          <iframe width="100%" height="100%" src={"https://www.youtube.com/embed/" + item.youtubeId + "?autoplay=1"}
-            title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen style={{ border: "none", display: "block", width: "100%", height: "100%" }} />
-        </div>
-      ) : (
-        <div onClick={() => { setPlayingVideoId(item.id); markWatched(item.id); }} style={{ height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
-          <img src={"https://img.youtube.com/vi/" + item.youtubeId + "/hqdefault.jpg"} alt={item.title}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          <div style={{ position: "relative", width: "56px", height: "56px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-            <div style={{ width: 0, height: 0, borderTop: "12px solid transparent", borderBottom: "12px solid transparent", borderLeft: "20px solid white", marginLeft: "4px" }} />
+  const VideoCard = ({ item, delay = 0 }: { item: ContentItem; delay?: number }) => {
+    const cleanYtId = extractYoutubeId(item.youtubeId);
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -4, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+        transition={{ type: "spring", stiffness: 80, damping: 12, delay }}
+        style={{ background: "white", border: "1.5px solid #e5e7eb", borderRadius: "16px", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", height: "100%" }}>
+        {playingVideoId === item.id && cleanYtId ? (
+          <div>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "#0f172a",
+              padding: "6px 12px",
+              borderBottom: "1px solid #1e293b"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", display: "inline-block" }} />
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#f8fafc" }}>Now Playing</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPlayingVideoId(null);
+                }}
+                title="Close Video"
+                style={{
+                  background: "rgba(239, 68, 68, 0.18)",
+                  color: "#fca5a5",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  borderRadius: "14px",
+                  padding: "3px 10px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  transition: "all 0.15s ease"
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "#dc2626";
+                  (e.currentTarget as HTMLElement).style.color = "#ffffff";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(239, 68, 68, 0.18)";
+                  (e.currentTarget as HTMLElement).style.color = "#fca5a5";
+                }}
+              >
+                <span>✕</span>
+                <span>Close Video</span>
+              </button>
+            </div>
+            <div style={{ width: "100%", aspectRatio: "16/9", position: "relative", background: "#000" }}>
+              <iframe width="100%" height="100%" src={"https://www.youtube.com/embed/" + cleanYtId + "?autoplay=1"}
+                title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen style={{ border: "none", display: "block", width: "100%", height: "100%" }} />
+            </div>
           </div>
-          {item.duration && <span style={{ position: "absolute", bottom: "8px", right: "10px", background: "rgba(0,0,0,0.75)", color: "white", fontSize: "10px", padding: "2px 8px", borderRadius: "4px", zIndex: 1 }}>{item.duration}</span>}
+        ) : (
+          <div onClick={() => { setPlayingVideoId(item.id); markWatched(item.id); }} style={{ height: "160px", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", background: "#000" }}>
+            <img src={"https://img.youtube.com/vi/" + cleanYtId + "/hqdefault.jpg"} alt={item.title}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+            <div style={{ position: "relative", width: "52px", height: "52px", background: "rgba(255,0,0,0.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, boxShadow: "0 4px 14px rgba(0,0,0,0.3)" }}>
+              <div style={{ width: 0, height: 0, borderTop: "11px solid transparent", borderBottom: "11px solid transparent", borderLeft: "18px solid white", marginLeft: "3px" }} />
+            </div>
+            {item.duration && <span style={{ position: "absolute", bottom: "8px", right: "10px", background: "rgba(0,0,0,0.75)", color: "white", fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px", zIndex: 1 }}>{item.duration}</span>}
+          </div>
+        )}
+        <div style={{ padding: "14px", display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <span style={{ background: "#E6F1FB", color: "#0C447C", borderRadius: "20px", padding: "2px 10px", fontSize: "11px", fontWeight: 500 }}>🎥 Video</span>
+                {levelBadge(item.level)}
+              </div>
+            </div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e1b4b", marginBottom: "4px", lineHeight: 1.35 }}>{item.title}</div>
+            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "8px", lineHeight: 1.4 }}>{item.description}</div>
+          </div>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.source} · {item.date}</div>
+              <a href={"https://www.youtube.com/watch?v=" + cleanYtId} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: "11px", color: "#ff0000", fontWeight: 600, textDecoration: "none" }}>Watch on YouTube ↗</a>
+            </div>
+            <button
+              onClick={() => askAboutContent(item)}
+              style={{ width: "100%", padding: "8px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#3344e6,#7c3aed)", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+              🤖 Ask Chatbot About This
+            </button>
+          </div>
         </div>
-      )}
-      <div style={{ padding: "14px" }}>
-        <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
-          <span style={{ background: "#E6F1FB", color: "#0C447C", borderRadius: "20px", padding: "2px 10px", fontSize: "11px", fontWeight: 500 }}>🎥 Video</span>
-          {levelBadge(item.level)}
-        </div>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: "#1e1b4b", marginBottom: "4px" }}>{item.title}</div>
-        <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "6px" }}>{item.description}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.source} · {item.date}</div>
-          <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: "11px", color: "#ff0000", fontWeight: 600, textDecoration: "none" }}>Watch on YouTube ↗</a>
-        </div>
-        <button
-          onClick={() => askAboutContent(item)}
-          style={{ marginTop: "10px", width: "100%", padding: "8px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#3344e6,#7c3aed)", color: "white", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-          🤖 Ask Chatbot About This
-        </button>
-      </div>
-    </motion.div>
-  );
+      </motion.div>
+    );
+  };
 
   const ArticleCard = ({ item, delay = 0 }: { item: ContentItem; delay?: number }) => (
     <motion.a
@@ -589,7 +778,7 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "#1e1b4b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</div>
                         <div style={{ fontSize: "11px", color: "#9ca3af" }}>{item.duration}</div>
                       </div>
-                      <a href={"https://www.youtube.com/watch?v=" + item.youtubeId} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#ff0000", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#fff0f0", padding: "4px 10px", borderRadius: "20px" }}>▶ Watch</a>
+                      <a href={"https://www.youtube.com/watch?v=" + extractYoutubeId(item.youtubeId)} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: "#ff0000", flexShrink: 0, fontWeight: 600, textDecoration: "none", background: "#fff0f0", padding: "4px 10px", borderRadius: "20px" }}>▶ Watch</a>
                     </div>
                   ))}
                 </div>
@@ -599,16 +788,45 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
         </AnimatePresence>
 
         {/* TABS MENU */}
-        <div style={{ display: "flex", gap: "4px", borderBottom: "1.5px solid #e5e7eb", marginBottom: "16px" }}>
-          {(["all", "articles", "videos", "quiz"]).map(t => (
-            <motion.button
-              whileHover={{ backgroundColor: tab === t ? "#3344e6" : "#f3f4f6" }}
-              whileTap={{ scale: 0.95 }}
-              key={t} onClick={() => setTab(t as "all" | "articles" | "videos" | "quiz")}
-              style={{ padding: "8px 16px", borderRadius: "12px 12px 0 0", border: "none", fontSize: "12px", fontWeight: 600, cursor: "pointer", background: tab === t ? "#3344e6" : "transparent", color: tab === t ? "white" : "#6b7280" }}>
-              {t === "all" ? "✨ All" : t === "articles" ? "📄 Articles" : t === "videos" ? "🎥 Videos" : "🧠 Quiz"}
-            </motion.button>
-          ))}
+        <div style={{ display: "flex", gap: "6px", background: "#f3f4f6", padding: "4px", borderRadius: "12px", width: "fit-content", marginBottom: "16px", border: "1px solid #e5e7eb" }}>
+          {(["all", "articles", "videos", "quiz"] as const).map(t => {
+            const isActive = tab === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: "9px",
+                  border: "none",
+                  fontSize: "12px",
+                  fontWeight: isActive ? 700 : 600,
+                  cursor: "pointer",
+                  backgroundColor: isActive ? "#3344e6" : "transparent",
+                  color: isActive ? "#ffffff" : "#4b5563",
+                  boxShadow: isActive ? "0 2px 8px rgba(51, 68, 230, 0.3)" : "none",
+                  transition: "background-color 0.15s ease, color 0.15s ease",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = "#e5e7eb";
+                    e.currentTarget.style.color = "#111827";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "#4b5563";
+                  }
+                }}
+              >
+                {t === "all" ? "✨ All" : t === "articles" ? "📄 Articles" : t === "videos" ? "🎥 Videos" : "🧠 Quiz"}
+              </button>
+            );
+          })}
         </div>
 
         <div style={{ paddingTop: "14px" }}>
@@ -638,12 +856,53 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                     <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>Take our 2-min quiz and get content matched to your financial situation.</div>
                     <button onClick={() => setTab("quiz")} style={{ padding: "8px 20px", borderRadius: "20px", background: "#3344e6", color: "white", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>🚀 Take quiz</button>
                   </div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px" }}>📰 Latest articles</div>
-                  {filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)}
+
+                  {/* Financial Tips / Shorts & Reels */}
+                  {(categoryFilter === "All" || categoryFilter === "Financial Tips") && (
+                    <FinancialTipsColumn />
+                  )}
+
+                  {/* Videos */}
+                  {filteredVideos.length > 0 && (
+                    <div style={{ marginBottom: "20px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        🎥 Expert Videos
+                        <span style={{ fontSize: "11px", color: "#6b7280", fontWeight: 500 }}>({filteredVideos.length})</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredVideos.map((v, idx) => <VideoCard key={v.id} item={v} delay={Math.min(idx * 0.05, 0.3)} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Articles */}
+                  {filteredArticles.length > 0 && (
+                    <div style={{ marginBottom: "20px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", margin: "0 0 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        📰 Curated Articles
+                        <span style={{ fontSize: "11px", color: "#6b7280", fontWeight: 500 }}>({filteredArticles.length})</span>
+                      </div>
+                      {filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)}
+                    </div>
+                  )}
+
+                  {filteredVideos.length === 0 && filteredArticles.length === 0 && categoryFilter !== "Financial Tips" && (
+                    <div style={{ textAlign: "center", padding: "30px 16px", background: "#f9fafb", borderRadius: "16px", color: "#6b7280", fontSize: "13px" }}>
+                      No content found matching this filter or search query.
+                    </div>
+                  )}
                 </>
               )}
 
-              {tab === "articles" && filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)}
+              {tab === "articles" && (
+                filteredArticles.length > 0 ? (
+                  filteredArticles.map((a, idx) => <ArticleCard key={a.id} item={a} delay={Math.min(idx * 0.05, 0.3)} />)
+                ) : (
+                  <div style={{ textAlign: "center", padding: "30px 16px", background: "#f9fafb", borderRadius: "16px", color: "#6b7280", fontSize: "13px" }}>
+                    No articles found matching this category or search query.
+                  </div>
+                )
+              )}
 
               {tab === "videos" && (
                 <>
@@ -652,8 +911,20 @@ export default function FinancialEducation({ userId, onToggleSidebar, onAskAbout
                   ) : (
                     <>
                       {categoryFilter === "All" && <FinancialTipsColumn />}
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
-                      {filteredVideos.map((v, idx) => <VideoCard key={v.id} item={v} delay={Math.min(idx * 0.05, 0.3)} />)}
+                      {filteredVideos.length > 0 ? (
+                        <>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b4b", marginBottom: "10px" }}>🎥 Full Videos</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {filteredVideos.map((v, idx) => <VideoCard key={v.id} item={v} delay={Math.min(idx * 0.05, 0.3)} />)}
+                          </div>
+                        </>
+                      ) : (
+                        categoryFilter !== "All" && (
+                          <div style={{ textAlign: "center", padding: "30px 16px", background: "#f9fafb", borderRadius: "16px", color: "#6b7280", fontSize: "13px" }}>
+                            No full videos found for this category.
+                          </div>
+                        )
+                      )}
                     </>
                   )}
                 </>

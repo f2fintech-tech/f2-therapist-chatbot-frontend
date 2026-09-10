@@ -260,7 +260,7 @@ export default function EligibilityCibilView({
 
     const loadPermissions = async () => {
       if (isSuperAdmin) {
-        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]);
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
         return;
       }
 
