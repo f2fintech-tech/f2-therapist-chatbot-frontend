@@ -23,6 +23,7 @@ interface LenderVersionHistoryModalProps {
   onClose: () => void;
   lenderId: string | null;
   lenderName: string | null;
+  onRollbackSuccess?: () => void;
 }
 
 export default function LenderVersionHistoryModal({
@@ -30,6 +31,7 @@ export default function LenderVersionHistoryModal({
   onClose,
   lenderId,
   lenderName,
+  onRollbackSuccess,
 }: LenderVersionHistoryModalProps) {
   const [history, setHistory] = useState<VersionRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(false);

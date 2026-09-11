@@ -46,6 +46,59 @@ import {
 } from "lucide-react";
 import PolicyModal from "./PolicyModal";
 
+interface DirectorDetail {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  aadhaarDoc: {
+    mode?: "pdf" | "photo";
+    fileName?: string;
+    fileList?: string[];
+    frontPhoto?: string;
+    backPhoto?: string;
+    isEncrypted?: boolean;
+    pdfPassword?: string;
+  };
+  panDoc: {
+    mode?: "pdf" | "photo";
+    fileName?: string;
+    fileList?: string[];
+    frontPhoto?: string;
+    backPhoto?: string;
+    isEncrypted?: boolean;
+    pdfPassword?: string;
+  };
+  photoDoc: {
+    fileName?: string;
+    photoPreview?: string;
+  };
+}
+
+interface PartnerDetail {
+  id: string;
+  name: string;
+  phone: string;
+  aadhaarDoc: {
+    mode?: "pdf" | "photo";
+    fileName?: string;
+    fileList?: string[];
+    frontPhoto?: string;
+    backPhoto?: string;
+    isEncrypted?: boolean;
+    pdfPassword?: string;
+  };
+  panDoc: {
+    mode?: "pdf" | "photo";
+    fileName?: string;
+    fileList?: string[];
+    frontPhoto?: string;
+    backPhoto?: string;
+    isEncrypted?: boolean;
+    pdfPassword?: string;
+  };
+}
+
 interface ApplyForLoanViewProps {
   userId: string;
   userEmail?: string;
@@ -150,8 +203,8 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
       }
     ],
     additionalDocFields: [
-      { id: "address_proof", label: "Current Address Proof (Rent Agreement / Utility Bill)", description: "Upload if current address differs from Aadhaar card", required: false },
-      { id: "form_16", label: "Form 16 / Income Tax Return", description: "Upload Form 16 Part A & B for tax verification", required: false }
+      { id: "form_16_2yr", label: "Form 16 (Last 2 Years - Part A & Part B)", description: "For the last 2 financial years", required: true },
+      { id: "itr_2yr", label: "ITR (Last 2 Financial Years)", description: "For the last 2 financial years", required: true }
     ]
   },
   {
@@ -498,6 +551,7 @@ export default function ApplyForLoanView({
   const initialDraft = useMemo(() => loadSavedDraft(), []);
 
   const [activeTab, setActiveTab] = useState<string>(initialDraft?.activeTab || initialCategory);
+  const [businessType, setBusinessType] = useState<string>(initialDraft?.businessType || "sole_proprietorship");
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [activePolicyTab, setActivePolicyTab] = useState<"credit-consent" | "terms-of-use" | "privacy-policy" | "dpdp-notice" | "data-retention">("privacy-policy");
@@ -548,6 +602,31 @@ export default function ApplyForLoanView({
   const [permanentAddressProofDoc, setPermanentAddressProofDoc] = useState(initialDraft?.permanentAddressProofDoc || {});
   const [form26ASDoc, setForm26ASDoc] = useState(initialDraft?.form26ASDoc || {});
   const [additionalUploaded, setAdditionalUploaded] = useState<Record<string, { fileName?: string; fileList?: string[] }>>(initialDraft?.additionalUploaded || {});
+  const [companyOfficialEmail, setCompanyOfficialEmail] = useState<string>(initialDraft?.companyOfficialEmail || "");
+  const [pvtDirectors, setPvtDirectors] = useState<DirectorDetail[]>(
+    initialDraft?.pvtDirectors || [
+      {
+        id: "dir_1",
+        name: "",
+        phone: "",
+        email: "",
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" },
+        photoDoc: {}
+      }
+    ]
+  );
+  const [partnershipPartners, setPartnershipPartners] = useState<PartnerDetail[]>(
+    initialDraft?.partnershipPartners || [
+      {
+        id: "partner_1",
+        name: "",
+        phone: "",
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" }
+      }
+    ]
+  );
 
   // Auto-save form & stage progress to localStorage whenever state updates
   useEffect(() => {
@@ -556,6 +635,7 @@ export default function ApplyForLoanView({
         activeTab,
         currentStep,
         formData,
+        businessType,
         aadhaarDoc,
         panDoc,
         photoDoc,
@@ -566,13 +646,38 @@ export default function ApplyForLoanView({
         permanentAddressProofDoc,
         form26ASDoc,
         additionalUploaded,
+        companyOfficialEmail,
+        pvtDirectors,
+        partnershipPartners,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners]);
+
+  // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
+  useEffect(() => {
+    if (businessType === "llp" && pvtDirectors.length < 2) {
+      setPvtDirectors((prev) => {
+        if (prev.length >= 2) return prev;
+        const copy = [...prev];
+        while (copy.length < 2) {
+          copy.push({
+            id: `dir_${Date.now()}_${copy.length + 1}`,
+            name: "",
+            phone: "",
+            email: "",
+            aadhaarDoc: { mode: "pdf" },
+            panDoc: { mode: "pdf" },
+            photoDoc: {}
+          });
+        }
+        return copy;
+      });
+    }
+  }, [businessType]);
 
   const handleClearDraft = () => {
     if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
@@ -581,6 +686,28 @@ export default function ApplyForLoanView({
       } catch (e) { }
       setIsDraftRestored(false);
       setCurrentStep(1);
+      setBusinessType("sole_proprietorship");
+      setCompanyOfficialEmail("");
+      setPvtDirectors([
+        {
+          id: "dir_1",
+          name: "",
+          phone: "",
+          email: "",
+          aadhaarDoc: { mode: "pdf" },
+          panDoc: { mode: "pdf" },
+          photoDoc: {}
+        }
+      ]);
+      setPartnershipPartners([
+        {
+          id: "partner_1",
+          name: "",
+          phone: "",
+          aadhaarDoc: { mode: "pdf" },
+          panDoc: { mode: "pdf" }
+        }
+      ]);
       setFormData({
         fullName: "",
         fatherName: "",
@@ -634,6 +761,247 @@ export default function ApplyForLoanView({
       return [item.fileName];
     }
     return [];
+  };
+
+  // Dynamic helper for additional document fields customized per loan & entity type
+  const getEffectiveDocFields = () => {
+    if (activeTab === "business") {
+      if (businessType === "sole_proprietorship") {
+        return [
+          {
+            id: "comp_income_2yr",
+            label: "Computation of Income (Last 2 Financial Years)",
+            description: "Upload Computation of Income sheet for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "financials_pnl_bs",
+            label: "Financials (Profit & Loss Statement & Balance Sheet - Last 2 Years)",
+            description: "Upload Profit & Loss Statement & Audited/Certified Balance Sheet for the last 2 years",
+            required: true
+          },
+          {
+            id: "udyam_shop_act",
+            label: "Udyam Registration / Shop & Establishment Act Registration",
+            description: "Upload Udyam Aadhar or Shop & Establishment Act Registration certificate",
+            required: true
+          },
+          {
+            id: "gst_cert",
+            label: "GST Registration Certificate & Returns",
+            description: "Upload GST Registration certificate & recent GST returns",
+            required: false
+          },
+          {
+            id: "itr_2yr_biz",
+            label: "ITR (Last 2 Financial Years)",
+            description: "Upload Income Tax Returns (ITR with computation sheet) for the last 2 years",
+            required: true
+          }
+        ];
+      }
+      if (businessType === "pvt_ltd") {
+        return [
+          {
+            id: "bank_stmt_1yr_pvt",
+            label: "1 Year Current Account Bank Statement",
+            description: "Upload official bank account statement for the last 12 months for the company's primary current account",
+            required: true
+          },
+          {
+            id: "itr_2yr_pvt",
+            label: "ITR (Last 2 Financial Years)",
+            description: "Upload Income Tax Returns for the company for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "comp_income_2yr_ca_pvt",
+            label: "Computation of Income (Last 2 Financial Years - Verified by CA)",
+            description: "Upload Computation of Income sheet for the last 2 financial years certified and verified by a Chartered Accountant (CA)",
+            required: true
+          },
+          {
+            id: "financials_pnl_bs_pvt",
+            label: "Financial Statements (Profit & Loss Statement & Balance Sheet - Last 2 Years)",
+            description: "Upload Audited Profit & Loss Statement and Balance Sheet for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "gstr_3b_2yr_pvt",
+            label: "GSTR-3B Returns (Last 2 Financial Years)",
+            description: "Upload GSTR-3B monthly/quarterly returns filed for the last 2 years",
+            required: true
+          },
+          {
+            id: "lod_pvt",
+            label: "List of Directors (LOD)",
+            description: "Upload certified List of Directors (LOD) on company letterhead signed by authorized signatory",
+            required: true
+          },
+          {
+            id: "shareholders_list_pvt",
+            label: "List of Shareholders",
+            description: "Upload certified list of current shareholders with equity percentage breakdown",
+            required: true
+          },
+          {
+            id: "aoa_pvt",
+            label: "Articles of Association (AOA)",
+            description: "Upload official Articles of Association of the company",
+            required: true
+          },
+          {
+            id: "moa_pvt",
+            label: "Memorandum of Association (MOA)",
+            description: "Upload official Memorandum of Association of the company",
+            required: true
+          },
+          {
+            id: "udyam_pvt",
+            label: "Udyam Registration Certificate",
+            description: "Upload Udyam MSME registration certificate of the company",
+            required: true
+          },
+          {
+            id: "company_pan_pvt",
+            label: "Company PAN Card",
+            description: "Upload clear PDF or image of the Company PAN Card",
+            required: true
+          },
+          {
+            id: "gst_cert_pvt",
+            label: "GST Registration Certificate",
+            description: "Upload GST Registration Certificate (Form REG-06)",
+            required: true
+          }
+        ];
+      }
+      if (businessType === "partnership") {
+        return [
+          {
+            id: "partnership_deed",
+            label: "Partnership Deed",
+            description: "Upload registered or notarized Partnership Deed of the firm",
+            required: true
+          },
+          {
+            id: "udyam_partnership",
+            label: "Udyam Registration Certificate",
+            description: "Upload Udyam MSME Registration Certificate of the Partnership firm",
+            required: true
+          },
+          {
+            id: "gst_cert_partnership",
+            label: "GST Registration Certificate",
+            description: "Upload GST Registration Certificate (Form REG-06)",
+            required: true
+          },
+          {
+            id: "financials_pnl_bs_partnership",
+            label: "Financial Statements - Profit & Loss Statement & Balance Sheet (Last 2 Years)",
+            description: "Upload Profit & Loss Statement and Audited/Certified Balance Sheet for the last 2 years",
+            required: true
+          },
+          {
+            id: "comp_income_2yr_partnership",
+            label: "Computation of Income (Last 2 Financial Years)",
+            description: "Upload Computation of Income sheet for the firm for the last 2 financial years",
+            required: true
+          }
+        ];
+      }
+      if (businessType === "llp") {
+        return [
+          {
+            id: "bank_stmt_1yr_llp",
+            label: "1 Year Current Account Bank Statement",
+            description: "Upload official bank account statement for the last 12 months for the firm's primary current account",
+            required: true
+          },
+          {
+            id: "coi_llp",
+            label: "Certificate of Incorporation",
+            description: "Upload Certificate of Incorporation issued by Registrar of Companies (ROC)",
+            required: true
+          },
+          {
+            id: "board_resolution_llp",
+            label: "Board Resolution (BR)",
+            description: "Upload Board Resolution passed by partners authorizing loan application",
+            required: true
+          },
+          {
+            id: "lod_llp",
+            label: "List of Directors / Designated Partners (LOD)",
+            description: "Upload certified List of Directors / Designated Partners (LOD) on firm letterhead signed by authorized partner",
+            required: true
+          },
+          {
+            id: "itr_2yr_llp",
+            label: "ITR (Last 2 Financial Years)",
+            description: "Upload Income Tax Returns for the firm for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "comp_income_2yr_ca_llp",
+            label: "Computation of Income (Last 2 Financial Years - Verified by CA)",
+            description: "Upload Computation of Income sheet for the last 2 financial years certified and verified by a CA",
+            required: true
+          },
+          {
+            id: "financials_pnl_bs_llp",
+            label: "Financial Statements (Profit & Loss Statement & Balance Sheet - Last 2 Years)",
+            description: "Upload Audited Profit & Loss Statement and Balance Sheet for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "gstr_3b_2yr_llp",
+            label: "GSTR-3B Returns (Last 2 Financial Years)",
+            description: "Upload GSTR-3B monthly/quarterly returns filed for the last 2 years",
+            required: true
+          },
+          {
+            id: "shareholders_list_llp",
+            label: "List of Shareholders / Partners",
+            description: "Upload certified list of current partners/shareholders with contribution breakdown",
+            required: true
+          },
+          {
+            id: "llp_agreement",
+            label: "LLP Agreement / Articles of Association",
+            description: "Upload registered LLP Agreement or Articles of Association",
+            required: true
+          },
+          {
+            id: "moa_llp",
+            label: "Memorandum of Association (MOA)",
+            description: "Upload official Memorandum of Association of the firm",
+            required: true
+          },
+          {
+            id: "udyam_llp",
+            label: "Udyam Registration Certificate",
+            description: "Upload Udyam MSME registration certificate of the firm",
+            required: true
+          },
+          {
+            id: "company_pan_llp",
+            label: "Company / Firm PAN Card",
+            description: "Upload clear PDF or image of the Firm PAN Card",
+            required: true
+          },
+          {
+            id: "gst_cert_llp",
+            label: "GST Registration Certificate",
+            description: "Upload GST Registration Certificate (Form REG-06)",
+            required: true
+          }
+        ];
+      }
+      // Strictly return empty list for unconfigured business entity types (HUF)
+      return [];
+    }
+    return currentCategory.additionalDocFields;
   };
 
   // Helper to add files to doc state
@@ -799,6 +1167,102 @@ export default function ApplyForLoanView({
 
   const handleSubmitFinal = (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveFields = getEffectiveDocFields();
+    for (const field of effectiveFields) {
+      if (field.required && getAdditionalFiles(field.id).length === 0) {
+        alert(`Please upload mandatory document: ${field.label}`);
+        return;
+      }
+    }
+
+    if (activeTab === "business" && (businessType === "pvt_ltd" || businessType === "llp")) {
+      if (!companyOfficialEmail.trim() || !companyOfficialEmail.includes("@")) {
+        alert("Please enter a valid Company / Firm Official Email ID.");
+        return;
+      }
+
+      const minDirectorsRequired = businessType === "llp" ? 2 : 1;
+      if (!pvtDirectors || pvtDirectors.length < minDirectorsRequired) {
+        alert(`Limited Liability Partnership (LLP) requires at least ${minDirectorsRequired} Directors / Designated Partners to be added.`);
+        return;
+      }
+
+      for (let i = 0; i < pvtDirectors.length; i++) {
+        const dir = pvtDirectors[i];
+        const num = i + 1;
+        if (!dir.name.trim()) {
+          alert(`Please enter Full Name for Director #${num}.`);
+          return;
+        }
+        if (!dir.phone.trim() || dir.phone.replace(/\D/g, "").length < 10) {
+          alert(`Please enter a valid 10-digit Phone Number for Director #${num}.`);
+          return;
+        }
+        if (!dir.email.trim() || !dir.email.includes("@")) {
+          alert(`Please enter a valid Email ID for Director #${num}.`);
+          return;
+        }
+
+        const hasDirAadhaar = dir.aadhaarDoc.mode === "pdf"
+          ? Boolean(dir.aadhaarDoc.fileName || (dir.aadhaarDoc.fileList && dir.aadhaarDoc.fileList.length > 0))
+          : Boolean(dir.aadhaarDoc.frontPhoto);
+        if (!hasDirAadhaar) {
+          alert(`Please upload Aadhaar Card for Director #${num}.`);
+          return;
+        }
+
+        const hasDirPan = dir.panDoc.mode === "pdf"
+          ? Boolean(dir.panDoc.fileName || (dir.panDoc.fileList && dir.panDoc.fileList.length > 0))
+          : Boolean(dir.panDoc.frontPhoto);
+        if (!hasDirPan) {
+          alert(`Please upload PAN Card for Director #${num}.`);
+          return;
+        }
+
+        const hasDirPhoto = Boolean(dir.photoDoc.fileName || dir.photoDoc.photoPreview);
+        if (!hasDirPhoto) {
+          alert(`Please upload or capture Passport Size Photo for Director #${num}.`);
+          return;
+        }
+      }
+    }
+
+    if (activeTab === "business" && businessType === "partnership") {
+      if (!partnershipPartners || partnershipPartners.length === 0) {
+        alert("Please add at least one Partner detail.");
+        return;
+      }
+
+      for (let i = 0; i < partnershipPartners.length; i++) {
+        const part = partnershipPartners[i];
+        const num = i + 1;
+        if (!part.name.trim()) {
+          alert(`Please enter Full Name for Partner #${num}.`);
+          return;
+        }
+        if (!part.phone.trim() || part.phone.replace(/\D/g, "").length < 10) {
+          alert(`Please enter a valid 10-digit Mobile Number for Partner #${num}.`);
+          return;
+        }
+
+        const hasPartAadhaar = part.aadhaarDoc.mode === "pdf"
+          ? Boolean(part.aadhaarDoc.fileName || (part.aadhaarDoc.fileList && part.aadhaarDoc.fileList.length > 0))
+          : Boolean(part.aadhaarDoc.frontPhoto);
+        if (!hasPartAadhaar) {
+          alert(`Please upload Aadhaar Card for Partner #${num}.`);
+          return;
+        }
+
+        const hasPartPan = part.panDoc.mode === "pdf"
+          ? Boolean(part.panDoc.fileName || (part.panDoc.fileList && part.panDoc.fileList.length > 0))
+          : Boolean(part.panDoc.frontPhoto);
+        if (!hasPartPan) {
+          alert(`Please upload PAN Card for Partner #${num}.`);
+          return;
+        }
+      }
+    }
+
     if (!formData.acceptTerms) {
       alert("Please authorize F2 Fintech consent terms to proceed.");
       return;
@@ -895,12 +1359,71 @@ export default function ApplyForLoanView({
   const confirmCapturedPhoto = () => {
     if (!cameraModalTarget || !simulatedSnapshot) return;
 
-    if (cameraModalTarget === "aadhaar_front") {
+    if (cameraModalTarget.startsWith("partner_")) {
+      const parts = cameraModalTarget.split("_");
+      const idx = parseInt(parts[1], 10);
+      const docType = parts[2];
+      const side = parts[3];
+
+      setPartnershipPartners((prev) => {
+        const list = [...prev];
+        if (!list[idx]) return prev;
+        const targetPart = { ...list[idx] };
+        if (docType === "aadhaar") {
+          targetPart.aadhaarDoc = {
+            ...targetPart.aadhaarDoc,
+            mode: "photo",
+            [side === "front" ? "frontPhoto" : "backPhoto"]: simulatedSnapshot
+          };
+        } else if (docType === "pan") {
+          targetPart.panDoc = {
+            ...targetPart.panDoc,
+            mode: "photo",
+            [side === "front" ? "frontPhoto" : "backPhoto"]: simulatedSnapshot
+          };
+        }
+        list[idx] = targetPart;
+        return list;
+      });
+    } else if (cameraModalTarget.startsWith("director_")) {
+      const parts = cameraModalTarget.split("_");
+      const idx = parseInt(parts[1], 10);
+      const docType = parts[2];
+      const side = parts[3];
+
+      setPvtDirectors((prev) => {
+        const list = [...prev];
+        if (!list[idx]) return prev;
+        const targetDir = { ...list[idx] };
+        if (docType === "aadhaar") {
+          targetDir.aadhaarDoc = {
+            ...targetDir.aadhaarDoc,
+            mode: "photo",
+            [side === "front" ? "frontPhoto" : "backPhoto"]: simulatedSnapshot
+          };
+        } else if (docType === "pan") {
+          targetDir.panDoc = {
+            ...targetDir.panDoc,
+            mode: "photo",
+            [side === "front" ? "frontPhoto" : "backPhoto"]: simulatedSnapshot
+          };
+        } else if (docType === "photo") {
+          targetDir.photoDoc = {
+            fileName: "director_photo_capture.jpg",
+            photoPreview: simulatedSnapshot
+          };
+        }
+        list[idx] = targetDir;
+        return list;
+      });
+    } else if (cameraModalTarget === "aadhaar_front") {
       setAadhaarDoc((prev: any) => ({ ...prev, mode: "photo", frontPhoto: simulatedSnapshot }));
     } else if (cameraModalTarget === "aadhaar_back") {
       setAadhaarDoc((prev: any) => ({ ...prev, mode: "photo", backPhoto: simulatedSnapshot }));
     } else if (cameraModalTarget === "pan_front") {
       setPanDoc((prev: any) => ({ ...prev, mode: "photo", frontPhoto: simulatedSnapshot }));
+    } else if (cameraModalTarget === "pan_back") {
+      setPanDoc((prev: any) => ({ ...prev, mode: "photo", backPhoto: simulatedSnapshot }));
     } else if (cameraModalTarget === "photo") {
       setPhotoDoc({ fileName: "photo_camera_capture.jpg", photoPreview: simulatedSnapshot });
     }
@@ -986,22 +1509,20 @@ export default function ApplyForLoanView({
                   <button
                     type="button"
                     onClick={() => handleTabChange(cat.id)}
-                    className={`w-full flex flex-col items-center text-center p-3.5 rounded-2xl transition-all duration-300 cursor-pointer relative backdrop-blur-xl ${
-                      isActive
+                    className={`w-full flex flex-col items-center text-center p-3.5 rounded-2xl transition-all duration-300 cursor-pointer relative backdrop-blur-xl ${isActive
                         ? "bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-700/90 text-white shadow-xl shadow-blue-600/35 font-bold scale-[1.03] ring-2 ring-blue-400/40 border border-white/40"
                         : "bg-white/50 hover:bg-white/85 text-slate-800 hover:text-blue-950 border border-white/70 hover:border-blue-300/80 shadow-xs hover:shadow-lg hover:shadow-blue-500/10 backdrop-saturate-150"
-                    }`}
+                      }`}
                   >
                     <span className="text-2xl mb-1.5 transition-transform duration-200 group-hover:scale-110">{cat.icon}</span>
                     <span className="text-xs font-bold truncate max-w-full tracking-tight">{cat.name}</span>
 
                     {cat.badge && (
                       <span
-                        className={`absolute -top-2.5 -right-1 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md z-20 whitespace-nowrap transition-all backdrop-blur-md ${
-                          isActive
+                        className={`absolute -top-2.5 -right-1 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md z-20 whitespace-nowrap transition-all backdrop-blur-md ${isActive
                             ? "bg-amber-400/95 text-slate-950 border border-amber-200/90 shadow-amber-400/20"
                             : "bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white border border-amber-300/50 shadow-orange-500/20"
-                        }`}
+                          }`}
                       >
                         {cat.badge}
                       </span>
@@ -1118,8 +1639,8 @@ export default function ApplyForLoanView({
             </div>
 
             <div className={`grid grid-cols-1 ${([currentCategory.requiredDocs.salaried, currentCategory.requiredDocs.selfEmployed, currentCategory.requiredDocs.doctors].filter(Boolean).length > 2)
-                ? "md:grid-cols-2 lg:grid-cols-3"
-                : "md:grid-cols-2"
+              ? "md:grid-cols-2 lg:grid-cols-3"
+              : "md:grid-cols-2"
               } gap-4 pt-1`}>
               {/* Salaried Employees */}
               {currentCategory.requiredDocs.salaried && (
@@ -1223,10 +1744,10 @@ export default function ApplyForLoanView({
                   type="button"
                   onClick={() => setCurrentStep(1)}
                   className={`py-2.5 px-2 rounded-xl border transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${currentStep === 1
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20"
-                      : currentStep > 1
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                        : "bg-gray-50 text-gray-400 border-gray-200"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20"
+                    : currentStep > 1
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                      : "bg-gray-50 text-gray-400 border-gray-200"
                     }`}
                 >
                   <span>1. Applicant Details</span>
@@ -1238,10 +1759,10 @@ export default function ApplyForLoanView({
                     if (currentStep > 1) setCurrentStep(2);
                   }}
                   className={`py-2.5 px-2 rounded-xl border transition-all duration-200 flex items-center justify-center gap-1.5 ${currentStep === 2
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20 cursor-pointer"
-                      : currentStep > 2
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 cursor-pointer"
-                        : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20 cursor-pointer"
+                    : currentStep > 2
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 cursor-pointer"
+                      : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
                     }`}
                 >
                   <span>2. Core Documents</span>
@@ -1253,8 +1774,8 @@ export default function ApplyForLoanView({
                     if (currentStep === 3) setCurrentStep(3);
                   }}
                   className={`py-2.5 px-2 rounded-xl border transition-all duration-200 flex items-center justify-center gap-1.5 ${currentStep === 3
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20 cursor-pointer"
-                      : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 ring-2 ring-blue-600/20 cursor-pointer"
+                    : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
                     }`}
                 >
                   <span>3. Additional Docs</span>
@@ -1545,9 +2066,8 @@ export default function ApplyForLoanView({
                             value={formData.permanentAddress || ""}
                             onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
                             placeholder="Enter permanent address as per Aadhaar / Passport"
-                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all ${
-                              formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
-                            }`}
+                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all ${formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
+                              }`}
                           />
                         </div>
                       </div>
@@ -1599,7 +2119,7 @@ export default function ApplyForLoanView({
                         100% Encrypted & Safe
                       </span>
                     </div>
-                    
+
 
                     <div className="space-y-5">
                       {/* 1. AADHAAR CARD */}
@@ -1792,7 +2312,7 @@ export default function ApplyForLoanView({
                             </span>
                             <div>
                               <h5 className="text-xs sm:text-sm font-bold text-gray-900">2. PAN Card <span className="text-red-500">* (Mandatory)</span></h5>
-                              <p className="text-[11px] text-gray-500">Upload e-PAN PDF or capture front card photo</p>
+                              <p className="text-[11px] text-gray-500">Upload e-PAN PDF or capture front & back card photos</p>
                             </div>
                           </div>
 
@@ -1811,7 +2331,7 @@ export default function ApplyForLoanView({
                               className={`px-3 py-1 rounded-md transition-all cursor-pointer ${panDoc.mode === "photo" ? "bg-indigo-600 text-white shadow-2xs" : "text-gray-600 hover:bg-gray-50"
                                 }`}
                             >
-                              Photo Capture
+                              Front & Back Photo
                             </button>
                           </div>
                         </div>
@@ -1876,27 +2396,88 @@ export default function ApplyForLoanView({
                             </div>
                           </div>
                         ) : (
-                          <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center">
-                            {panDoc.frontPhoto ? (
-                              <div className="relative">
-                                <img src={panDoc.frontPhoto} alt="PAN Front" className="h-28 mx-auto rounded border object-cover" />
-                                <button
-                                  type="button"
-                                  onClick={() => setPanDoc((prev: any) => ({ ...prev, frontPhoto: undefined }))}
-                                  className="mt-1 text-[10px] text-red-600 font-bold hover:underline"
-                                >
-                                  Remove Photo
-                                </button>
+                          <div className="space-y-3 bg-white p-3.5 rounded-xl border border-gray-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Front Photo */}
+                              <div className="space-y-2 text-center p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                                <span className="text-xs font-bold text-gray-700 block">PAN Front Side *</span>
+                                {panDoc.frontPhoto ? (
+                                  <div className="relative">
+                                    <img src={panDoc.frontPhoto} alt="PAN Front" className="h-24 mx-auto rounded border object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setPanDoc((prev: any) => ({ ...prev, frontPhoto: undefined }))}
+                                      className="mt-1 text-[10px] text-red-600 font-bold hover:underline"
+                                    >
+                                      Remove Photo
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pan_front")}
+                                      className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 mx-auto cursor-pointer"
+                                    >
+                                      <Camera className="w-3.5 h-3.5" /> Capture / Upload Front
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => triggerCameraModal("pan_front")}
-                                className="px-4 py-2 bg-indigo-600 text-white font-bold text-xs rounded-lg inline-flex items-center gap-2 cursor-pointer"
-                              >
-                                <Camera className="w-4 h-4" /> Capture / Upload PAN Card Photo
-                              </button>
-                            )}
+
+                              {/* Back Photo */}
+                              <div className="space-y-2 text-center p-3 border border-dashed border-gray-300 rounded-lg bg-gray-50">
+                                <span className="text-xs font-bold text-gray-700 block">PAN Back Side <span className="text-gray-400 font-normal">(Optional)</span></span>
+                                {panDoc.backPhoto ? (
+                                  <div className="relative">
+                                    <img src={panDoc.backPhoto} alt="PAN Back" className="h-24 mx-auto rounded border object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setPanDoc((prev: any) => ({ ...prev, backPhoto: undefined }))}
+                                      className="mt-1 text-[10px] text-red-600 font-bold hover:underline"
+                                    >
+                                      Remove Photo
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pan_back")}
+                                      className="px-3 py-1.5 bg-indigo-600 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 mx-auto cursor-pointer"
+                                    >
+                                      <Camera className="w-3.5 h-3.5" /> Capture / Upload Back
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Password Option Toggle for PAN */}
+                            <div className="pt-2 border-t border-gray-100 flex items-center gap-4">
+                              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={panDoc.isEncrypted || false}
+                                  onChange={(e) => setPanDoc((prev: any) => ({ ...prev, isEncrypted: e.target.checked }))}
+                                  className="w-3.5 h-3.5 text-indigo-600 rounded"
+                                />
+                                <span className="font-semibold">Is this PDF Password Encrypted?</span>
+                              </label>
+
+                              {panDoc.isEncrypted && (
+                                <div className="flex-1 max-w-xs relative">
+                                  <Key className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                                  <input
+                                    type="text"
+                                    value={panDoc.pdfPassword || ""}
+                                    onChange={(e) => setPanDoc((prev: any) => ({ ...prev, pdfPassword: e.target.value }))}
+                                    placeholder="Enter PAN Password"
+                                    className="w-full pl-8 pr-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-slate-50 focus:bg-white"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2343,14 +2924,785 @@ export default function ApplyForLoanView({
                       </div>
                     </div>
 
+                    {/* Business Entity Type Selector (Visible for Business Loan) */}
+                    {activeTab === "business" && (
+                      <div className="bg-blue-50/80 p-4 rounded-2xl border border-blue-200/80 space-y-2">
+                        <label className="text-xs font-bold text-gray-900 block flex items-center gap-1.5" htmlFor="businessTypeSelect">
+                          <Briefcase className="w-4 h-4 text-blue-600" /> Select Type of Business / Entity *
+                        </label>
+                        <p className="text-[11px] text-gray-500">Document requirements will automatically update based on your selected business structure</p>
+                        <div className="relative max-w-md pt-1">
+                          <select
+                            id="businessTypeSelect"
+                            value={businessType}
+                            onChange={(e) => setBusinessType(e.target.value)}
+                            className="w-full pl-3.5 pr-8 py-2.5 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 bg-white appearance-none cursor-pointer shadow-2xs"
+                          >
+                            <option value="sole_proprietorship">1. Sole Proprietorship</option>
+                            <option value="pvt_ltd">2. Private Limited</option>
+                            <option value="llp">3. Limited Liability Partnership (LLP)</option>
+                            <option value="huf">4. HUF (Hindu Undivided Family)</option>
+                            <option value="partnership">5. Partnership</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-4 pointer-events-none" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notice for unconfigured business entity types */}
+                    {activeTab === "business" && businessType !== "sole_proprietorship" && businessType !== "pvt_ltd" && businessType !== "partnership" && businessType !== "llp" && (
+                      <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-4 text-xs text-amber-950 flex items-start gap-3 shadow-2xs">
+                        <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <h5 className="font-bold text-amber-950 text-xs">Checklist Pending for HUF</h5>
+                          <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
+                            Specific additional document requirements for HUF will be customized soon. You can complete your application with the core documents already uploaded in Step 1 & Step 2.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Private Limited & LLP Specific Inputs: Company/Firm Official Email & List of Directors */}
+                    {activeTab === "business" && (businessType === "pvt_ltd" || businessType === "llp") && (
+                      <div className="space-y-4">
+                        {/* Company Official Email ID */}
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                          <label className="text-xs font-bold text-gray-900 block" htmlFor="companyOfficialEmailInput">
+                            Company Official Email ID <span className="text-red-500 font-bold ml-1">* (Mandatory)</span>
+                          </label>
+                          <p className="text-[11px] text-gray-500">Official email address registered with Ministry of Corporate Affairs (MCA) / GST</p>
+                          <div className="relative max-w-md pt-1">
+                            <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                            <input
+                              id="companyOfficialEmailInput"
+                              type="email"
+                              required
+                              value={companyOfficialEmail}
+                              onChange={(e) => setCompanyOfficialEmail(e.target.value)}
+                              placeholder="e.g. contact@yourcompany.com"
+                              className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* List of Directors Management UI */}
+                        <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                          <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-blue-600" />
+                                List of Directors / Designated Partners <span className="text-red-500 font-bold">* (Mandatory)</span>
+                              </h5>
+                              <p className="text-[11px] text-gray-500">
+                                Provide details and KYC documents (Aadhaar, PAN, Photo) for directors/partners {businessType === "llp" && <span className="text-blue-700 font-bold">(Minimum 2 Directors Required for LLP)</span>}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPvtDirectors((prev) => [
+                                  ...prev,
+                                  {
+                                    id: `dir_${Date.now()}`,
+                                    name: "",
+                                    phone: "",
+                                    email: "",
+                                    aadhaarDoc: { mode: "pdf" },
+                                    panDoc: { mode: "pdf" },
+                                    photoDoc: {}
+                                  }
+                                ]);
+                              }}
+                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <span>+ Add More Director</span>
+                            </button>
+                          </div>
+
+                          {pvtDirectors.map((director, index) => (
+                            <div key={director.id} className="bg-white p-4 rounded-xl border border-gray-200 space-y-4 shadow-2xs relative">
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <span className="text-xs font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                  Director / Designated Partner #{index + 1}
+                                </span>
+                                {((businessType === "llp" && pvtDirectors.length > 2) || (businessType !== "llp" && pvtDirectors.length > 1)) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPvtDirectors((prev) => prev.filter((_, i) => i !== index))}
+                                    className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Remove Director
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Inputs for Name, Phone, Email */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-700 block mb-1">Director Name *</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={director.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPvtDirectors((prev) => {
+                                        const list = [...prev];
+                                        list[index] = { ...list[index], name: val };
+                                        return list;
+                                      });
+                                    }}
+                                    placeholder="Full Name as per PAN"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-700 block mb-1">Phone No. *</label>
+                                  <input
+                                    type="tel"
+                                    required
+                                    maxLength={10}
+                                    value={director.phone}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, "");
+                                      setPvtDirectors((prev) => {
+                                        const list = [...prev];
+                                        list[index] = { ...list[index], phone: val };
+                                        return list;
+                                      });
+                                    }}
+                                    placeholder="10-digit Mobile"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-700 block mb-1">Email ID *</label>
+                                  <input
+                                    type="email"
+                                    required
+                                    value={director.email}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPvtDirectors((prev) => {
+                                        const list = [...prev];
+                                        list[index] = { ...list[index], email: val };
+                                        return list;
+                                      });
+                                    }}
+                                    placeholder="Director Email ID"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* KYC Documents for Director: Aadhaar, PAN, Photo */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
+                                {/* Director Aadhaar Card */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-gray-800">Aadhaar Card <span className="text-red-500">*</span></span>
+                                    <div className="flex text-[10px] bg-white border border-gray-200 rounded p-0.5 font-semibold">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, mode: "pdf" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${director.aadhaarDoc?.mode === "pdf" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, mode: "photo" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${director.aadhaarDoc?.mode === "photo" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        Photo
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {director.aadhaarDoc?.mode === "pdf" ? (
+                                    <div className="space-y-1.5">
+                                      <input
+                                        id={`dir_${index}_aadhaar_input`}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={(e) => {
+                                          const files = e.target.files;
+                                          if (files && files.length > 0) {
+                                            const names = Array.from(files).map((f) => f.name);
+                                            setPvtDirectors((prev) => {
+                                              const list = [...prev];
+                                              const existing = list[index].aadhaarDoc?.fileList || (list[index].aadhaarDoc?.fileName ? [list[index].aadhaarDoc.fileName!] : []);
+                                              const updated = Array.from(new Set([...existing, ...names]));
+                                              list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, fileName: updated[0], fileList: updated } };
+                                              return list;
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`dir_${index}_aadhaar_input`}
+                                        className="w-full py-1.5 px-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 font-bold text-[11px] rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Upload className="w-3 h-3" /> Choose Aadhaar PDF
+                                      </label>
+
+                                      {(director.aadhaarDoc?.fileList || (director.aadhaarDoc?.fileName ? [director.aadhaarDoc.fileName] : [])).map((fn, fIdx) => (
+                                        <div key={fIdx} className="flex items-center justify-between text-[11px] bg-blue-50 px-2 py-1 rounded text-blue-900">
+                                          <span className="truncate max-w-[120px]">{fn}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPvtDirectors((prev) => {
+                                                const list = [...prev];
+                                                const existing = list[index].aadhaarDoc?.fileList || [];
+                                                const updated = existing.filter((_, i) => i !== fIdx);
+                                                list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, fileName: updated[0], fileList: updated } };
+                                                return list;
+                                              });
+                                            }}
+                                            className="text-red-600 hover:text-red-800"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => triggerCameraModal(`director_${index}_aadhaar_front`)}
+                                          className="flex-1 py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                        >
+                                          <Camera className="w-3 h-3" /> Front Photo
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => triggerCameraModal(`director_${index}_aadhaar_back`)}
+                                          className="flex-1 py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                        >
+                                          <Camera className="w-3 h-3" /> Back Photo
+                                        </button>
+                                      </div>
+                                      {director.aadhaarDoc?.frontPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> Front Photo Captured
+                                        </p>
+                                      )}
+                                      {director.aadhaarDoc?.backPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> Back Photo Captured
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Director PAN Card */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-gray-800">PAN Card <span className="text-red-500">*</span></span>
+                                    <div className="flex text-[10px] bg-white border border-gray-200 rounded p-0.5 font-semibold">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], panDoc: { ...list[index].panDoc, mode: "pdf" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${director.panDoc?.mode === "pdf" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], panDoc: { ...list[index].panDoc, mode: "photo" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${director.panDoc?.mode === "photo" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        Photo
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {director.panDoc?.mode === "pdf" ? (
+                                    <div className="space-y-1.5">
+                                      <input
+                                        id={`dir_${index}_pan_input`}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={(e) => {
+                                          const files = e.target.files;
+                                          if (files && files.length > 0) {
+                                            const names = Array.from(files).map((f) => f.name);
+                                            setPvtDirectors((prev) => {
+                                              const list = [...prev];
+                                              const existing = list[index].panDoc?.fileList || (list[index].panDoc?.fileName ? [list[index].panDoc.fileName!] : []);
+                                              const updated = Array.from(new Set([...existing, ...names]));
+                                              list[index] = { ...list[index], panDoc: { ...list[index].panDoc, fileName: updated[0], fileList: updated } };
+                                              return list;
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`dir_${index}_pan_input`}
+                                        className="w-full py-1.5 px-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 font-bold text-[11px] rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Upload className="w-3 h-3" /> Choose PAN PDF
+                                      </label>
+
+                                      {(director.panDoc?.fileList || (director.panDoc?.fileName ? [director.panDoc.fileName] : [])).map((fn, fIdx) => (
+                                        <div key={fIdx} className="flex items-center justify-between text-[11px] bg-blue-50 px-2 py-1 rounded text-blue-900">
+                                          <span className="truncate max-w-[120px]">{fn}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPvtDirectors((prev) => {
+                                                const list = [...prev];
+                                                const existing = list[index].panDoc?.fileList || [];
+                                                const updated = existing.filter((_, i) => i !== fIdx);
+                                                list[index] = { ...list[index], panDoc: { ...list[index].panDoc, fileName: updated[0], fileList: updated } };
+                                                return list;
+                                              });
+                                            }}
+                                            className="text-red-600 hover:text-red-800"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => triggerCameraModal(`director_${index}_pan_front`)}
+                                        className="w-full py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                      >
+                                        <Camera className="w-3 h-3" /> Capture PAN Photo
+                                      </button>
+                                      {director.panDoc?.frontPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> PAN Photo Captured
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Director Passport Photo */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                  <span className="text-[11px] font-bold text-gray-800 block">Director Photo <span className="text-red-500">*</span></span>
+                                  {director.photoDoc?.photoPreview || director.photoDoc?.fileName ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 p-1.5 rounded">
+                                      {director.photoDoc?.photoPreview ? (
+                                        <img src={director.photoDoc.photoPreview} alt="Director" className="w-8 h-8 rounded object-cover border" />
+                                      ) : (
+                                        <ImageIcon className="w-4 h-4 text-emerald-600" />
+                                      )}
+                                      <span className="text-[10px] font-semibold text-emerald-900 truncate flex-1">{director.photoDoc?.fileName || "Photo Attached"}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], photoDoc: {} };
+                                            return list;
+                                          });
+                                        }}
+                                        className="text-red-600 hover:text-red-800"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex gap-1.5">
+                                      <input
+                                        id={`dir_${index}_photo_input`}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setPvtDirectors((prev) => {
+                                              const list = [...prev];
+                                              list[index] = { ...list[index], photoDoc: { fileName: file.name } };
+                                              return list;
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`dir_${index}_photo_input`}
+                                        className="flex-1 py-1 px-1 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 text-[10px] font-bold rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Upload className="w-3 h-3" /> Upload
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => triggerCameraModal(`director_${index}_photo`)}
+                                        className="flex-1 py-1 px-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Camera className="w-3 h-3" /> Click Photo
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Partnership Specific Inputs: List of Partners */}
+                    {activeTab === "business" && businessType === "partnership" && (
+                      <div className="space-y-4">
+                        <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                          <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-blue-600" />
+                                List of Partners <span className="text-red-500 font-bold">* (Mandatory)</span>
+                              </h5>
+                              <p className="text-[11px] text-gray-500">Provide details and KYC documents (Aadhaar & PAN) for all partners in the firm</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPartnershipPartners((prev) => [
+                                  ...prev,
+                                  {
+                                    id: `partner_${Date.now()}`,
+                                    name: "",
+                                    phone: "",
+                                    aadhaarDoc: { mode: "pdf" },
+                                    panDoc: { mode: "pdf" }
+                                  }
+                                ]);
+                              }}
+                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <span>+ Add Another Partner</span>
+                            </button>
+                          </div>
+
+                          {partnershipPartners.map((partner, index) => (
+                            <div key={partner.id} className="bg-white p-4 rounded-xl border border-gray-200 space-y-4 shadow-2xs relative">
+                              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                <span className="text-xs font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                  Partner #{index + 1}
+                                </span>
+                                {partnershipPartners.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPartnershipPartners((prev) => prev.filter((_, i) => i !== index))}
+                                    className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Remove Partner
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Inputs for Name, Phone */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-700 block mb-1">Partner Name *</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={partner.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setPartnershipPartners((prev) => {
+                                        const list = [...prev];
+                                        list[index] = { ...list[index], name: val };
+                                        return list;
+                                      });
+                                    }}
+                                    placeholder="Full Name as per PAN"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs font-semibold text-gray-700 block mb-1">Mobile No. *</label>
+                                  <input
+                                    type="tel"
+                                    required
+                                    maxLength={10}
+                                    value={partner.phone}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, "");
+                                      setPartnershipPartners((prev) => {
+                                        const list = [...prev];
+                                        list[index] = { ...list[index], phone: val };
+                                        return list;
+                                      });
+                                    }}
+                                    placeholder="10-digit Mobile Number"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* KYC Documents for Partner: Aadhaar & PAN */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                                {/* Partner Aadhaar Card */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-gray-800">Aadhaar Card <span className="text-red-500">*</span></span>
+                                    <div className="flex text-[10px] bg-white border border-gray-200 rounded p-0.5 font-semibold">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPartnershipPartners((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, mode: "pdf" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${partner.aadhaarDoc?.mode === "pdf" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPartnershipPartners((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, mode: "photo" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${partner.aadhaarDoc?.mode === "photo" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        Photo
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {partner.aadhaarDoc?.mode === "pdf" ? (
+                                    <div className="space-y-1.5">
+                                      <input
+                                        id={`partner_${index}_aadhaar_input`}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={(e) => {
+                                          const files = e.target.files;
+                                          if (files && files.length > 0) {
+                                            const names = Array.from(files).map((f) => f.name);
+                                            setPartnershipPartners((prev) => {
+                                              const list = [...prev];
+                                              const existing = list[index].aadhaarDoc?.fileList || (list[index].aadhaarDoc?.fileName ? [list[index].aadhaarDoc.fileName!] : []);
+                                              const updated = Array.from(new Set([...existing, ...names]));
+                                              list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, fileName: updated[0], fileList: updated } };
+                                              return list;
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`partner_${index}_aadhaar_input`}
+                                        className="w-full py-1.5 px-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 font-bold text-[11px] rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Upload className="w-3 h-3" /> Choose Aadhaar PDF
+                                      </label>
+
+                                      {(partner.aadhaarDoc?.fileList || (partner.aadhaarDoc?.fileName ? [partner.aadhaarDoc.fileName] : [])).map((fn, fIdx) => (
+                                        <div key={fIdx} className="flex items-center justify-between text-[11px] bg-blue-50 px-2 py-1 rounded text-blue-900">
+                                          <span className="truncate max-w-[150px]">{fn}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPartnershipPartners((prev) => {
+                                                const list = [...prev];
+                                                const existing = list[index].aadhaarDoc?.fileList || [];
+                                                const updated = existing.filter((_, i) => i !== fIdx);
+                                                list[index] = { ...list[index], aadhaarDoc: { ...list[index].aadhaarDoc, fileName: updated[0], fileList: updated } };
+                                                return list;
+                                              });
+                                            }}
+                                            className="text-red-600 hover:text-red-800"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      <div className="flex gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => triggerCameraModal(`partner_${index}_aadhaar_front`)}
+                                          className="flex-1 py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                        >
+                                          <Camera className="w-3 h-3" /> Front Photo
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => triggerCameraModal(`partner_${index}_aadhaar_back`)}
+                                          className="flex-1 py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                        >
+                                          <Camera className="w-3 h-3" /> Back Photo
+                                        </button>
+                                      </div>
+                                      {partner.aadhaarDoc?.frontPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> Front Photo Captured
+                                        </p>
+                                      )}
+                                      {partner.aadhaarDoc?.backPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> Back Photo Captured
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Partner PAN Card */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-gray-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-gray-800">PAN Card <span className="text-red-500">*</span></span>
+                                    <div className="flex text-[10px] bg-white border border-gray-200 rounded p-0.5 font-semibold">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPartnershipPartners((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], panDoc: { ...list[index].panDoc, mode: "pdf" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${partner.panDoc?.mode === "pdf" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPartnershipPartners((prev) => {
+                                            const list = [...prev];
+                                            list[index] = { ...list[index], panDoc: { ...list[index].panDoc, mode: "photo" } };
+                                            return list;
+                                          });
+                                        }}
+                                        className={`px-1.5 py-0.5 rounded cursor-pointer ${partner.panDoc?.mode === "photo" ? "bg-blue-600 text-white" : "text-gray-600"}`}
+                                      >
+                                        Photo
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {partner.panDoc?.mode === "pdf" ? (
+                                    <div className="space-y-1.5">
+                                      <input
+                                        id={`partner_${index}_pan_input`}
+                                        type="file"
+                                        accept=".pdf"
+                                        onChange={(e) => {
+                                          const files = e.target.files;
+                                          if (files && files.length > 0) {
+                                            const names = Array.from(files).map((f) => f.name);
+                                            setPartnershipPartners((prev) => {
+                                              const list = [...prev];
+                                              const existing = list[index].panDoc?.fileList || (list[index].panDoc?.fileName ? [list[index].panDoc.fileName!] : []);
+                                              const updated = Array.from(new Set([...existing, ...names]));
+                                              list[index] = { ...list[index], panDoc: { ...list[index].panDoc, fileName: updated[0], fileList: updated } };
+                                              return list;
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`partner_${index}_pan_input`}
+                                        className="w-full py-1.5 px-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 font-bold text-[11px] rounded flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Upload className="w-3 h-3" /> Choose PAN PDF
+                                      </label>
+
+                                      {(partner.panDoc?.fileList || (partner.panDoc?.fileName ? [partner.panDoc.fileName] : [])).map((fn, fIdx) => (
+                                        <div key={fIdx} className="flex items-center justify-between text-[11px] bg-blue-50 px-2 py-1 rounded text-blue-900">
+                                          <span className="truncate max-w-[150px]">{fn}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPartnershipPartners((prev) => {
+                                                const list = [...prev];
+                                                const existing = list[index].panDoc?.fileList || [];
+                                                const updated = existing.filter((_, i) => i !== fIdx);
+                                                list[index] = { ...list[index], panDoc: { ...list[index].panDoc, fileName: updated[0], fileList: updated } };
+                                                return list;
+                                              });
+                                            }}
+                                            className="text-red-600 hover:text-red-800"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => triggerCameraModal(`partner_${index}_pan_front`)}
+                                        className="w-full py-1 px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
+                                      >
+                                        <Camera className="w-3 h-3" /> Capture PAN Photo
+                                      </button>
+                                      {partner.panDoc?.frontPhoto && (
+                                        <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                          <Check className="w-3 h-3" /> PAN Photo Captured
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-4">
-                      {currentCategory.additionalDocFields.map((field) => (
+                      {getEffectiveDocFields().map((field) => (
                         <div key={field.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-                          <div className="flex items-center justify-between">
+                          <div>
                             <label className="text-xs font-bold text-gray-900 block">
-                              {field.label} {field.required && <span className="text-red-500">*</span>}
+                              {field.label} {field.required ? <span className="text-red-500 font-bold ml-1">* (Mandatory)</span> : <span className="text-gray-400 font-normal ml-1">(Optional)</span>}
                             </label>
-                            <span className="text-[10px] text-gray-400">{field.required ? "Mandatory" : "Optional"}</span>
                           </div>
                           <p className="text-[11px] text-gray-500">{field.description}</p>
 
