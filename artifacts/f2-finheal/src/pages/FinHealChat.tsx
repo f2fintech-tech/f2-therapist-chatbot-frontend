@@ -58,6 +58,7 @@ export default function FinHealChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [isEligibilityModalOpen, setIsEligibilityModalOpen] = useState(false);
+  const [applyLoanCategory, setApplyLoanCategory] = useState<string>("personal");
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
@@ -706,17 +707,40 @@ export default function FinHealChat() {
   const openCreditCards = () => setMainView("credit-cards");
 
 
-  const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
-    const formattedAmount = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const handleApplyLoan = useCallback((loanType: string, amount?: number, rate?: number, tenure?: number, details?: string) => {
+    const lower = (loanType || "").toLowerCase();
+    let category = "personal";
+    if (lower.includes("home")) category = "home";
+    else if (lower.includes("business")) category = "business";
+    else if (lower.includes("education")) category = "education";
+    else if (lower.includes("car") || lower.includes("auto") || lower.includes("vehicle")) category = "car";
+    else if (lower.includes("property") || lower.includes("lap")) category = "lap";
+    else if (lower.includes("professional") || lower.includes("doctor") || lower.includes("ca") || lower.includes("cs")) category = "doctor";
+    else if (lower.includes("consumer")) category = "consumer";
+    else if (lower.includes("personal")) category = "personal";
 
-    const messageText = `I would like to apply for a ${loanType} of ${formattedAmount} at an interest rate of ${rate}% for a tenure of ${tenure} years. Could you please guide me on the next steps, eligibility criteria, and documents required?`;
+    setApplyLoanCategory(category);
 
-    setMainView("chat");
-    setPrefillMessage({ text: messageText, card: "" });
+    // Save prefilled loan draft data so ApplyForLoanView initializes with chosen amount and tenure
+    if (amount || tenure) {
+      try {
+        const savedDraft = JSON.parse(localStorage.getItem("f2_loan_application_draft_v1") || "{}");
+        const nextDraft = {
+          ...savedDraft,
+          activeTab: category,
+          formData: {
+            ...(savedDraft.formData || {}),
+            desiredAmount: amount || savedDraft.formData?.desiredAmount || 500000,
+            tenureYears: tenure || savedDraft.formData?.tenureYears || 3,
+          }
+        };
+        localStorage.setItem("f2_loan_application_draft_v1", JSON.stringify(nextDraft));
+      } catch (e) {
+        console.warn("Could not save prefilled loan draft", e);
+      }
+    }
+
+    setMainView("apply-loan");
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       closeSidebar();
@@ -1195,6 +1219,10 @@ export default function FinHealChat() {
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onApplyNow={handleApplyLoan}
+                onAskChatbot={(message: string) => {
+                  setMainView("chat");
+                  setPrefillMessage({ text: message, card: "" });
+                }}
                 onTalkToAdvisor={() => setMainView("advisor")}
                 isGuest={authSession?.isGuest ?? true}
                 onLoginRequired={handleLogout}
@@ -1283,6 +1311,7 @@ export default function FinHealChat() {
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onOpenLoanCalculator={openLoanCalculator}
+                initialCategory={applyLoanCategory}
               />
             ) : (
               <DebtBalanceReviewView

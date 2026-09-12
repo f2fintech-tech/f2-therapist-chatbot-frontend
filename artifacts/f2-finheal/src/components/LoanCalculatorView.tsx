@@ -27,7 +27,8 @@ import {
   Phone,
   FileText,
   Sparkles,
-  CalendarCheck
+  CalendarCheck,
+  MessageSquare
 } from "lucide-react";
 
 
@@ -36,6 +37,7 @@ interface LoanCalculatorViewProps {
   onToggleSidebar: () => void;
   onToggleInsights: () => void;
   onApplyNow: (loanType: string, amount: number, rate: number, tenure: number, details?: string) => void;
+  onAskChatbot?: (message: string) => void;
   onTalkToAdvisor?: () => void;
   isGuest?: boolean;
   onLoginRequired?: () => void;
@@ -203,6 +205,7 @@ export default function LoanCalculatorView({
   onToggleSidebar,
   onToggleInsights,
   onApplyNow,
+  onAskChatbot,
   onTalkToAdvisor,
   isGuest = false,
   onLoginRequired,
@@ -1712,48 +1715,32 @@ export default function LoanCalculatorView({
     currencyScale
   ]);
 
-  // AI Chat Handler Integration for each tool output
-  const handleAskAssistant = () => {
+  // Direct Apply for Loan Navigation
+  const handleApplyNow = () => {
     let detailsStr = "";
 
     if (calcType === "emi") {
       if (activeTab === "professional" && profStructure === "flexi") {
-        detailsStr = `Calculated a Professional Loan (Doctors) with Flexi OD structure on the EMI Calculator. ` +
-          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}/mo, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years. ` +
-          `Initial interest-only payment (Years 1-${flexiInterestOnlyTenure}): starts at ${formatCurrency(flexiODCalculations.monthlyInterest)}/mo (decreasing with deposits). ` +
-          `Subsequent Monthly EMI (Years ${Number(flexiInterestOnlyTenure) + 1}-${Number(flexiInterestOnlyTenure) + Number(flexiRepaymentTenure)}): reduced to ${formatCurrency(flexiODCalculations.monthlyEMI)}/mo (was ${formatCurrency(flexiODCalculations.baselineMonthlyEMI)}/mo). ` +
-          `Total interest saved by parking deposits: ${formatCurrency(flexiODCalculations.totalInterestSaved)}. Remaining utilized balance after Phase 1: ${formatCurrency(flexiODCalculations.remainingUtilized)}.`;
+        detailsStr = `Applied for Professional Loan (Flexi OD). ` +
+          `Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Rate: ${Number(flexiRate) || 0}%, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years.`;
       } else if (activeTab === "professional" && profStructure === "dropdown") {
-        detailsStr = `Calculated a Professional Loan (Doctors) with Drop Down OD structure on the EMI Calculator. ` +
-          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(dropdownUtilized) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Amortization Tenure: ${Number(dropdownTenure) || 0} Years (Plan: 1+${Number(dropdownTenure)} Y), Reduction Schedule: ${dropdownODCalculations.reductionPct.toFixed(1)}% / Year. ` +
-          (dropdownODCalculations.isFullyUtilized
-            ? `Fully Utilized: full monthly EMI of ${formatCurrency(dropdownODCalculations.fullEMI)}/mo paid from Year 1.`
-            : `Partially Utilized: Year 1 interest-only payment of ${formatCurrency(dropdownODCalculations.year1Interest)}/mo, followed by full monthly EMI of ${formatCurrency(dropdownODCalculations.subsequentEMI)}/mo for Years 2-${1 + Number(dropdownTenure)}.`);
+        detailsStr = `Applied for Professional Loan (Drop Down OD). ` +
+          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Tenure: 1+${Number(dropdownTenure)} Years.`;
       } else {
-        detailsStr = `Calculated a ${activeConfig.name} on the EMI Calculator. ` +
-          `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years. ` +
-          `EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo. ` +
-          `Total interest payable: ${formatCurrency(emiCalculations.totalInterest)}. ` +
-          (emiOptimize ? `Optimized with 1 extra EMI annually to save ${formatCurrency(emiCalculations.interestSaved)} and payoff ${Math.floor(emiCalculations.monthsSaved / 12)}y ${emiCalculations.monthsSaved % 12}m earlier.` : "");
+        detailsStr = `Applied for ${activeConfig.name} calculated on Loan Calculator. ` +
+          `Amount: ${formatCurrency(Number(emiAmount) || 0)}, Rate: ${Number(emiRate) || 0}%, Tenure: ${Number(emiTenure) || 0} years (EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo).`;
       }
     } else if (calcType === "compare") {
       const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
-      const typeB = LOAN_TYPES.find((t) => t.id === compTypeB) || LOAN_TYPES[0];
-      detailsStr = `Compared two loans side-by-side. ` +
-        `Loan A (${typeA.name}): ${formatCurrency(Number(compAmountA) || 0)} at ${Number(compRateA) || 0}% for ${Number(compTenureA) || 0} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}, Total Payable: ${formatCurrency(compCalculations.loanA.totalPayable)}). ` +
-        `Loan B (${typeB.name}): ${formatCurrency(Number(compAmountB) || 0)} at ${Number(compRateB) || 0}% for ${Number(compTenureB) || 0} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}, Total Payable: ${formatCurrency(compCalculations.loanB.totalPayable)}). ` +
-        `Difference: EMI diff is ${formatCurrency(compCalculations.emiDiff)}, interest diff is ${formatCurrency(compCalculations.interestDiff)}. ` +
-        `Loan ${compCalculations.betterLoan} (${compCalculations.betterLoan === "A" ? typeA.name : typeB.name}) is cheaper in total cost.`;
+      detailsStr = `Applied for ${typeA.name} based on Loan Comparison.`;
     } else if (calcType === "prepayment") {
-      detailsStr = `Simulated prepayment/foreclosure impact on a ${formatCurrency(Number(prepAmount) || 0)} loan at ${Number(prepRate) || 0}% for ${Number(prepTenure) || 0} years. ` +
-        `Prepayment plan: ${prepType === "monthly" ? "Extra monthly payment" : "Lump sum"} of ${formatCurrency(Number(prepVal) || 0)} starting in Month ${Number(prepStartMonth) || 1}. ` +
-        `Result: Saved ${formatCurrency(prepCalculations.interestSaved)} in interest, and paid off loan ${Math.floor(prepCalculations.monthsSaved / 12)} years ${prepCalculations.monthsSaved % 12} months sooner.`;
+      detailsStr = `Applied for Loan based on Prepayment simulation. Amount: ${formatCurrency(Number(prepAmount) || 0)}.`;
     }
 
     const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
     onApplyNow(
       calcType === "compare"
-        ? `${typeA.name} vs Alternative`
+        ? `${typeA.name}`
         : activeTab === "professional" && profStructure === "flexi"
         ? "Professional Loan (Flexi OD)"
         : activeTab === "professional" && profStructure === "dropdown"
@@ -1782,6 +1769,43 @@ export default function LoanCalculatorView({
         : (Number(emiTenure) || 0),
       detailsStr
     );
+  };
+
+  // AI Chat Handler Integration for each tool output
+  const handleAskAssistant = () => {
+    let detailsStr = "";
+
+    if (calcType === "emi") {
+      if (activeTab === "professional" && profStructure === "flexi") {
+        detailsStr = `I am calculating a Professional Loan (Doctors) with Flexi OD structure on the EMI Calculator. ` +
+          `Credit Limit: ${formatCurrency(Number(flexiLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(flexiUtilized) || 0)}, Rate: ${Number(flexiRate) || 0}%, Expected Monthly Deposit: ${formatCurrency(Number(flexiDeposit) || 0)}/mo, Tenure: ${flexiInterestOnlyTenure}+${flexiRepaymentTenure} Years. ` +
+          `Could you please explain how this OD structure benefits me and what documents are required?`;
+      } else if (activeTab === "professional" && profStructure === "dropdown") {
+        detailsStr = `I am calculating a Professional Loan (Doctors) with Drop Down OD structure on the EMI Calculator. ` +
+          `Initial Limit: ${formatCurrency(Number(dropdownLimit) || 0)}, Utilized Amount: ${formatCurrency(Number(dropdownUtilized) || 0)}, Rate: ${Number(dropdownRate) || 0}%, Amortization Tenure: ${Number(dropdownTenure) || 0} Years. ` +
+          `Could you help me understand the reduction schedule and best repayment strategy?`;
+      } else {
+        detailsStr = `I am calculating a ${activeConfig.name} on the EMI Calculator with an amount of ${formatCurrency(Number(emiAmount) || 0)}, interest rate of ${Number(emiRate) || 0}%, and tenure of ${Number(emiTenure) || 0} years (Estimated EMI: ${formatCurrency(emiCalculations.monthlyEmi)}/mo). ` +
+          `Could you advise if this is a good loan structure and what options or tips can reduce my total interest?`;
+      }
+    } else if (calcType === "compare") {
+      const typeA = LOAN_TYPES.find((t) => t.id === compTypeA) || LOAN_TYPES[0];
+      const typeB = LOAN_TYPES.find((t) => t.id === compTypeB) || LOAN_TYPES[0];
+      detailsStr = `I compared two loans on the EMI Calculator: ` +
+        `Loan A (${typeA.name}): ${formatCurrency(Number(compAmountA) || 0)} at ${Number(compRateA) || 0}% for ${Number(compTenureA) || 0} years (EMI: ${formatCurrency(compCalculations.loanA.emi)}). ` +
+        `Loan B (${typeB.name}): ${formatCurrency(Number(compAmountB) || 0)} at ${Number(compRateB) || 0}% for ${Number(compTenureB) || 0} years (EMI: ${formatCurrency(compCalculations.loanB.emi)}). ` +
+        `Which loan option should I choose based on my financial health?`;
+    } else if (calcType === "prepayment") {
+      detailsStr = `I simulated prepayment/foreclosure impact on a ${formatCurrency(Number(prepAmount) || 0)} loan at ${Number(prepRate) || 0}% for ${Number(prepTenure) || 0} years. ` +
+        `With an extra ${prepType === "monthly" ? "monthly payment" : "lump sum"} of ${formatCurrency(Number(prepVal) || 0)}, it saves ${formatCurrency(prepCalculations.interestSaved)} in interest. ` +
+        `Could you provide more guidance on whether pre-paying or investing this amount is better?`;
+    }
+
+    if (onAskChatbot) {
+      onAskChatbot(detailsStr);
+    } else {
+      onApplyNow(activeConfig.name, Number(emiAmount) || 0, Number(emiRate) || 0, Number(emiTenure) || 0, detailsStr);
+    }
   };
 
   const handleExportExcel = () => {
@@ -3463,23 +3487,34 @@ export default function LoanCalculatorView({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 w-full">
-                    <button
-                      type="button"
-                      onClick={handleAskAssistant}
-                      className="flex-1 h-[40px] bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center hover:-translate-y-0.5 whitespace-nowrap"
-                    >
-                      Apply & Chat
-                    </button>
-                    {onTalkToAdvisor && (
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="flex items-center gap-2 w-full">
                       <button
                         type="button"
-                        onClick={handleTalkToAdvisorClick}
-                        className="flex-1 h-[40px] bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center hover:-translate-y-0.5 whitespace-nowrap"
+                        onClick={handleAskAssistant}
+                        className="flex-1 h-[40px] bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[12px] font-bold rounded-[12px] transition-all cursor-pointer shadow-xs flex items-center justify-center hover:-translate-y-0.5 whitespace-nowrap px-2"
                       >
-                        Talk to Advisor
+                        <MessageSquare className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                        <span>Ask Chatbot</span>
                       </button>
-                    )}
+                      {onTalkToAdvisor && (
+                        <button
+                          type="button"
+                          onClick={handleTalkToAdvisorClick}
+                          className="flex-1 h-[40px] bg-emerald-600 text-white text-[12px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center hover:-translate-y-0.5 whitespace-nowrap px-2"
+                        >
+                          <span>Talk to Advisor</span>
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApplyNow}
+                      className="w-full h-[40px] bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-1.5 hover:-translate-y-0.5 whitespace-nowrap"
+                    >
+                      <span>Apply Now</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -4688,25 +4723,34 @@ export default function LoanCalculatorView({
                 </div>
               </div>
 
-              <div className="w-full max-w-[320px] flex flex-col gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={handleAskAssistant}
-                  className="w-full px-4 py-2.5 bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
-                >
-                  <span>Apply & Chat with Advisor</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-                {onTalkToAdvisor && (
+              <div className="w-full max-w-[340px] flex flex-col gap-2 mt-2">
+                <div className="flex items-center gap-2 w-full">
                   <button
                     type="button"
-                    onClick={handleTalkToAdvisorClick}
-                    className="w-full px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                    onClick={handleAskAssistant}
+                    className="flex-1 h-[40px] bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[12px] font-bold rounded-[12px] transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5 hover:-translate-y-0.5"
                   >
-                    <span>Talk to Advisor</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>Ask Chatbot</span>
                   </button>
-                )}
+                  {onTalkToAdvisor && (
+                    <button
+                      type="button"
+                      onClick={handleTalkToAdvisorClick}
+                      className="flex-1 h-[40px] bg-emerald-600 text-white text-[12px] font-bold rounded-[12px] hover:bg-emerald-500 transition-all cursor-pointer shadow-[0_4px_14px_rgba(16,185,129,0.3)] flex items-center justify-center gap-1.5 hover:-translate-y-0.5"
+                    >
+                      <span>Talk to Advisor</span>
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyNow}
+                  className="w-full h-[40px] bg-primary text-white text-[13px] font-bold rounded-[12px] hover:opacity-90 transition-all cursor-pointer shadow-[0_4px_14px_rgba(50,68,230,0.3)] flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                >
+                  <span>Apply Now</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>

@@ -373,14 +373,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Build or Buy Your Dream Home with Lowest EMIs",
     description: "Long-term home financing with attractive interest rates for property purchase, plot acquisition, home construction, or balance transfers.",
     maxAmount: "Up to ₹10 Crore",
-    startRate: "7.15% p.a.",
+    startRate: "7.35% p.a.",
     maxTenure: "Up to 30 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 5000000,
     minAmountNum: 500000,
     maxAmountNum: 30000000,
     stepAmountNum: 250000,
-    defaultRateNum: 7.15,
+    defaultRateNum: 7.35,
     defaultTenureNum: 20,
     features: [
       "Financing up to 85%-90% of property cost",
@@ -500,7 +500,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Tailored High-Limit Financing for Certified Doctors, CAs, CS, CMAs & Professionals",
     description: "Specialized credit facilities for Chartered Accountants (CA), Company Secretaries (CS), Cost Accountants (CMA), Doctors (MBBS, BDS, MD, MS, BAMS, BHMS), and certified professionals to set up offices/clinics, purchase equipment, or expand professional practice.",
     maxAmount: "Up to ₹1 Crore",
-    startRate: "13.5% p.a.",
+    startRate: "11.5% p.a.",
     maxTenure: "Up to 7 Years",
     processingTime: "24 - 48 Hours",
     defaultAmountNum: 2500000,
@@ -646,9 +646,15 @@ export default function ApplyForLoanView({
     return null;
   };
 
+  const normalizeCategory = (cat?: string) => {
+    if (!cat) return "personal";
+    if (cat === "professional" || cat === "doctor") return "doctor";
+    return cat;
+  };
+
   const initialDraft = useMemo(() => loadSavedDraft(), []);
 
-  const [activeTab, setActiveTab] = useState<string>(initialDraft?.activeTab || initialCategory);
+  const [activeTab, setActiveTab] = useState<string>(normalizeCategory(initialDraft?.activeTab || initialCategory));
   const [businessType, setBusinessType] = useState<string>(initialDraft?.businessType || "sole_proprietorship");
   const [expandedFaqIndex, setExpandedFaqIndex] = useState<number | null>(0);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -727,6 +733,27 @@ export default function ApplyForLoanView({
   );
   const [eduDetails, setEduDetails] = useState<EducationLoanDetails>(initialDraft?.eduDetails || initialEduDetails);
   const [proDetails, setProDetails] = useState<ProfessionalLoanDetails>(initialDraft?.proDetails || initialProDetails);
+
+  // Synchronize category and prefilled values when navigated from Eligibility Checker or other tabs
+  useEffect(() => {
+    if (initialCategory) {
+      const norm = normalizeCategory(initialCategory);
+      setActiveTab(norm);
+      try {
+        const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.formData?.desiredAmount) {
+            setFormData((prev: any) => ({
+              ...prev,
+              desiredAmount: parsed.formData.desiredAmount,
+              tenureYears: parsed.formData.tenureYears || prev.tenureYears
+            }));
+          }
+        }
+      } catch { }
+    }
+  }, [initialCategory]);
 
   // Auto-save form & stage progress to localStorage whenever state updates
   useEffect(() => {
@@ -1153,7 +1180,7 @@ export default function ApplyForLoanView({
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [submittedRefNo, setSubmittedRefNo] = useState("");
 
-  const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab) || LOAN_CATEGORIES[0];
+  const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab || (activeTab === "professional" && cat.id === "doctor")) || LOAN_CATEGORIES[0];
 
   // Dynamic Real-Time Bank Statement Notice Date Calculation
   const bankStatementNotice = useMemo(() => {
