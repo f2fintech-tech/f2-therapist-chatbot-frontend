@@ -5,6 +5,7 @@ import {
   CheckCircle,
   FileText,
   User as UserIcon,
+  UserCheck,
   Phone,
   MapPin,
   HelpCircle,
@@ -38,6 +39,7 @@ import {
   Key,
   Users,
   ChevronRight,
+  GraduationCap,
   ChevronLeft,
   X,
   FileCheck,
@@ -99,6 +101,102 @@ interface PartnerDetail {
   };
 }
 
+export interface EducationLoanDetails {
+  applicantEmail: string;
+  applicantMobile: string;
+  applicantMotherName: string;
+  applicantAadhaarDoc: { mode?: "pdf" | "photo"; fileName?: string; fileList?: string[]; frontPhoto?: string; backPhoto?: string; isEncrypted?: boolean; pdfPassword?: string };
+  applicantPanDoc: { mode?: "pdf" | "photo"; fileName?: string; fileList?: string[]; frontPhoto?: string; backPhoto?: string; isEncrypted?: boolean; pdfPassword?: string };
+  applicantMarksheetsDoc: { fileName?: string; fileList?: string[] };
+  applicantOfferLetterDoc: { fileName?: string; fileList?: string[] };
+  applicantFeeStructureDoc: { fileName?: string; fileList?: string[] };
+  applicantEntranceExamDoc: { fileName?: string; fileList?: string[] };
+  applicantCancelledChequeDoc: { fileName?: string; fileList?: string[] };
+
+  coApplicantRelation: string;
+  coApplicantRelationOther: string;
+  coApplicantEmploymentType: "salaried" | "self_employed";
+  coApplicantEmail: string;
+  coApplicantMobile: string;
+  coApplicantMotherName: string;
+  coApplicantAadhaarDoc: { mode?: "pdf" | "photo"; fileName?: string; fileList?: string[]; frontPhoto?: string; backPhoto?: string; isEncrypted?: boolean; pdfPassword?: string };
+  coApplicantPanDoc: { mode?: "pdf" | "photo"; fileName?: string; fileList?: string[]; frontPhoto?: string; backPhoto?: string; isEncrypted?: boolean; pdfPassword?: string };
+  coApplicantCancelledChequeDoc: { fileName?: string; fileList?: string[] };
+
+  coApplicantForm16Doc: { fileName?: string; fileList?: string[] };
+  coApplicantSalarySlipsDoc: { fileName?: string; fileList?: string[] };
+  coApplicantCompanyIdDoc: { fileName?: string; fileList?: string[] };
+
+  coApplicantItrDoc: { fileName?: string; fileList?: string[] };
+  coApplicantUdyamDoc: { fileName?: string; fileList?: string[] };
+  coApplicantGstDoc: { fileName?: string; fileList?: string[] };
+  coApplicantFinancialsDoc: { fileName?: string; fileList?: string[] };
+}
+
+const initialEduDetails: EducationLoanDetails = {
+  applicantEmail: "",
+  applicantMobile: "",
+  applicantMotherName: "",
+  applicantAadhaarDoc: { mode: "pdf" },
+  applicantPanDoc: { mode: "pdf" },
+  applicantMarksheetsDoc: {},
+  applicantOfferLetterDoc: {},
+  applicantFeeStructureDoc: {},
+  applicantEntranceExamDoc: {},
+  applicantCancelledChequeDoc: {},
+
+  coApplicantRelation: "father",
+  coApplicantRelationOther: "",
+  coApplicantEmploymentType: "salaried",
+  coApplicantEmail: "",
+  coApplicantMobile: "",
+  coApplicantMotherName: "",
+  coApplicantAadhaarDoc: { mode: "pdf" },
+  coApplicantPanDoc: { mode: "pdf" },
+  coApplicantCancelledChequeDoc: {},
+
+  coApplicantForm16Doc: {},
+  coApplicantSalarySlipsDoc: {},
+  coApplicantCompanyIdDoc: {},
+
+  coApplicantItrDoc: {},
+  coApplicantUdyamDoc: {},
+  coApplicantGstDoc: {},
+  coApplicantFinancialsDoc: {}
+};
+
+export interface ProfessionalLoanDetails {
+  professionType: "doctor" | "ca_cs_cma";
+  doctorUgDegreeDoc: { fileName?: string; fileList?: string[] };
+  doctorConsultancyLetterDoc: { fileName?: string; fileList?: string[] };
+  doctorPgDegreeDoc: { fileName?: string; fileList?: string[] };
+  doctorRegistrationDoc: { fileName?: string; fileList?: string[] };
+  doctorLetterHeadDoc: { fileName?: string; fileList?: string[] };
+
+  financialCopDoc: { fileName?: string; fileList?: string[] };
+  financialComDoc: { fileName?: string; fileList?: string[] };
+  financialFirmCardDoc: { fileName?: string; fileList?: string[] };
+  financialLetterHeadDoc: { fileName?: string; fileList?: string[] };
+  financialItrCoiDoc: { fileName?: string; fileList?: string[] };
+  financialUdyamShopDoc: { fileName?: string; fileList?: string[] };
+}
+
+const initialProDetails: ProfessionalLoanDetails = {
+  professionType: "doctor",
+  doctorUgDegreeDoc: {},
+  doctorConsultancyLetterDoc: {},
+  doctorPgDegreeDoc: {},
+  doctorRegistrationDoc: {},
+  doctorLetterHeadDoc: {},
+
+  financialCopDoc: {},
+  financialComDoc: {},
+  financialFirmCardDoc: {},
+  financialLetterHeadDoc: {},
+  financialItrCoiDoc: {},
+  financialUdyamShopDoc: {}
+};
+
 interface ApplyForLoanViewProps {
   userId: string;
   userEmail?: string;
@@ -145,14 +243,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Instant Unsecured Funds for Any Urgent Financial Need",
     description: "Get instant approval for medical emergencies, travel, weddings, education, or consolidating existing debts without offering collateral.",
     maxAmount: "Up to ₹40 Lakhs",
-    startRate: "10.5% p.a.",
+    startRate: "9.99% p.a.",
     maxTenure: "Up to 5 Years",
     processingTime: "24 - 48 Hours",
     defaultAmountNum: 500000,
     minAmountNum: 50000,
     maxAmountNum: 4000000,
     stepAmountNum: 25000,
-    defaultRateNum: 11.5,
+    defaultRateNum: 9.99,
     defaultTenureNum: 3,
     features: [
       "No collateral or guarantor required",
@@ -215,14 +313,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Fuel Your Business Expansion & Working Capital Growth",
     description: "Tailored collateral-free business financing for micro, small, and medium enterprises (MSMEs), retailers, and manufacturers.",
     maxAmount: "Up to ₹50 Lakhs / ₹5 Cr",
-    startRate: "13.5% p.a.",
+    startRate: "14.5% p.a.",
     maxTenure: "Up to 7 Years",
     processingTime: "48 - 72 Hours",
     defaultAmountNum: 2000000,
     minAmountNum: 200000,
     maxAmountNum: 10000000,
     stepAmountNum: 100000,
-    defaultRateNum: 14.0,
+    defaultRateNum: 14.5,
     defaultTenureNum: 4,
     features: [
       "Collateral-free options available up to ₹50 Lakhs",
@@ -275,14 +373,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Build or Buy Your Dream Home with Lowest EMIs",
     description: "Long-term home financing with attractive interest rates for property purchase, plot acquisition, home construction, or balance transfers.",
     maxAmount: "Up to ₹10 Crore",
-    startRate: "8.35% p.a.",
+    startRate: "7.15% p.a.",
     maxTenure: "Up to 30 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 5000000,
     minAmountNum: 500000,
     maxAmountNum: 30000000,
     stepAmountNum: 250000,
-    defaultRateNum: 8.5,
+    defaultRateNum: 7.15,
     defaultTenureNum: 20,
     features: [
       "Financing up to 85%-90% of property cost",
@@ -338,14 +436,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Unlock Maximum Cash Value from Your Property Asset",
     description: "Leverage your residential, commercial, or industrial property to secure high-value loans at interest rates lower than personal loans.",
     maxAmount: "Up to ₹15 Crore",
-    startRate: "9.5% p.a.",
+    startRate: "8.0% p.a.",
     maxTenure: "Up to 15 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 7500000,
     minAmountNum: 1000000,
     maxAmountNum: 50000000,
     stepAmountNum: 500000,
-    defaultRateNum: 10.0,
+    defaultRateNum: 8.0,
     defaultTenureNum: 12,
     features: [
       "High LTV (Loan to Value) up to 70% of market property valuation",
@@ -396,62 +494,62 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
   },
   {
     id: "doctor",
-    name: "Doctor Loan",
-    icon: "🩺",
+    name: "Professional Loan",
+    icon: "👨‍💼",
     badge: "Exclusive Professional Credit",
-    heroTagline: "Tailored High-Limit Financing for Certified Doctors & Medical Experts",
-    description: "Specialized credit facilities for MBBS, BDS, MD, MS, BAMS, BHMS, and certified medical professionals to set up clinics, purchase medical equipment, or expand healthcare facilities.",
+    heroTagline: "Tailored High-Limit Financing for Certified Doctors, CAs, CS, CMAs & Professionals",
+    description: "Specialized credit facilities for Chartered Accountants (CA), Company Secretaries (CS), Cost Accountants (CMA), Doctors (MBBS, BDS, MD, MS, BAMS, BHMS), and certified professionals to set up offices/clinics, purchase equipment, or expand professional practice.",
     maxAmount: "Up to ₹1 Crore",
-    startRate: "9.99% p.a.",
+    startRate: "13.5% p.a.",
     maxTenure: "Up to 7 Years",
     processingTime: "24 - 48 Hours",
     defaultAmountNum: 2500000,
     minAmountNum: 200000,
     maxAmountNum: 10000000,
     stepAmountNum: 100000,
-    defaultRateNum: 10.5,
+    defaultRateNum: 13.5,
     defaultTenureNum: 5,
     features: [
-      "Pre-approved loan limits up to ₹1 Cr based on qualification degree",
-      "Zero collateral required for qualified medical practitioners",
-      "Medical equipment purchase & clinic setup financing",
+      "Pre-approved loan limits up to ₹1 Cr based on qualification degree & COP",
+      "Zero collateral required for qualified medical & financial professionals",
+      "Office expansion, clinic setup & equipment purchase financing",
       "Flexible repayment terms up to 84 months",
       "Minimal documentation with fast-track processing"
     ],
     f2Advantages: [
-      "Exclusive doctor loan programs in partnership with premier healthcare lenders",
-      "Simplified evaluation based on degree certificate & practice duration",
-      "Special low interest rate brackets tailored for medical professionals",
+      "Exclusive professional loan programs in partnership with premier lenders",
+      "Simplified evaluation based on degree certificate, COP & practice duration",
+      "Special low interest rate brackets tailored for CAs, CS, CMAs & Doctors",
       "Doorstep service by F2 Professional Loan Experts",
       "No financial statement audit required for limits up to ₹25 Lakhs"
     ],
     requiredDocs: {
       doctors: [
         "PAN Card & Aadhaar Card",
-        "Medical Degree Certificate (MBBS / BDS / MD / MS / BAMS / BHMS)",
-        "Medical Council Registration Certificate",
+        "Professional Qualification Certificate & COP (CA / CS / CMA / MBBS / BDS / MD / MS)",
+        "Professional Institute / Council Registration (ICAI / ICSI / ICMAI / MCI / State Council)",
         "Last 6 Months Bank Statement",
-        "Proof of Practice / Clinic Registration (if applicable)"
+        "Proof of Practice / Office / Clinic Registration (if applicable)"
       ]
     },
     eligibilityCriteria: [
-      "Recognized medical degree certified by MCI / State Council",
-      "Minimum 1 year of post-qualification experience",
+      "Recognized professional degree & COP certified by ICAI / ICSI / ICMAI / MCI / State Council",
+      "Minimum 1 year of post-qualification experience or practice",
       "Age between 25 to 65 years"
     ],
     faq: [
       {
-        q: "Do I need financial statements (ITR) for a Doctor Loan?",
-        a: "For pre-approved doctor loan limits up to ₹25 Lakhs, financial statements are often waived based on your medical registration certificate!"
+        q: "Do I need financial statements (ITR) for a Professional Loan?",
+        a: "For pre-approved professional loan limits up to ₹25 Lakhs, financial statements are often waived based on your professional COP or registration certificate!"
       },
       {
-        q: "Can I use the Doctor Loan to buy medical equipment?",
-        a: "Yes! Funds can be used for buying diagnostic machines, clinic equipment, interior setup, or general professional expenses."
+        q: "Can I use the Professional Loan to expand my office or clinic?",
+        a: "Yes! Funds can be used for office/clinic expansion, equipment, technology upgrades, interior setup, or general professional expenses."
       }
     ],
     additionalDocFields: [
-      { id: "medical_degree", label: "Medical Degree Certificate (MBBS / MD / BDS / MS)", description: "Copy of qualification certificate", required: true },
-      { id: "council_reg", label: "Medical Council Registration Certificate", description: "State or MCI registration certificate", required: true }
+      { id: "professional_degree", label: "Professional Qualification Certificate & COP (CA / CS / CMA / MBBS / MD / BDS)", description: "Copy of professional degree certificate & COP", required: true },
+      { id: "council_reg", label: "Professional Institute / Council Registration (ICAI / ICSI / ICMAI / MCI)", description: "Registration certificate from ICAI, ICSI, ICMAI, or MCI/State Council", required: true }
     ]
   },
   {
@@ -462,14 +560,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     heroTagline: "Fund Higher Education in India & Abroad with Flexible Repayment",
     description: "Comprehensive financial support for Premier Domestic Colleges and Abroad Universities covering tuition fees, accommodation, travel, & study expenses.",
     maxAmount: "Up to ₹1.5 Crore",
-    startRate: "8.85% p.a.",
+    startRate: "8.5% p.a.",
     maxTenure: "Up to 15 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 1500000,
     minAmountNum: 100000,
     maxAmountNum: 15000000,
     stepAmountNum: 50000,
-    defaultRateNum: 9.2,
+    defaultRateNum: 8.5,
     defaultTenureNum: 10,
     features: [
       "Collateral-free loans available up to ₹40 Lakhs for top premier universities",
@@ -627,6 +725,8 @@ export default function ApplyForLoanView({
       }
     ]
   );
+  const [eduDetails, setEduDetails] = useState<EducationLoanDetails>(initialDraft?.eduDetails || initialEduDetails);
+  const [proDetails, setProDetails] = useState<ProfessionalLoanDetails>(initialDraft?.proDetails || initialProDetails);
 
   // Auto-save form & stage progress to localStorage whenever state updates
   useEffect(() => {
@@ -649,13 +749,15 @@ export default function ApplyForLoanView({
         companyOfficialEmail,
         pvtDirectors,
         partnershipPartners,
+        eduDetails,
+        proDetails,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails]);
 
   // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
   useEffect(() => {
@@ -708,6 +810,8 @@ export default function ApplyForLoanView({
           panDoc: { mode: "pdf" }
         }
       ]);
+      setEduDetails(initialEduDetails);
+      setProDetails(initialProDetails);
       setFormData({
         fullName: "",
         fatherName: "",
@@ -1001,6 +1105,9 @@ export default function ApplyForLoanView({
       // Strictly return empty list for unconfigured business entity types (HUF)
       return [];
     }
+    if (activeTab === "education" || activeTab === "doctor") {
+      return [];
+    }
     return currentCategory.additionalDocFields;
   };
 
@@ -1263,6 +1370,167 @@ export default function ApplyForLoanView({
       }
     }
 
+    if (activeTab === "education") {
+      // Validate Applicant
+      if (!eduDetails.applicantEmail.trim() || !eduDetails.applicantEmail.includes("@")) {
+        alert("Please enter a valid Email ID for the Main Applicant.");
+        return;
+      }
+      if (!eduDetails.applicantMobile.trim() || eduDetails.applicantMobile.replace(/\D/g, "").length < 10) {
+        alert("Please enter a valid 10-digit Mobile Number for the Main Applicant.");
+        return;
+      }
+      if (!eduDetails.applicantMotherName.trim()) {
+        alert("Please enter Mother's Name for the Main Applicant.");
+        return;
+      }
+      const hasAppAadhaar = eduDetails.applicantAadhaarDoc.mode === "pdf"
+        ? Boolean(eduDetails.applicantAadhaarDoc.fileName || (eduDetails.applicantAadhaarDoc.fileList && eduDetails.applicantAadhaarDoc.fileList.length > 0))
+        : Boolean(eduDetails.applicantAadhaarDoc.frontPhoto);
+      if (!hasAppAadhaar) {
+        alert("Please upload or capture Aadhaar Card for the Main Applicant.");
+        return;
+      }
+      const hasAppPan = eduDetails.applicantPanDoc.mode === "pdf"
+        ? Boolean(eduDetails.applicantPanDoc.fileName || (eduDetails.applicantPanDoc.fileList && eduDetails.applicantPanDoc.fileList.length > 0))
+        : Boolean(eduDetails.applicantPanDoc.frontPhoto);
+      if (!hasAppPan) {
+        alert("Please upload or capture PAN Card for the Main Applicant.");
+        return;
+      }
+      if (getDocFiles(eduDetails.applicantMarksheetsDoc).length === 0) {
+        alert("Please upload Class 10th, 12th & Graduation Marksheets for the Main Applicant.");
+        return;
+      }
+      if (getDocFiles(eduDetails.applicantOfferLetterDoc).length === 0) {
+        alert("Please upload College / University Offer Letter for the Main Applicant.");
+        return;
+      }
+      if (getDocFiles(eduDetails.applicantFeeStructureDoc).length === 0) {
+        alert("Please upload Fee Structure Document for the Main Applicant.");
+        return;
+      }
+      if (getDocFiles(eduDetails.applicantCancelledChequeDoc).length === 0) {
+        alert("Please upload Cancelled Cheque of Bank Account for the Main Applicant.");
+        return;
+      }
+
+      // Validate Co-Applicant
+      if (eduDetails.coApplicantRelation === "other" && !eduDetails.coApplicantRelationOther.trim()) {
+        alert("Please specify the relation of Co-Applicant with Applicant.");
+        return;
+      }
+      if (!eduDetails.coApplicantEmail.trim() || !eduDetails.coApplicantEmail.includes("@")) {
+        alert("Please enter a valid Email ID for the Co-Applicant.");
+        return;
+      }
+      if (!eduDetails.coApplicantMobile.trim() || eduDetails.coApplicantMobile.replace(/\D/g, "").length < 10) {
+        alert("Please enter a valid 10-digit Mobile Number for the Co-Applicant.");
+        return;
+      }
+      if (!eduDetails.coApplicantMotherName.trim()) {
+        alert("Please enter Mother's Name for the Co-Applicant.");
+        return;
+      }
+      const hasCoAppAadhaar = eduDetails.coApplicantAadhaarDoc.mode === "pdf"
+        ? Boolean(eduDetails.coApplicantAadhaarDoc.fileName || (eduDetails.coApplicantAadhaarDoc.fileList && eduDetails.coApplicantAadhaarDoc.fileList.length > 0))
+        : Boolean(eduDetails.coApplicantAadhaarDoc.frontPhoto);
+      if (!hasCoAppAadhaar) {
+        alert("Please upload or capture Aadhaar Card for the Co-Applicant.");
+        return;
+      }
+      const hasCoAppPan = eduDetails.coApplicantPanDoc.mode === "pdf"
+        ? Boolean(eduDetails.coApplicantPanDoc.fileName || (eduDetails.coApplicantPanDoc.fileList && eduDetails.coApplicantPanDoc.fileList.length > 0))
+        : Boolean(eduDetails.coApplicantPanDoc.frontPhoto);
+      if (!hasCoAppPan) {
+        alert("Please upload or capture PAN Card for the Co-Applicant.");
+        return;
+      }
+      if (getDocFiles(eduDetails.coApplicantCancelledChequeDoc).length === 0) {
+        alert("Please upload Cancelled Cheque of Bank Account for the Co-Applicant.");
+        return;
+      }
+
+      // Validate Co-Applicant Employment Specific Docs
+      if (eduDetails.coApplicantEmploymentType === "salaried") {
+        if (getDocFiles(eduDetails.coApplicantForm16Doc).length === 0) {
+          alert("Please upload Form 16 Part A-B (Last 2 Years) for the Co-Applicant.");
+          return;
+        }
+        if (getDocFiles(eduDetails.coApplicantSalarySlipsDoc).length === 0) {
+          alert("Please upload Last 3 Months Salary Slips for the Co-Applicant.");
+          return;
+        }
+        if (getDocFiles(eduDetails.coApplicantCompanyIdDoc).length === 0) {
+          alert("Please upload Company / Govt ID Card for the Co-Applicant.");
+          return;
+        }
+      } else if (eduDetails.coApplicantEmploymentType === "self_employed") {
+        if (getDocFiles(eduDetails.coApplicantItrDoc).length === 0) {
+          alert("Please upload Last 2 Years ITR with Computation of Income for the Co-Applicant.");
+          return;
+        }
+        if (getDocFiles(eduDetails.coApplicantUdyamDoc).length === 0) {
+          alert("Please upload Udyam Registration Certificate for the Co-Applicant.");
+          return;
+        }
+        if (getDocFiles(eduDetails.coApplicantGstDoc).length === 0) {
+          alert("Please upload GST Certificate for the Co-Applicant.");
+          return;
+        }
+        if (getDocFiles(eduDetails.coApplicantFinancialsDoc).length === 0) {
+          alert("Please upload Last 2 Years Financials (P/L, B/S) for the Co-Applicant.");
+          return;
+        }
+      }
+    }
+
+    if (activeTab === "doctor") {
+      if (proDetails.professionType === "doctor") {
+        if (getDocFiles(proDetails.doctorUgDegreeDoc).length === 0) {
+          alert("Please upload UG Degree (MBBS / BDS / BAMS / BHMS).");
+          return;
+        }
+        if (getDocFiles(proDetails.doctorConsultancyLetterDoc).length === 0) {
+          alert("Please upload Consultancy Letter.");
+          return;
+        }
+        if (getDocFiles(proDetails.doctorRegistrationDoc).length === 0) {
+          alert("Please upload Registration Certificate for UG/PG/Super Specialist.");
+          return;
+        }
+        if (getDocFiles(proDetails.doctorLetterHeadDoc).length === 0) {
+          alert("Please upload Doctor / Clinic Letter Head.");
+          return;
+        }
+      } else {
+        if (getDocFiles(proDetails.financialCopDoc).length === 0) {
+          alert("Please upload Certificate of Practice (COP).");
+          return;
+        }
+        if (getDocFiles(proDetails.financialComDoc).length === 0) {
+          alert("Please upload Certificate of Membership (COM).");
+          return;
+        }
+        if (getDocFiles(proDetails.financialFirmCardDoc).length === 0) {
+          alert("Please upload Firm Card.");
+          return;
+        }
+        if (getDocFiles(proDetails.financialLetterHeadDoc).length === 0) {
+          alert("Please upload Letter Head.");
+          return;
+        }
+        if (getDocFiles(proDetails.financialItrCoiDoc).length === 0) {
+          alert("Please upload 2 Years ITR & Computation of Income (COI).");
+          return;
+        }
+        if (getDocFiles(proDetails.financialUdyamShopDoc).length === 0) {
+          alert("Please upload Udyam & Shop Establishment Registration.");
+          return;
+        }
+      }
+    }
+
     if (!formData.acceptTerms) {
       alert("Please authorize F2 Fintech consent terms to proceed.");
       return;
@@ -1424,6 +1692,29 @@ export default function ApplyForLoanView({
       setPanDoc((prev: any) => ({ ...prev, mode: "photo", frontPhoto: simulatedSnapshot }));
     } else if (cameraModalTarget === "pan_back") {
       setPanDoc((prev: any) => ({ ...prev, mode: "photo", backPhoto: simulatedSnapshot }));
+    } else if (cameraModalTarget.startsWith("edu_")) {
+      const target = cameraModalTarget;
+      setEduDetails((prev) => {
+        const copy = { ...prev };
+        if (target === "edu_applicant_aadhaar_front") {
+          copy.applicantAadhaarDoc = { ...copy.applicantAadhaarDoc, mode: "photo", frontPhoto: simulatedSnapshot };
+        } else if (target === "edu_applicant_aadhaar_back") {
+          copy.applicantAadhaarDoc = { ...copy.applicantAadhaarDoc, mode: "photo", backPhoto: simulatedSnapshot };
+        } else if (target === "edu_applicant_pan_front") {
+          copy.applicantPanDoc = { ...copy.applicantPanDoc, mode: "photo", frontPhoto: simulatedSnapshot };
+        } else if (target === "edu_applicant_pan_back") {
+          copy.applicantPanDoc = { ...copy.applicantPanDoc, mode: "photo", backPhoto: simulatedSnapshot };
+        } else if (target === "edu_coapplicant_aadhaar_front") {
+          copy.coApplicantAadhaarDoc = { ...copy.coApplicantAadhaarDoc, mode: "photo", frontPhoto: simulatedSnapshot };
+        } else if (target === "edu_coapplicant_aadhaar_back") {
+          copy.coApplicantAadhaarDoc = { ...copy.coApplicantAadhaarDoc, mode: "photo", backPhoto: simulatedSnapshot };
+        } else if (target === "edu_coapplicant_pan_front") {
+          copy.coApplicantPanDoc = { ...copy.coApplicantPanDoc, mode: "photo", frontPhoto: simulatedSnapshot };
+        } else if (target === "edu_coapplicant_pan_back") {
+          copy.coApplicantPanDoc = { ...copy.coApplicantPanDoc, mode: "photo", backPhoto: simulatedSnapshot };
+        }
+        return copy;
+      });
     } else if (cameraModalTarget === "photo") {
       setPhotoDoc({ fileName: "photo_camera_capture.jpg", photoPreview: simulatedSnapshot });
     }
@@ -3692,6 +3983,1598 @@ export default function ApplyForLoanView({
                               </div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Professional Loan Minimalist Step 3 UI */}
+                    {activeTab === "doctor" && (
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100/80">
+                                <UserCheck className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2.5">
+                                  <h5 className="text-base font-bold text-slate-900">
+                                    Professional Additional Documents
+                                  </h5>
+                                  <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100">
+                                    Professional Verification
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Select your qualification field and upload mandatory practice certificates
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Profession Selector Dropdown */}
+                          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/80 space-y-2 max-w-md">
+                            <label className="text-xs font-bold text-slate-800 block flex items-center gap-1.5" htmlFor="professionTypeSelect">
+                              <Briefcase className="w-4 h-4 text-indigo-600" /> Select Professional Qualification <span className="text-red-500 font-bold">*</span>
+                            </label>
+                            <p className="text-[11px] text-slate-500">Document upload list will update based on your professional selection</p>
+                            <select
+                              id="professionTypeSelect"
+                              value={proDetails.professionType}
+                              onChange={(e) => setProDetails(prev => ({ ...prev, professionType: e.target.value as "doctor" | "ca_cs_cma" }))}
+                              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 font-semibold text-slate-800 transition-all cursor-pointer shadow-2xs"
+                            >
+                              <option value="doctor">Doctor (MBBS, BDS, BAMS, BHMS)</option>
+                              <option value="ca_cs_cma">CA / CS / CMA (Chartered Accountant, CS, CMA)</option>
+                            </select>
+                          </div>
+
+                          {/* DOCTOR FIELDS */}
+                          {proDetails.professionType === "doctor" && (
+                            <div className="space-y-4 pt-2">
+                              <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2 flex items-center gap-2">
+                                <Stethoscope className="w-4 h-4 text-blue-600" />
+                                <span>Doctor Practice & Qualification Documents</span>
+                              </h6>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* 1. UG Degree */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    UG Degree (MBBS, BDS, BAMS, BHMS) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_ug_degree"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorUgDegreeDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorUgDegreeDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_ug_degree" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorUgDegreeDoc.fileList?.length ? "Add UG Degree" : "Upload UG Degree"}
+                                  </label>
+                                  {(proDetails.doctorUgDegreeDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgDegreeDoc: { fileList: prev.doctorUgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 2. Consultancy Letter */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Consultancy Letter <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_consultancy"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorConsultancyLetterDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorConsultancyLetterDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_consultancy" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorConsultancyLetterDoc.fileList?.length ? "Add Letter" : "Upload Consultancy Letter"}
+                                  </label>
+                                  {(proDetails.doctorConsultancyLetterDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorConsultancyLetterDoc: { fileList: prev.doctorConsultancyLetterDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 3. PG Degree */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    PG Degree (MD, MS, MCH) <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_pg_degree"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorPgDegreeDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorPgDegreeDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_pg_degree" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {proDetails.doctorPgDegreeDoc.fileList?.length ? "Add PG Degree" : "Upload PG Degree"}
+                                  </label>
+                                  {(proDetails.doctorPgDegreeDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgDegreeDoc: { fileList: prev.doctorPgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 4. Registration for UG, PG & Super Specialist */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Registration (UG, PG & Super Specialist) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_registration"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorRegistrationDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorRegistrationDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_registration" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorRegistrationDoc.fileList?.length ? "Add Registration" : "Upload Registration Certificates"}
+                                  </label>
+                                  {(proDetails.doctorRegistrationDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorRegistrationDoc: { fileList: prev.doctorRegistrationDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 5. Letter Head */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5 sm:col-span-2 max-w-md">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Doctor / Clinic Letter Head <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_letterhead"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorLetterHeadDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorLetterHeadDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_letterhead" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorLetterHeadDoc.fileList?.length ? "Add Letter Head" : "Upload Letter Head"}
+                                  </label>
+                                  {(proDetails.doctorLetterHeadDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[180px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorLetterHeadDoc: { fileList: prev.doctorLetterHeadDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* CA / CS / CMA FIELDS */}
+                          {proDetails.professionType === "ca_cs_cma" && (
+                            <div className="space-y-4 pt-2">
+                              <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2 flex items-center gap-2">
+                                <Award className="w-4 h-4 text-indigo-600" />
+                                <span>CA / CS / CMA Practice & Accreditation Documents</span>
+                              </h6>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* 1. COP */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Certificate of Practice (COP) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_cop"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialCopDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialCopDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_cop" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialCopDoc.fileList?.length ? "Add COP" : "Upload COP Certificate"}
+                                  </label>
+                                  {(proDetails.financialCopDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialCopDoc: { fileList: prev.financialCopDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 2. COM */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Certificate of Membership (COM) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_com"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialComDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialComDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_com" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialComDoc.fileList?.length ? "Add COM" : "Upload COM Certificate"}
+                                  </label>
+                                  {(proDetails.financialComDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialComDoc: { fileList: prev.financialComDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 3. Firm Card */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Firm Card <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_firm_card"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialFirmCardDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialFirmCardDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_firm_card" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialFirmCardDoc.fileList?.length ? "Add Firm Card" : "Upload Firm Card"}
+                                  </label>
+                                  {(proDetails.financialFirmCardDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialFirmCardDoc: { fileList: prev.financialFirmCardDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 4. Letter Head */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Letter Head <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_letterhead"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialLetterHeadDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialLetterHeadDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_letterhead" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialLetterHeadDoc.fileList?.length ? "Add Letter Head" : "Upload Letter Head"}
+                                  </label>
+                                  {(proDetails.financialLetterHeadDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialLetterHeadDoc: { fileList: prev.financialLetterHeadDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 5. 2 yrs ITR and COI */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    2 Yrs ITR & Computation (COI) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_itr_coi"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialItrCoiDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialItrCoiDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_itr_coi" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialItrCoiDoc.fileList?.length ? "Add ITR & COI" : "Upload 2 Yrs ITR & COI"}
+                                  </label>
+                                  {(proDetails.financialItrCoiDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialItrCoiDoc: { fileList: prev.financialItrCoiDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 6. Udyam & Shop registration */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Udyam & Shop Registration <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_fin_udyam_shop"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          financialUdyamShopDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.financialUdyamShopDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_fin_udyam_shop" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-indigo-600" /> {proDetails.financialUdyamShopDoc.fileList?.length ? "Add Registration" : "Upload Udyam / Shop Reg"}
+                                  </label>
+                                  {(proDetails.financialUdyamShopDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, financialUdyamShopDoc: { fileList: prev.financialUdyamShopDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Education Loan Minimalist Step 3 UI */}
+                    {activeTab === "education" && (
+                      <div className="space-y-7">
+                        {/* SECTION 1: MAIN APPLICANT (STUDENT) */}
+                        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
+                          {/* Section Header */}
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100/80">
+                                <GraduationCap className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2.5">
+                                  <h5 className="text-base font-bold text-slate-900">
+                                    1. Main Applicant Details & Documents
+                                  </h5>
+                                  <span className="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold border border-blue-100">
+                                    Student
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Academic records, offer letter, fee structure & personal identity
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Applicant Basic Info Inputs */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Applicant Email ID <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="email"
+                                value={eduDetails.applicantEmail}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, applicantEmail: e.target.value }))}
+                                placeholder="e.g. student@gmail.com"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Applicant Mobile No. <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="tel"
+                                maxLength={10}
+                                value={eduDetails.applicantMobile}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, applicantMobile: e.target.value.replace(/\D/g, "") }))}
+                                placeholder="10-digit mobile number"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Applicant Mother's Name <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={eduDetails.applicantMotherName}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, applicantMotherName: e.target.value }))}
+                                placeholder="Full Mother's Name"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Identity KYC Section */}
+                          <div>
+                            <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2">
+                              Identity & Address Verification
+                            </h6>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Applicant Aadhaar */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-4 transition-all space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-800">
+                                    Applicant Aadhaar Card <span className="text-red-500 font-bold">*</span>
+                                  </span>
+                                  <div className="flex text-[10px] bg-white border border-slate-200 rounded-lg p-0.5 font-medium shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, applicantAadhaarDoc: { ...prev.applicantAadhaarDoc, mode: "pdf" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.applicantAadhaarDoc.mode === "pdf" ? "bg-blue-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      PDF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, applicantAadhaarDoc: { ...prev.applicantAadhaarDoc, mode: "photo" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.applicantAadhaarDoc.mode === "photo" ? "bg-blue-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      Front & Back Photo
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {eduDetails.applicantAadhaarDoc.mode === "pdf" ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      id="edu_app_aadhaar_pdf"
+                                      type="file"
+                                      accept=".pdf"
+                                      onChange={(e) => {
+                                        if (e.target.files?.length) {
+                                          const names = Array.from(e.target.files).map(f => f.name);
+                                          setEduDetails(prev => ({
+                                            ...prev,
+                                            applicantAadhaarDoc: {
+                                              ...prev.applicantAadhaarDoc,
+                                              fileName: names[0],
+                                              fileList: Array.from(new Set([...(prev.applicantAadhaarDoc.fileList || []), ...names]))
+                                            }
+                                          }));
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <label htmlFor="edu_app_aadhaar_pdf" className="w-full py-2.5 px-3.5 bg-white hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 font-medium text-xs rounded-xl border border-slate-200 hover:border-blue-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-blue-600" /> {eduDetails.applicantAadhaarDoc.fileList?.length ? "Add More PDF" : "Choose Aadhaar PDF"}
+                                    </label>
+                                    {(eduDetails.applicantAadhaarDoc.fileList || []).map((fn, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs bg-blue-50/70 border border-blue-100 px-3 py-1.5 rounded-lg text-blue-950 font-medium">
+                                        <span className="truncate max-w-[200px]">{fn}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEduDetails(prev => ({
+                                            ...prev,
+                                            applicantAadhaarDoc: {
+                                              ...prev.applicantAadhaarDoc,
+                                              fileList: prev.applicantAadhaarDoc.fileList?.filter((_, i) => i !== idx)
+                                            }
+                                          }))}
+                                          className="text-slate-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Front Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.applicantAadhaarDoc.frontPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.applicantAadhaarDoc.frontPhoto} alt="Aadhaar Front" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantAadhaarDoc: { ...prev.applicantAadhaarDoc, frontPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_applicant_aadhaar_front")} className="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Back Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.applicantAadhaarDoc.backPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.applicantAadhaarDoc.backPhoto} alt="Aadhaar Back" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantAadhaarDoc: { ...prev.applicantAadhaarDoc, backPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_applicant_aadhaar_back")} className="w-full py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Applicant PAN */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-4 transition-all space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-800">
+                                    Applicant PAN Card <span className="text-red-500 font-bold">*</span>
+                                  </span>
+                                  <div className="flex text-[10px] bg-white border border-slate-200 rounded-lg p-0.5 font-medium shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, applicantPanDoc: { ...prev.applicantPanDoc, mode: "pdf" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.applicantPanDoc.mode === "pdf" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      PDF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, applicantPanDoc: { ...prev.applicantPanDoc, mode: "photo" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.applicantPanDoc.mode === "photo" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      Front & Back Photo
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {eduDetails.applicantPanDoc.mode === "pdf" ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      id="edu_app_pan_pdf"
+                                      type="file"
+                                      accept=".pdf"
+                                      onChange={(e) => {
+                                        if (e.target.files?.length) {
+                                          const names = Array.from(e.target.files).map(f => f.name);
+                                          setEduDetails(prev => ({
+                                            ...prev,
+                                            applicantPanDoc: {
+                                              ...prev.applicantPanDoc,
+                                              fileName: names[0],
+                                              fileList: Array.from(new Set([...(prev.applicantPanDoc.fileList || []), ...names]))
+                                            }
+                                          }));
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <label htmlFor="edu_app_pan_pdf" className="w-full py-2.5 px-3.5 bg-white hover:bg-indigo-50/50 text-slate-700 hover:text-indigo-700 font-medium text-xs rounded-xl border border-slate-200 hover:border-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-indigo-600" /> {eduDetails.applicantPanDoc.fileList?.length ? "Add More PDF" : "Choose PAN PDF"}
+                                    </label>
+                                    {(eduDetails.applicantPanDoc.fileList || []).map((fn, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs bg-indigo-50/70 border border-indigo-100 px-3 py-1.5 rounded-lg text-indigo-950 font-medium">
+                                        <span className="truncate max-w-[200px]">{fn}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEduDetails(prev => ({
+                                            ...prev,
+                                            applicantPanDoc: {
+                                              ...prev.applicantPanDoc,
+                                              fileList: prev.applicantPanDoc.fileList?.filter((_, i) => i !== idx)
+                                            }
+                                          }))}
+                                          className="text-slate-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Front Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.applicantPanDoc.frontPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.applicantPanDoc.frontPhoto} alt="PAN Front" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantPanDoc: { ...prev.applicantPanDoc, frontPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_applicant_pan_front")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Back Photo <span className="text-slate-400 font-normal">(Opt)</span></span>
+                                      {eduDetails.applicantPanDoc.backPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.applicantPanDoc.backPhoto} alt="PAN Back" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantPanDoc: { ...prev.applicantPanDoc, backPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_applicant_pan_back")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Academic & Fee Proofs Section */}
+                          <div>
+                            <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2">
+                              Academic & Admission Proofs
+                            </h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {/* Marksheets */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  Marksheets (10th, 12th, Grad) <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  id="edu_app_marksheets"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  multiple
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        applicantMarksheetsDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.applicantMarksheetsDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_app_marksheets" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-blue-600" /> {eduDetails.applicantMarksheetsDoc.fileList?.length ? "Add Marksheets" : "Upload Marksheets"}
+                                </label>
+                                {(eduDetails.applicantMarksheetsDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[130px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantMarksheetsDoc: { fileList: prev.applicantMarksheetsDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* College Offer Letter */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  College Offer Letter <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  id="edu_app_offer_letter"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        applicantOfferLetterDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.applicantOfferLetterDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_app_offer_letter" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-blue-600" /> {eduDetails.applicantOfferLetterDoc.fileList?.length ? "Add Offer Letter" : "Upload Offer Letter"}
+                                </label>
+                                {(eduDetails.applicantOfferLetterDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[130px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantOfferLetterDoc: { fileList: prev.applicantOfferLetterDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Fee Structure */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  Fee Structure Document <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  id="edu_app_fee_structure"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        applicantFeeStructureDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.applicantFeeStructureDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_app_fee_structure" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-blue-600" /> {eduDetails.applicantFeeStructureDoc.fileList?.length ? "Add Fee Structure" : "Upload Fee Structure"}
+                                </label>
+                                {(eduDetails.applicantFeeStructureDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[130px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantFeeStructureDoc: { fileList: prev.applicantFeeStructureDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Entrance & Bank Details Section */}
+                          <div>
+                            <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2">
+                              Entrance Exam & Banking
+                            </h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {/* Entrance Exam Result */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  Entrance Exam Scorecard <span className="text-slate-400 font-normal">(Optional)</span>
+                                </label>
+                                <input
+                                  id="edu_app_entrance_exam"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        applicantEntranceExamDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.applicantEntranceExamDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_app_entrance_exam" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-slate-500" /> {eduDetails.applicantEntranceExamDoc.fileList?.length ? "Add Scorecard" : "Upload Entrance Scorecard"}
+                                </label>
+                                {(eduDetails.applicantEntranceExamDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[150px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantEntranceExamDoc: { fileList: prev.applicantEntranceExamDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Applicant Cancelled Cheque */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  Applicant Bank Cancelled Cheque <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  id="edu_app_cheque"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        applicantCancelledChequeDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.applicantCancelledChequeDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_app_cheque" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-blue-600" /> {eduDetails.applicantCancelledChequeDoc.fileList?.length ? "Add Cheque" : "Upload Cancelled Cheque"}
+                                </label>
+                                {(eduDetails.applicantCancelledChequeDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[150px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, applicantCancelledChequeDoc: { fileList: prev.applicantCancelledChequeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* SECTION 2: CO-APPLICANT (GUARANTOR) */}
+                        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
+                          {/* Section Header */}
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100/80">
+                                <Users className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2.5">
+                                  <h5 className="text-base font-bold text-slate-900">
+                                    2. Co-Applicant Details & Income Proofs
+                                  </h5>
+                                  <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100">
+                                    Guarantor
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Relationship, identity verification & financial income proof
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Co-Applicant Relationship & Basic Inputs */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Relation with Applicant <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <select
+                                value={eduDetails.coApplicantRelation}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantRelation: e.target.value }))}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                              >
+                                <option value="father">Father</option>
+                                <option value="mother">Mother</option>
+                                <option value="other">Other (Specify)</option>
+                              </select>
+                            </div>
+
+                            {eduDetails.coApplicantRelation === "other" && (
+                              <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                  Specify Relation <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={eduDetails.coApplicantRelationOther}
+                                  onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantRelationOther: e.target.value }))}
+                                  placeholder="e.g. Guardian, Uncle, Brother"
+                                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                                />
+                              </div>
+                            )}
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Co-Applicant Employment Type <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <select
+                                value={eduDetails.coApplicantEmploymentType}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantEmploymentType: e.target.value as "salaried" | "self_employed" }))}
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                              >
+                                <option value="salaried">Salaried</option>
+                                <option value="self_employed">Self Employed</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Co-Applicant Email ID <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="email"
+                                value={eduDetails.coApplicantEmail}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantEmail: e.target.value }))}
+                                placeholder="e.g. parent@gmail.com"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Co-Applicant Mobile No. <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="tel"
+                                maxLength={10}
+                                value={eduDetails.coApplicantMobile}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantMobile: e.target.value.replace(/\D/g, "") }))}
+                                placeholder="10-digit mobile number"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                                Co-Applicant Mother's Name <span className="text-red-500 font-bold">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={eduDetails.coApplicantMotherName}
+                                onChange={(e) => setEduDetails(prev => ({ ...prev, coApplicantMotherName: e.target.value }))}
+                                placeholder="Full Mother's Name"
+                                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/40 hover:border-slate-300 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Identity KYC Section */}
+                          <div>
+                            <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2">
+                              Co-Applicant Identity Verification
+                            </h6>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Co-Applicant Aadhaar */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-4 transition-all space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-800">
+                                    Co-Applicant Aadhaar Card <span className="text-red-500 font-bold">*</span>
+                                  </span>
+                                  <div className="flex text-[10px] bg-white border border-slate-200 rounded-lg p-0.5 font-medium shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, coApplicantAadhaarDoc: { ...prev.coApplicantAadhaarDoc, mode: "pdf" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.coApplicantAadhaarDoc.mode === "pdf" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      PDF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, coApplicantAadhaarDoc: { ...prev.coApplicantAadhaarDoc, mode: "photo" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.coApplicantAadhaarDoc.mode === "photo" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      Front & Back Photo
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {eduDetails.coApplicantAadhaarDoc.mode === "pdf" ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      id="edu_coapp_aadhaar_pdf"
+                                      type="file"
+                                      accept=".pdf"
+                                      onChange={(e) => {
+                                        if (e.target.files?.length) {
+                                          const names = Array.from(e.target.files).map(f => f.name);
+                                          setEduDetails(prev => ({
+                                            ...prev,
+                                            coApplicantAadhaarDoc: {
+                                              ...prev.coApplicantAadhaarDoc,
+                                              fileName: names[0],
+                                              fileList: Array.from(new Set([...(prev.coApplicantAadhaarDoc.fileList || []), ...names]))
+                                            }
+                                          }));
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <label htmlFor="edu_coapp_aadhaar_pdf" className="w-full py-2.5 px-3.5 bg-white hover:bg-indigo-50/50 text-slate-700 hover:text-indigo-700 font-medium text-xs rounded-xl border border-slate-200 hover:border-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-indigo-600" /> {eduDetails.coApplicantAadhaarDoc.fileList?.length ? "Add More PDF" : "Upload Aadhaar PDF"}
+                                    </label>
+                                    {(eduDetails.coApplicantAadhaarDoc.fileList || []).map((fn, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs bg-indigo-50/70 border border-indigo-100 px-3 py-1.5 rounded-lg text-indigo-950 font-medium">
+                                        <span className="truncate max-w-[200px]">{fn}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEduDetails(prev => ({
+                                            ...prev,
+                                            coApplicantAadhaarDoc: {
+                                              ...prev.coApplicantAadhaarDoc,
+                                              fileList: prev.coApplicantAadhaarDoc.fileList?.filter((_, i) => i !== idx)
+                                            }
+                                          }))}
+                                          className="text-slate-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Front Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.coApplicantAadhaarDoc.frontPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.coApplicantAadhaarDoc.frontPhoto} alt="Aadhaar Front" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantAadhaarDoc: { ...prev.coApplicantAadhaarDoc, frontPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_coapplicant_aadhaar_front")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Back Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.coApplicantAadhaarDoc.backPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.coApplicantAadhaarDoc.backPhoto} alt="Aadhaar Back" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantAadhaarDoc: { ...prev.coApplicantAadhaarDoc, backPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_coapplicant_aadhaar_back")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Co-Applicant PAN */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-4 transition-all space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-800">
+                                    Co-Applicant PAN Card <span className="text-red-500 font-bold">*</span>
+                                  </span>
+                                  <div className="flex text-[10px] bg-white border border-slate-200 rounded-lg p-0.5 font-medium shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, coApplicantPanDoc: { ...prev.coApplicantPanDoc, mode: "pdf" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.coApplicantPanDoc.mode === "pdf" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      PDF
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEduDetails(prev => ({ ...prev, coApplicantPanDoc: { ...prev.coApplicantPanDoc, mode: "photo" } }))}
+                                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${eduDetails.coApplicantPanDoc.mode === "photo" ? "bg-indigo-600 text-white font-semibold shadow-2xs" : "text-slate-600 hover:text-slate-900"}`}
+                                    >
+                                      Front & Back Photo
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {eduDetails.coApplicantPanDoc.mode === "pdf" ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      id="edu_coapp_pan_pdf"
+                                      type="file"
+                                      accept=".pdf"
+                                      onChange={(e) => {
+                                        if (e.target.files?.length) {
+                                          const names = Array.from(e.target.files).map(f => f.name);
+                                          setEduDetails(prev => ({
+                                            ...prev,
+                                            coApplicantPanDoc: {
+                                              ...prev.coApplicantPanDoc,
+                                              fileName: names[0],
+                                              fileList: Array.from(new Set([...(prev.coApplicantPanDoc.fileList || []), ...names]))
+                                            }
+                                          }));
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                    <label htmlFor="edu_coapp_pan_pdf" className="w-full py-2.5 px-3.5 bg-white hover:bg-indigo-50/50 text-slate-700 hover:text-indigo-700 font-medium text-xs rounded-xl border border-slate-200 hover:border-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-indigo-600" /> {eduDetails.coApplicantPanDoc.fileList?.length ? "Add More PDF" : "Upload PAN PDF"}
+                                    </label>
+                                    {(eduDetails.coApplicantPanDoc.fileList || []).map((fn, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs bg-indigo-50/70 border border-indigo-100 px-3 py-1.5 rounded-lg text-indigo-950 font-medium">
+                                        <span className="truncate max-w-[200px]">{fn}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEduDetails(prev => ({
+                                            ...prev,
+                                            coApplicantPanDoc: {
+                                              ...prev.coApplicantPanDoc,
+                                              fileList: prev.coApplicantPanDoc.fileList?.filter((_, i) => i !== idx)
+                                            }
+                                          }))}
+                                          className="text-slate-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Front Photo <span className="text-red-500">*</span></span>
+                                      {eduDetails.coApplicantPanDoc.frontPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.coApplicantPanDoc.frontPhoto} alt="PAN Front" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantPanDoc: { ...prev.coApplicantPanDoc, frontPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_coapplicant_pan_front")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="text-center p-2.5 border border-slate-200 rounded-xl bg-white space-y-1.5">
+                                      <span className="text-[11px] font-semibold text-slate-700 block">Back Photo <span className="text-slate-400 font-normal">(Opt)</span></span>
+                                      {eduDetails.coApplicantPanDoc.backPhoto ? (
+                                        <div className="relative pt-1">
+                                          <img src={eduDetails.coApplicantPanDoc.backPhoto} alt="PAN Back" className="h-14 mx-auto rounded border object-cover" />
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantPanDoc: { ...prev.coApplicantPanDoc, backPhoto: undefined } }))} className="text-[10px] text-red-600 font-semibold hover:underline mt-1 cursor-pointer block mx-auto">Remove</button>
+                                        </div>
+                                      ) : (
+                                        <button type="button" onClick={() => triggerCameraModal("edu_coapplicant_pan_back")} className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                                          <Camera className="w-3.5 h-3.5" /> Capture
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Banking & Income Proofs Section */}
+                          <div>
+                            <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2 flex items-center justify-between">
+                              <span>Banking & Income Proofs</span>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
+                                {eduDetails.coApplicantEmploymentType === "salaried" ? "Salaried Person" : "Self-Employed"}
+                              </span>
+                            </h6>
+                            
+                            <div className="space-y-4">
+                              {/* Cancelled Cheque */}
+                              <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5 max-w-md">
+                                <label className="text-xs font-semibold text-slate-800 block">
+                                  Co-Applicant Bank Cancelled Cheque <span className="text-red-500 font-bold">*</span>
+                                </label>
+                                <input
+                                  id="edu_coapp_cheque"
+                                  type="file"
+                                  accept=".pdf, image/*"
+                                  onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                      const names = Array.from(e.target.files).map(f => f.name);
+                                      setEduDetails(prev => ({
+                                        ...prev,
+                                        coApplicantCancelledChequeDoc: {
+                                          fileName: names[0],
+                                          fileList: Array.from(new Set([...(prev.coApplicantCancelledChequeDoc.fileList || []), ...names]))
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                                <label htmlFor="edu_coapp_cheque" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                  <Upload className="w-3.5 h-3.5 text-indigo-600" /> {eduDetails.coApplicantCancelledChequeDoc.fileList?.length ? "Add Cancelled Cheque" : "Upload Cancelled Cheque"}
+                                </label>
+                                {(eduDetails.coApplicantCancelledChequeDoc.fileList || []).map((fn, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                    <span className="truncate max-w-[180px]">{fn}</span>
+                                    <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantCancelledChequeDoc: { fileList: prev.coApplicantCancelledChequeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Conditional Income Proofs for Co-Applicant */}
+                              {eduDetails.coApplicantEmploymentType === "salaried" ? (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                                    <span>Salaried Income Documents</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {/* Form 16 */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        Form 16 Part A-B (2 Yrs) <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_form16"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        multiple
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantForm16Doc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantForm16Doc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_form16" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-emerald-600" /> {eduDetails.coApplicantForm16Doc.fileList?.length ? "Add Form 16" : "Upload Form 16"}
+                                      </label>
+                                      {(eduDetails.coApplicantForm16Doc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[120px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantForm16Doc: { fileList: prev.coApplicantForm16Doc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Salary Slips */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        3 Months Salary Slips <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_slips"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        multiple
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantSalarySlipsDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantSalarySlipsDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_slips" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-emerald-600" /> {eduDetails.coApplicantSalarySlipsDoc.fileList?.length ? "Add Slips" : "Upload Slips"}
+                                      </label>
+                                      {(eduDetails.coApplicantSalarySlipsDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[120px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantSalarySlipsDoc: { fileList: prev.coApplicantSalarySlipsDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Company / Govt ID */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        Company / Govt ID Card <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_comp_id"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantCompanyIdDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantCompanyIdDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_comp_id" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-emerald-600" /> {eduDetails.coApplicantCompanyIdDoc.fileList?.length ? "Add ID Card" : "Upload ID Card"}
+                                      </label>
+                                      {(eduDetails.coApplicantCompanyIdDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[120px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantCompanyIdDoc: { fileList: prev.coApplicantCompanyIdDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                                    <Briefcase className="w-4 h-4 text-amber-600" />
+                                    <span>Self-Employed Business Documents</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* Last 2 Years ITR */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        ITR & Computation (2 Yrs) <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_itr"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        multiple
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantItrDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantItrDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_itr" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-amber-600" /> {eduDetails.coApplicantItrDoc.fileList?.length ? "Add ITR" : "Upload ITR & Computation"}
+                                      </label>
+                                      {(eduDetails.coApplicantItrDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[140px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantItrDoc: { fileList: prev.coApplicantItrDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Udyam Certificate */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        Udyam Registration <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_udyam"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantUdyamDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantUdyamDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_udyam" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-amber-600" /> {eduDetails.coApplicantUdyamDoc.fileList?.length ? "Add Certificate" : "Upload Udyam Certificate"}
+                                      </label>
+                                      {(eduDetails.coApplicantUdyamDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[140px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantUdyamDoc: { fileList: prev.coApplicantUdyamDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* GST Certificate */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        GST Certificate <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_gst"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantGstDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantGstDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_gst" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-amber-600" /> {eduDetails.coApplicantGstDoc.fileList?.length ? "Add GST" : "Upload GST Certificate"}
+                                      </label>
+                                      {(eduDetails.coApplicantGstDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[140px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantGstDoc: { fileList: prev.coApplicantGstDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Financial Statements (P/L, B/S) */}
+                                    <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2">
+                                      <label className="text-xs font-semibold text-slate-800 block">
+                                        Financials (P/L & B/S - 2 Yrs) <span className="text-red-500 font-bold">*</span>
+                                      </label>
+                                      <input
+                                        id="edu_coapp_financials"
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        multiple
+                                        onChange={(e) => {
+                                          if (e.target.files?.length) {
+                                            const names = Array.from(e.target.files).map(f => f.name);
+                                            setEduDetails(prev => ({
+                                              ...prev,
+                                              coApplicantFinancialsDoc: {
+                                                fileName: names[0],
+                                                fileList: Array.from(new Set([...(prev.coApplicantFinancialsDoc.fileList || []), ...names]))
+                                              }
+                                            }));
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label htmlFor="edu_coapp_financials" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                        <Upload className="w-3.5 h-3.5 text-amber-600" /> {eduDetails.coApplicantFinancialsDoc.fileList?.length ? "Add Financials" : "Upload Financials (P/L & B/S)"}
+                                      </label>
+                                      {(eduDetails.coApplicantFinancialsDoc.fileList || []).map((fn, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                          <span className="truncate max-w-[140px]">{fn}</span>
+                                          <button type="button" onClick={() => setEduDetails(prev => ({ ...prev, coApplicantFinancialsDoc: { fileList: prev.coApplicantFinancialsDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
