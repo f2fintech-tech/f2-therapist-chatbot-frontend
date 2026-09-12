@@ -3095,7 +3095,7 @@ ${sheetDataXml}
                         sub={dashboardSummary?.credit_score?.score ? `Bureau: ${dashboardSummary.credit_score.bureau.toUpperCase()} · Synced` : "Check your CIBIL score →"}
                         color={dashboardSummary?.credit_score?.score ? (dashboardSummary.credit_score.score >= 750 ? "#10b981" : dashboardSummary.credit_score.score >= 700 ? BRAND : "#f59e0b") : "#ef4444"}
                         delay={0}
-                        onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
+                        onClick={() => onNavigate("CIBIL & Bank Statement Analyser")}
                       />
                     )}
 
@@ -3618,7 +3618,7 @@ ${sheetDataXml}
                       </p>
                       {onNavigate && (
                         <button
-                          onClick={() => onNavigate("Eligibility, CIBIL & BSA")}
+                          onClick={() => onNavigate("CIBIL & Bank Statement Analyser")}
                           className="mt-3 px-4 py-2 bg-[#3244e6] hover:bg-[#2836b8] text-white text-[11px] font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
                         >
                           <span>Check Credit Score Now</span>

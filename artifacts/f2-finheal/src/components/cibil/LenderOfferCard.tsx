@@ -37,15 +37,17 @@ export default function LenderOfferCard({
   onToggleSelect?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  if (!lender) return null;
+
   const isNotApproved = likelihood === "ineligible";
 
   // Likelihood Badge Config
-  const badgeConfig = {
+  const badgeConfig = (likelihood && {
     high: { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "High Match" },
     medium: { bg: "bg-amber-50 text-amber-700 border-amber-250", label: "Medium Match" },
     low: { bg: "bg-rose-50 text-rose-700 border-rose-200", label: "Low Match" },
     ineligible: { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Not Approved" }
-  }[likelihood];
+  }[likelihood]) || { bg: "bg-gray-100 text-gray-600 border-gray-200", label: "Evaluating" };
 
   const handleApplyClick = () => {
     const rateStr = lender.minRate === lender.maxRate ? `${lender.minRate}%` : `${lender.minRate}% – ${lender.maxRate}%`;

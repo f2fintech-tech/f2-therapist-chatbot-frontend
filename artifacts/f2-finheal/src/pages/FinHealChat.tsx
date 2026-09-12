@@ -37,6 +37,8 @@ const ApplyForLoanView = lazy(() => import("@/components/ApplyForLoanView"));
 const LoanCalculatorView = lazy(() => import("@/components/LoanCalculatorView"));
 const CibilAnalyzerView = lazy(() => import("@/components/CibilAnalyzerView"));
 const EligibilityCibilView = lazy(() => import("@/components/EligibilityCibilView"));
+const EligibilityCheckerModal = lazy(() => import("@/components/EligibilityCheckerModal"));
+const EligibilityCheckerView = lazy(() => import("@/components/EligibilityCheckerView"));
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const RemindersView = lazy(() => import("@/components/RemindersView"));
 const CreditCardGeniusView = lazy(() => import("@/components/CreditCardGeniusView"));
@@ -55,6 +57,7 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [isEligibilityModalOpen, setIsEligibilityModalOpen] = useState(false);
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
@@ -139,6 +142,7 @@ export default function FinHealChat() {
     if (location === "/loan-calculator" || location.startsWith("/loan-calculator/")) return "loan-calculator";
     if (location === "/cibil-analyzer") return "cibil-analyzer";
     if (location === "/eligibility-cibil") return "eligibility-cibil";
+    if (location === "/eligibility-checker" || location === "/eligibility") return "eligibility-checker";
     if (location === "/apply-loan" || location.startsWith("/apply-loan/")) return "apply-loan";
     if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
@@ -693,6 +697,9 @@ export default function FinHealChat() {
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
+  const openEligibilityChecker = () => setMainView("eligibility-checker");
+  const openEligibilityModal = useCallback(() => setIsEligibilityModalOpen(true), []);
+  const closeEligibilityModal = useCallback(() => setIsEligibilityModalOpen(false), []);
   const openApplyLoan = () => setMainView("apply-loan");
   const openDashboard = () => setMainView("dashboard");
   const openReminders = () => setMainView("reminders");
@@ -793,8 +800,10 @@ export default function FinHealChat() {
                 ? "Loan Calculator"
                 : mainView === "cibil-analyzer"
                   ? "CIBIL Analyzer"
+                  : mainView === "eligibility-checker"
+                    ? "Check your Eligibility"
                   : mainView === "eligibility-cibil"
-                    ? "Eligibility, CIBIL & BSA"
+                    ? "CIBIL & Bank Statement Analyser"
                   : mainView === "apply-loan"
                     ? "Apply for Loan"
                     : mainView === "dashboard"
@@ -859,6 +868,16 @@ export default function FinHealChat() {
   }
   return (
     <>
+      <Suspense fallback={null}>
+        <EligibilityCheckerModal
+          isOpen={isEligibilityModalOpen}
+          onClose={closeEligibilityModal}
+          onApplyNow={handleApplyLoan}
+          onTalkToAdvisor={() => setMainView("advisor")}
+          userId={userId}
+          userEmail={authSession?.email || ""}
+        />
+      </Suspense>
       <QuizPopup
         visible={showQuizPopup && mainView === "chat"}
         onDismiss={handleQuizDismiss}
@@ -1028,6 +1047,8 @@ export default function FinHealChat() {
           onSelectMood={handleSelectMood}
           onOpenLoanCalculator={openLoanCalculator}
           onOpenEligibilityCibil={openEligibilityCibil}
+          onOpenEligibilityChecker={openEligibilityChecker}
+          onOpenEligibilityModal={openEligibilityModal}
           onOpenApplyLoan={openApplyLoan}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
@@ -1204,12 +1225,25 @@ export default function FinHealChat() {
                     setMainView("advisor");
                   } else if (page === "Financial Education") {
                     setMainView("education");
-                  } else if (page === "Eligibility, CIBIL & BSA") {
+                  } else if (page === "Check your Eligibility") {
+                    setMainView("eligibility-checker");
+                  } else if (page === "Eligibility, CIBIL & BSA" || page === "CIBIL & Bank Statement Analyser") {
                     setMainView("eligibility-cibil");
                   }
                 }}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
+              />
+            ) : mainView === "eligibility-checker" ? (
+              <EligibilityCheckerView
+                userId={userId}
+                userEmail={authSession.email || ""}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNow={handleApplyLoan}
+                onTalkToAdvisor={() => setMainView("advisor")}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
               />
             ) : mainView === "eligibility-cibil" ? (
               <EligibilityCibilView
@@ -1222,6 +1256,7 @@ export default function FinHealChat() {
                 onOpenAdmin={openAdmin}
                 isGuest={authSession?.isGuest ?? true}
                 onLoginRequired={handleLogout}
+                onOpenEligibilityModal={openEligibilityChecker}
               />
             ) : mainView === "cibil-analyzer" ? (
               <CibilAnalyzerView
