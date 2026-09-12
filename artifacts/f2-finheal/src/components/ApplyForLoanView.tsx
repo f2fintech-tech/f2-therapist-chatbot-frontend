@@ -167,11 +167,15 @@ const initialEduDetails: EducationLoanDetails = {
 
 export interface ProfessionalLoanDetails {
   professionType: "doctor" | "ca_cs_cma";
-  doctorUgDegreeDoc: { fileName?: string; fileList?: string[] };
-  doctorConsultancyLetterDoc: { fileName?: string; fileList?: string[] };
-  doctorPgDegreeDoc: { fileName?: string; fileList?: string[] };
-  doctorRegistrationDoc: { fileName?: string; fileList?: string[] };
+  doctorUgDegreeDoc: { fileName?: string; fileList?: string[]; photoPreview?: string };
+  doctorUgRegistrationDoc: { fileName?: string; fileList?: string[]; photoPreview?: string };
+  doctorPgDegreeDoc: { fileName?: string; fileList?: string[]; photoPreview?: string };
+  doctorPgRegistrationDoc: { fileName?: string; fileList?: string[]; photoPreview?: string };
+  doctorConsultancyLetterDoc: { fileName?: string; fileList?: string[]; photoPreview?: string };
   doctorLetterHeadDoc: { fileName?: string; fileList?: string[] };
+  doctorItrDoc: { fileName?: string; fileList?: string[] };
+  doctorCoiDoc: { fileName?: string; fileList?: string[] };
+  doctorUdyamDoc: { fileName?: string; fileList?: string[] };
 
   financialCopDoc: { fileName?: string; fileList?: string[] };
   financialComDoc: { fileName?: string; fileList?: string[] };
@@ -184,10 +188,14 @@ export interface ProfessionalLoanDetails {
 const initialProDetails: ProfessionalLoanDetails = {
   professionType: "doctor",
   doctorUgDegreeDoc: {},
-  doctorConsultancyLetterDoc: {},
+  doctorUgRegistrationDoc: {},
   doctorPgDegreeDoc: {},
-  doctorRegistrationDoc: {},
+  doctorPgRegistrationDoc: {},
+  doctorConsultancyLetterDoc: {},
   doctorLetterHeadDoc: {},
+  doctorItrDoc: {},
+  doctorCoiDoc: {},
+  doctorUdyamDoc: {},
 
   financialCopDoc: {},
   financialComDoc: {},
@@ -195,6 +203,32 @@ const initialProDetails: ProfessionalLoanDetails = {
   financialLetterHeadDoc: {},
   financialItrCoiDoc: {},
   financialUdyamShopDoc: {}
+};
+
+export interface HlLapDetails {
+  employmentType: "salaried" | "self_employed";
+  salariedForm16Doc: { fileName?: string; fileList?: string[] };
+  salariedItrDoc: { fileName?: string; fileList?: string[] };
+  hlBbaAtsDoc: { fileName?: string; fileList?: string[] };
+  hlSalesDeedDoc: { fileName?: string; fileList?: string[] };
+  hlSanctionLetterDoc: { fileName?: string; fileList?: string[] };
+  hlSoaDoc: { fileName?: string; fileList?: string[] };
+  lapRegistryCopyDoc: { fileName?: string; fileList?: string[] };
+  lapSalesDeedDoc: { fileName?: string; fileList?: string[] };
+  lapGpaPowerDoc: { fileName?: string; fileList?: string[] };
+}
+
+const initialHlLapDetails: HlLapDetails = {
+  employmentType: "salaried",
+  salariedForm16Doc: {},
+  salariedItrDoc: {},
+  hlBbaAtsDoc: {},
+  hlSalesDeedDoc: {},
+  hlSanctionLetterDoc: {},
+  hlSoaDoc: {},
+  lapRegistryCopyDoc: {},
+  lapSalesDeedDoc: {},
+  lapGpaPowerDoc: {}
 };
 
 interface ApplyForLoanViewProps {
@@ -731,8 +765,9 @@ export default function ApplyForLoanView({
       }
     ]
   );
-  const [eduDetails, setEduDetails] = useState<EducationLoanDetails>(initialDraft?.eduDetails || initialEduDetails);
-  const [proDetails, setProDetails] = useState<ProfessionalLoanDetails>(initialDraft?.proDetails || initialProDetails);
+  const [eduDetails, setEduDetails] = useState<EducationLoanDetails>({ ...initialEduDetails, ...(initialDraft?.eduDetails || {}) });
+  const [proDetails, setProDetails] = useState<ProfessionalLoanDetails>({ ...initialProDetails, ...(initialDraft?.proDetails || {}) });
+  const [hlLapDetails, setHlLapDetails] = useState<HlLapDetails>({ ...initialHlLapDetails, ...(initialDraft?.hlLapDetails || {}) });
 
   // Synchronize category and prefilled values when navigated from Eligibility Checker or other tabs
   useEffect(() => {
@@ -778,13 +813,14 @@ export default function ApplyForLoanView({
         partnershipPartners,
         eduDetails,
         proDetails,
+        hlLapDetails,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails]);
 
   // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
   useEffect(() => {
@@ -839,6 +875,7 @@ export default function ApplyForLoanView({
       ]);
       setEduDetails(initialEduDetails);
       setProDetails(initialProDetails);
+      setHlLapDetails(initialHlLapDetails);
       setFormData({
         fullName: "",
         fatherName: "",
@@ -879,6 +916,9 @@ export default function ApplyForLoanView({
     if (docState.fileName) {
       return [docState.fileName];
     }
+    if (docState.photoPreview) {
+      return ["captured_photo.jpg"];
+    }
     return [];
   };
 
@@ -896,7 +936,7 @@ export default function ApplyForLoanView({
 
   // Dynamic helper for additional document fields customized per loan & entity type
   const getEffectiveDocFields = () => {
-    if (activeTab === "business") {
+    if (activeTab === "business" || ((activeTab === "home" || activeTab === "lap") && hlLapDetails.employmentType === "self_employed")) {
       if (businessType === "sole_proprietorship") {
         return [
           {
@@ -1129,7 +1169,52 @@ export default function ApplyForLoanView({
           }
         ];
       }
-      // Strictly return empty list for unconfigured business entity types (HUF)
+      if (businessType === "huf") {
+        return [
+          {
+            id: "huf_deed",
+            label: "Deed of HUF / HUF Declaration",
+            description: "Upload registered Deed of HUF or HUF declaration certificate",
+            required: true
+          },
+          {
+            id: "huf_pan",
+            label: "HUF PAN Card",
+            description: "Upload clear PDF or image of the HUF PAN Card",
+            required: true
+          },
+          {
+            id: "comp_income_2yr_huf",
+            label: "Computation of Income (Last 2 Financial Years)",
+            description: "Upload Computation of Income sheet of HUF for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "financials_pnl_bs_huf",
+            label: "Financial Statements (Profit & Loss Statement & Balance Sheet - Last 2 Years)",
+            description: "Upload Audited/Certified Profit & Loss Statement and Balance Sheet for the last 2 years",
+            required: true
+          },
+          {
+            id: "itr_2yr_huf",
+            label: "ITR (Last 2 Financial Years)",
+            description: "Upload Income Tax Returns of HUF for the last 2 financial years",
+            required: true
+          },
+          {
+            id: "bank_stmt_1yr_huf",
+            label: "1 Year Bank Account Statement",
+            description: "Upload official bank account statement for the last 12 months for the HUF bank account",
+            required: true
+          },
+          {
+            id: "udyam_huf",
+            label: "Udyam Registration Certificate",
+            description: "Upload Udyam MSME registration certificate if applicable",
+            required: false
+          }
+        ];
+      }
       return [];
     }
     if (activeTab === "education" || activeTab === "doctor") {
@@ -1522,8 +1607,8 @@ export default function ApplyForLoanView({
           alert("Please upload Consultancy Letter.");
           return;
         }
-        if (getDocFiles(proDetails.doctorRegistrationDoc).length === 0) {
-          alert("Please upload Registration Certificate for UG/PG/Super Specialist.");
+        if (getDocFiles(proDetails.doctorUgRegistrationDoc).length === 0) {
+          alert("Please upload UG Registration Certificate.");
           return;
         }
         if (getDocFiles(proDetails.doctorLetterHeadDoc).length === 0) {
@@ -1739,6 +1824,23 @@ export default function ApplyForLoanView({
           copy.coApplicantPanDoc = { ...copy.coApplicantPanDoc, mode: "photo", frontPhoto: simulatedSnapshot };
         } else if (target === "edu_coapplicant_pan_back") {
           copy.coApplicantPanDoc = { ...copy.coApplicantPanDoc, mode: "photo", backPhoto: simulatedSnapshot };
+        }
+        return copy;
+      });
+    } else if (cameraModalTarget.startsWith("pro_doctor_")) {
+      const target = cameraModalTarget;
+      setProDetails((prev) => {
+        const copy = { ...prev };
+        if (target === "pro_doctor_ug_degree") {
+          copy.doctorUgDegreeDoc = { ...copy.doctorUgDegreeDoc, fileName: "ug_degree_photo.jpg", photoPreview: simulatedSnapshot };
+        } else if (target === "pro_doctor_ug_reg") {
+          copy.doctorUgRegistrationDoc = { ...copy.doctorUgRegistrationDoc, fileName: "ug_registration_photo.jpg", photoPreview: simulatedSnapshot };
+        } else if (target === "pro_doctor_pg_degree") {
+          copy.doctorPgDegreeDoc = { ...copy.doctorPgDegreeDoc, fileName: "pg_degree_photo.jpg", photoPreview: simulatedSnapshot };
+        } else if (target === "pro_doctor_pg_reg") {
+          copy.doctorPgRegistrationDoc = { ...copy.doctorPgRegistrationDoc, fileName: "pg_registration_photo.jpg", photoPreview: simulatedSnapshot };
+        } else if (target === "pro_doctor_consultancy") {
+          copy.doctorConsultancyLetterDoc = { ...copy.doctorConsultancyLetterDoc, fileName: "consultancy_letter_photo.jpg", photoPreview: simulatedSnapshot };
         }
         return copy;
       });
@@ -4014,6 +4116,758 @@ export default function ApplyForLoanView({
                       </div>
                     )}
 
+                    {/* Home Loan & LAP Minimalist Step 3 UI */}
+                    {(activeTab === "home" || activeTab === "lap") && (
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100/80">
+                                {activeTab === "home" ? <Building className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2.5">
+                                  <h5 className="text-base font-bold text-slate-900">
+                                    {activeTab === "home" ? "Home Loan" : "Loan Against Property (LAP)"} Additional Documents
+                                  </h5>
+                                  <span className="text-[11px] bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold border border-blue-100">
+                                    Property & Income Verification
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Select your employment profile & upload required financial and property ownership documents
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 1. Employment Type Selector Dropdown */}
+                          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/80 space-y-2 max-w-md">
+                            <label className="text-xs font-bold text-slate-800 block flex items-center gap-1.5" htmlFor="hlLapEmploymentTypeSelect">
+                              <Briefcase className="w-4 h-4 text-blue-600" /> Select Employment Type <span className="text-red-500 font-bold">*</span>
+                            </label>
+                            <p className="text-[11px] text-slate-500">Document checklist will update based on Salaried or Self-Employed selection</p>
+                            <select
+                              id="hlLapEmploymentTypeSelect"
+                              value={hlLapDetails.employmentType}
+                              onChange={(e) => setHlLapDetails(prev => ({ ...prev, employmentType: e.target.value as "salaried" | "self_employed" }))}
+                              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 font-semibold text-slate-800 transition-all cursor-pointer shadow-2xs"
+                            >
+                              <option value="salaried">Salaried (Pvt / Govt / MNC Employee)</option>
+                              <option value="self_employed">Self-Employed (Business Owner / Businessman)</option>
+                            </select>
+                          </div>
+
+                          {/* SALARIED DOCUMENTS (Same as Personal Loan Additional Docs) */}
+                          {hlLapDetails.employmentType === "salaried" && (
+                            <div className="space-y-4 pt-2">
+                              <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3.5 border-b border-slate-100 pb-2 flex items-center gap-2">
+                                <FileCheck className="w-4 h-4 text-emerald-600" />
+                                <span>Salaried Income Documents (Personal Loan Requirements)</span>
+                              </h6>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Form 16 */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Form 16 (Last 2 Years - Part A & Part B) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="hllap_form16"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          salariedForm16Doc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.salariedForm16Doc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hllap_form16" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.salariedForm16Doc.fileList?.length ? "Add Form 16" : "Upload Form 16"}
+                                  </label>
+                                  {(hlLapDetails.salariedForm16Doc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, salariedForm16Doc: { fileList: prev.salariedForm16Doc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* ITR Last 2 Financial Years */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    ITR (Last 2 Financial Years) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="hllap_itr_salaried"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          salariedItrDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.salariedItrDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hllap_itr_salaried" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.salariedItrDoc.fileList?.length ? "Add ITR" : "Upload 2 Yrs ITR"}
+                                  </label>
+                                  {(hlLapDetails.salariedItrDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, salariedItrDoc: { fileList: prev.salariedItrDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SELF-EMPLOYED DOCUMENTS (Same as Business Loan Requirements) */}
+                          {hlLapDetails.employmentType === "self_employed" && (
+                            <div className="space-y-6 pt-2 border-t border-slate-100">
+                              <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Briefcase className="w-4 h-4 text-blue-600" />
+                                <span>Self-Employed Business Documents (Business Loan Requirements)</span>
+                              </h6>
+
+                              {/* Business Entity Type Selector */}
+                              <div className="bg-blue-50/80 p-4 rounded-2xl border border-blue-200/80 space-y-2 max-w-md">
+                                <label className="text-xs font-bold text-gray-900 block flex items-center gap-1.5" htmlFor="businessTypeSelectHlLap">
+                                  <Briefcase className="w-4 h-4 text-blue-600" /> Select Type of Business / Entity *
+                                </label>
+                                <p className="text-[11px] text-gray-500">Document requirements will update based on your selected business structure</p>
+                                <div className="relative max-w-md pt-1">
+                                  <select
+                                    id="businessTypeSelectHlLap"
+                                    value={businessType}
+                                    onChange={(e) => setBusinessType(e.target.value)}
+                                    className="w-full pl-3.5 pr-8 py-2.5 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 bg-white appearance-none cursor-pointer shadow-2xs"
+                                  >
+                                    <option value="sole_proprietorship">1. Sole Proprietorship</option>
+                                    <option value="pvt_ltd">2. Private Limited</option>
+                                    <option value="llp">3. Limited Liability Partnership (LLP)</option>
+                                    <option value="huf">4. HUF (Hindu Undivided Family)</option>
+                                    <option value="partnership">5. Partnership</option>
+                                  </select>
+                                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-3 top-4 pointer-events-none" />
+                                </div>
+                              </div>
+
+                              {/* Private Limited & LLP Specific Inputs */}
+                              {(businessType === "pvt_ltd" || businessType === "llp") && (
+                                <div className="space-y-4">
+                                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                    <label className="text-xs font-bold text-gray-900 block" htmlFor="companyOfficialEmailHlLap">
+                                      Company Official Email ID <span className="text-red-500 font-bold ml-1">* (Mandatory)</span>
+                                    </label>
+                                    <p className="text-[11px] text-gray-500">Official email address registered with MCA / GST</p>
+                                    <div className="relative max-w-md pt-1">
+                                      <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                                      <input
+                                        id="companyOfficialEmailHlLap"
+                                        type="email"
+                                        required
+                                        value={companyOfficialEmail}
+                                        onChange={(e) => setCompanyOfficialEmail(e.target.value)}
+                                        placeholder="e.g. contact@yourcompany.com"
+                                        className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 bg-white"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                                    <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                                      <div>
+                                        <h5 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                                          <Users className="w-4 h-4 text-blue-600" />
+                                          List of Directors / Designated Partners <span className="text-red-500 font-bold">* (Mandatory)</span>
+                                        </h5>
+                                        <p className="text-[11px] text-gray-500">
+                                          Provide details and KYC documents (Aadhaar, PAN, Photo) for directors/partners {businessType === "llp" && <span className="text-blue-700 font-bold">(Minimum 2 Directors Required for LLP)</span>}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPvtDirectors((prev) => [
+                                            ...prev,
+                                            {
+                                              id: `dir_${Date.now()}`,
+                                              name: "",
+                                              phone: "",
+                                              email: "",
+                                              aadhaarDoc: { mode: "pdf" },
+                                              panDoc: { mode: "pdf" },
+                                              photoDoc: {}
+                                            }
+                                          ]);
+                                        }}
+                                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                                      >
+                                        <span>+ Add Director</span>
+                                      </button>
+                                    </div>
+
+                                    {pvtDirectors.map((director, index) => (
+                                      <div key={director.id} className="bg-white p-4 rounded-xl border border-gray-200 space-y-4 shadow-2xs relative">
+                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                          <span className="text-xs font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                            Director / Partner #{index + 1}
+                                          </span>
+                                          {((businessType === "llp" && pvtDirectors.length > 2) || (businessType !== "llp" && pvtDirectors.length > 1)) && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setPvtDirectors((prev) => prev.filter((_, i) => i !== index))}
+                                              className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <X className="w-3.5 h-3.5" /> Remove
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                          <div>
+                                            <label className="text-xs font-semibold text-gray-700 block mb-1">Director Name *</label>
+                                            <input
+                                              type="text"
+                                              required
+                                              value={director.name}
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setPvtDirectors((prev) => {
+                                                  const list = [...prev];
+                                                  list[index] = { ...list[index], name: val };
+                                                  return list;
+                                                });
+                                              }}
+                                              placeholder="Full Name as per PAN"
+                                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs font-semibold text-gray-700 block mb-1">Phone No. *</label>
+                                            <input
+                                              type="tel"
+                                              required
+                                              maxLength={10}
+                                              value={director.phone}
+                                              onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, "");
+                                                setPvtDirectors((prev) => {
+                                                  const list = [...prev];
+                                                  list[index] = { ...list[index], phone: val };
+                                                  return list;
+                                                });
+                                              }}
+                                              placeholder="10-digit Mobile"
+                                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs font-semibold text-gray-700 block mb-1">Email ID *</label>
+                                            <input
+                                              type="email"
+                                              required
+                                              value={director.email}
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setPvtDirectors((prev) => {
+                                                  const list = [...prev];
+                                                  list[index] = { ...list[index], email: val };
+                                                  return list;
+                                                });
+                                              }}
+                                              placeholder="Director Email ID"
+                                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Partnership Specific Inputs */}
+                              {businessType === "partnership" && (
+                                <div className="space-y-4">
+                                  <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                                    <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                                      <div>
+                                        <h5 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
+                                          <Users className="w-4 h-4 text-blue-600" />
+                                          List of Partners <span className="text-red-500 font-bold">* (Mandatory)</span>
+                                        </h5>
+                                        <p className="text-[11px] text-gray-500">Provide details and KYC documents for all partners in the firm</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setPartnershipPartners((prev) => [
+                                            ...prev,
+                                            {
+                                              id: `partner_${Date.now()}`,
+                                              name: "",
+                                              phone: "",
+                                              aadhaarDoc: { mode: "pdf" },
+                                              panDoc: { mode: "pdf" }
+                                            }
+                                          ]);
+                                        }}
+                                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                                      >
+                                        <span>+ Add Partner</span>
+                                      </button>
+                                    </div>
+
+                                    {partnershipPartners.map((partner, index) => (
+                                      <div key={partner.id} className="bg-white p-4 rounded-xl border border-gray-200 space-y-4 shadow-2xs relative">
+                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                          <span className="text-xs font-extrabold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                            Partner #{index + 1}
+                                          </span>
+                                          {partnershipPartners.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setPartnershipPartners((prev) => prev.filter((_, i) => i !== index))}
+                                              className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <X className="w-3.5 h-3.5" /> Remove
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          <div>
+                                            <label className="text-xs font-semibold text-gray-700 block mb-1">Partner Name *</label>
+                                            <input
+                                              type="text"
+                                              required
+                                              value={partner.name}
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setPartnershipPartners((prev) => {
+                                                  const list = [...prev];
+                                                  list[index] = { ...list[index], name: val };
+                                                  return list;
+                                                });
+                                              }}
+                                              placeholder="Full Name as per PAN"
+                                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="text-xs font-semibold text-gray-700 block mb-1">Mobile No. *</label>
+                                            <input
+                                              type="tel"
+                                              required
+                                              maxLength={10}
+                                              value={partner.phone}
+                                              onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, "");
+                                                setPartnershipPartners((prev) => {
+                                                  const list = [...prev];
+                                                  list[index] = { ...list[index], phone: val };
+                                                  return list;
+                                                });
+                                              }}
+                                              placeholder="10-digit Mobile"
+                                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                 </div>
+                               )}
+
+                              {/* Business Required Document Upload Cards */}
+                              <div className="space-y-4 pt-4 border-t border-slate-200/80">
+                                <h6 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-blue-600" />
+                                  <span>Required Business Documents ({businessType === "sole_proprietorship" ? "Sole Proprietorship" : businessType === "pvt_ltd" ? "Private Limited" : businessType === "partnership" ? "Partnership" : businessType === "llp" ? "LLP (Limited Liability Partnership)" : "HUF (Hindu Undivided Family)"})</span>
+                                </h6>
+
+                                {getEffectiveDocFields().map((field) => (
+                                  <div key={field.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                    <div>
+                                      <label className="text-xs font-bold text-gray-900 block">
+                                        {field.label} {field.required ? <span className="text-red-500 font-bold ml-1">* (Mandatory)</span> : <span className="text-gray-400 font-normal ml-1">(Optional)</span>}
+                                      </label>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">{field.description}</p>
+
+                                    <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                                      <input
+                                        id={`additional_hllap_${field.id}`}
+                                        type="file"
+                                        accept=".pdf, image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setAdditionalUploaded((prev) => {
+                                              const currentList = getAdditionalFiles(field.id);
+                                              const updated = Array.from(new Set([...currentList, file.name]));
+                                              return {
+                                                ...prev,
+                                                [field.id]: { fileName: updated[0], fileList: updated }
+                                              };
+                                            });
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                      <label
+                                        htmlFor={`additional_hllap_${field.id}`}
+                                        className="px-3.5 py-1.5 bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                                      >
+                                        <Upload className="w-3.5 h-3.5" />
+                                        <span>{getAdditionalFiles(field.id).length > 0 ? "Add More File" : "Upload Document"}</span>
+                                      </label>
+
+                                      {getAdditionalFiles(field.id).map((name: string, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs text-blue-950 shadow-2xs">
+                                          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                                          <span className="font-bold truncate max-w-[180px] sm:max-w-xs">{name}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setAdditionalUploaded((prev) => {
+                                                const currentList = getAdditionalFiles(field.id);
+                                                const updated = currentList.filter((_: string, i: number) => i !== idx);
+                                                if (updated.length === 0) {
+                                                  const copy = { ...prev };
+                                                  delete copy[field.id];
+                                                  return copy;
+                                                }
+                                                return {
+                                                  ...prev,
+                                                  [field.id]: { fileName: updated[0], fileList: updated }
+                                                };
+                                              });
+                                            }}
+                                            className="p-0.5 text-red-600 hover:text-white hover:bg-red-600 rounded-full transition-all cursor-pointer shrink-0 ml-1"
+                                            title="Remove File"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. PROPERTY DOCUMENTS SECTION */}
+                          <div className="space-y-4 pt-4 border-t border-slate-200/80">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <h6 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                <Building className="w-4 h-4 text-blue-600" />
+                                <span>{activeTab === "home" ? "Home Loan Property Legal Documents" : "LAP Property Legal Documents"}</span>
+                              </h6>
+                              <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-semibold border border-blue-100">
+                                Property Ownership & Sanction Docs
+                              </span>
+                            </div>
+
+                            {/* HOME LOAN PROPERTY DOCUMENTS */}
+                            {activeTab === "home" && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* 1. BBA and ATS */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    BBA and ATS (Builder Buyer Agreement / Agreement To Sell) <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="hl_bba_ats"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          hlBbaAtsDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.hlBbaAtsDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hl_bba_ats" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.hlBbaAtsDoc.fileList?.length ? "Add BBA & ATS" : "Upload BBA and ATS"}
+                                  </label>
+                                  {(hlLapDetails.hlBbaAtsDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, hlBbaAtsDoc: { fileList: prev.hlBbaAtsDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 2. Property Sales DEED */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Property Sales DEED <span className="text-slate-500 font-normal">(In case of Resale)</span> <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="hl_sales_deed"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          hlSalesDeedDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.hlSalesDeedDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hl_sales_deed" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.hlSalesDeedDoc.fileList?.length ? "Add Sales Deed" : "Upload Property Sales DEED"}
+                                  </label>
+                                  {(hlLapDetails.hlSalesDeedDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, hlSalesDeedDoc: { fileList: prev.hlSalesDeedDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 3. Sanction Letter (Optional - Balance Transfer) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Sanction Letter <span className="text-slate-500 font-normal">(In case of Balance Transfer)</span> <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="hl_sanction_letter"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          hlSanctionLetterDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.hlSanctionLetterDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hl_sanction_letter" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {hlLapDetails.hlSanctionLetterDoc.fileList?.length ? "Add Sanction Letter" : "Upload Sanction Letter"}
+                                  </label>
+                                  {(hlLapDetails.hlSanctionLetterDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, hlSanctionLetterDoc: { fileList: prev.hlSanctionLetterDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 4. SOA (Optional - Balance Transfer) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    SOA - Statement of Account <span className="text-slate-500 font-normal">(In case of Balance Transfer)</span> <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="hl_soa"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          hlSoaDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.hlSoaDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="hl_soa" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {hlLapDetails.hlSoaDoc.fileList?.length ? "Add SOA" : "Upload Statement of Account (SOA)"}
+                                  </label>
+                                  {(hlLapDetails.hlSoaDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, hlSoaDoc: { fileList: prev.hlSoaDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* LAP PROPERTY DOCUMENTS */}
+                            {activeTab === "lap" && (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                {/* 1. Copy of Registry */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Copy of Registry <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="lap_registry_copy"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          lapRegistryCopyDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.lapRegistryCopyDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="lap_registry_copy" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.lapRegistryCopyDoc.fileList?.length ? "Add Registry" : "Upload Copy of Registry"}
+                                  </label>
+                                  {(hlLapDetails.lapRegistryCopyDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, lapRegistryCopyDoc: { fileList: prev.lapRegistryCopyDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 2. Sales Deed */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Sales Deed <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="lap_sales_deed"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          lapSalesDeedDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.lapSalesDeedDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="lap_sales_deed" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.lapSalesDeedDoc.fileList?.length ? "Add Sales Deed" : "Upload Sales Deed"}
+                                  </label>
+                                  {(hlLapDetails.lapSalesDeedDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, lapSalesDeedDoc: { fileList: prev.lapSalesDeedDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 3. GPA / Power of Attorney */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    GPA / Power of Attorney <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="lap_gpa_power"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setHlLapDetails(prev => ({
+                                          ...prev,
+                                          lapGpaPowerDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.lapGpaPowerDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="lap_gpa_power" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {hlLapDetails.lapGpaPowerDoc.fileList?.length ? "Add GPA" : "Upload GPA / Power of Attorney"}
+                                  </label>
+                                  {(hlLapDetails.lapGpaPowerDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setHlLapDetails(prev => ({ ...prev, lapGpaPowerDoc: { fileList: prev.lapGpaPowerDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Professional Loan Minimalist Step 3 UI */}
                     {activeTab === "doctor" && (
                       <div className="space-y-6">
@@ -4066,7 +4920,7 @@ export default function ApplyForLoanView({
                               </h6>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* 1. UG Degree */}
+                                {/* 1. UG Degree (With Camera Option) */}
                                 <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
                                   <label className="text-xs font-semibold text-slate-800 block">
                                     UG Degree (MBBS, BDS, BAMS, BHMS) <span className="text-red-500 font-bold">*</span>
@@ -4082,6 +4936,7 @@ export default function ApplyForLoanView({
                                         setProDetails(prev => ({
                                           ...prev,
                                           doctorUgDegreeDoc: {
+                                            ...prev.doctorUgDegreeDoc,
                                             fileName: names[0],
                                             fileList: Array.from(new Set([...(prev.doctorUgDegreeDoc.fileList || []), ...names]))
                                           }
@@ -4090,56 +4945,92 @@ export default function ApplyForLoanView({
                                     }}
                                     className="hidden"
                                   />
-                                  <label htmlFor="pro_doc_ug_degree" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
-                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorUgDegreeDoc.fileList?.length ? "Add UG Degree" : "Upload UG Degree"}
-                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label htmlFor="pro_doc_ug_degree" className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">{proDetails.doctorUgDegreeDoc.fileList?.length ? "Add File" : "Upload File"}</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pro_doctor_ug_degree")}
+                                      className="py-2 px-2.5 bg-white hover:bg-blue-50 text-blue-600 font-medium text-[11px] rounded-xl border border-blue-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">Click Photo</span>
+                                    </button>
+                                  </div>
+                                  {proDetails.doctorUgDegreeDoc.photoPreview && (
+                                    <div className="relative border border-blue-200 rounded-lg p-1 bg-blue-50/50">
+                                      <img src={proDetails.doctorUgDegreeDoc.photoPreview} alt="UG Degree Snapshot" className="h-16 w-full object-cover rounded" />
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgDegreeDoc: { ...prev.doctorUgDegreeDoc, photoPreview: undefined } }))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer">
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
                                   {(proDetails.doctorUgDegreeDoc.fileList || []).map((fn, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
                                       <span className="truncate max-w-[150px]">{fn}</span>
-                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgDegreeDoc: { fileList: prev.doctorUgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgDegreeDoc: { ...prev.doctorUgDegreeDoc, fileList: prev.doctorUgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
                                         <X className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   ))}
                                 </div>
 
-                                {/* 2. Consultancy Letter */}
+                                {/* 2. UG Registration (With Camera Option) */}
                                 <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
                                   <label className="text-xs font-semibold text-slate-800 block">
-                                    Consultancy Letter <span className="text-red-500 font-bold">*</span>
+                                    UG Registration Certificate <span className="text-red-500 font-bold">*</span>
                                   </label>
                                   <input
-                                    id="pro_doc_consultancy"
+                                    id="pro_doc_ug_reg"
                                     type="file"
                                     accept=".pdf, image/*"
+                                    multiple
                                     onChange={(e) => {
                                       if (e.target.files?.length) {
                                         const names = Array.from(e.target.files).map(f => f.name);
                                         setProDetails(prev => ({
                                           ...prev,
-                                          doctorConsultancyLetterDoc: {
+                                          doctorUgRegistrationDoc: {
+                                            ...prev.doctorUgRegistrationDoc,
                                             fileName: names[0],
-                                            fileList: Array.from(new Set([...(prev.doctorConsultancyLetterDoc.fileList || []), ...names]))
+                                            fileList: Array.from(new Set([...(prev.doctorUgRegistrationDoc.fileList || []), ...names]))
                                           }
                                         }));
                                       }
                                     }}
                                     className="hidden"
                                   />
-                                  <label htmlFor="pro_doc_consultancy" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
-                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorConsultancyLetterDoc.fileList?.length ? "Add Letter" : "Upload Consultancy Letter"}
-                                  </label>
-                                  {(proDetails.doctorConsultancyLetterDoc.fileList || []).map((fn, idx) => (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label htmlFor="pro_doc_ug_reg" className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">{proDetails.doctorUgRegistrationDoc.fileList?.length ? "Add File" : "Upload File"}</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pro_doctor_ug_reg")}
+                                      className="py-2 px-2.5 bg-white hover:bg-blue-50 text-blue-600 font-medium text-[11px] rounded-xl border border-blue-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">Click Photo</span>
+                                    </button>
+                                  </div>
+                                  {proDetails.doctorUgRegistrationDoc.photoPreview && (
+                                    <div className="relative border border-blue-200 rounded-lg p-1 bg-blue-50/50">
+                                      <img src={proDetails.doctorUgRegistrationDoc.photoPreview} alt="UG Registration Snapshot" className="h-16 w-full object-cover rounded" />
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgRegistrationDoc: { ...prev.doctorUgRegistrationDoc, photoPreview: undefined } }))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer">
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  {(proDetails.doctorUgRegistrationDoc.fileList || []).map((fn, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
                                       <span className="truncate max-w-[150px]">{fn}</span>
-                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorConsultancyLetterDoc: { fileList: prev.doctorConsultancyLetterDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUgRegistrationDoc: { ...prev.doctorUgRegistrationDoc, fileList: prev.doctorUgRegistrationDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
                                         <X className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   ))}
                                 </div>
 
-                                {/* 3. PG Degree */}
+                                {/* 3. PG Degree (MD, MS, MCH) (With Camera Option) */}
                                 <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
                                   <label className="text-xs font-semibold text-slate-800 block">
                                     PG Degree (MD, MS, MCH) <span className="text-slate-400 font-normal">(Optional)</span>
@@ -4155,6 +5046,7 @@ export default function ApplyForLoanView({
                                         setProDetails(prev => ({
                                           ...prev,
                                           doctorPgDegreeDoc: {
+                                            ...prev.doctorPgDegreeDoc,
                                             fileName: names[0],
                                             fileList: Array.from(new Set([...(prev.doctorPgDegreeDoc.fileList || []), ...names]))
                                           }
@@ -4163,26 +5055,43 @@ export default function ApplyForLoanView({
                                     }}
                                     className="hidden"
                                   />
-                                  <label htmlFor="pro_doc_pg_degree" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
-                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {proDetails.doctorPgDegreeDoc.fileList?.length ? "Add PG Degree" : "Upload PG Degree"}
-                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label htmlFor="pro_doc_pg_degree" className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-slate-500 shrink-0" /> <span className="truncate">{proDetails.doctorPgDegreeDoc.fileList?.length ? "Add File" : "Upload File"}</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pro_doctor_pg_degree")}
+                                      className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-slate-500 shrink-0" /> <span className="truncate">Click Photo</span>
+                                    </button>
+                                  </div>
+                                  {proDetails.doctorPgDegreeDoc.photoPreview && (
+                                    <div className="relative border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                      <img src={proDetails.doctorPgDegreeDoc.photoPreview} alt="PG Degree Snapshot" className="h-16 w-full object-cover rounded" />
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgDegreeDoc: { ...prev.doctorPgDegreeDoc, photoPreview: undefined } }))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer">
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
                                   {(proDetails.doctorPgDegreeDoc.fileList || []).map((fn, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
                                       <span className="truncate max-w-[150px]">{fn}</span>
-                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgDegreeDoc: { fileList: prev.doctorPgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgDegreeDoc: { ...prev.doctorPgDegreeDoc, fileList: prev.doctorPgDegreeDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
                                         <X className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   ))}
                                 </div>
 
-                                {/* 4. Registration for UG, PG & Super Specialist */}
+                                {/* 4. PG Registration (With Camera Option) */}
                                 <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
                                   <label className="text-xs font-semibold text-slate-800 block">
-                                    Registration (UG, PG & Super Specialist) <span className="text-red-500 font-bold">*</span>
+                                    PG Registration Certificate <span className="text-slate-400 font-normal">(Optional)</span>
                                   </label>
                                   <input
-                                    id="pro_doc_registration"
+                                    id="pro_doc_pg_reg"
                                     type="file"
                                     accept=".pdf, image/*"
                                     multiple
@@ -4191,30 +5100,102 @@ export default function ApplyForLoanView({
                                         const names = Array.from(e.target.files).map(f => f.name);
                                         setProDetails(prev => ({
                                           ...prev,
-                                          doctorRegistrationDoc: {
+                                          doctorPgRegistrationDoc: {
+                                            ...prev.doctorPgRegistrationDoc,
                                             fileName: names[0],
-                                            fileList: Array.from(new Set([...(prev.doctorRegistrationDoc.fileList || []), ...names]))
+                                            fileList: Array.from(new Set([...(prev.doctorPgRegistrationDoc.fileList || []), ...names]))
                                           }
                                         }));
                                       }
                                     }}
                                     className="hidden"
                                   />
-                                  <label htmlFor="pro_doc_registration" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
-                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorRegistrationDoc.fileList?.length ? "Add Registration" : "Upload Registration Certificates"}
-                                  </label>
-                                  {(proDetails.doctorRegistrationDoc.fileList || []).map((fn, idx) => (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label htmlFor="pro_doc_pg_reg" className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-slate-500 shrink-0" /> <span className="truncate">{proDetails.doctorPgRegistrationDoc.fileList?.length ? "Add File" : "Upload File"}</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pro_doctor_pg_reg")}
+                                      className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-slate-500 shrink-0" /> <span className="truncate">Click Photo</span>
+                                    </button>
+                                  </div>
+                                  {proDetails.doctorPgRegistrationDoc.photoPreview && (
+                                    <div className="relative border border-slate-200 rounded-lg p-1 bg-slate-50">
+                                      <img src={proDetails.doctorPgRegistrationDoc.photoPreview} alt="PG Registration Snapshot" className="h-16 w-full object-cover rounded" />
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgRegistrationDoc: { ...prev.doctorPgRegistrationDoc, photoPreview: undefined } }))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer">
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  {(proDetails.doctorPgRegistrationDoc.fileList || []).map((fn, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
                                       <span className="truncate max-w-[150px]">{fn}</span>
-                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorRegistrationDoc: { fileList: prev.doctorRegistrationDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorPgRegistrationDoc: { ...prev.doctorPgRegistrationDoc, fileList: prev.doctorPgRegistrationDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
                                         <X className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   ))}
                                 </div>
 
-                                {/* 5. Letter Head */}
-                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5 sm:col-span-2 max-w-md">
+                                {/* 5. Consultancy Letter (With Camera Option) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Consultancy Letter <span className="text-red-500 font-bold">*</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_consultancy"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorConsultancyLetterDoc: {
+                                            ...prev.doctorConsultancyLetterDoc,
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorConsultancyLetterDoc.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label htmlFor="pro_doc_consultancy" className="py-2 px-2.5 bg-white hover:bg-slate-100 text-slate-700 font-medium text-[11px] rounded-xl border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                                      <Upload className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">{proDetails.doctorConsultancyLetterDoc.fileList?.length ? "Add File" : "Upload File"}</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCameraModal("pro_doctor_consultancy")}
+                                      className="py-2 px-2.5 bg-white hover:bg-blue-50 text-blue-600 font-medium text-[11px] rounded-xl border border-blue-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                    >
+                                      <Camera className="w-3.5 h-3.5 text-blue-600 shrink-0" /> <span className="truncate">Click Photo</span>
+                                    </button>
+                                  </div>
+                                  {proDetails.doctorConsultancyLetterDoc.photoPreview && (
+                                    <div className="relative border border-blue-200 rounded-lg p-1 bg-blue-50/50">
+                                      <img src={proDetails.doctorConsultancyLetterDoc.photoPreview} alt="Consultancy Letter Snapshot" className="h-16 w-full object-cover rounded" />
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorConsultancyLetterDoc: { ...prev.doctorConsultancyLetterDoc, photoPreview: undefined } }))} className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer">
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  {(proDetails.doctorConsultancyLetterDoc.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[150px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorConsultancyLetterDoc: { ...prev.doctorConsultancyLetterDoc, fileList: prev.doctorConsultancyLetterDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 6. Doctor / Clinic Letter Head */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
                                   <label className="text-xs font-semibold text-slate-800 block">
                                     Doctor / Clinic Letter Head <span className="text-red-500 font-bold">*</span>
                                   </label>
@@ -4229,7 +5210,7 @@ export default function ApplyForLoanView({
                                           ...prev,
                                           doctorLetterHeadDoc: {
                                             fileName: names[0],
-                                            fileList: Array.from(new Set([...(prev.doctorLetterHeadDoc.fileList || []), ...names]))
+                                            fileList: Array.from(new Set([...(prev.doctorLetterHeadDoc?.fileList || []), ...names]))
                                           }
                                         }));
                                       }
@@ -4237,12 +5218,121 @@ export default function ApplyForLoanView({
                                     className="hidden"
                                   />
                                   <label htmlFor="pro_doc_letterhead" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
-                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorLetterHeadDoc.fileList?.length ? "Add Letter Head" : "Upload Letter Head"}
+                                    <Upload className="w-3.5 h-3.5 text-blue-600" /> {proDetails.doctorLetterHeadDoc?.fileList?.length ? "Add Letter Head" : "Upload Letter Head"}
                                   </label>
-                                  {(proDetails.doctorLetterHeadDoc.fileList || []).map((fn, idx) => (
+                                  {(proDetails.doctorLetterHeadDoc?.fileList || []).map((fn, idx) => (
                                     <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
                                       <span className="truncate max-w-[180px]">{fn}</span>
-                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorLetterHeadDoc: { fileList: prev.doctorLetterHeadDoc.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorLetterHeadDoc: { fileList: prev.doctorLetterHeadDoc?.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 7. ITR (Last 2 Financial Years) (Optional) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    ITR (Last 2 Financial Years) <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_itr"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    multiple
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorItrDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorItrDoc?.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_itr" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {proDetails.doctorItrDoc?.fileList?.length ? "Add ITR" : "Upload 2 Yrs ITR"}
+                                  </label>
+                                  {(proDetails.doctorItrDoc?.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[180px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorItrDoc: { fileList: prev.doctorItrDoc?.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 8. COI (Optional) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Certificate of Incorporation (COI) <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_coi"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorCoiDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorCoiDoc?.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_coi" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {proDetails.doctorCoiDoc?.fileList?.length ? "Add COI" : "Upload COI"}
+                                  </label>
+                                  {(proDetails.doctorCoiDoc?.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[180px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorCoiDoc: { fileList: prev.doctorCoiDoc?.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* 9. Udyam Registration Certificate (Optional) */}
+                                <div className="bg-slate-50/30 hover:bg-slate-50/60 border border-slate-200/70 hover:border-slate-300 rounded-xl p-3.5 transition-all space-y-2.5 sm:col-span-2 max-w-md">
+                                  <label className="text-xs font-semibold text-slate-800 block">
+                                    Udyam Registration Certificate <span className="text-slate-400 font-normal">(Optional)</span>
+                                  </label>
+                                  <input
+                                    id="pro_doc_udyam"
+                                    type="file"
+                                    accept=".pdf, image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files?.length) {
+                                        const names = Array.from(e.target.files).map(f => f.name);
+                                        setProDetails(prev => ({
+                                          ...prev,
+                                          doctorUdyamDoc: {
+                                            fileName: names[0],
+                                            fileList: Array.from(new Set([...(prev.doctorUdyamDoc?.fileList || []), ...names]))
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <label htmlFor="pro_doc_udyam" className="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-slate-500" /> {proDetails.doctorUdyamDoc?.fileList?.length ? "Add Udyam Certificate" : "Upload Udyam Certificate"}
+                                  </label>
+                                  {(proDetails.doctorUdyamDoc?.fileList || []).map((fn, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-800">
+                                      <span className="truncate max-w-[180px]">{fn}</span>
+                                      <button type="button" onClick={() => setProDetails(prev => ({ ...prev, doctorUdyamDoc: { fileList: prev.doctorUdyamDoc?.fileList?.filter((_, i) => i !== idx) } }))} className="text-slate-400 hover:text-red-600 cursor-pointer">
                                         <X className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
@@ -5606,8 +6696,9 @@ export default function ApplyForLoanView({
                       </div>
                     )}
 
-                    <div className="space-y-4">
-                      {getEffectiveDocFields().map((field) => (
+                    {activeTab !== "doctor" && activeTab !== "education" && activeTab !== "home" && activeTab !== "lap" && (
+                      <div className="space-y-4">
+                        {getEffectiveDocFields().map((field) => (
                         <div key={field.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                           <div>
                             <label className="text-xs font-bold text-gray-900 block">
@@ -5676,6 +6767,7 @@ export default function ApplyForLoanView({
                         </div>
                       ))}
                     </div>
+                  )}
 
                     {/* Authorization Checkbox */}
                     <div className="flex items-start gap-2.5 pt-2 bg-blue-50/70 p-4 rounded-xl border border-blue-100">
