@@ -280,7 +280,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const pwReqs = checkPasswordRequirements(loginPassword);
 
   return (
-    <div className="auth-screen-shell" style={{ position: "relative", width: "100%", minHeight: "100dvh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", overflow: "hidden" }}>
+    <div className="auth-screen-shell" style={{ position: "relative", width: "100%", height: "100dvh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#F9FAFB 0%,#EFF6FF 40%,#FAF5FF 100%)", overflow: "hidden" }}>
       <div className="auth-screen-grid-overlay" style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(99,102,241,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.06) 1px,transparent 1px)", backgroundSize: "22px 22px", zIndex: 0, WebkitMaskImage: "linear-gradient(to right,transparent 10%,black 45%)", maskImage: "linear-gradient(to right,transparent 10%,black 45%)", pointerEvents: "none" }} />
 
       <div className="auth-screen-grid" style={{
@@ -288,16 +288,52 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         maxWidth: "1140px",
         display: "grid",
         gridTemplateColumns: "minmax(0,1.05fr) minmax(360px,0.95fr)",
-        gap: "clamp(24px, 4vw, 64px)",
+        gap: "clamp(20px, 3vw, 48px)",
         alignItems: "center",
         alignContent: "center",
-        height: "100dvh",
+        height: "100%",
         boxSizing: "border-box",
-        padding: "clamp(16px, 3vw, 40px) clamp(16px, 4vw, 48px)",
+        padding: "16px clamp(16px, 4vw, 48px)",
         position: "relative",
         zIndex: 1
       }}>
         <style>{`
+          /* Custom scrollbar styling for mobile/small viewports */
+          .auth-screen-shell::-webkit-scrollbar {
+            width: 6px;
+          }
+          .auth-screen-shell::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .auth-screen-shell::-webkit-scrollbar-thumb {
+            background: #a5b4fc;
+            border-radius: 999px;
+          }
+
+          /* Enable scroll container only for short viewports or small mobile screens */
+          @media (max-height: 680px), (max-width: 1023px) {
+            .auth-screen-shell {
+              position: fixed !important;
+              inset: 0 !important;
+              height: 100dvh !important;
+              overflow-y: auto !important;
+              align-items: flex-start !important;
+              justify-content: center !important;
+              padding-top: 12px !important;
+              padding-bottom: 24px !important;
+              box-sizing: border-box !important;
+            }
+
+            .auth-screen-grid {
+              min-height: auto !important;
+              height: auto !important;
+              margin: 0 auto !important;
+              padding-top: 8px !important;
+              padding-bottom: 24px !important;
+              align-content: flex-start !important;
+            }
+          }
+
           @media (max-width: 1023px) {
             .auth-screen-shell {
               position: fixed !important;
@@ -404,7 +440,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
         <div className="auth-screen-left" style={{
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
+          gap: "12px",
           width: "100%",
           minWidth: 0,
           minHeight: 0,
@@ -434,7 +470,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
               maxWidth: "460px",
               background: "linear-gradient(135deg, #1a1f3d 0%, #0f1729 50%, #1a2744 100%)",
               borderRadius: "20px",
-              padding: "20px 24px",
+              padding: "16px 20px",
               position: "relative",
               overflow: "hidden",
               transition: "transform 0.15s ease, box-shadow 0.15s ease",
@@ -443,7 +479,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
               cursor: "default",
               display: "flex",
               flexDirection: "column",
-              gap: "14px"
+              gap: "10px"
             }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%, rgba(99,102,241,0.04) 100%)", pointerEvents: "none" }} />
@@ -620,7 +656,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           transform: animateIn ? "translateY(0px)" : "translateY(24px)",
           transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s"
         }}>
-          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: authMode === "signup" ? "16px 22px" : "24px 28px", width: "100%", maxWidth: "380px", minHeight: authMode === "signup" ? "auto" : "480px", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "14px" }}>
+          <div className="auth-screen-form-card" style={{ background: "linear-gradient(135deg,#ffffff 0%,#f5f3ff 100%)", borderRadius: "16px", padding: authMode === "signup" ? "16px 22px" : "20px 24px", width: "100%", maxWidth: "380px", minHeight: "auto", height: "auto", boxSizing: "border-box", boxShadow: "0 18px 56px rgba(15,23,42,0.08)", border: "1px solid rgba(255,255,255,0.8)", display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "12px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", flexWrap: "wrap" }}>
               <div style={{ display: "flex", overflow: "hidden", borderRadius: "10px", border: "1px solid #e5e7eb", width: "fit-content", maxWidth: "100%" }}>
                 <button type="button" onClick={() => handleSetAuthMode("login")} style={{ padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: "none", background: authMode === "login" ? "#3344e6" : "#fff", color: authMode === "login" ? "#fff" : "#6b7280", transition: "all 0.15s" }}>Sign in</button>

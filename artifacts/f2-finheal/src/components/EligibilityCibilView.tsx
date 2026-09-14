@@ -77,6 +77,7 @@ interface EligibilityCibilViewProps {
   onOpenAdmin?: (tab?: string) => void;
   isGuest?: boolean;
   onLoginRequired?: () => void;
+  onOpenEligibilityModal?: () => void;
 }
 
 
@@ -202,8 +203,9 @@ export default function EligibilityCibilView({
   onOpenAdmin,
   isGuest = false,
   onLoginRequired,
+  onOpenEligibilityModal,
 }: EligibilityCibilViewProps) {
-  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa" | "lenders">("eligibility");
+  const [cibilSubTab, setCibilSubTab] = useState<"eligibility" | "cibil" | "bsa" | "lenders">("cibil");
 
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const formatCurrency = (val: number) => {
@@ -260,7 +262,7 @@ export default function EligibilityCibilView({
 
     const loadPermissions = async () => {
       if (isSuperAdmin) {
-        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]);
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
         return;
       }
 
@@ -789,10 +791,18 @@ export default function EligibilityCibilView({
 
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const empId = selectedEmployeeId || (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-STAFF"));
+      const empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Staff User";
+      const empDesignation = isSuperAdmin ? "System Administrator" : "Credit & Ops Staff";
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empId,
+          "X-Employee-Name": empName,
+          "X-Designation": empDesignation,
+          "X-Change-Reason": editingLender ? `Updated policy criteria for ${editingLender.name}` : `Added new lender product ${item.name}`
         },
         body: JSON.stringify(updatedList),
       });
@@ -821,10 +831,18 @@ export default function EligibilityCibilView({
     const updatedList = lenders.filter(l => l.id !== lenderToDelete.id);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const empId = selectedEmployeeId || (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId) ? userId : (userEmail ? userEmail.split("@")[0].toUpperCase() : "F2-STAFF"));
+      const empName = userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Staff User";
+      const empDesignation = isSuperAdmin ? "System Administrator" : "Credit & Ops Staff";
+
       const res = await fetch(`${apiBase}/lenders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Employee-ID": empId,
+          "X-Employee-Name": empName,
+          "X-Designation": empDesignation,
+          "X-Change-Reason": `Deleted lender product ${lenderToDelete.name}`
         },
         body: JSON.stringify(updatedList),
       });
@@ -1831,8 +1849,8 @@ export default function EligibilityCibilView({
             <ShieldCheck className="w-[20px] h-[20px]" />
           </div>
           <div>
-            <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">FinHeal Eligibility & CIBIL Center</h1>
-            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-[0.5px]">Verify credit rating and evaluate lender approval eligibility</p>
+            <h1 className="text-[16px] font-bold text-gray-800 tracking-tight">FinHeal CIBIL & Bank Statement Analyser Center</h1>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-[0.5px]">Verify credit rating, analyse statements and evaluate credit profile</p>
           </div>
         </div>
         
@@ -1861,21 +1879,9 @@ export default function EligibilityCibilView({
         </div>
       </header>
 
-      {/* CIBIL / Eligibility Tab Switcher */}
+      {/* CIBIL / BSA / Lenders Tab Switcher */}
       <div className="border-b border-gray-150 bg-white pt-4 px-[16px] sm:px-[20px] pb-3 shrink-0 cibil-print-hide z-10 shadow-sm relative">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar whitespace-nowrap">
-          <button
-            type="button"
-            onClick={() => setCibilSubTab("eligibility")}
-            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-              cibilSubTab === "eligibility"
-                ? "bg-primary text-white shadow-md border border-transparent"
-                : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            <span>Eligibility Checker</span>
-          </button>
           <button
             type="button"
             onClick={() => setCibilSubTab("cibil")}
@@ -1887,6 +1893,18 @@ export default function EligibilityCibilView({
           >
             {isGuest ? <Lock className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <ShieldCheck className="h-4 w-4 shrink-0" />}
             <span>CIBIL Score Checker</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCibilSubTab("bsa")}
+            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+              cibilSubTab === "bsa"
+                ? "bg-primary text-white shadow-md border border-transparent"
+                : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            {isGuest ? <Lock className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <Sparkles className="h-4 w-4 shrink-0" />}
+            <span>Bank Statement Analyzer</span>
           </button>
           {hasCibilViewPermission && (
             <button
@@ -1912,18 +1930,16 @@ export default function EligibilityCibilView({
               <span>Lenders Catalog</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setCibilSubTab("bsa")}
-            className={`px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-              cibilSubTab === "bsa"
-                ? "bg-primary text-white shadow-md border border-transparent"
-                : "bg-gray-55/40 border border-gray-200 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            {isGuest ? <Lock className="h-3.5 w-3.5 shrink-0 text-gray-400" /> : <Sparkles className="h-4 w-4 shrink-0" />}
-            <span>Bank Statement Analyzer</span>
-          </button>
+          {onOpenEligibilityModal && (
+            <button
+              type="button"
+              onClick={onOpenEligibilityModal}
+              className="px-4 py-2 rounded-[12px] text-[12.5px] font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 ml-auto"
+            >
+              <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
+              <span>Check Loan Eligibility 🎯</span>
+            </button>
+          )}
         </div>
       </div>
 

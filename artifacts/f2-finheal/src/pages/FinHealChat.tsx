@@ -33,9 +33,12 @@ import WelcomeSplash from "@/components/WelcomeSplash";
 const FinancialEducation = lazy(() => import("@/components/FinancialEducation"));
 const AdvisorPanel = lazy(() => import("@/components/AdvisorPanel"));
 const AdminPortal = lazy(() => import("@/components/AdminPortal"));
+const ApplyForLoanView = lazy(() => import("@/components/ApplyForLoanView"));
 const LoanCalculatorView = lazy(() => import("@/components/LoanCalculatorView"));
 const CibilAnalyzerView = lazy(() => import("@/components/CibilAnalyzerView"));
 const EligibilityCibilView = lazy(() => import("@/components/EligibilityCibilView"));
+const EligibilityCheckerModal = lazy(() => import("@/components/EligibilityCheckerModal"));
+const EligibilityCheckerView = lazy(() => import("@/components/EligibilityCheckerView"));
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const RemindersView = lazy(() => import("@/components/RemindersView"));
 const CreditCardGeniusView = lazy(() => import("@/components/CreditCardGeniusView"));
@@ -54,6 +57,8 @@ export default function FinHealChat() {
   const [currentMoodDims, setCurrentMoodDims] = useState<MoodDimensions | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [isEligibilityModalOpen, setIsEligibilityModalOpen] = useState(false);
+  const [applyLoanCategory, setApplyLoanCategory] = useState<string>("personal");
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
@@ -138,6 +143,8 @@ export default function FinHealChat() {
     if (location === "/loan-calculator" || location.startsWith("/loan-calculator/")) return "loan-calculator";
     if (location === "/cibil-analyzer") return "cibil-analyzer";
     if (location === "/eligibility-cibil") return "eligibility-cibil";
+    if (location === "/eligibility-checker" || location === "/eligibility") return "eligibility-checker";
+    if (location === "/apply-loan" || location.startsWith("/apply-loan/")) return "apply-loan";
     if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
@@ -154,6 +161,7 @@ export default function FinHealChat() {
 
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
+    else if (view === "apply-loan") setLocation("/apply-loan");
     else if (view === "credit-cards") setLocation("/credit-cards");
     else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
     else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
@@ -577,8 +585,17 @@ export default function FinHealChat() {
       // 2. Secure Admin Portal route
       if (mainView.startsWith("admin")) {
         if (!isSuperAdmin) {
-          if (isStaff && location === "/admin/cibil-enquiries") {
+          let userPerms = authSession.permissions || [];
+          if (!userPerms.length) {
+            try {
+              const session = JSON.parse(localStorage.getItem("finheal-auth-session") || "{}");
+              userPerms = session?.permissions || [];
+            } catch (e) { }
+          }
+          if (isStaff && location === "/admin/cibil-enquiries" && (userPerms.includes("cibil_view") || userPerms.includes("cibil_view_all") || userPerms.length === 0)) {
             // Allow authorized staff to view the specific CIBIL Enquiries admin tab
+          } else if (isStaff && location === "/admin/education" && (userPerms.includes("education_edit") || userPerms.length === 0)) {
+            // Allow authorized staff to view the specific Education admin tab
           } else {
             setLocation("/chat", { replace: true });
             return;
@@ -675,28 +692,55 @@ export default function FinHealChat() {
   const openAdvisor = () => setMainView("advisor");
   const openAdmin = (tab?: string) => {
     const isSuperAdmin = authSession?.email ? ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase()) : false;
-    const basePath = (isSuperAdmin || tab === "cibil-enquiries") ? "admin" : "advisor-workspace";
+    const basePath = (isSuperAdmin || tab === "cibil-enquiries" || tab === "education") ? "admin" : "advisor-workspace";
     setMainView(tab ? `${basePath}/${tab}` : basePath);
   };
   const openLoanCalculator = () => setMainView("loan-calculator");
   const openCibilAnalyzer = () => setMainView("cibil-analyzer");
   const openEligibilityCibil = () => setMainView("eligibility-cibil");
+  const openEligibilityChecker = () => setMainView("eligibility-checker");
+  const openEligibilityModal = useCallback(() => setIsEligibilityModalOpen(true), []);
+  const closeEligibilityModal = useCallback(() => setIsEligibilityModalOpen(false), []);
+  const openApplyLoan = () => setMainView("apply-loan");
   const openDashboard = () => setMainView("dashboard");
   const openReminders = () => setMainView("reminders");
   const openCreditCards = () => setMainView("credit-cards");
 
 
-  const handleApplyLoan = useCallback((loanType: string, amount: number, rate: number, tenure: number) => {
-    const formattedAmount = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const handleApplyLoan = useCallback((loanType: string, amount?: number, rate?: number, tenure?: number, details?: string) => {
+    const lower = (loanType || "").toLowerCase();
+    let category = "personal";
+    if (lower.includes("home")) category = "home";
+    else if (lower.includes("business")) category = "business";
+    else if (lower.includes("education")) category = "education";
+    else if (lower.includes("car") || lower.includes("auto") || lower.includes("vehicle")) category = "car";
+    else if (lower.includes("property") || lower.includes("lap")) category = "lap";
+    else if (lower.includes("professional") || lower.includes("doctor") || lower.includes("ca") || lower.includes("cs")) category = "doctor";
+    else if (lower.includes("consumer")) category = "consumer";
+    else if (lower.includes("personal")) category = "personal";
 
-    const messageText = `I would like to apply for a ${loanType} of ${formattedAmount} at an interest rate of ${rate}% for a tenure of ${tenure} years. Could you please guide me on the next steps, eligibility criteria, and documents required?`;
+    setApplyLoanCategory(category);
 
-    setMainView("chat");
-    setPrefillMessage({ text: messageText, card: "" });
+    // Save prefilled loan draft data so ApplyForLoanView initializes with chosen amount and tenure
+    if (amount || tenure) {
+      try {
+        const savedDraft = JSON.parse(localStorage.getItem("f2_loan_application_draft_v1") || "{}");
+        const nextDraft = {
+          ...savedDraft,
+          activeTab: category,
+          formData: {
+            ...(savedDraft.formData || {}),
+            desiredAmount: amount || savedDraft.formData?.desiredAmount || 500000,
+            tenureYears: tenure || savedDraft.formData?.tenureYears || 3,
+          }
+        };
+        localStorage.setItem("f2_loan_application_draft_v1", JSON.stringify(nextDraft));
+      } catch (e) {
+        console.warn("Could not save prefilled loan draft", e);
+      }
+    }
+
+    setMainView("apply-loan");
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       closeSidebar();
@@ -780,8 +824,12 @@ export default function FinHealChat() {
                 ? "Loan Calculator"
                 : mainView === "cibil-analyzer"
                   ? "CIBIL Analyzer"
+                  : mainView === "eligibility-checker"
+                    ? "Check your Eligibility"
                   : mainView === "eligibility-cibil"
-                    ? "Eligibility, CIBIL & BSA"
+                    ? "CIBIL & Bank Statement Analyser"
+                  : mainView === "apply-loan"
+                    ? "Apply for Loan"
                     : mainView === "dashboard"
                       ? "My Dashboard"
                       : mainView === "reminders"
@@ -844,6 +892,16 @@ export default function FinHealChat() {
   }
   return (
     <>
+      <Suspense fallback={null}>
+        <EligibilityCheckerModal
+          isOpen={isEligibilityModalOpen}
+          onClose={closeEligibilityModal}
+          onApplyNow={handleApplyLoan}
+          onTalkToAdvisor={() => setMainView("advisor")}
+          userId={userId}
+          userEmail={authSession?.email || ""}
+        />
+      </Suspense>
       <QuizPopup
         visible={showQuizPopup && mainView === "chat"}
         onDismiss={handleQuizDismiss}
@@ -1013,6 +1071,9 @@ export default function FinHealChat() {
           onSelectMood={handleSelectMood}
           onOpenLoanCalculator={openLoanCalculator}
           onOpenEligibilityCibil={openEligibilityCibil}
+          onOpenEligibilityChecker={openEligibilityChecker}
+          onOpenEligibilityModal={openEligibilityModal}
+          onOpenApplyLoan={openApplyLoan}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
           onOpenCreditCards={openCreditCards}
@@ -1158,6 +1219,10 @@ export default function FinHealChat() {
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onApplyNow={handleApplyLoan}
+                onAskChatbot={(message: string) => {
+                  setMainView("chat");
+                  setPrefillMessage({ text: message, card: "" });
+                }}
                 onTalkToAdvisor={() => setMainView("advisor")}
                 isGuest={authSession?.isGuest ?? true}
                 onLoginRequired={handleLogout}
@@ -1188,12 +1253,25 @@ export default function FinHealChat() {
                     setMainView("advisor");
                   } else if (page === "Financial Education") {
                     setMainView("education");
-                  } else if (page === "Eligibility, CIBIL & BSA") {
+                  } else if (page === "Check your Eligibility") {
+                    setMainView("eligibility-checker");
+                  } else if (page === "Eligibility, CIBIL & BSA" || page === "CIBIL & Bank Statement Analyser") {
                     setMainView("eligibility-cibil");
                   }
                 }}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
+              />
+            ) : mainView === "eligibility-checker" ? (
+              <EligibilityCheckerView
+                userId={userId}
+                userEmail={authSession.email || ""}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNow={handleApplyLoan}
+                onTalkToAdvisor={() => setMainView("advisor")}
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
               />
             ) : mainView === "eligibility-cibil" ? (
               <EligibilityCibilView
@@ -1206,6 +1284,7 @@ export default function FinHealChat() {
                 onOpenAdmin={openAdmin}
                 isGuest={authSession?.isGuest ?? true}
                 onLoginRequired={handleLogout}
+                onOpenEligibilityModal={openEligibilityChecker}
               />
             ) : mainView === "cibil-analyzer" ? (
               <CibilAnalyzerView
@@ -1225,6 +1304,15 @@ export default function FinHealChat() {
               />
             ) : mainView === "credit-cards" ? (
               <CreditCardGeniusView />
+            ) : mainView === "apply-loan" ? (
+              <ApplyForLoanView
+                userId={userId}
+                userEmail={authSession?.email}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onOpenLoanCalculator={openLoanCalculator}
+                initialCategory={applyLoanCategory}
+              />
             ) : (
               <DebtBalanceReviewView
                 userId={userId}

@@ -21,18 +21,21 @@ interface SidebarProps {
   onOpenProfile: () => void;
   onOpenEducation?: () => void;
   onOpenAdvisor?: () => void;
-  onOpenAdmin?: () => void;
+  onOpenAdmin?: (tab?: string) => void;
   onLogout?: () => void;
   initialActiveNav: string;
   onSelectMood?: (moodEmoji: string, moodTitle: string) => void;
   onOpenLoanCalculator?: () => void;
   onOpenEligibilityCibil?: () => void;
+  onOpenEligibilityModal?: () => void;
+  onOpenEligibilityChecker?: () => void;
   onOpenDashboard?: () => void;
   onOpenReminders?: () => void;
   onOpenCreditCards?: () => void;
+  onOpenApplyLoan?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenDashboard, onOpenReminders, onOpenCreditCards }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenEligibilityModal, onOpenEligibilityChecker, onOpenDashboard, onOpenReminders, onOpenCreditCards, onOpenApplyLoan }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -68,7 +71,7 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     const loadPermissions = async () => {
       // Super admins have all permissions — no need to check
       if (isSuperAdmin) {
-        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit"]);
+        setUserPermissions(["cibil_fetch", "cibil_view", "cibil_view_all", "scheduled_calls", "lenders_edit", "education_edit"]);
         return;
       }
 
@@ -329,6 +332,15 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const handleOpenManageEducation = () => {
+    setActiveNav("Manage Education");
+    onOpenAdmin?.("education");
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
   const handleOpenLoanCalculator = () => {
     setActiveNav("Loan Calculator");
     onOpenLoanCalculator?.();
@@ -339,8 +351,30 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
   };
 
   const handleOpenEligibilityCibil = () => {
-    setActiveNav("Eligibility, CIBIL & BSA");
+    setActiveNav("CIBIL & Bank Statement Analyser");
     onOpenEligibilityCibil?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenEligibilityChecker = () => {
+    setActiveNav("Check your Eligibility");
+    if (onOpenEligibilityChecker) {
+      onOpenEligibilityChecker();
+    } else if (onOpenEligibilityModal) {
+      onOpenEligibilityModal();
+    }
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
+  const handleOpenApplyLoan = () => {
+    setActiveNav("Apply for Loan");
+    onOpenApplyLoan?.();
 
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
       onClose();
@@ -664,8 +698,10 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
                 <NavBtn icon="🧑‍💼" label="Talk to an Advisor" active={activeNav === "Talk to an Advisor"} onClick={handleOpenAdvisor} />
               )}
               {hasPermission("cibil_fetch") && (
-                <NavBtn icon="🛡️" label="Eligibility, CIBIL & BSA" active={activeNav === "Eligibility, CIBIL & BSA"} onClick={handleOpenEligibilityCibil} />
+                <NavBtn icon="🛡️" label="CIBIL & Bank Statement Analyser" active={activeNav === "CIBIL & Bank Statement Analyser"} onClick={handleOpenEligibilityCibil} />
               )}
+              <NavBtn icon="🎯" label="Check your Eligibility" active={activeNav === "Check your Eligibility"} onClick={handleOpenEligibilityChecker} />
+              <NavBtn icon="📝" label="Apply for Loan" active={activeNav === "Apply for Loan"} onClick={handleOpenApplyLoan} />
               <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
               <NavBtn icon="💳" label="Credit Cards" active={activeNav === "Credit Cards"} onClick={handleOpenCreditCards} />
 
@@ -686,6 +722,11 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               {/* If Expert/Advisor/Staff — show Workspace if they are a front-facing advisor */}
               {isUserAdvisor(userEmail) && !isSuperAdmin && (
                 <NavBtn icon="💼" label="Advisor Workspace" active={activeNav === "Advisor Workspace"} onClick={handleOpenAdmin} />
+              )}
+
+              {/* If Employee/Advisor has education_edit permission and is not Super Admin */}
+              {(hasPermission("education_edit") || userPermissions.includes("education_edit")) && !isSuperAdmin && (
+                <NavBtn icon="📚" label="Manage Education" active={activeNav === "Manage Education"} onClick={handleOpenManageEducation} />
               )}
 
 

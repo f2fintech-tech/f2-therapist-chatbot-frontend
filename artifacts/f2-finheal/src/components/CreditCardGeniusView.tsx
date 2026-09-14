@@ -524,12 +524,13 @@ export default function CreditCardGeniusView() {
 
     setSelectedCardForApply(card);
     setApplyError(null);
-    setApplyForm((prev) => ({
-      ...prev,
-      fullName: prev.fullName || session.displayName || "",
-      email: prev.email || session.email || "",
-      pincode: eligibilityForm.pincode || prev.pincode || "110001",
-    }));
+    setApplyForm({
+      fullName: "",
+      mobileNumber: "",
+      email: "",
+      city: "",
+      pincode: eligibilityForm.pincode || "",
+    });
     setApplyModalOpen(true);
   };
 
@@ -809,6 +810,33 @@ export default function CreditCardGeniusView() {
 
           {/* Full-Width Cards Grid (3 Columns) */}
           <div className="space-y-4">
+            {/* Dynamic Results Count Header */}
+            {!loadingCards && !catalogError && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">
+                    {filteredCards.length === cards.length ? (
+                      <span>Showing all <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 ml-1 mr-1">{filteredCards.length}</span> Credit Cards</span>
+                    ) : (
+                      <span>Showing <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white ml-1 mr-1">{filteredCards.length}</span> of {cards.length} Credit Cards</span>
+                    )}
+                  </span>
+                  {isAnyFilterActive && (
+                    <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">Filtered</span>
+                  )}
+                </div>
+                
+                {isAnyFilterActive && (
+                  <button
+                    onClick={handleClearAllFilters}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 transition-colors"
+                  >
+                    <span>Clear all filters</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Active Filter Chips Summary */}
             {isAnyFilterActive && (
               <div className="flex flex-wrap items-center gap-2 bg-blue-50/60 p-3 rounded-2xl border border-blue-100 text-xs">

@@ -317,8 +317,9 @@ export default function CibilAnalyzerView({
     if (bsaPassword) {
       formData.append("password", bsaPassword);
     }
-    if (report?.id) {
-      formData.append("report_id", report.id);
+    const activeReportId = report?.id || reportId;
+    if (activeReportId) {
+      formData.append("report_id", activeReportId);
     }
 
     try {
