@@ -1211,17 +1211,44 @@ ${sheetDataXml}
   }, [isAdmin, activeTab, currentExpertId, cibilPage, filterDate, filterEndDate, filterRole, filterEmployee, filterLoanType, debouncedSearch, filterBureau]);
 
   // Lenders CRUD Handlers
-  const getProductPrefix = (category: string, productType: string): string => {
-    const cat = (category || "").toLowerCase().trim();
+  const deriveCategoryFromProductType = (productType: string): string => {
+    const prod = (productType || "").toLowerCase().trim();
+    if (prod.includes("home")) return "home";
+    if (prod.includes("personal")) return "personal";
+    if (prod.includes("professional") || prod.includes("prof")) return "professional";
+    if (prod.includes("business")) return "business";
+    if (prod.includes("auto") || prod.includes("car")) return "auto";
+    if (prod.includes("property") || prod.includes("lap")) return "lap";
+    if (prod.includes("credit card") || prod.includes("card") || prod.includes("emi")) return "credit_card";
+    if (prod.includes("education")) return "education";
+    if (prod.includes("gold")) return "gold";
+    return prod.replace(/[^a-z0-9]+/g, "_") || "other";
+  };
+
+  const getProductPrefix = (productType: string, category?: string): string => {
     const prod = (productType || "").toLowerCase().trim();
 
+    if (prod.includes("personal")) return "PL";
+    if (prod.includes("home")) return "HL";
+    if (prod.includes("business")) return "BL";
+    if (prod.includes("professional") || prod.includes("prof")) return "PR";
+    if (prod.includes("auto") || prod.includes("car")) return "AL";
+    if (prod.includes("property") || prod.includes("lap")) return "LAP";
+    if (prod.includes("credit card") || prod.includes("card") || prod.includes("emi")) return "CC";
+    if (prod.includes("education")) return "EL";
+    if (prod.includes("gold")) return "GL";
+    if (prod.includes("other")) return "OT";
+
+    const cat = (category || "").toLowerCase().trim();
     if (cat === "home") return "HL";
     if (cat === "personal") return "PL";
     if (cat === "professional") return "PR";
-
-    if (prod.includes("home")) return "HL";
-    if (prod.includes("personal")) return "PL";
-    if (prod.includes("professional") || prod.includes("prof")) return "PR";
+    if (cat === "business") return "BL";
+    if (cat === "auto" || cat === "car") return "AL";
+    if (cat === "lap") return "LAP";
+    if (cat === "credit_card" || cat === "cc") return "CC";
+    if (cat === "education") return "EL";
+    if (cat === "gold") return "GL";
 
     const words = (productType || category || "").split(/\s+/).filter(Boolean);
     if (words.length >= 2) {
@@ -1236,9 +1263,14 @@ ${sheetDataXml}
 
   const handleUpdateLenderField = (updatedFields: Partial<typeof lenderForm>) => {
     const nextForm = { ...lenderForm, ...updatedFields };
-    const prefix = getProductPrefix(nextForm.category || "", nextForm.productType || "");
+    if (updatedFields.productType !== undefined) {
+      nextForm.category = deriveCategoryFromProductType(nextForm.productType);
+    }
+    const prefix = getProductPrefix(nextForm.productType || "", nextForm.category || "");
     const cleanName = (nextForm.name || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-    nextForm.id = cleanName ? `${prefix}-${cleanName}` : prefix;
+    if (!editingLender) {
+      nextForm.id = cleanName ? `${prefix}-${cleanName}` : prefix;
+    }
     setLenderForm(nextForm);
   };
 
@@ -5459,29 +5491,29 @@ ${sheetDataXml}
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Product Type</label>
-                  <input
-                    type="text"
-                    value={lenderForm.productType || ""}
+                  <select
+                    value={lenderForm.productType || "Personal Loan"}
                     onChange={(e) => handleUpdateLenderField({ productType: e.target.value })}
-                    placeholder="e.g. Home Loan"
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary"
-                  />
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white cursor-pointer"
+                  >
+                    <option value="Personal Loan">Personal Loan</option>
+                    <option value="Home Loan">Home Loan</option>
+                    <option value="Business Loan">Business Loan</option>
+                    <option value="Professional Loan">Professional Loan</option>
+                    <option value="Auto / Car Loan">Auto / Car Loan</option>
+                    <option value="Loan Against Property">Loan Against Property</option>
+                    <option value="Credit Card EMI">Credit Card EMI</option>
+                    <option value="Education Loan">Education Loan</option>
+                    <option value="Gold Loan">Gold Loan</option>
+                    <option value="Other">Other</option>
+                    {lenderForm.productType && !["Personal Loan", "Home Loan", "Business Loan", "Professional Loan", "Auto / Car Loan", "Loan Against Property", "Credit Card EMI", "Education Loan", "Gold Loan", "Other"].includes(lenderForm.productType) && (
+                      <option value={lenderForm.productType}>{lenderForm.productType}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-[10px]">
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Category</label>
-                  <select
-                    value={lenderForm.category || "home"}
-                    onChange={(e) => handleUpdateLenderField({ category: e.target.value as any })}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary bg-white animate-fade-in"
-                  >
-                    <option value="home">Home Loan</option>
-                    <option value="personal">Personal Loan</option>
-                    <option value="professional">Professional Loan</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-2 gap-[10px]">
                 <div>
                   <label className="text-[11px] font-bold text-gray-400 uppercase block mb-[4px]">Lender Type</label>
                   <select
@@ -5500,9 +5532,9 @@ ${sheetDataXml}
                     type="text"
                     value={lenderForm.id || ""}
                     onChange={(e) => setLenderForm({ ...lenderForm, id: e.target.value })}
-                    placeholder="e.g. HL-SBI"
+                    placeholder={`e.g. ${getProductPrefix(lenderForm.productType || "Personal Loan")}-SBI`}
                     disabled={!!editingLender}
-                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary disabled:bg-gray-50"
+                    className="w-full px-[10px] py-[8px] border border-gray-300 rounded-[10px] text-[12px] focus:outline-none focus:border-primary disabled:bg-gray-50 font-semibold text-gray-800"
                   />
                 </div>
               </div>
