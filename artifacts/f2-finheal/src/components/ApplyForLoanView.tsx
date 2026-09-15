@@ -53,6 +53,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import PolicyModal from "./PolicyModal";
+import { getStoredAuthSession } from "@/utils/authSession";
 
 interface DirectorDetail {
   id: string;
@@ -240,6 +241,7 @@ const initialHlLapDetails: HlLapDetails = {
 interface ApplyForLoanViewProps {
   userId: string;
   userEmail?: string;
+  userName?: string;
   onToggleSidebar: () => void;
   onToggleInsights?: () => void;
   onOpenLoanCalculator?: (loanType?: string) => void;
@@ -830,6 +832,7 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
 export default function ApplyForLoanView({
   userId,
   userEmail,
+  userName,
   onToggleSidebar,
   onToggleInsights,
   onOpenLoanCalculator,
@@ -868,6 +871,7 @@ export default function ApplyForLoanView({
   const wizardFormRef = useRef<HTMLDivElement | null>(null);
   const [applyLoanToggle, setApplyLoanToggle] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialDraft?.currentStep || 1);
+  const [omsCustomerId, setOmsCustomerId] = useState<number | null>(initialDraft?.omsCustomerId || null);
   const [isDraftRestored, setIsDraftRestored] = useState<boolean>(Boolean(initialDraft));
 
   const handleScrollToApplicantForm = () => {
@@ -1060,13 +1064,14 @@ export default function ApplyForLoanView({
         eduDetails,
         proDetails,
         hlLapDetails,
+        omsCustomerId,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails, omsCustomerId]);
 
   // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
   useEffect(() => {
@@ -1096,6 +1101,7 @@ export default function ApplyForLoanView({
         localStorage.removeItem(DRAFT_STORAGE_KEY);
       } catch (e) { }
       setIsDraftRestored(false);
+      setOmsCustomerId(null);
       setCurrentStep(1);
       setBusinessType("sole_proprietorship");
       setCompanyOfficialEmail("");
@@ -1531,11 +1537,14 @@ export default function ApplyForLoanView({
   const [isCameraLoading, setIsCameraLoading] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStep1Submitting, setIsStep1Submitting] = useState(false);
+  const [isStep2Submitting, setIsStep2Submitting] = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [submittedRefNo, setSubmittedRefNo] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab || (activeTab === "professional" && cat.id === "doctor")) || LOAN_CATEGORIES[0];
+
 
   // Dynamic Real-Time Bank Statement Notice Date Calculation
   const bankStatementNotice = useMemo(() => {
@@ -1573,7 +1582,7 @@ export default function ApplyForLoanView({
     }
   };
 
-  const handleNextStep1 = () => {
+  const handleNextStep1 = async () => {
     if (!formData.fullName.trim()) {
       alert("Please enter your Full Name.");
       return;
@@ -1640,10 +1649,56 @@ export default function ApplyForLoanView({
       return;
     }
 
-    setCurrentStep(2);
+    setIsStep1Submitting(true);
+    setSubmitError(null);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const applicantPayload = {
+        prefix: formData.prefix || "Mr.",
+        full_name: formData.fullName.trim(),
+        dob: formData.dob || "",
+        father_name: formData.fatherName.trim(),
+        mother_name: formData.motherName.trim(),
+        mobile: formData.mobileNumber.replace(/\D/g, ""),
+        email: formData.email.trim(),
+        official_email: formData.officialEmail?.trim() || companyOfficialEmail?.trim() || "",
+        city: formData.city.trim(),
+        state: formData.currentState?.trim() || formData.permanentState?.trim() || "",
+        current_address: formData.currentAddress.trim(),
+        permanent_address: formData.permanentAddress.trim() || formData.currentAddress.trim(),
+        working_address: formData.workingAddress.trim(),
+        employment_type: formData.employmentType || "salaried",
+        monthly_income: parseFloat(String(formData.monthlyIncome).replace(/,/g, "")) || 0,
+        pan: (panDoc.fileName || "").toUpperCase().slice(0, 10) || "ABCDE1234F"
+      };
+
+      const res = await fetch(`${apiBase}/loan-applications/step1-register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customer_id: omsCustomerId || undefined,
+          applicant: applicantPayload
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.customer_id) {
+          setOmsCustomerId(data.customer_id);
+        }
+      }
+    } catch (err) {
+      console.warn("Step 1 customer registration notice:", err);
+    } finally {
+      setIsStep1Submitting(false);
+      setCurrentStep(2);
+    }
   };
 
-  const handleNextStep2 = () => {
+  const handleNextStep2 = async () => {
     // Validate Mandatory Docs
     const hasAadhaar = aadhaarDoc.mode === "pdf" ? Boolean(aadhaarDoc.fileName) : Boolean(aadhaarDoc.frontPhoto);
     if (!hasAadhaar) {
@@ -1677,7 +1732,53 @@ export default function ApplyForLoanView({
       return;
     }
 
-    setCurrentStep(3);
+    setIsStep2Submitting(true);
+    setSubmitError(null);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+
+      const coreDocsPayload: any[] = [];
+      if (aadhaarDoc.mode === "pdf") {
+        coreDocsPayload.push({ type: "Aadhaar Card", filename: aadhaarDoc.fileName || "aadhaar.pdf", data: aadhaarDoc.fileData });
+      } else {
+        if (aadhaarDoc.frontPhoto) coreDocsPayload.push({ type: "Aadhaar Front", filename: "aadhaar_front.jpg", data: aadhaarDoc.frontPhoto });
+        if (aadhaarDoc.backPhoto) coreDocsPayload.push({ type: "Aadhaar Back", filename: "aadhaar_back.jpg", data: aadhaarDoc.backPhoto });
+      }
+      if (panDoc.mode === "pdf") {
+        coreDocsPayload.push({ type: "PAN Card", filename: panDoc.fileName || "pan.pdf", data: panDoc.fileData });
+      } else if (panDoc.frontPhoto) {
+        coreDocsPayload.push({ type: "PAN Card", filename: "pan.jpg", data: panDoc.frontPhoto });
+      }
+      if (photoDoc.photoPreview || photoDoc.fileData) {
+        coreDocsPayload.push({ type: "Photo", filename: photoDoc.fileName || "photo.jpg", data: photoDoc.photoPreview || photoDoc.fileData });
+      }
+      if (bankStatementDoc.fileName || bankStatementDoc.fileData) {
+        coreDocsPayload.push({ type: "Bank Statements", filename: bankStatementDoc.fileName || "bank_statement.pdf", data: bankStatementDoc.fileData });
+      }
+      if (currentAddressProofDoc.fileName || currentAddressProofDoc.fileData) {
+        coreDocsPayload.push({ type: "Current Address Proof", filename: currentAddressProofDoc.fileName, data: currentAddressProofDoc.fileData });
+      }
+      if (permanentAddressProofDoc.fileName || permanentAddressProofDoc.fileData) {
+        coreDocsPayload.push({ type: "Permanent Address Proof", filename: permanentAddressProofDoc.fileName, data: permanentAddressProofDoc.fileData });
+      }
+
+      await fetch(`${apiBase}/loan-applications/step2-documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customer_id: omsCustomerId,
+          documents: coreDocsPayload
+        })
+      });
+    } catch (err) {
+      console.warn("Step 2 documents upload notice:", err);
+    } finally {
+      setIsStep2Submitting(false);
+      setCurrentStep(3);
+    }
   };
 
   const handleSubmitFinal = async (e: React.FormEvent) => {
@@ -2076,14 +2177,22 @@ export default function ApplyForLoanView({
       };
 
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const response = await fetch(`${apiBase}/loan-applications/submit`, {
+      const session = getStoredAuthSession();
+      const currentLoggedInName = (userName?.trim() || session?.displayName?.trim() || formData.fullName?.trim() || "Applicant").trim();
+      const currentLoggedInEmail = (userEmail?.trim() || session?.email?.trim() || formData.email?.trim() || "").trim();
+
+      const response = await fetch(`${apiBase}/loan-applications/step3-application`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          applicant: applicantPayload,
+          customer_id: omsCustomerId,
           loan: loanPayload,
+          user_name: currentLoggedInName,
+          user_email: currentLoggedInEmail,
+          // applied_by_name: currentLoggedInName,
           documents: documentsPayload,
-          bank_statement: bankStatementPayload,
           business_details: activeTab === "business" ? { businessType, companyOfficialEmail, pvtDirectors, partnershipPartners } : undefined,
           education_details: activeTab === "education" ? eduDetails : undefined,
           professional_details: activeTab === "doctor" ? proDetails : undefined,
@@ -2097,7 +2206,8 @@ export default function ApplyForLoanView({
       }
 
       const resData = await response.json();
-      const generatedRef = resData.reference_no || `F2-LN-${Math.floor(100000 + Math.random() * 900000)}`;
+      const rawRef = String(resData.application_no || resData.reference_no || "").replace(/\D/g, "");
+      const generatedRef = rawRef || String(Math.floor(10000000 + Math.random() * 90000000));
 
       setSubmittedRefNo(generatedRef);
       setIsSubmittedSuccess(true);
@@ -2671,8 +2781,8 @@ export default function ApplyForLoanView({
                 </div>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-1">
-                  <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Application Reference Number</div>
-                  <div className="text-xl font-extrabold text-primary tracking-widest mt-1 select-all">{submittedRefNo}</div>
+                  <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Application Number</div>
+                  <div className="text-2xl font-extrabold text-blue-600 tracking-wider mt-1 select-all">{submittedRefNo}</div>
                   <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-1 mt-1">
                     <Check className="w-3.5 h-3.5" /> Direct OMS Lead Generated & Forwarded to Lending Desk
                   </div>
@@ -3426,15 +3536,24 @@ export default function ApplyForLoanView({
                       <button
                         type="button"
                         onClick={handleNextStep1}
-                        disabled={isUnderage}
+                        disabled={isUnderage || isStep1Submitting}
                         className={`py-3 px-8 font-bold text-xs rounded-xl transition-all flex items-center gap-2 ${
-                          isUnderage
+                          isUnderage || isStep1Submitting
                             ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
                             : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                         }`}
                       >
-                        <span>{isUnderage ? "Form Locked (Age < 20)" : "Next: Upload Documents"}</span>
-                        <ChevronRight className="w-4 h-4" />
+                        {isStep1Submitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Registering Customer Profile...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{isUnderage ? "Form Locked (Age < 20)" : "Next: Upload Documents"}</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -4242,10 +4361,24 @@ export default function ApplyForLoanView({
                       <button
                         type="button"
                         onClick={handleNextStep2}
-                        className="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                        disabled={isStep2Submitting}
+                        className={`py-3 px-8 font-bold text-xs rounded-xl transition-all flex items-center gap-2 ${
+                          isStep2Submitting
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                        }`}
                       >
-                        <span>Next: Additional Documents</span>
-                        <ChevronRight className="w-4 h-4" />
+                        {isStep2Submitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Uploading Core Documents to S3...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Next: Additional Documents</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

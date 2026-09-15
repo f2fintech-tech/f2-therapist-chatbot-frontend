@@ -1355,6 +1355,7 @@ export default function FinHealChat() {
               <ApplyForLoanView
                 userId={userId}
                 userEmail={authSession?.email}
+                userName={authSession?.displayName}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onOpenLoanCalculator={openLoanCalculator}
