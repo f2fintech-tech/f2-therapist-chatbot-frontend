@@ -44,6 +44,7 @@ const EligibilityCheckerView = lazy(() => import("@/components/EligibilityChecke
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const RemindersView = lazy(() => import("@/components/RemindersView"));
 const CreditCardGeniusView = lazy(() => import("@/components/CreditCardGeniusView"));
+const TrackApplicationView = lazy(() => import("@/components/TrackApplicationView"));
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 
 const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -155,6 +156,7 @@ export default function FinHealChat() {
     if (location === "/eligibility-cibil") return "eligibility-cibil";
     if (location === "/eligibility-checker" || location === "/eligibility") return "eligibility-checker";
     if (location === "/apply-loan" || location.startsWith("/apply-loan/")) return "apply-loan";
+    if (location === "/track-application" || location === "/track-tickets") return "track-application";
     if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
@@ -172,6 +174,7 @@ export default function FinHealChat() {
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
     else if (view === "apply-loan") setLocation("/apply-loan");
+    else if (view === "track-application") setLocation("/track-application");
     else if (view === "credit-cards") setLocation("/credit-cards");
     else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
     else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
@@ -790,6 +793,14 @@ export default function FinHealChat() {
   const openDebtBalanceReview = () => openTestInNewTab("debt-balance");
   const openCreditReadiness = () => openTestInNewTab("credit-readiness");
 
+  const openTrackApplication = () => {
+    setMainView("track-application");
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      closeSidebar();
+    }
+  };
+
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -836,6 +847,9 @@ export default function FinHealChat() {
     return false;
   };
 
+  const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+  const isStaff = authSession?.isAdvisor || authSession?.isStaff || (authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) || isUserAdvisor(authSession?.email) || isEmployeeId;
+
   const activeSidebarNav = mainView === "chat"
     ? "Talk to FinHeal"
     : mainView === "goals"
@@ -860,6 +874,8 @@ export default function FinHealChat() {
                     ? "CIBIL & Bank Statement Analyser"
                   : mainView === "apply-loan"
                     ? "Apply for Loan"
+                  : mainView === "track-application"
+                    ? (isStaff ? "Track Your Tickets" : "Track Your Application")
                     : mainView === "dashboard"
                       ? "My Dashboard"
                       : mainView === "reminders"
@@ -1104,6 +1120,7 @@ export default function FinHealChat() {
           onOpenEligibilityChecker={openEligibilityChecker}
           onOpenEligibilityModal={openEligibilityModal}
           onOpenApplyLoan={openApplyLoan}
+          onOpenTrackApplication={openTrackApplication}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
           onOpenCreditCards={openCreditCards}
@@ -1342,6 +1359,15 @@ export default function FinHealChat() {
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onOpenLoanCalculator={openLoanCalculator}
                 initialCategory={applyLoanCategory}
+              />
+            ) : mainView === "track-application" ? (
+              <TrackApplicationView
+                userId={userId}
+                userEmail={authSession?.email}
+                portalRole={(authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) ? "admin" : isStaff ? "employee" : "user"}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNewLoan={openApplyLoan}
               />
             ) : (
               <DebtBalanceReviewView
