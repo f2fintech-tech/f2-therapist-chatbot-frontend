@@ -5,8 +5,10 @@ packages:
   - scripts
 
 allowBuilds:
+  '@firebase/util': set this to true or false
   core-js: set this to true or false
   esbuild: true
+  protobufjs: set this to true or false
 
 autoInstallPeers: false
 
