@@ -74,218 +74,7 @@ export interface LoanTicket {
   sanctionLetterUrl?: string;
 }
 
-const DEFAULT_MOCK_TICKETS: LoanTicket[] = [
-  {
-    ticketId: "FIN-2026-8942",
-    applicantName: "Rahul Sharma",
-    applicantMobile: "9876543210",
-    applicantEmail: "rahul.sharma@example.com",
-    loanCategory: "Home Loan",
-    loanAmount: 4500000,
-    tenureYears: 20,
-    createdDate: "12 Sep 2026, 10:30 AM",
-    currentStageId: 3,
-    bankPartner: "HDFC Bank & SBI",
-    createdByRole: "user",
-    creditManager: {
-      name: "Ananya Deshmukh",
-      role: "Senior Credit Officer",
-      phone: "+91 98201 44512",
-      email: "ananya.credit@finheal.com"
-    },
-    actionRequiredNote: "Please re-upload clear 6 Months Salary Account Bank Statement.",
-    stages: [
-      {
-        id: 1,
-        title: "Application Created & Ticket Generated",
-        subtitle: "Ticket ID: FIN-2026-8942",
-        description: "Your Home Loan application details and mandatory KYC documents were successfully recorded.",
-        status: "completed",
-        timestamp: "12 Sep 2026, 10:30 AM",
-        actor: "System Automated"
-      },
-      {
-        id: 2,
-        title: "Picked by Credit Manager & Docs Verified",
-        subtitle: "Finheal In-house Underwriting",
-        description: "Senior Credit Manager Ananya Deshmukh picked your file, audited CIBIL score (782), and verified basic income proof.",
-        status: "completed",
-        timestamp: "13 Sep 2026, 02:15 PM",
-        actor: "Ananya Deshmukh (Finheal Credit)"
-      },
-      {
-        id: 3,
-        title: "Submitted to Banker & Profile Under Review",
-        subtitle: "HDFC Bank Credit Underwriting Desk",
-        description: "Your profile has been forwarded to HDFC Bank & SBI loan processing hub. Bank credit officer is evaluating property legal documents.",
-        status: "current",
-        timestamp: "14 Sep 2026, 11:00 AM",
-        actor: "HDFC Bank Credit Desk"
-      },
-      {
-        id: 4,
-        title: "Bank Credit Sanction Approval",
-        subtitle: "In-Principle Approval",
-        description: "Bank issues formal Sanction Letter specifying approved loan amount, interest rate, and tenure.",
-        status: "pending"
-      },
-      {
-        id: 5,
-        title: "Agreement Signing & Loan Disbursal",
-        subtitle: "Final Disbursal",
-        description: "Execution of loan agreement, property mortgage registration, and direct bank account payout.",
-        status: "pending"
-      }
-    ],
-    docsStatus: [
-      { name: "Aadhaar & PAN Card", status: "verified" },
-      { name: "2 Years ITR & Computation", status: "verified" },
-      { name: "6 Months Bank Statement", status: "resubmit_required", remarks: "Page 3 PDF is blurry" },
-      { name: "Property Sales Deed / BBA", status: "pending" }
-    ]
-  },
-  {
-    ticketId: "FIN-2026-7310",
-    applicantName: "Dr. Vikram Sethi",
-    applicantMobile: "98112 33445",
-    applicantEmail: "vikram.sethi@clinic.org",
-    loanCategory: "Professional Loan (Doctor)",
-    loanAmount: 2500000,
-    tenureYears: 5,
-    createdDate: "10 Sep 2026, 04:45 PM",
-    currentStageId: 4,
-    bankPartner: "ICICI Bank",
-    createdByRole: "user",
-    creditManager: {
-      name: "Amitav Roy",
-      role: "Lead Ops Manager",
-      phone: "+91 99100 88234",
-      email: "amitav.roy@finheal.com"
-    },
-    sanctionLetterUrl: "#",
-    stages: [
-      {
-        id: 1,
-        title: "Application Created & Ticket Generated",
-        subtitle: "Ticket ID: FIN-2026-7310",
-        description: "Professional Doctor loan request submitted with UG/PG degrees and clinic letterhead.",
-        status: "completed",
-        timestamp: "10 Sep 2026, 04:45 PM",
-        actor: "System Automated"
-      },
-      {
-        id: 2,
-        title: "Picked by Credit Manager & Docs Verified",
-        subtitle: "Finheal Underwriting",
-        description: "Doctor degree registration & clinic practice proof verified.",
-        status: "completed",
-        timestamp: "11 Sep 2026, 11:30 AM",
-        actor: "Amitav Roy (Finheal Credit)"
-      },
-      {
-        id: 3,
-        title: "Submitted to Banker & Profile Under Review",
-        subtitle: "ICICI Bank Fast-Track Desk",
-        description: "Submitted to ICICI Bank Doctor Special Program at 13.5% ROI.",
-        status: "completed",
-        timestamp: "12 Sep 2026, 03:00 PM",
-        actor: "ICICI Bank Officer"
-      },
-      {
-        id: 4,
-        title: "Bank Credit Sanction Approval",
-        subtitle: "Sanction Letter Issued @ 13.5%",
-        description: "Congratulations! In-principle sanction of ₹25 Lakhs approved by ICICI Bank.",
-        status: "current",
-        timestamp: "14 Sep 2026, 06:20 PM",
-        actor: "ICICI Sanction Hub"
-      },
-      {
-        id: 5,
-        title: "Agreement Signing & Loan Disbursal",
-        subtitle: "Final Payout Pending",
-        description: "E-signing of agreement via Aadhaar OTP pending from applicant.",
-        status: "pending"
-      }
-    ],
-    docsStatus: [
-      { name: "MBBS / MD UG PG Degree", status: "verified" },
-      { name: "Medical Council Registration", status: "verified" },
-      { name: "Clinic Letter Head", status: "verified" }
-    ]
-  },
-  {
-    ticketId: "FIN-2026-9921",
-    applicantName: "Priya Malhotra",
-    applicantMobile: "99887 66554",
-    applicantEmail: "priya.m@techcorp.in",
-    loanCategory: "Personal Loan",
-    loanAmount: 800000,
-    tenureYears: 4,
-    createdDate: "08 Sep 2026, 09:15 AM",
-    currentStageId: 5,
-    bankPartner: "Axis Bank",
-    createdByRole: "employee",
-    creditManager: {
-      name: "Neha Gupta",
-      role: "Senior Operations Specialist",
-      phone: "+91 97110 55432",
-      email: "neha.gupta@finheal.com"
-    },
-    stages: [
-      {
-        id: 1,
-        title: "Application Created & Ticket Generated",
-        subtitle: "Ticket ID: FIN-2026-9921",
-        description: "Personal Loan application logged by Ops team.",
-        status: "completed",
-        timestamp: "08 Sep 2026, 09:15 AM",
-        actor: "Neha Gupta (Ops)"
-      },
-      {
-        id: 2,
-        title: "Picked by Credit Manager & Docs Verified",
-        subtitle: "Finheal Credit",
-        description: "Salary slips & Form 16 verified.",
-        status: "completed",
-        timestamp: "08 Sep 2026, 02:00 PM",
-        actor: "Neha Gupta (Credit)"
-      },
-      {
-        id: 3,
-        title: "Submitted to Banker & Profile Under Review",
-        subtitle: "Axis Bank Instant Desk",
-        description: "Axis Bank pre-approved pre-underwriting passed.",
-        status: "completed",
-        timestamp: "09 Sep 2026, 10:00 AM",
-        actor: "Axis Desk"
-      },
-      {
-        id: 4,
-        title: "Bank Credit Sanction Approval",
-        subtitle: "Approved ₹8,00,000 @ 9.99%",
-        description: "Sanction letter approved with 0 processing fee waiver.",
-        status: "completed",
-        timestamp: "09 Sep 2026, 04:30 PM",
-        actor: "Axis Sanction Officer"
-      },
-      {
-        id: 5,
-        title: "Agreement Signing & Loan Disbursal",
-        subtitle: "Funds Disbursed to Bank Account",
-        description: "Amount ₹8,00,000 credited to Salary Account terminating with ****4091.",
-        status: "completed",
-        timestamp: "10 Sep 2026, 11:45 AM",
-        actor: "Finheal Disbursal Desk"
-      }
-    ],
-    docsStatus: [
-      { name: "3 Months Salary Slips", status: "verified" },
-      { name: "Form 16 Part A & B", status: "verified" },
-      { name: "KYC Aadhaar & PAN", status: "verified" }
-    ]
-  }
-];
+const DEFAULT_MOCK_TICKETS: LoanTicket[] = [];
 
 interface TrackApplicationViewProps {
   userId?: string;
@@ -310,20 +99,24 @@ export default function TrackApplicationView({
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
   const activeRole: "user" | "employee" | "admin" = portalRole || (isSuperAdmin ? "admin" : isStaffRole ? "employee" : "user");
 
-  // Load tickets from localStorage or use defaults
+  // Load tickets from localStorage or start empty
   const [tickets, setTickets] = useState<LoanTicket[]>(() => {
     try {
       const saved = localStorage.getItem("f2_loan_tickets_v1");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          // Remove legacy mock sample tickets if present
+          const realOnly = parsed.filter(
+            (t) => !["FIN-2026-8942", "FIN-2026-7310", "FIN-2026-9921"].includes(t.ticketId)
+          );
+          return realOnly;
         }
       }
     } catch (e) {
       console.warn("Could not load local loan tickets", e);
     }
-    return DEFAULT_MOCK_TICKETS;
+    return [];
   });
 
   // Sync to localStorage
@@ -377,7 +170,7 @@ export default function TrackApplicationView({
     );
   });
 
-  const [selectedTicketId, setSelectedTicketId] = useState<string>(filteredTickets[0]?.ticketId || "FIN-2026-8942");
+  const [selectedTicketId, setSelectedTicketId] = useState<string>("");
 
   // Keep selectedTicketId valid
   useEffect(() => {
@@ -386,7 +179,7 @@ export default function TrackApplicationView({
     }
   }, [filteredTickets, selectedTicketId]);
 
-  const activeTicket = filteredTickets.find((t) => t.ticketId.toLowerCase() === selectedTicketId.toLowerCase()) || filteredTickets[0] || tickets[0];
+  const activeTicket = filteredTickets.find((t) => t.ticketId.toLowerCase() === selectedTicketId.toLowerCase()) || filteredTickets[0] || null;
 
   const handleCopyTicketId = (tid: string) => {
     navigator.clipboard.writeText(tid);
@@ -611,9 +404,25 @@ export default function TrackApplicationView({
 
           {/* Master Data Table */}
           {filteredTickets.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-2">
-              <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs text-slate-500 font-semibold">No loan applications found matching your criteria.</p>
+            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
+              <FileText className="w-10 h-10 text-slate-300 mx-auto" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-700">No loan applications found</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  {activeRole === "user"
+                    ? "You haven't submitted any loan applications yet. New loan requests will appear here with live status tracking."
+                    : "No active loan tickets found matching your current filters."}
+                </p>
+              </div>
+              {activeRole === "user" && onApplyNewLoan && (
+                <button
+                  type="button"
+                  onClick={onApplyNewLoan}
+                  className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Apply for a Loan
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto border border-slate-200 rounded-2xl max-h-[380px] overflow-y-auto scrollbar-thin">
