@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { Gauge, Landmark, ShieldCheck, ChevronRight } from "lucide-react";
-import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest } from "@/lib/backendAuth";
+import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest, signInWithGoogle } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
 import PolicyModal from "./PolicyModal";
 
@@ -275,6 +275,32 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
       setIsSubmitting(false);
     }
   };
+
+  const handleGoogleSignIn = async () => {
+    setLoginError(null);
+    setIsSubmitting(true);
+    try {
+      const session = await signInWithGoogle(currentSession?.isGuest ? currentSession.userId : undefined);
+      if (currentSession?.isGuest && currentSession.userId !== session.userId) {
+        migrateConversationsFromUserId(currentSession.userId, session.userId);
+        try {
+          await migrateCalculatorActivities(currentSession.userId, session.userId);
+        } catch (err) {
+          console.error("Failed to migrate calculator activities:", err);
+        }
+      }
+      onAuthSuccess(session);
+    } catch (error: any) {
+      if (error?.code === "auth/popup-closed-by-user") {
+        setLoginError("Sign-in cancelled.");
+      } else {
+        setLoginError(error instanceof Error ? error.message : "Failed to sign in with Google.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const pwStrength = getPasswordStrength(loginPassword);
   const pwReqs = checkPasswordRequirements(loginPassword);
@@ -877,15 +903,49 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 {isSubmitting ? "Processing..." : authMode === "signup" ? "Register" : "Sign in"}
               </button>
             </form>
-            <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ flex: 1, height: "1px", background: "#f3f4f6" }} />
-                <span style={{ fontSize: "10px", color: "#d1d5db" }}>or</span>
+                <span style={{ fontSize: "10px", color: "#d1d5db" }}>or continue with</span>
                 <div style={{ flex: 1, height: "1px", background: "#f3f4f6" }} />
               </div>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isSubmitting}
+                style={{
+                  height: "38px",
+                  background: "#ffffff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#374151",
+                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  transition: "all 0.15s",
+                  opacity: isSubmitting ? 0.7 : 1,
+                }}
+                onMouseOver={e => { if (!isSubmitting) e.currentTarget.style.background = "#f9fafb"; }}
+                onMouseOut={e => { if (!isSubmitting) e.currentTarget.style.background = "#ffffff"; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                Continue with Google
+              </button>
               <button type="button" onClick={handleGuestLogin} disabled={isSubmitting} style={{ height: "36px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", fontSize: "12px", fontWeight: 600, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>
                 Continue as guest
               </button>
+
               <div style={{ textAlign: "center", fontSize: "11px", color: "#9ca3af" }}>
                 {authMode === "signup" ? "Already have an account? " : "No account yet? "}
                 <button type="button" onClick={() => handleSetAuthMode(authMode === "signup" ? "login" : "signup")} style={{ background: "none", border: "none", color: "#3344e6", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", fontSize: "11px" }}>

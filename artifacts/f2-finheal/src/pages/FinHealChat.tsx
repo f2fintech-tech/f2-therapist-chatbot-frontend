@@ -20,7 +20,9 @@ const CreditReadinessReviewView = lazy(() => import("@/components/CreditReadines
 const DynamicTestView = lazy(() => import("@/components/DynamicTestView"));
 const InsightsPanel = lazy(() => import("@/components/InsightsPanel"));
 import AuthScreen from "@/components/AuthScreen";
+import OnboardingModal from "@/components/OnboardingModal";
 import ProfilePage from "@/components/ProfilePage";
+
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
@@ -59,7 +61,9 @@ export default function FinHealChat() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [isEligibilityModalOpen, setIsEligibilityModalOpen] = useState(false);
   const [applyLoanCategory, setApplyLoanCategory] = useState<string>("personal");
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [location, setLocation] = useLocation();
+
 
   useEffect(() => {
     if (location === "/") {
@@ -110,12 +114,18 @@ export default function FinHealChat() {
           }
         } else if (authSession.userId && !authSession.isGuest) {
           const profile = await fetchUserProfile(authSession.userId);
-          if (profile && profile.name && profile.name !== authSession.displayName) {
-            const updatedSession = { ...authSession, displayName: profile.name };
-            setStoredAuthSession(updatedSession);
-            setAuthSession(updatedSession);
+          if (profile) {
+            if (profile.name && profile.name !== authSession.displayName) {
+              const updatedSession = { ...authSession, displayName: profile.name };
+              setStoredAuthSession(updatedSession);
+              setAuthSession(updatedSession);
+            }
+            if ((!profile.phone || !profile.dateOfBirth) && authSession.userId.startsWith("ga-")) {
+              setShowOnboardingModal(true);
+            }
           }
         }
+
       } catch (err) {
         console.warn("Session validation failed. Forcing logout:", err);
         clearStoredAuthSession();
@@ -404,8 +414,28 @@ export default function FinHealChat() {
       setMainView("chat");
       setShowWelcome(true);
       window.localStorage.removeItem("finheal_quiz_dismissed_time");
+      if (session.isNewUser || (session.userId && session.userId.startsWith("ga-") && !session.isGuest)) {
+        setShowOnboardingModal(true);
+      }
     }
   };
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboardingModal(false);
+    if (authSession?.userId) {
+      try {
+        const updated = await fetchUserProfile(authSession.userId);
+        if (updated && updated.name) {
+          const nextSession = { ...authSession, displayName: updated.name, isNewUser: false };
+          setStoredAuthSession(nextSession);
+          setAuthSession(nextSession);
+        }
+      } catch (e) {
+        console.error("Failed to refresh profile after onboarding:", e);
+      }
+    }
+  };
+
 
   const refreshHearts = useCallback(async () => {
     if (!authSession?.userId || !authSession.isGuest) return;
@@ -1426,9 +1456,17 @@ export default function FinHealChat() {
           isAdvisor={isUserAdvisor(authSession?.email)}
           isAdmin={authSession?.email === "admin@finheal.com" || authSession?.email === "admin@f2finheal.com"}
         />
+        {showOnboardingModal && authSession && (
+          <OnboardingModal
+            isOpen={showOnboardingModal}
+            session={authSession}
+            onComplete={handleOnboardingComplete}
+          />
+        )}
       </div>
     </>
   );
 }
+
 
 

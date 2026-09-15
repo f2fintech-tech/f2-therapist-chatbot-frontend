@@ -6,12 +6,14 @@ export interface AuthSession {
   avatarUrl?: string | null;
   hearts?: number | null;
   isGuest?: boolean | null;
+  isNewUser?: boolean | null;
   isAdvisor?: boolean | null;
   isStaff?: boolean | null;
   permissions?: string[];
   authenticatedAt: string;
   lastActiveAt?: string;
 }
+
 
 const AUTH_SESSION_STORAGE_KEY = "finheal-auth-session";
 const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
