@@ -1670,7 +1670,7 @@ export default function ApplyForLoanView({
         working_address: formData.workingAddress.trim(),
         employment_type: formData.employmentType || "salaried",
         monthly_income: parseFloat(String(formData.monthlyIncome).replace(/,/g, "")) || 0,
-        pan: (panDoc.fileName || "").toUpperCase().slice(0, 10) || "ABCDE1234F"
+        pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
       };
 
       const res = await fetch(`${apiBase}/loan-applications/step1-register`, {
@@ -2065,7 +2065,7 @@ export default function ApplyForLoanView({
         working_address: formData.workingAddress.trim(),
         employment_type: formData.employmentType || "salaried",
         monthly_income: parseFloat(String(formData.monthlyIncome).replace(/,/g, "")) || 0,
-        pan: (panDoc.fileName || "").toUpperCase().slice(0, 10) || "ABCDE1234F"
+        pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
       };
 
       const loanPayload = {

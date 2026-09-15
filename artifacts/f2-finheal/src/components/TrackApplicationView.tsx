@@ -86,6 +86,106 @@ interface TrackApplicationViewProps {
   isStaffRole?: boolean;
 }
 
+function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
+  const statusLower = String(raw.ticketStatus || raw.loanStatus || "").toLowerCase();
+
+  // Determine current stage: 1 to 5
+  let stageId = 1;
+  if (statusLower.includes("disburs")) {
+    stageId = 5;
+  } else if (statusLower.includes("sanction") || statusLower.includes("approv") || raw.approvedAt) {
+    stageId = 3;
+  } else if (statusLower.includes("credit") || statusLower.includes("operation") || statusLower.includes("review") || statusLower.includes("process")) {
+    stageId = 2;
+  }
+
+  const createdDateFormatted = raw.createdAt
+    ? new Date(raw.createdAt).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      })
+    : (raw.applicationDate || "Recently");
+
+  const rawAmt = parseFloat(String(raw.applicationAmount || 0).replace(/,/g, "")) || 0;
+  const rawTenure = parseInt(String(raw.applicationTenure || 3), 10) || 3;
+  const rawType = raw.loanType ? (raw.loanType.charAt(0).toUpperCase() + raw.loanType.slice(1)) : "Personal Loan";
+
+  // Build 5-stage progressive timeline
+  const stages: TicketStage[] = [
+    {
+      id: 1,
+      title: "Application Received",
+      subtitle: "FinHeal Digital Onboarding",
+      description: "Loan application and basic identity submitted to OMS.",
+      status: stageId > 1 ? "completed" : "current",
+      timestamp: createdDateFormatted,
+      actor: "FinHeal Portal"
+    },
+    {
+      id: 2,
+      title: "Credit Verification",
+      subtitle: "Bank Hub & Ops Underwriting",
+      description: "Documents and banking statements under underwriting review.",
+      status: stageId > 2 ? "completed" : stageId === 2 ? "current" : "pending",
+      timestamp: stageId >= 2 ? createdDateFormatted : undefined,
+      actor: "Credit Operations"
+    },
+    {
+      id: 3,
+      title: "Bank Sanction Approved",
+      subtitle: raw.applicationProvider || "Partner Bank",
+      description: raw.approvedAmount ? `Sanctioned loan amount of ₹${Number(raw.approvedAmount).toLocaleString("en-IN")}.` : "Credit checks cleared and in-principle sanction approved.",
+      status: stageId > 3 ? "completed" : stageId === 3 ? "current" : "pending",
+      timestamp: raw.approvedAt ? new Date(raw.approvedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : undefined,
+      actor: raw.applicationProvider || "Lender Desk"
+    },
+    {
+      id: 4,
+      title: "Agreement & e-Sign",
+      subtitle: "Loan Contract Signing",
+      description: "Borrower agreement and repayment mandate execution.",
+      status: stageId > 4 ? "completed" : stageId === 4 ? "current" : "pending",
+      actor: "Legal & Operations"
+    },
+    {
+      id: 5,
+      title: "Funds Disbursed",
+      subtitle: "Direct Account Credit",
+      description: raw.disbursedAmount ? `Funds of ₹${Number(raw.disbursedAmount).toLocaleString("en-IN")} credited.` : "Direct account transfer completed by lender.",
+      status: stageId === 5 ? "completed" : "pending",
+      timestamp: raw.disbursedAt ? new Date(raw.disbursedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : undefined,
+      actor: "Disbursement Desk"
+    }
+  ];
+
+  return {
+    ticketId: String(raw.ticketId ? `TKT-${raw.ticketId}` : (raw.applicationId ? `APP-${raw.applicationId}` : "TKT-LIVE")),
+    applicantName: raw.customerName || "Applicant",
+    applicantMobile: raw.customerContact || "",
+    applicantEmail: raw.customerEmail || "",
+    loanCategory: rawType,
+    loanAmount: rawAmt,
+    tenureYears: rawTenure,
+    createdDate: createdDateFormatted,
+    currentStageId: stageId,
+    bankPartner: raw.applicationProvider || "Partner Bank",
+    createdByRole: raw.appliedBy ? "employee" : "user",
+    creditManager: {
+      name: raw.creditManagerName || "Credit Operations",
+      role: "Operations Specialist",
+      phone: raw.creditManagerContact || "",
+      email: raw.creditManagerEmail || ""
+    },
+    stages,
+    docsStatus: [
+      { name: "Identity & Address Proof", status: "verified" },
+      { name: "Bank Statement", status: "verified" },
+      { name: "Income / Salary Proof", status: "verified" }
+    ]
+  };
+}
+
 export default function TrackApplicationView({
   userId,
   userEmail,
@@ -99,6 +199,9 @@ export default function TrackApplicationView({
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
   const activeRole: "user" | "employee" | "admin" = portalRole || (isSuperAdmin ? "admin" : isStaffRole ? "employee" : "user");
 
+  // Loading state for live OMS fetch
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+
   // Load tickets from localStorage or start empty
   const [tickets, setTickets] = useState<LoanTicket[]>(() => {
     try {
@@ -106,7 +209,6 @@ export default function TrackApplicationView({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Remove legacy mock sample tickets if present
           const realOnly = parsed.filter(
             (t) => !["FIN-2026-8942", "FIN-2026-7310", "FIN-2026-9921"].includes(t.ticketId)
           );
@@ -118,6 +220,35 @@ export default function TrackApplicationView({
     }
     return [];
   });
+
+  // Fetch live tickets strictly with applicationSource = 'finheal'
+  const fetchLiveTickets = async () => {
+    setIsLoadingTickets(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = Array.isArray(json.tickets) ? json.tickets : (json.data?.data?.results || []);
+
+        // Double safety filter: strictly retain only tickets where applicationSource is 'finheal'
+        const finhealOnly = rawList.filter(
+          (t: any) => String(t.applicationSource || "").trim().toLowerCase() === "finheal"
+        );
+
+        const mapped = finhealOnly.map(mapOmsTicketToLoanTicket);
+        setTickets(mapped);
+      }
+    } catch (e) {
+      console.warn("[TrackApplicationView] Could not fetch live FinHeal tickets:", e);
+    } finally {
+      setIsLoadingTickets(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveTickets();
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -249,16 +380,29 @@ export default function TrackApplicationView({
           </div>
         </div>
 
-        {/* Action Button */}
-        {activeRole === "user" && onApplyNewLoan && (
+        {/* Header Actions */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onApplyNewLoan}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={fetchLiveTickets}
+            disabled={isLoadingTickets}
+            title="Refresh Live FinHeal Tickets from OMS"
+            className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 text-xs font-bold border border-slate-200"
           >
-            <Plus className="w-4 h-4" /> Apply New Loan
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingTickets ? "animate-spin text-blue-600" : ""}`} />
+            <span className="hidden md:inline">{isLoadingTickets ? "Syncing..." : "Sync Live Tickets"}</span>
           </button>
-        )}
+
+          {activeRole === "user" && onApplyNewLoan && (
+            <button
+              type="button"
+              onClick={onApplyNewLoan}
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Apply New Loan
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -403,7 +547,15 @@ export default function TrackApplicationView({
           </div>
 
           {/* Master Data Table */}
-          {filteredTickets.length === 0 ? (
+          {isLoadingTickets ? (
+            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
+              <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-slate-700">Syncing Live FinHeal Tickets...</h4>
+                <p className="text-xs text-slate-400">Connecting to OMS platform to fetch latest records</p>
+              </div>
+            </div>
+          ) : filteredTickets.length === 0 ? (
             <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
               <FileText className="w-10 h-10 text-slate-300 mx-auto" />
               <div className="space-y-1">
