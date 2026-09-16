@@ -61,7 +61,7 @@ export interface LoanTicket {
     name: string;
     role: string;
     phone: string;
-    email: string;
+    email?: string;
     avatarUrl?: string;
   };
   stages: TicketStage[];
@@ -74,6 +74,103 @@ export interface LoanTicket {
   sanctionLetterUrl?: string;
 }
 
+export interface CreditManagerProfile {
+  empCode: string;
+  name: string;
+  role: string;
+  phone: string;
+  email?: string;
+  avatarUrl?: string;
+}
+
+export const FINHEAL_CREDIT_MANAGERS: CreditManagerProfile[] = [
+  {
+    empCode: "F2-369-403",
+    name: "Puneet Gautam",
+    role: "Credit Manager",
+    phone: "7844957879"
+  },
+  {
+    empCode: "F2-369-536",
+    name: "Akshay Jain",
+    role: "Credit Executive",
+    phone: "6388561901"
+  },
+  {
+    empCode: "F2-369-445",
+    name: "Md Mehboob",
+    role: "Asst. Ops Manager",
+    phone: "9310179765"
+  },
+  {
+    empCode: "F2-369-019",
+    name: "Furkan Jung",
+    role: "Sr. Operations & Alliances Manager",
+    phone: "8791876992"
+  }
+];
+
+export function getCreditManagerInfo(input?: any): CreditManagerProfile | null {
+  if (!input) return null;
+
+  let nameStr = "";
+  let empCodeStr = "";
+  let phoneStr = "";
+  let roleStr = "";
+  let emailStr = "";
+
+  if (typeof input === "object" && input !== null) {
+    nameStr = (input.name || input.assignedTo || input.creditManagerName || "").toString().trim();
+    empCodeStr = (input.empCode || input.emp_code || input.id || "").toString().trim();
+    phoneStr = (input.phone || input.mobile || input.contact || "").toString().replace(/\D/g, "");
+    roleStr = (input.role || "").toString().trim();
+    emailStr = (input.email || "").toString().trim();
+  } else if (typeof input === "string") {
+    nameStr = input.trim();
+    empCodeStr = input.trim();
+  }
+
+  if (!nameStr && !empCodeStr && !phoneStr) {
+    return null;
+  }
+
+  const lowerName = nameStr.toLowerCase();
+  if (["credit operations", "system automated", "pending", "unassigned", "n/a", "none", ""].includes(lowerName)) {
+    return null;
+  }
+
+  if (empCodeStr) {
+    const match = FINHEAL_CREDIT_MANAGERS.find(
+      (m) => m.empCode.toLowerCase() === empCodeStr.toLowerCase()
+    );
+    if (match) return match;
+  }
+
+  if (nameStr) {
+    const match = FINHEAL_CREDIT_MANAGERS.find(
+      (m) =>
+        m.name.toLowerCase().includes(lowerName) ||
+        lowerName.includes(m.name.toLowerCase())
+    );
+    if (match) return match;
+
+    return {
+      empCode: empCodeStr || "",
+      name: nameStr,
+      role: roleStr || "Credit Officer",
+      phone: phoneStr,
+      email: emailStr
+    };
+  }
+
+  if (phoneStr) {
+    const match = FINHEAL_CREDIT_MANAGERS.find((m) => m.phone === phoneStr);
+    if (match) return match;
+  }
+
+  return null;
+}
+
 const DEFAULT_MOCK_TICKETS: LoanTicket[] = [];
 
 interface TrackApplicationViewProps {
@@ -84,6 +181,26 @@ interface TrackApplicationViewProps {
   onToggleInsights?: () => void;
   onApplyNewLoan?: () => void;
   isStaffRole?: boolean;
+}
+
+function formatDateTimeWithTime(rawDate: any): string {
+  if (!rawDate) return "Recently";
+  try {
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) {
+      return String(rawDate);
+    }
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+  } catch (e) {
+    return String(rawDate);
+  }
 }
 
 function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
@@ -99,13 +216,8 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
     stageId = 2;
   }
 
-  const createdDateFormatted = raw.createdAt
-    ? new Date(raw.createdAt).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-      })
-    : (raw.applicationDate || "Recently");
+  const rawCreated = raw.createdAt || raw.created_at || raw.ticketCreatedDate || raw.createdDate || raw.applicationDate;
+  const createdDateFormatted = formatDateTimeWithTime(rawCreated);
 
   const rawAmt = parseFloat(String(raw.applicationAmount || 0).replace(/,/g, "")) || 0;
   const rawTenure = parseInt(String(raw.applicationTenure || 3), 10) || 3;
@@ -137,7 +249,7 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
       subtitle: raw.applicationProvider || "Partner Bank",
       description: raw.approvedAmount ? `Sanctioned loan amount of ₹${Number(raw.approvedAmount).toLocaleString("en-IN")}.` : "Credit checks cleared and in-principle sanction approved.",
       status: stageId > 3 ? "completed" : stageId === 3 ? "current" : "pending",
-      timestamp: raw.approvedAt ? new Date(raw.approvedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : undefined,
+      timestamp: raw.approvedAt ? formatDateTimeWithTime(raw.approvedAt) : undefined,
       actor: raw.applicationProvider || "Lender Desk"
     },
     {
@@ -154,13 +266,13 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
       subtitle: "Direct Account Credit",
       description: raw.disbursedAmount ? `Funds of ₹${Number(raw.disbursedAmount).toLocaleString("en-IN")} credited.` : "Direct account transfer completed by lender.",
       status: stageId === 5 ? "completed" : "pending",
-      timestamp: raw.disbursedAt ? new Date(raw.disbursedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : undefined,
+      timestamp: raw.disbursedAt ? formatDateTimeWithTime(raw.disbursedAt) : undefined,
       actor: "Disbursement Desk"
     }
   ];
 
   return {
-    ticketId: String(raw.ticketId ? `TKT-${raw.ticketId}` : (raw.applicationId ? `APP-${raw.applicationId}` : "TKT-LIVE")),
+    ticketId: String(raw.ticketId ? `${raw.ticketId}` : (raw.applicationId ? `${raw.applicationId}` : "LIVE")),
     applicantName: raw.customerName || "Applicant",
     applicantMobile: raw.customerContact || "",
     applicantEmail: raw.customerEmail || "",
@@ -172,9 +284,9 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
     bankPartner: raw.applicationProvider || "Partner Bank",
     createdByRole: raw.appliedBy ? "employee" : "user",
     creditManager: {
-      name: raw.creditManagerName || "Credit Operations",
-      role: "Operations Specialist",
-      phone: raw.creditManagerContact || "",
+      name: raw.creditManagerName || raw.assignedTo || raw.creditOfficer || "",
+      role: raw.creditManagerRole || "",
+      phone: raw.creditManagerContact || raw.creditManagerPhone || "",
       email: raw.creditManagerEmail || ""
     },
     stages,
@@ -277,7 +389,7 @@ export default function TrackApplicationView({
     } else if (activeRole === "employee") {
       // Employee Portal
       if (employeeTab === "my") {
-        return t.createdByRole === "employee" || t.creditManager.email.toLowerCase() === (userEmail || "").toLowerCase();
+        return t.createdByRole === "employee" || (t.creditManager.email ? t.creditManager.email.toLowerCase() === (userEmail || "").toLowerCase() : false);
       }
       return true;
     } else {
@@ -352,7 +464,7 @@ export default function TrackApplicationView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f8fafc] overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[f8fafc] overflow-y-auto">
       {/* Header Bar */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-3 sm:px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
@@ -414,18 +526,16 @@ export default function TrackApplicationView({
             <button
               type="button"
               onClick={() => setEmployeeTab("all")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                employeeTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
             >
               <Building className="w-4 h-4" /> All Company Tickets ({tickets.length})
             </button>
             <button
               type="button"
               onClick={() => setEmployeeTab("my")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                employeeTab === "my" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "my" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
             >
               <UserCheck className="w-4 h-4" /> My Created / Assigned Tickets ({tickets.filter(t => t.createdByRole === "employee").length})
             </button>
@@ -437,27 +547,24 @@ export default function TrackApplicationView({
             <button
               type="button"
               onClick={() => setAdminTab("all")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                adminTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
             >
               <ShieldCheck className="w-4 h-4" /> All System Tickets ({tickets.length})
             </button>
             <button
               type="button"
               onClick={() => setAdminTab("user")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                adminTab === "user" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "user" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
             >
               <User className="w-4 h-4" /> User Applied ({tickets.filter(t => t.createdByRole === "user").length})
             </button>
             <button
               type="button"
               onClick={() => setAdminTab("staff")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                adminTab === "staff" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "staff" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
             >
               <Building2 className="w-4 h-4" /> Staff / Credit Applied ({tickets.filter(t => t.createdByRole === "employee").length})
             </button>
@@ -584,14 +691,13 @@ export default function TrackApplicationView({
                     <th className="p-3 w-10 text-center">Select</th>
                     <th className="p-3">Ticket ID</th>
                     <th className="p-3">Applicant Name</th>
-                    <th className="p-3">Category</th>
+                    <th className="p-3 whitespace-nowrap">Category</th>
                     <th className="p-3">Loan Amount</th>
                     <th className="p-3">Created Date & Time</th>
                     {(activeRole === "employee" || activeRole === "admin") && (
                       <th className="p-3">Created By</th>
                     )}
                     <th className="p-3">Current Processing Stage</th>
-                    <th className="p-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -603,24 +709,22 @@ export default function TrackApplicationView({
                       <tr
                         key={t.ticketId}
                         onClick={() => setSelectedTicketId(t.ticketId)}
-                        className={`transition-colors cursor-pointer ${
-                          isSelected
-                            ? "bg-blue-50/90 font-bold border-l-4 border-l-blue-600"
-                            : "hover:bg-slate-50/80 bg-white"
-                        }`}
+                        className={`transition-colors cursor-pointer ${isSelected
+                          ? "bg-blue-50/90 font-bold border-l-4 border-l-blue-600"
+                          : "hover:bg-slate-50/80 bg-white"
+                          }`}
                       >
                         {/* Radio Indicator */}
                         <td className="p-3 text-center">
-                          <div className={`w-4 h-4 mx-auto rounded-full flex items-center justify-center transition-all ${
-                            isSelected ? "bg-blue-600 text-white shadow-2xs" : "border border-slate-300 bg-white"
-                          }`}>
+                          <div className={`w-4 h-4 mx-auto rounded-full flex items-center justify-center transition-all ${isSelected ? "bg-blue-600 text-white shadow-2xs" : "border border-slate-300 bg-white"
+                            }`}>
                             {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
                           </div>
                         </td>
 
                         {/* Ticket ID */}
-                        <td className="p-3 font-black text-blue-900">
-                          #{t.ticketId}
+                        <td className="p-3 font-black text-blue-900 whitespace-nowrap">
+                          {t.ticketId}
                         </td>
 
                         {/* Applicant Details */}
@@ -630,21 +734,20 @@ export default function TrackApplicationView({
                         </td>
 
                         {/* Category */}
-                        <td className="p-3">
-                          <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
-                            isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"
-                          }`}>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md whitespace-nowrap inline-block ${isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}>
                             {t.loanCategory.split("(")[0].trim()}
                           </span>
                         </td>
 
                         {/* Loan Amount */}
-                        <td className="p-3 font-extrabold text-slate-900">
+                        <td className="p-3 font-extrabold text-slate-900 whitespace-nowrap">
                           ₹{t.loanAmount.toLocaleString("en-IN")}
                         </td>
 
                         {/* Created Date & Time */}
-                        <td className="p-3 text-slate-600 text-[11px]">
+                        <td className="p-3 text-slate-600 text-[11px] whitespace-nowrap">
                           <div className="flex items-center gap-1 font-semibold">
                             <Clock className="w-3 h-3 text-slate-400" />
                             {t.createdDate}
@@ -653,48 +756,28 @@ export default function TrackApplicationView({
 
                         {/* Created By (Employee/Admin View) */}
                         {(activeRole === "employee" || activeRole === "admin") && (
-                          <td className="p-3">
-                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
-                              t.createdByRole === "user"
-                                ? "bg-slate-100 text-slate-700"
-                                : t.createdByRole === "employee"
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${t.createdByRole === "user"
+                              ? "bg-slate-100 text-slate-700"
+                              : t.createdByRole === "employee"
                                 ? "bg-blue-100 text-blue-800"
                                 : "bg-purple-100 text-purple-800"
-                            }`}>
+                              }`}>
                               {t.createdByRole || "user"}
                             </span>
                           </td>
                         )}
 
                         {/* Current Processing Stage */}
-                        <td className="p-3">
-                          <span className={`inline-flex items-center gap-1 font-extrabold px-2.5 py-1 rounded-lg border text-[10.5px] ${
-                            t.currentStageId === 5
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : t.currentStageId === 4
+                        <td className="p-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 font-extrabold px-2.5 py-1 rounded-lg border text-[10.5px] ${t.currentStageId === 5
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : t.currentStageId === 4
                               ? "bg-amber-50 text-amber-900 border-amber-200"
                               : "bg-blue-50 text-blue-900 border-blue-200"
-                          }`}>
+                            }`}>
                             Stage {t.currentStageId}/5: {stageName}
                           </span>
-                        </td>
-
-                        {/* Action Button */}
-                        <td className="p-3 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTicketId(t.ticketId);
-                            }}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-blue-600 text-white shadow-2xs"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                            }`}
-                          >
-                            {isSelected ? "Selected" : "Track →"}
-                          </button>
                         </td>
                       </tr>
                     );
@@ -726,7 +809,7 @@ export default function TrackApplicationView({
 
                   <div className="flex items-center gap-3">
                     <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                      Ticket #{activeTicket.ticketId}
+                      Ticket {activeTicket.ticketId}
                     </h2>
                     <button
                       type="button"
@@ -802,7 +885,7 @@ export default function TrackApplicationView({
                     <BarChart2 className="w-5 h-5 text-blue-600" />
                     <span>Application Progress & Live Stages</span>
                   </h3>
-                  <p className="text-xs text-slate-500">Ticket #{activeTicket.ticketId} — Created on {activeTicket.createdDate}</p>
+                  <p className="text-xs text-slate-500">Ticket {activeTicket.ticketId} — Created on {activeTicket.createdDate}</p>
                 </div>
                 <button
                   type="button"
@@ -846,22 +929,20 @@ export default function TrackApplicationView({
                         <div key={stage.id} className="flex flex-col items-center text-center space-y-2 group cursor-pointer">
                           {/* Node Icon */}
                           <div
-                            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-sm transition-all shadow-md ${
-                              isCompleted
-                                ? "bg-amber-500 text-white shadow-amber-500/20"
-                                : isCurrent
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-sm transition-all shadow-md ${isCompleted
+                              ? "bg-amber-500 text-white shadow-amber-500/20"
+                              : isCurrent
                                 ? "bg-blue-600 text-white ring-4 ring-blue-100 shadow-blue-500/30 scale-110"
                                 : "bg-white border-2 border-slate-200 text-slate-400"
-                            }`}
+                              }`}
                           >
                             <StageIcon className="w-6 h-6" />
                           </div>
 
                           {/* Stage Title */}
                           <h4
-                            className={`text-xs font-extrabold line-clamp-2 max-w-[130px] pt-1 ${
-                              isCurrent ? "text-blue-900" : isCompleted ? "text-amber-900" : "text-slate-400"
-                            }`}
+                            className={`text-xs font-extrabold line-clamp-2 max-w-[130px] pt-1 ${isCurrent ? "text-blue-900" : isCompleted ? "text-amber-900" : "text-slate-400"
+                              }`}
                           >
                             {stage.title}
                           </h4>
@@ -882,43 +963,99 @@ export default function TrackApplicationView({
             {/* TWO COLUMN SUMMARY: Credit Officer & Document Verification Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Credit Officer Info */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <UserCheck className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-slate-900">Assigned Finheal Credit Officer</h3>
-                </div>
+              {(() => {
+                const manager = getCreditManagerInfo(activeTicket.creditManager);
 
-                <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-extrabold text-base flex items-center justify-center shadow-md shrink-0">
-                    {activeTicket.creditManager.name.charAt(0)}
-                  </div>
-                  <div className="space-y-0.5">
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                      {activeTicket.creditManager.name}
-                      <BadgeCheck className="w-4 h-4 text-blue-600" />
-                    </h4>
-                    <p className="text-xs text-slate-500">{activeTicket.creditManager.role}</p>
-                    <p className="text-[11px] text-blue-700 font-semibold">{activeTicket.creditManager.email}</p>
-                  </div>
-                </div>
+                if (!manager) {
+                  return (
+                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                        <UserCheck className="w-5 h-5 text-slate-400" />
+                        <h3 className="text-sm font-bold text-slate-900">Assigned Finheal Credit Officer</h3>
+                      </div>
 
-                <div className="flex items-center gap-2 pt-1">
-                  <a
-                    href={`tel:${activeTicket.creditManager.phone}`}
-                    className="flex-1 py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <PhoneCall className="w-4 h-4 text-blue-600" /> Call Officer
-                  </a>
-                  <a
-                    href={`https://wa.me/${activeTicket.creditManager.phone.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex-1 py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <MessageSquare className="w-4 h-4 text-emerald-600" /> WhatsApp Chat
-                  </a>
-                </div>
-              </div>
+                      <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-500 font-extrabold text-base flex items-center justify-center shrink-0">
+                          <UserCheck className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <h4 className="text-sm font-bold text-slate-700">Not Assigned Yet</h4>
+                          <p className="text-xs text-slate-400">Waiting for Credit Officer assignment</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled
+                          className="flex-1 py-2.5 px-3 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-not-allowed"
+                        >
+                          <PhoneCall className="w-4 h-4 text-slate-400" /> Call Officer
+                        </button>
+                        <button
+                          type="button"
+                          disabled
+                          className="flex-1 py-2.5 px-3 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 cursor-not-allowed"
+                        >
+                          <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp Chat
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const cleanPhone = manager.phone ? manager.phone.replace(/\D/g, "") : "";
+                const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+                return (
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                      <UserCheck className="w-5 h-5 text-blue-600" />
+                      <h3 className="text-sm font-bold text-slate-900">Assigned Finheal Credit Officer</h3>
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-extrabold text-base flex items-center justify-center shadow-md shrink-0">
+                        {manager.name.charAt(0)}
+                      </div>
+                      <div className="space-y-0.5">
+                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                          {manager.name}
+                          <BadgeCheck className="w-4 h-4 text-blue-600" />
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          {manager.role} {manager.empCode ? `(${manager.empCode})` : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <a
+                        href={cleanPhone ? `tel:${cleanPhone}` : "#"}
+                        className={`flex-1 py-2.5 px-3 font-bold text-xs rounded-xl border flex items-center justify-center gap-2 transition-colors ${
+                          cleanPhone
+                            ? "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 cursor-pointer"
+                            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                        }`}
+                      >
+                        <PhoneCall className="w-4 h-4 text-blue-600" /> Call Officer
+                      </a>
+                      <a
+                        href={waPhone ? `https://wa.me/${waPhone}` : "#"}
+                        target={waPhone ? "_blank" : undefined}
+                        rel="noreferrer"
+                        className={`flex-1 py-2.5 px-3 font-bold text-xs rounded-xl border flex items-center justify-center gap-2 transition-colors ${
+                          waPhone
+                            ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer"
+                            : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4 text-emerald-600" /> WhatsApp Chat
+                      </a>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Document Audit Checklist */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
