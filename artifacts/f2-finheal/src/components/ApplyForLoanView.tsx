@@ -242,6 +242,9 @@ interface ApplyForLoanViewProps {
   userId: string;
   userEmail?: string;
   userName?: string;
+  journeyType?: "user" | "employee" | "admin";
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights?: () => void;
   onOpenLoanCalculator?: (loanType?: string) => void;
@@ -833,12 +836,23 @@ export default function ApplyForLoanView({
   userId,
   userEmail,
   userName,
+  journeyType = "user",
+  isGuest = false,
+  onLoginRequired,
   onToggleSidebar,
   onToggleInsights,
   onOpenLoanCalculator,
   initialCategory = "personal"
 }: ApplyForLoanViewProps) {
-  const DRAFT_STORAGE_KEY = "f2_loan_application_draft_v1";
+  const DRAFT_STORAGE_KEY = useMemo(() => {
+    if (journeyType === "employee") {
+      return `f2_loan_application_draft_employee_${userId || "staff"}`;
+    }
+    if (journeyType === "admin") {
+      return `f2_loan_application_draft_admin_${userId || "admin"}`;
+    }
+    return userEmail ? `f2_loan_application_draft_user_${userEmail.trim().toLowerCase()}` : "f2_loan_application_draft_v1";
+  }, [journeyType, userId, userEmail]);
 
   // Helper to load saved draft from localStorage
   const loadSavedDraft = () => {
@@ -873,17 +887,25 @@ export default function ApplyForLoanView({
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialDraft?.currentStep || 1);
   const [omsCustomerId, setOmsCustomerId] = useState<number | null>(initialDraft?.omsCustomerId || null);
   const [isDraftRestored, setIsDraftRestored] = useState<boolean>(Boolean(initialDraft));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStep1Submitting, setIsStep1Submitting] = useState(false);
+  const [isStep2Submitting, setIsStep2Submitting] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [submittedRefNo, setSubmittedRefNo] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleScrollToApplicantForm = () => {
     setApplyLoanToggle(true);
-    if (wizardFormRef.current) {
-      wizardFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      document.getElementById("applicantFormWizardSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    setTimeout(() => {
+      if (wizardFormRef.current) {
+        wizardFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        document.getElementById("applicantFormWizardSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
   };
 
-  // Form Data State - Email is empty by default unless saved draft exists
+  // Form Data State - Email defaults to logged-in userEmail
   const [formData, setFormData] = useState(initialDraft?.formData || {
     prefix: initialDraft?.formData?.prefix || "Mr.",
     fullName: "",
@@ -891,7 +913,7 @@ export default function ApplyForLoanView({
     fatherName: "",
     motherName: "",
     mobileNumber: "",
-    email: "",
+    email: initialDraft?.formData?.email || userEmail || "",
     officialEmail: "",
     city: "",
     currentState: initialDraft?.formData?.currentState || "",
@@ -916,6 +938,13 @@ export default function ApplyForLoanView({
     monthlyIncome: "",
     acceptTerms: false
   });
+
+  // Automatically ensure logged-in email is prefilled ONLY for direct user journey
+  useEffect(() => {
+    if (journeyType === "user" && userEmail && (!formData.email || formData.email !== userEmail)) {
+      setFormData((prev: any) => ({ ...prev, email: userEmail }));
+    }
+  }, [userEmail, journeyType]);
 
   // Helper to compute age from DOB
   const calculateAge = (dobString: string): number | null => {
@@ -1042,6 +1071,9 @@ export default function ApplyForLoanView({
 
   // Auto-save form & stage progress to localStorage whenever state updates
   useEffect(() => {
+    // Never overwrite or restore previous draft if application is in submitted success state
+    if (isSubmittedSuccess) return;
+
     try {
       const payload = {
         activeTab,
@@ -1071,7 +1103,7 @@ export default function ApplyForLoanView({
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails, omsCustomerId]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails, omsCustomerId, isSubmittedSuccess]);
 
   // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
   useEffect(() => {
@@ -1095,77 +1127,90 @@ export default function ApplyForLoanView({
     }
   }, [businessType]);
 
-  const handleClearDraft = () => {
-    if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
+  const resetEntireApplicationForm = (clearStorage: boolean = true) => {
+    if (clearStorage) {
       try {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
       } catch (e) { }
-      setIsDraftRestored(false);
-      setOmsCustomerId(null);
-      setCurrentStep(1);
-      setBusinessType("sole_proprietorship");
-      setCompanyOfficialEmail("");
-      setPvtDirectors([
-        {
-          id: "dir_1",
-          name: "",
-          phone: "",
-          email: "",
-          aadhaarDoc: { mode: "pdf" },
-          panDoc: { mode: "pdf" },
-          photoDoc: {}
-        }
-      ]);
-      setPartnershipPartners([
-        {
-          id: "partner_1",
-          name: "",
-          phone: "",
-          aadhaarDoc: { mode: "pdf" },
-          panDoc: { mode: "pdf" }
-        }
-      ]);
-      setEduDetails(initialEduDetails);
-      setProDetails(initialProDetails);
-      setHlLapDetails(initialHlLapDetails);
-      setFormData({
-        fullName: "",
-        fatherName: "",
-        motherName: "",
-        mobileNumber: "",
+    }
+    setIsSubmittedSuccess(false);
+    setSubmittedRefNo("");
+    setIsDraftRestored(false);
+    setOmsCustomerId(null);
+    setCurrentStep(1);
+    setBusinessType("sole_proprietorship");
+    setCompanyOfficialEmail("");
+    setPvtDirectors([
+      {
+        id: "dir_1",
+        name: "",
+        phone: "",
         email: "",
-        officialEmail: "",
-        city: "",
-        currentAddress: "",
-        permanentAddress: "",
-        sameAsCurrentAddress: false,
-        workingAddress: "",
-        desiredAmount: 500000,
-        loanAmountRequired: "5,00,000",
-        loanType: "personal",
-        comfortableTenure: "3 Years",
-        selectedProviders: [],
-        leadType: "Notion",
-        caseType: "Fresh",
-        hasExistingLoans: "No",
-        existingLoans: [
-          { id: "loan_1", lenderName: "", loanType: "Personal Loan", monthlyEmi: "", outstandingAmount: "" }
-        ],
-        tenureYears: 3,
-        employmentType: "salaried",
-        monthlyIncome: "",
-        acceptTerms: false
-      });
-      setAadhaarDoc({ mode: "pdf" });
-      setPanDoc({ mode: "pdf" });
-      setPhotoDoc({});
-      setSalarySlipsDoc({});
-      setIdCardDoc({});
-      setBankStatementDoc({});
-      setCurrentAddressProofDoc({});
-      setPermanentAddressProofDoc({});
-      setForm26ASDoc({});
-      setAdditionalUploaded({});
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" },
+        photoDoc: {}
+      }
+    ]);
+    setPartnershipPartners([
+      {
+        id: "partner_1",
+        name: "",
+        phone: "",
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" }
+      }
+    ]);
+    setEduDetails({ ...initialEduDetails });
+    setProDetails({ ...initialProDetails });
+    setHlLapDetails({ ...initialHlLapDetails });
+    setFormData({
+      prefix: "Mr.",
+      fullName: "",
+      dob: "",
+      fatherName: "",
+      motherName: "",
+      mobileNumber: "",
+      email: userEmail || "",
+      officialEmail: "",
+      city: "",
+      currentState: "",
+      currentAddress: "",
+      permanentState: "",
+      permanentAddress: "",
+      sameAsCurrentAddress: false,
+      workingAddress: "",
+      desiredAmount: 500000,
+      loanAmountRequired: "5,00,000",
+      loanType: activeTab || "personal",
+      comfortableTenure: "3 Years",
+      selectedProviders: [],
+      leadType: "Notion",
+      caseType: "Fresh",
+      hasExistingLoans: "No",
+      existingLoans: [
+        { id: "loan_1", lenderName: "", loanType: "Personal Loan", monthlyEmi: "", outstandingAmount: "" }
+      ],
+      tenureYears: 3,
+      employmentType: "salaried",
+      monthlyIncome: "",
+      pan: "",
+      acceptTerms: false
+    });
+    setAadhaarDoc({ mode: "pdf" });
+    setPanDoc({ mode: "pdf" });
+    setPhotoDoc({});
+    setSalarySlipsDoc({});
+    setIdCardDoc({});
+    setBankStatementDoc({});
+    setCurrentAddressProofDoc({});
+    setPermanentAddressProofDoc({});
+    setForm26ASDoc({});
+    setAdditionalUploaded({});
+  };
+
+  const handleClearDraft = () => {
+    if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
+      resetEntireApplicationForm(true);
     }
   };
 
@@ -1536,12 +1581,6 @@ export default function ApplyForLoanView({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isStep1Submitting, setIsStep1Submitting] = useState(false);
-  const [isStep2Submitting, setIsStep2Submitting] = useState(false);
-  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
-  const [submittedRefNo, setSubmittedRefNo] = useState("");
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab || (activeTab === "professional" && cat.id === "doctor")) || LOAN_CATEGORIES[0];
 
@@ -1673,6 +1712,7 @@ export default function ApplyForLoanView({
         pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
       };
 
+      const leadTypeValue = journeyType === "employee" ? "employee" : journeyType === "admin" ? "admin" : "notion";
       const res = await fetch(`${apiBase}/loan-applications/step1-register`, {
         method: "POST",
         headers: {
@@ -1680,7 +1720,11 @@ export default function ApplyForLoanView({
         },
         body: JSON.stringify({
           customer_id: omsCustomerId || undefined,
-          applicant: applicantPayload
+          applicant: applicantPayload,
+          is_guest: isGuest,
+          lead_type: leadTypeValue,
+          leadType: leadTypeValue,
+          journey_type: journeyType
         })
       });
 
@@ -2068,12 +2112,29 @@ export default function ApplyForLoanView({
         pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
       };
 
+      // Resolve provider string from selectedProviders
+      const providersList: string[] = Array.isArray(formData.selectedProviders)
+        ? formData.selectedProviders.map((p: any) => String(p).trim()).filter(Boolean)
+        : [];
+
+      let resolvedProvider = "Let F2 Fintech decide your lender";
+      if (providersList.length > 0) {
+        const hasDecide = providersList.some((p) => p.toLowerCase().includes("decide"));
+        if (hasDecide && providersList.length === 1) {
+          resolvedProvider = "Let F2 Fintech decide your lender";
+        } else {
+          const specificBanks = providersList.filter((p) => !p.toLowerCase().includes("decide"));
+          resolvedProvider = specificBanks.length > 0 ? specificBanks.join(", ") : "Let F2 Fintech decide your lender";
+        }
+      }
+
       const loanPayload = {
         amount: parseFloat(String(formData.loanAmountRequired || formData.desiredAmount).replace(/,/g, "")) || 500000,
         type: currentCategory.name || "Personal Loan",
         tenure_years: formData.tenureYears || 3,
         purpose: `${currentCategory.name} Application via FinHeal`,
-        selected_providers: formData.selectedProviders || [],
+        provider: resolvedProvider,
+        selected_providers: providersList.length > 0 ? providersList : [resolvedProvider],
         case_type: formData.caseType || "Fresh",
         has_existing_loans: formData.hasExistingLoans || "No",
         existing_loans: formData.hasExistingLoans === "Yes" ? (formData.existingLoans || []) : []
@@ -2181,6 +2242,7 @@ export default function ApplyForLoanView({
       const currentLoggedInName = (userName?.trim() || session?.displayName?.trim() || formData.fullName?.trim() || "Applicant").trim();
       const currentLoggedInEmail = (userEmail?.trim() || session?.email?.trim() || formData.email?.trim() || "").trim();
 
+      const leadTypeValue = journeyType === "employee" ? "employee" : journeyType === "admin" ? "admin" : "notion";
       const response = await fetch(`${apiBase}/loan-applications/step3-application`, {
         method: "POST",
         headers: {
@@ -2189,9 +2251,13 @@ export default function ApplyForLoanView({
         body: JSON.stringify({
           customer_id: omsCustomerId,
           loan: loanPayload,
+          provider: resolvedProvider,
+          lead_type: leadTypeValue,
+          leadType: leadTypeValue,
+          journey_type: journeyType,
           user_name: currentLoggedInName,
           user_email: currentLoggedInEmail,
-          // applied_by_name: currentLoggedInName,
+          applied_by_name: (journeyType === "employee" || journeyType === "admin") ? currentLoggedInName : undefined,
           documents: documentsPayload,
           business_details: activeTab === "business" ? { businessType, companyOfficialEmail, pvtDirectors, partnershipPartners } : undefined,
           education_details: activeTab === "education" ? eduDetails : undefined,
@@ -2209,11 +2275,11 @@ export default function ApplyForLoanView({
       const rawRef = String(resData.application_no || resData.reference_no || "").replace(/\D/g, "");
       const generatedRef = rawRef || String(Math.floor(10000000 + Math.random() * 90000000));
 
+      // Reset all underlying form data and attached documents so next application starts completely blank
+      resetEntireApplicationForm(true);
+      // Set submission confirmation state and reference number for the success screen
       setSubmittedRefNo(generatedRef);
       setIsSubmittedSuccess(true);
-      try {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-      } catch (e) {}
     } catch (err: any) {
       console.error("Loan application submission failed:", err);
       setSubmitError(err.message || "Failed to submit application. Please verify your connection and try again.");
@@ -2413,7 +2479,27 @@ export default function ApplyForLoanView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f8fafc] overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f8fafc] overflow-y-auto relative">
+      {/* Guest User Restriction Modal (Identical to CIBIL Fetch Page) */}
+      {isGuest && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none">
+          <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[420px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.25)] animate-scale-in">
+            <div className="text-[36px] text-center mb-[14px]">🔒</div>
+            <h3 className="text-[20px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign in to Apply for a Loan</h3>
+            <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+              Guest accounts cannot submit loan applications. Please create a free account or sign in to verify your profile and submit your loan application.
+            </p>
+            <button
+              onClick={onLoginRequired}
+              className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer shadow-md shadow-primary/20"
+              type="button"
+            >
+              Sign Up / Login
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Navigation Bar */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-3 sm:px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
@@ -2440,7 +2526,7 @@ export default function ApplyForLoanView({
       </header>
 
       {/* Main Content Body */}
-      <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <div className={`max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
         {/* Hero Banner Section */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[#1e1b4b] text-white p-6 sm:p-8 shadow-xl">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
@@ -2795,13 +2881,12 @@ export default function ApplyForLoanView({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsSubmittedSuccess(false);
-                    setSubmittedRefNo("");
-                    setCurrentStep(1);
+                    resetEntireApplicationForm(true);
+                    handleScrollToApplicantForm();
                   }}
-                  className="w-full py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Submit Another Loan Application
+                  <Plus className="w-4 h-4" /> Submit Fresh Loan Application
                 </button>
               </div>
             ) : (
@@ -2939,11 +3024,18 @@ export default function ApplyForLoanView({
                         </div>
                       </div>
 
-                      {/* Personal Email (Mandatory) */}
+                      {/* Personal Email (Locked for Direct User, Open for Employee/Admin Client Onboarding) */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
-                          Personal Email ID *
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
+                            Personal Email ID *
+                          </label>
+                          {journeyType === "user" && userEmail && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                              ✓ Verified Account Email
+                            </span>
+                          )}
+                        </div>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                           <input
@@ -2951,11 +3043,29 @@ export default function ApplyForLoanView({
                             type="email"
                             required
                             value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            placeholder="Enter your personal email ID"
-                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                            onChange={(e) => {
+                              if (journeyType !== "user" || !userEmail) {
+                                setFormData({ ...formData, email: e.target.value });
+                              }
+                            }}
+                            readOnly={journeyType === "user" && Boolean(userEmail)}
+                            placeholder={journeyType === "user" ? "Enter your personal email ID" : "Enter client's personal email ID"}
+                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs transition-all ${
+                              (journeyType === "user" && userEmail)
+                                ? "bg-gray-50/80 text-gray-600 font-medium cursor-not-allowed border-gray-200"
+                                : "bg-white text-gray-800 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
                           />
                         </div>
+                        {journeyType === "user" && userEmail ? (
+                          <p className="text-[10px] text-gray-400">
+                            Locked to your logged-in account so you can track this application in your dashboard.
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400">
+                            Enter the applicant / client email address for correspondence and tracking.
+                          </p>
+                        )}
                       </div>
 
                       {/* Official Email ID (Optional) */}
@@ -3159,8 +3269,15 @@ export default function ApplyForLoanView({
 
                             {/* Featured: Let F2 Fintech decide your lender */}
                             {(!providerSearchQuery || "let f2 fintech decide your lender".includes(providerSearchQuery.toLowerCase())) && (
-                              <label
-                                className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer border transition-all ${
+                              <div
+                                onClick={() => {
+                                  const current = formData.selectedProviders || [];
+                                  const isChecked = current.includes("Let F2 Fintech decide your lender");
+                                  // Clicking toggles: if checked, uncheck to []; if unchecked, select it and clear all individual banks
+                                  const next = isChecked ? [] : ["Let F2 Fintech decide your lender"];
+                                  setFormData({ ...formData, selectedProviders: next });
+                                }}
+                                className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer border transition-all select-none ${
                                   (formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")
                                     ? "bg-blue-50 border-blue-300 text-blue-900 font-bold shadow-xs"
                                     : "bg-gradient-to-r from-blue-50/60 to-indigo-50/50 border-blue-100 hover:border-blue-300 text-slate-800"
@@ -3170,15 +3287,8 @@ export default function ApplyForLoanView({
                                   <input
                                     type="checkbox"
                                     checked={(formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")}
-                                    onChange={() => {
-                                      const current = formData.selectedProviders || [];
-                                      const isChecked = current.includes("Let F2 Fintech decide your lender");
-                                      const next = isChecked
-                                        ? current.filter((p: string) => p !== "Let F2 Fintech decide your lender")
-                                        : ["Let F2 Fintech decide your lender"];
-                                      setFormData({ ...formData, selectedProviders: next });
-                                    }}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    onChange={() => {}}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                                   />
                                   <span className="font-bold flex items-center gap-1.5">
                                     <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -3188,7 +3298,7 @@ export default function ApplyForLoanView({
                                 <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-md shadow-2xs">
                                   Recommended
                                 </span>
-                              </label>
+                              </div>
                             )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
@@ -3197,24 +3307,28 @@ export default function ApplyForLoanView({
                                 .map((provider) => {
                                   const isChecked = (formData.selectedProviders || []).includes(provider);
                                   return (
-                                    <label
+                                    <div
                                       key={provider}
-                                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors ${isChecked ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-gray-50 text-gray-700"}`}
+                                      onClick={() => {
+                                        // When user selects a specific bank, remove "Let F2 Fintech decide your lender"
+                                        const current = (formData.selectedProviders || []).filter(
+                                          (p: string) => p !== "Let F2 Fintech decide your lender"
+                                        );
+                                        const next = isChecked
+                                          ? current.filter((p: string) => p !== provider)
+                                          : [...current, provider];
+                                        setFormData({ ...formData, selectedProviders: next });
+                                      }}
+                                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors select-none ${isChecked ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-gray-50 text-gray-700"}`}
                                     >
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
-                                        onChange={() => {
-                                          const current = formData.selectedProviders || [];
-                                          const next = isChecked
-                                            ? current.filter((p: string) => p !== provider)
-                                            : [...current, provider];
-                                          setFormData({ ...formData, selectedProviders: next });
-                                        }}
-                                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        onChange={() => {}}
+                                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
                                       />
                                       <span className="truncate">{provider}</span>
-                                    </label>
+                                    </div>
                                   );
                                 })}
                             </div>
@@ -4371,7 +4485,7 @@ export default function ApplyForLoanView({
                         {isStep2Submitting ? (
                           <>
                             <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Uploading Core Documents to S3...</span>
+                            <span>Uploading Documents</span>
                           </>
                         ) : (
                           <>

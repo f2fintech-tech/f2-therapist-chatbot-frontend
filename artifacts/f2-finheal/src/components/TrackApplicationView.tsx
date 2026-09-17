@@ -35,7 +35,8 @@ import {
   Calendar,
   Activity,
   XCircle,
-  Ban
+  Ban,
+  Image as ImageIcon
 } from "lucide-react";
 
 export interface TicketStage {
@@ -78,6 +79,8 @@ export interface LoanTicket {
   }[];
   actionRequiredNote?: string;
   sanctionLetterUrl?: string;
+  isOmsTicket?: boolean;
+  documents?: { type: string; filename?: string; url: string }[];
 }
 
 export interface TicketHistoryItem {
@@ -383,6 +386,9 @@ export function getOmsStatusBadgeColor(status: string): string {
   if (s === "pendency in file" || s === "hold" || s === "carry forward") {
     return "bg-amber-50 text-amber-900 border-amber-300";
   }
+  if (s.includes("awaiting") || s === "submitted") {
+    return "bg-amber-50 text-amber-900 border-amber-300 font-black";
+  }
   if (s === "rejected" || s === "drop") {
     return "bg-rose-50 text-rose-900 border-rose-300";
   }
@@ -518,7 +524,17 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
     currentStageId: stageId,
     status: displayStatus,
     bankPartner: raw.applicationProvider || "Partner Bank",
-    createdByRole: raw.appliedBy ? "employee" : "user",
+    createdByRole: (
+      raw.journey_type === "admin" ||
+      String(raw.lead_type || raw.leadType || "").toLowerCase() === "admin" ||
+      ["7318", "7317", "7316", "7315", "7313"].includes(String(raw.ticketId || raw.id || ""))
+    )
+      ? "admin"
+      : (raw.journey_type === "employee" || String(raw.lead_type || raw.leadType || "").toLowerCase() === "employee" || Boolean(raw.appliedBy))
+      ? "employee"
+      : "user",
+    isOmsTicket: raw.isOmsTicket !== false && !String(raw.ticketId || "").startsWith("APP-"),
+    documents: Array.isArray(raw.documents) ? raw.documents : [],
     creditManager: {
       name: raw.creditManagerName || raw.assignedTo || raw.creditOfficer || "",
       role: raw.creditManagerRole || "",
@@ -550,10 +566,14 @@ export default function TrackApplicationView({
   // Loading state for live OMS fetch
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
 
+  const storageKey = activeRole === "user"
+    ? `f2_loan_tickets_user_${encodeURIComponent((userEmail || "guest").toLowerCase())}`
+    : "f2_loan_tickets_admin";
+
   // Load tickets from localStorage or start empty
   const [tickets, setTickets] = useState<LoanTicket[]>(() => {
     try {
-      const saved = localStorage.getItem("f2_loan_tickets_v1");
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -574,14 +594,16 @@ export default function TrackApplicationView({
     setIsLoadingTickets(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal`);
+      // If user portal, pass user's email to backend for safety
+      const emailParam = (activeRole === "user" && userEmail) ? `&email=${encodeURIComponent(userEmail.trim())}` : "";
+      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal${emailParam}`);
       if (res.ok) {
         const json = await res.json();
         const rawList = Array.isArray(json.tickets) ? json.tickets : (json.data?.data?.results || []);
 
         // Double safety filter: strictly retain only tickets where applicationSource is 'finheal'
         const finhealOnly = rawList.filter(
-          (t: any) => String(t.applicationSource || "").trim().toLowerCase() === "finheal"
+          (t: any) => String(t.applicationSource || t.source || "").trim().toLowerCase() === "finheal"
         );
 
         const mapped = finhealOnly.map(mapOmsTicketToLoanTicket);
@@ -596,16 +618,16 @@ export default function TrackApplicationView({
 
   useEffect(() => {
     fetchLiveTickets();
-  }, []);
+  }, [userEmail, activeRole]);
 
   // Sync to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem("f2_loan_tickets_v1", JSON.stringify(tickets));
+      localStorage.setItem(storageKey, JSON.stringify(tickets));
     } catch (e) {
       console.warn("Could not save loan tickets to localStorage", e);
     }
-  }, [tickets]);
+  }, [tickets, storageKey]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
@@ -641,16 +663,23 @@ export default function TrackApplicationView({
 
   // Employee & Admin Tab Filters
   const [employeeTab, setEmployeeTab] = useState<"all" | "my">("all");
-  const [adminTab, setAdminTab] = useState<"all" | "user" | "staff" | "admin">("all");
+  const [adminTab, setAdminTab] = useState<"all" | "user" | "staff" | "admin" | "awaiting">("all");
   const [opsFilterStage, setOpsFilterStage] = useState<string>("all");
 
   // Filter tickets based on active role
   const roleFilteredTickets = tickets.filter((t) => {
     if (activeRole === "user") {
-      // User Portal: only show user's own tickets
-      if (userEmail && t.applicantEmail.toLowerCase() === userEmail.toLowerCase()) return true;
-      if (userId && t.createdByUserId === userId) return true;
-      return t.createdByRole === "user" || !t.createdByRole;
+      // User Portal: strictly show only user's own tickets matching their email or user ID
+      const currentEmail = (userEmail || "").trim().toLowerCase();
+      const ticketEmail = (t.applicantEmail || "").trim().toLowerCase();
+      if (currentEmail && ticketEmail && currentEmail === ticketEmail) {
+        return true;
+      }
+      if (userId && t.createdByUserId && t.createdByUserId === userId) {
+        return true;
+      }
+      // Strictly never show other applicants' tickets to a regular user!
+      return false;
     } else if (activeRole === "employee") {
       // Employee Portal
       if (employeeTab === "my") {
@@ -662,6 +691,7 @@ export default function TrackApplicationView({
       if (adminTab === "user") return t.createdByRole === "user";
       if (adminTab === "staff") return t.createdByRole === "employee";
       if (adminTab === "admin") return t.createdByRole === "admin";
+      if (adminTab === "awaiting") return t.isOmsTicket === false;
       return true;
     }
   });
@@ -710,6 +740,13 @@ export default function TrackApplicationView({
     navigator.clipboard.writeText(tid);
     setCopiedTicketId(tid);
     setTimeout(() => setCopiedTicketId(null), 2000);
+  };
+
+  const handleInspectTicket = (ticketId: string) => {
+    setSelectedTicketId(ticketId);
+    setTimeout(() => {
+      document.getElementById("ticketInspectionSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   // Helper to advance ticket stage (Ops/Admin action)
@@ -832,7 +869,15 @@ export default function TrackApplicationView({
               className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
                 }`}
             >
-              <ShieldCheck className="w-4 h-4" /> All System Tickets ({tickets.length})
+              <ShieldCheck className="w-4 h-4" /> All Applications ({tickets.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminTab("awaiting")}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "awaiting" ? "bg-amber-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
+            >
+              <Clock className="w-4 h-4" /> Awaiting Pick ({tickets.filter(t => t.isOmsTicket === false).length})
             </button>
             <button
               type="button"
@@ -841,6 +886,14 @@ export default function TrackApplicationView({
                 }`}
             >
               <User className="w-4 h-4" /> User Applied ({tickets.filter(t => t.createdByRole === "user").length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminTab("admin")}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${adminTab === "admin" ? "bg-purple-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                }`}
+            >
+              <ShieldCheck className="w-4 h-4" /> Admin Applied ({tickets.filter(t => t.createdByRole === "admin").length})
             </button>
             <button
               type="button"
@@ -858,8 +911,14 @@ export default function TrackApplicationView({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Active OMS Tickets</span>
-              <div className="text-2xl font-black text-slate-900">{filteredTickets.length} Tickets</div>
-              <p className="text-[11px] text-slate-500">Tracked across HDFC, SBI & ICICI hubs</p>
+              <div className="text-2xl font-black text-slate-900">
+                {tickets.filter((t) => t.isOmsTicket !== false).length} Tickets
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {tickets.filter((t) => t.isOmsTicket === false).length > 0
+                  ? `${tickets.filter((t) => t.isOmsTicket === false).length} awaiting OMS employee pick`
+                  : "Tracked across HDFC, SBI & ICICI hubs"}
+              </p>
             </div>
 
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
@@ -977,6 +1036,7 @@ export default function TrackApplicationView({
                       <th className="p-3">Created By</th>
                     )}
                     <th className="p-3">OMS Status</th>
+                    <th className="p-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -987,7 +1047,7 @@ export default function TrackApplicationView({
                     return (
                       <tr
                         key={t.ticketId}
-                        onClick={() => setSelectedTicketId(t.ticketId)}
+                        onClick={() => handleInspectTicket(t.ticketId)}
                         className={`transition-colors cursor-pointer ${isSelected
                           ? "bg-blue-50/90 font-bold border-l-4 border-l-blue-600"
                           : "hover:bg-slate-50/80 bg-white"
@@ -1054,6 +1114,25 @@ export default function TrackApplicationView({
                             {t.status}
                           </span>
                         </td>
+
+                        {/* Inspect / Open Details Action */}
+                        <td className="p-3 whitespace-nowrap text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleInspectTicket(t.ticketId);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] inline-flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-blue-500/20"
+                                : "bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white"
+                            }`}
+                          >
+                            <span>Open Details</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -1081,7 +1160,7 @@ export default function TrackApplicationView({
           return (
             <div className="space-y-6">
               {/* Active Ticket Banner Card */}
-              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+              <div id="ticketInspectionSection" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
                 <div className="absolute right-0 top-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
@@ -1469,33 +1548,85 @@ export default function TrackApplicationView({
                 );
               })()}
 
-              {/* Document Audit Checklist */}
+              {/* Applicant Uploaded Documents Vault */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <FileCheck className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-slate-900">Uploaded Document Audit Checklist</h3>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-2xs">
+                      <FileCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Applicant Uploaded Documents</h3>
+                      <p className="text-[11px] text-slate-500">
+                        {activeTicket.documents && activeTicket.documents.length > 0
+                          ? `${activeTicket.documents.length} verified files stored on AWS S3`
+                          : "Files submitted by the applicant for verification"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> S3 Stored
+                  </span>
                 </div>
 
-                <div className="space-y-2.5">
-                  {activeTicket.docsStatus.map((doc, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
-                      <span className="font-semibold text-slate-800">{doc.name}</span>
-                      {doc.status === "verified" ? (
-                        <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Verified
-                        </span>
-                      ) : doc.status === "resubmit_required" ? (
-                        <span className="text-amber-800 bg-amber-50 border border-amber-200 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Re-upload Needed
-                        </span>
-                      ) : (
-                        <span className="text-slate-600 bg-slate-200 font-semibold px-2.5 py-0.5 rounded-full">
-                          Under Review
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {activeTicket.documents && activeTicket.documents.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2.5 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin">
+                    {activeTicket.documents.map((doc, idx) => {
+                      const isImage = (doc.filename || "").match(/\.(jpg|jpeg|png|webp)$/i) || (doc.type || "").toLowerCase().includes("photo");
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 bg-slate-50/80 hover:bg-blue-50/40 rounded-2xl border border-slate-200/80 hover:border-blue-200 transition-all text-xs group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                              isImage
+                                ? "bg-purple-50 text-purple-600 border-purple-100"
+                                : "bg-blue-50 text-blue-600 border-blue-100"
+                            }`}>
+                              {isImage ? <ImageIcon className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-extrabold text-slate-800 text-xs truncate">
+                                {doc.type}
+                              </h4>
+                              <p className="text-[10.5px] text-slate-400 font-mono truncate max-w-[170px] sm:max-w-xs">
+                                {doc.filename || `${doc.type.toLowerCase().replace(/ /g, "_")}.pdf`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                            </span>
+                            {doc.url ? (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                              >
+                                <span>View File</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            ) : (
+                              <span className="px-3 py-1 bg-slate-200 text-slate-600 font-semibold text-[11px] rounded-xl">
+                                Uploaded
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-1">
+                    <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                    <p className="text-xs text-slate-500 font-semibold">No uploaded documents attached</p>
+                    <p className="text-[11px] text-slate-400">Documents submitted during the application wizard will appear here</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
