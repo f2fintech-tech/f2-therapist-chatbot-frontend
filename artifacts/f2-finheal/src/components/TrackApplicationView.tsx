@@ -684,6 +684,39 @@ export default function TrackApplicationView({
     }
   };
 
+  // OMS Users directory map, populated 100% dynamically from API
+  const [omsUsersMap, setOmsUsersMap] = useState<Record<string, { id: number; name: string; username?: string; role?: string; designation?: string; phone?: string; email?: string }>>({});
+
+  const fetchOmsUsers = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${apiBase}/loan-applications/oms-users`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.users && typeof json.users === "object") {
+          setOmsUsersMap(json.users);
+        }
+      }
+    } catch (e) {
+      console.warn("[TrackApplicationView] Could not fetch OMS users:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchOmsUsers();
+  }, []);
+
+  const getCommentAuthorName = (comment: any) => {
+    if (comment.user_name && comment.user_name.trim()) {
+      return comment.user_name;
+    }
+    const uid = comment.user_id ? String(comment.user_id) : "";
+    if (uid && omsUsersMap[uid]?.name) {
+      return omsUsersMap[uid].name;
+    }
+    return uid ? `User #${uid}` : "Operations";
+  };
+
   // Employee & Admin Tab Filters
   const [employeeTab, setEmployeeTab] = useState<"all" | "my">("all");
   const [adminTab, setAdminTab] = useState<"all" | "user" | "staff" | "admin" | "awaiting">("all");
@@ -1522,24 +1555,35 @@ export default function TrackApplicationView({
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {ticketComments.map((c, idx) => (
-                        <div key={c.id || idx} className="flex gap-3">
-                          <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                            <User className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 space-y-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10.5px] font-bold text-slate-700">
-                                {c.user_id ? `User #${c.user_id}` : "Operations"}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                                {formatDateTimeWithTime(c.created_at)}
-                              </span>
+                      {ticketComments.map((c, idx) => {
+                        const authorName = getCommentAuthorName(c);
+                        const cleanInitial = (authorName.replace(/^user\s*#?/i, "").trim() || "O").charAt(0).toUpperCase();
+                        const userDesignation = (c.user_designation || omsUsersMap[String(c.user_id)]?.designation || "").trim();
+
+                        return (
+                          <div key={c.id || idx} className="flex gap-3">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                              {cleanInitial}
                             </div>
-                            <p className="text-xs text-slate-800 leading-relaxed">{c.comment}</p>
+                            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10.5px] font-bold text-slate-800 flex items-center gap-1.5">
+                                  {authorName}
+                                  {userDesignation && (
+                                    <span className="text-[9.5px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded capitalize border border-blue-100">
+                                      {userDesignation}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                  {formatDateTimeWithTime(c.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-800 leading-relaxed">{c.comment}</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1562,8 +1606,30 @@ export default function TrackApplicationView({
                   }
                 }
 
-                // Try to resolve picked name via manager registry, or fallback to object with name
-                const resolvedManager = manager || (pickedByName ? (getCreditManagerInfo(pickedByName) || { empCode: "", name: pickedByName, role: "Credit Officer", phone: "" }) : null);
+                // Check if picked officer exists in dynamically fetched omsUsersMap (by username, name, or email)
+                let matchedOmsUser: any = null;
+                if (pickedByName) {
+                  const pLower = pickedByName.toLowerCase();
+                  for (const u of Object.values(omsUsersMap)) {
+                    if (
+                      (u.name && u.name.toLowerCase() === pLower) ||
+                      (u.username && u.username.toLowerCase() === pLower) ||
+                      (u.email && u.email.toLowerCase().startsWith(pLower))
+                    ) {
+                      matchedOmsUser = u;
+                      break;
+                    }
+                  }
+                }
+
+                // Try to resolve picked name via manager registry, or dynamic OMS user, or fallback
+                const staticManager = pickedByName ? getCreditManagerInfo(pickedByName) : null;
+                const resolvedManager = manager || (pickedByName ? {
+                  empCode: staticManager?.empCode || (matchedOmsUser ? `OMS-#${matchedOmsUser.id}` : ""),
+                  name: staticManager?.name || matchedOmsUser?.name || pickedByName,
+                  role: staticManager?.role || matchedOmsUser?.designation || matchedOmsUser?.role || "Credit Officer",
+                  phone: staticManager?.phone || matchedOmsUser?.phone || ""
+                } : null);
 
                 if (!resolvedManager) {
                   return (
