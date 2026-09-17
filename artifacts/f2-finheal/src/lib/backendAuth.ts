@@ -96,8 +96,14 @@ export async function authRequest<T>(path: string, init: RequestInit): Promise<T
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    const message = body || `${response.status} ${response.statusText}`;
-    throw new Error(message);
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed.detail) {
+        message = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+      }
+    } catch (e) {}
+    throw new Error(message || `${response.status} ${response.statusText}`);
   }
 
   return parseJsonResponse<T>(response);

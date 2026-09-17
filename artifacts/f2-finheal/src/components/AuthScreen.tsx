@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Gauge, Landmark, ShieldCheck, ChevronRight } from "lucide-react";
 import { signInUser, signUpUser, signInGuest, migrateCalculatorActivities, signUpAdvisor, signInAdvisor, authRequest, signInWithGoogle } from "@/lib/backendAuth";
 import { migrateConversationsFromUserId } from "@/utils/localConversations";
+import { getApiBaseUrl } from "@/lib/backendChat";
 import PolicyModal from "./PolicyModal";
 
 const loginDefaults = { username: "", password: "" };
@@ -77,18 +78,23 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const [showPassword, setShowPassword] = useState(false);
   const [isPwFocused, setIsPwFocused] = useState(false);
   const [location, setLocation] = useLocation();
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot_password">("login");
 
   useEffect(() => {
     if (location === "/signup") setAuthMode("signup");
     else if (location === "/login") setAuthMode("login");
   }, [location]);
 
-  const handleSetAuthMode = (mode: "login" | "signup") => {
+  const handleSetAuthMode = (mode: "login" | "signup" | "forgot_password") => {
     setAuthMode(mode);
-    setLocation(`/${mode}`);
+    setLoginError(null);
+    setSuccessInfo(null);
+    if (mode !== "forgot_password") {
+      setLocation(`/${mode}`);
+    }
   };
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isEmployee, setIsEmployee] = useState(false);
@@ -152,6 +158,31 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
+    setSuccessInfo(null);
+
+    if (authMode === "forgot_password") {
+      const emailToReset = loginUsername.trim();
+      if (!emailToReset) {
+        setLoginError("Please enter your registered email address.");
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const cleanBaseUrl = getApiBaseUrl().replace(/\/+$/, "");
+        const response = await fetch(`${cleanBaseUrl}/auth/forgot-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailToReset }),
+        });
+        const data = await response.json();
+        setSuccessInfo(data.message || "If an account exists with this email, a password reset link has been sent.");
+      } catch (err) {
+        setLoginError("Failed to request password reset. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     // Client-side validation
     const email = loginUsername.trim();
@@ -221,9 +252,13 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
           : await signInAdvisor({ f2_fintech_id: employeeId, password });
       } else {
         const guestUserId = currentSession?.isGuest ? currentSession.userId : null;
-        payload = authMode === "signup"
-          ? await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email, referralCode || undefined)
-          : await signInUser(email, password);
+        if (authMode === "signup") {
+          await signUpUser(email, password, guestUserId ?? undefined, [firstName, loginLastName.trim()].filter(Boolean).join(" ") || email, referralCode || undefined);
+          setSuccessInfo(`Account created successfully! A verification email has been sent to ${email}. Please check your inbox and verify your email before logging in.`);
+          handleSetAuthMode("login");
+          return;
+        }
+        payload = await signInUser(email, password);
         if (guestUserId && payload.userId && guestUserId !== payload.userId) {
           migrateConversationsFromUserId(guestUserId, payload.userId);
           try {
@@ -695,12 +730,16 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
             </div>
             <div>
               <div style={{ fontSize: authMode === "signup" ? "19px" : "24px", fontWeight: 700, color: "#111827", lineHeight: 1.05 }}>
-                {isEmployee
+                {authMode === "forgot_password"
+                  ? "Reset password"
+                  : isEmployee
                   ? (authMode === "signup" ? "Register Employee" : "Employee Sign in")
                   : (authMode === "signup" ? "Create your account" : "Welcome back")}
               </div>
               <div style={{ marginTop: "3px", fontSize: "11px", lineHeight: 1.3, color: "#6b7280" }}>
-                {isEmployee
+                {authMode === "forgot_password"
+                  ? "Enter your registered email address and we'll send you a password reset link."
+                  : isEmployee
                   ? "Verify F2 Fintech credentials to manage advisor dashboard."
                   : (authMode === "signup" ? "Join FinHeal and start your financial wellness journey" : "Sign in to continue your financial wellness journey")}
               </div>
@@ -756,9 +795,21 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   </label>
                 </>
               )}
-              <label style={{ display: "flex", flexDirection: "column", gap: "2px", position: "relative" }}>
-                <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Password</span>
-                <div style={{ position: "relative" }}>
+              {authMode !== "forgot_password" && (
+                <label style={{ display: "flex", flexDirection: "column", gap: "2px", position: "relative" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Password</span>
+                    {authMode === "login" && !isEmployee && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetAuthMode("forgot_password")}
+                        style={{ background: "none", border: "none", padding: 0, color: "#3344e6", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ position: "relative" }}>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={loginPassword}
@@ -830,6 +881,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   </div>
                 )}
               </label>
+              )}
               {authMode === "signup" && isEmployee && (
                 <label style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 500, color: "#374151" }}>Confirm Password <span style={{ color: "#ef4444" }}>*</span></span>
@@ -876,6 +928,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                   </label>
                 </div>
               )}
+              {successInfo && <div style={{ padding: "8px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px", fontSize: "11.5px", color: "#166534", lineHeight: 1.4 }}>{successInfo}</div>}
               {loginError && <div style={{ padding: "6px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", fontSize: "11px", color: "#b91c1c" }}>{loginError}</div>}
               <button
                 type="submit"
@@ -900,10 +953,27 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 onMouseOver={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(51,68,230,0.4)"; } }}
                 onMouseOut={e => { if (!isSubmitting && !(authMode === "signup" && !isEmployee && !agreedToPolicies)) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(51,68,230,0.3)"; } }}
               >
-                {isSubmitting ? "Processing..." : authMode === "signup" ? "Register" : "Sign in"}
+                {isSubmitting
+                  ? (authMode === "forgot_password" ? "Sending Link..." : "Processing...")
+                  : authMode === "forgot_password"
+                  ? "Send Reset Link"
+                  : authMode === "signup"
+                  ? "Register"
+                  : "Sign in"}
               </button>
+
+              {authMode === "forgot_password" && (
+                <button
+                  type="button"
+                  onClick={() => handleSetAuthMode("login")}
+                  style={{ background: "none", border: "none", padding: "4px 0", color: "#3344e6", fontSize: "12px", fontWeight: 600, cursor: "pointer", textDecoration: "underline", width: "100%", textAlign: "center" }}
+                >
+                  ← Back to Sign in
+                </button>
+              )}
             </form>
-            <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "10px" }}>
+            {authMode !== "forgot_password" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: authMode === "signup" ? "8px" : "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ flex: 1, height: "1px", background: "#f3f4f6" }} />
                 <span style={{ fontSize: "10px", color: "#d1d5db" }}>or continue with</span>
@@ -953,6 +1023,7 @@ export default function AuthScreen({ currentSession, onAuthSuccess }: AuthScreen
                 </button>
               </div>
             </div>
+          )}
             <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
               {[
                 { icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>, label: "Bank-grade security" },
