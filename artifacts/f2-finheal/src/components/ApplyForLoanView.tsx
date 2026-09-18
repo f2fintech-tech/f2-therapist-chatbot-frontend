@@ -44,9 +44,16 @@ import {
   X,
   FileCheck,
   Building,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Landmark,
+  Plus,
+  Trash2,
+  IndianRupee,
+  AlertTriangle
 } from "lucide-react";
 import PolicyModal from "./PolicyModal";
+import { getStoredAuthSession } from "@/utils/authSession";
 
 interface DirectorDetail {
   id: string;
@@ -234,6 +241,10 @@ const initialHlLapDetails: HlLapDetails = {
 interface ApplyForLoanViewProps {
   userId: string;
   userEmail?: string;
+  userName?: string;
+  journeyType?: "user" | "employee" | "admin";
+  isGuest?: boolean;
+  onLoginRequired?: () => void;
   onToggleSidebar: () => void;
   onToggleInsights?: () => void;
   onOpenLoanCalculator?: (loanType?: string) => void;
@@ -268,6 +279,170 @@ interface LoanCategoryConfig {
   faq: { q: string; a: string }[];
   additionalDocFields: { id: string; label: string; description: string; required: boolean }[];
 }
+
+export const LOAN_TYPE_OPTIONS = [
+  { value: "personal", label: "Personal Loan" },
+  { value: "business", label: "Business Loan" },
+  { value: "home", label: "Home Loan" },
+  { value: "lap", label: "Loan Against Property (LAP)" },
+  { value: "doctor", label: "Professional Loan" },
+  { value: "education", label: "Education Loan" },
+  { value: "car", label: "Used / New Car Loan" },
+  { value: "gold", label: "Gold Loan" },
+  { value: "od_cc", label: "Overdraft / CC Limit" }
+];
+
+export const INDIAN_STATES = [
+  "Andaman and Nicobar Islands",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal"
+];
+
+export const CATEGORY_TENURE_MAP: Record<string, string[]> = {
+  personal: [
+    "1 Year",
+    "2 Years",
+    "3 Years",
+    "4 Years",
+    "5 Years",
+    "6 Years",
+    "7 Years",
+    "8 Years"
+  ],
+  business: [
+    "1 Year",
+    "2 Years",
+    "3 Years",
+    "4 Years",
+    "5 Years",
+    "6 Years",
+    "7 Years",
+    "8 Years"
+  ],
+  doctor: [
+    "1 Year",
+    "2 Years",
+    "3 Years",
+    "4 Years",
+    "5 Years",
+    "6 Years",
+    "7 Years",
+    "8 Years"
+  ],
+  education: [
+    "1 Year",
+    "2 Years",
+    "3 Years",
+    "4 Years",
+    "5 Years",
+    "6 Years",
+    "7 Years",
+    "8 Years"
+  ],
+  home: [
+    "5 Years",
+    "8 Years",
+    "10 Years",
+    "15 Years",
+    "20 Years",
+    "25 Years",
+    "30 Years"
+  ],
+  lap: [
+    "5 Years",
+    "8 Years",
+    "10 Years",
+    "15 Years",
+    "20 Years",
+    "25 Years",
+    "30 Years"
+  ]
+};
+
+export const getTenureOptionsForCategory = (category: string): string[] => {
+  const norm = category === "professional" ? "doctor" : category;
+  return CATEGORY_TENURE_MAP[norm] || CATEGORY_TENURE_MAP.personal;
+};
+
+export const PROVIDER_OPTIONS = [
+  "HDFC Bank",
+  "ICICI Bank",
+  "State Bank of India (SBI)",
+  "Axis Bank",
+  "Kotak Mahindra Bank",
+  "Bajaj Finserv",
+  "Tata Capital",
+  "Aditya Birla Capital",
+  "IndusInd Bank",
+  "IDFC FIRST Bank",
+  "Piramal Finance",
+  "Poonawalla Fincorp",
+  "L&T Finance",
+  "Godrej Capital",
+  "SMFG India Credit",
+  "Hero Fincorp",
+  "Muthoot Finance",
+  "Federal Bank",
+  "Bank of Baroda",
+  "Punjab National Bank",
+  "Yes Bank",
+  "InCred Financial",
+  "Paysense / PayU"
+];
+
+export const LEAD_TYPE_OPTIONS = [
+  "Notion",
+  "Direct / Organic",
+  "Referral",
+  "Partner / DSA",
+  "Telecalling / Outbound",
+  "Website / Chatbot",
+  "Campaign / Digital Ad",
+  "Branch Walk-in",
+  "Other"
+];
+
+export const CASE_TYPE_OPTIONS = [
+  "Fresh",
+  "Balance Transfer (BT)",
+  "BT + Top Up",
+  "Parallel Loan",
+  "Top Up",
+  "Restructuring / Renewal"
+];
 
 const LOAN_CATEGORIES: LoanCategoryConfig[] = [
   {
@@ -471,14 +646,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     description: "Leverage your residential, commercial, or industrial property to secure high-value loans at interest rates lower than personal loans.",
     maxAmount: "Up to ₹15 Crore",
     startRate: "8.0% p.a.",
-    maxTenure: "Up to 15 Years",
+    maxTenure: "Up to 30 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 7500000,
     minAmountNum: 1000000,
     maxAmountNum: 50000000,
     stepAmountNum: 500000,
     defaultRateNum: 8.0,
-    defaultTenureNum: 12,
+    defaultTenureNum: 15,
     features: [
       "High LTV (Loan to Value) up to 70% of market property valuation",
       "Accepts residential, commercial, or industrial property",
@@ -595,14 +770,14 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
     description: "Comprehensive financial support for Premier Domestic Colleges and Abroad Universities covering tuition fees, accommodation, travel, & study expenses.",
     maxAmount: "Up to ₹1.5 Crore",
     startRate: "8.5% p.a.",
-    maxTenure: "Up to 15 Years",
+    maxTenure: "Up to 8 Years",
     processingTime: "4 - 7 Days",
     defaultAmountNum: 1500000,
     minAmountNum: 100000,
     maxAmountNum: 15000000,
     stepAmountNum: 50000,
     defaultRateNum: 8.5,
-    defaultTenureNum: 10,
+    defaultTenureNum: 5,
     features: [
       "Collateral-free loans available up to ₹40 Lakhs for top premier universities",
       "Moratorium period (Course duration + 1 year grace period before EMI starts)",
@@ -660,12 +835,24 @@ const LOAN_CATEGORIES: LoanCategoryConfig[] = [
 export default function ApplyForLoanView({
   userId,
   userEmail,
+  userName,
+  journeyType = "user",
+  isGuest = false,
+  onLoginRequired,
   onToggleSidebar,
   onToggleInsights,
   onOpenLoanCalculator,
   initialCategory = "personal"
 }: ApplyForLoanViewProps) {
-  const DRAFT_STORAGE_KEY = "f2_loan_application_draft_v1";
+  const DRAFT_STORAGE_KEY = useMemo(() => {
+    if (journeyType === "employee") {
+      return `f2_loan_application_draft_employee_${userId || "staff"}`;
+    }
+    if (journeyType === "admin") {
+      return `f2_loan_application_draft_admin_${userId || "admin"}`;
+    }
+    return userEmail ? `f2_loan_application_draft_user_${userEmail.trim().toLowerCase()}` : "f2_loan_application_draft_v1";
+  }, [journeyType, userId, userEmail]);
 
   // Helper to load saved draft from localStorage
   const loadSavedDraft = () => {
@@ -698,36 +885,128 @@ export default function ApplyForLoanView({
   const wizardFormRef = useRef<HTMLDivElement | null>(null);
   const [applyLoanToggle, setApplyLoanToggle] = useState<boolean>(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(initialDraft?.currentStep || 1);
+  const [omsCustomerId, setOmsCustomerId] = useState<number | null>(initialDraft?.omsCustomerId || null);
   const [isDraftRestored, setIsDraftRestored] = useState<boolean>(Boolean(initialDraft));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStep1Submitting, setIsStep1Submitting] = useState(false);
+  const [isStep2Submitting, setIsStep2Submitting] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [submittedRefNo, setSubmittedRefNo] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleScrollToApplicantForm = () => {
     setApplyLoanToggle(true);
-    if (wizardFormRef.current) {
-      wizardFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      document.getElementById("applicantFormWizardSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    setTimeout(() => {
+      if (wizardFormRef.current) {
+        wizardFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        document.getElementById("applicantFormWizardSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
   };
 
-  // Form Data State - Email is empty by default unless saved draft exists
+  // Form Data State - Email defaults to logged-in userEmail
   const [formData, setFormData] = useState(initialDraft?.formData || {
+    prefix: initialDraft?.formData?.prefix || "Mr.",
     fullName: "",
+    dob: initialDraft?.formData?.dob || "",
     fatherName: "",
     motherName: "",
     mobileNumber: "",
-    email: "",
+    email: initialDraft?.formData?.email || userEmail || "",
     officialEmail: "",
     city: "",
+    currentState: initialDraft?.formData?.currentState || "",
     currentAddress: "",
+    permanentState: initialDraft?.formData?.permanentState || "",
     permanentAddress: "",
     sameAsCurrentAddress: false,
     workingAddress: "",
     desiredAmount: 500000,
+    loanAmountRequired: "5,00,000",
+    loanType: normalizeCategory(initialDraft?.activeTab || initialCategory),
+    comfortableTenure: "3 Years",
+    selectedProviders: [] as string[],
+    leadType: "Notion",
+    caseType: "Fresh",
+    hasExistingLoans: "No",
+    existingLoans: [
+      { id: "loan_1", lenderName: "", loanType: "Personal Loan", monthlyEmi: "", outstandingAmount: "" }
+    ],
     tenureYears: 3,
     employmentType: "salaried",
     monthlyIncome: "",
     acceptTerms: false
   });
+
+  // Automatically ensure logged-in email is prefilled ONLY for direct user journey
+  useEffect(() => {
+    if (journeyType === "user" && userEmail && (!formData.email || formData.email !== userEmail)) {
+      setFormData((prev: any) => ({ ...prev, email: userEmail }));
+    }
+  }, [userEmail, journeyType]);
+
+  // Helper to compute age from DOB
+  const calculateAge = (dobString: string): number | null => {
+    if (!dobString) return null;
+    const birthDate = new Date(dobString);
+    if (isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const applicantAge = calculateAge(formData.dob || "");
+  const isUnderage = applicantAge !== null && applicantAge < 20;
+  const isAgeValid = applicantAge !== null && applicantAge >= 20;
+
+  const [isProviderDropdownOpen, setIsProviderDropdownOpen] = useState(false);
+  const [providerSearchQuery, setProviderSearchQuery] = useState("");
+  const [catalogLenders, setCatalogLenders] = useState<string[]>(PROVIDER_OPTIONS);
+  const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(false);
+
+  // Dynamically load live lenders from backend lender catalogue
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLendersCatalog() {
+      setIsLoadingLenders(true);
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+        const res = await fetch(`${apiBase}/lenders`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            // Extract unique active lender names from the database catalogue
+            const names = Array.from(
+              new Set(
+                data
+                  .filter((item: any) => item && !item.is_deleted && item.name)
+                  .map((item: any) => String(item.name).trim())
+                  .filter(Boolean)
+              )
+            );
+            if (isMounted && names.length > 0) {
+              setCatalogLenders(names);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch live lenders catalog, using default provider list:", err);
+      } finally {
+        if (isMounted) setIsLoadingLenders(false);
+      }
+    }
+
+    loadLendersCatalog();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Document Upload States
   const [aadhaarDoc, setAadhaarDoc] = useState(initialDraft?.aadhaarDoc || { mode: "pdf" });
@@ -792,6 +1071,9 @@ export default function ApplyForLoanView({
 
   // Auto-save form & stage progress to localStorage whenever state updates
   useEffect(() => {
+    // Never overwrite or restore previous draft if application is in submitted success state
+    if (isSubmittedSuccess) return;
+
     try {
       const payload = {
         activeTab,
@@ -814,13 +1096,14 @@ export default function ApplyForLoanView({
         eduDetails,
         proDetails,
         hlLapDetails,
+        omsCustomerId,
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
     } catch (e) {
       console.warn("Could not save loan draft", e);
     }
-  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails]);
+  }, [activeTab, currentStep, formData, businessType, aadhaarDoc, panDoc, photoDoc, salarySlipsDoc, idCardDoc, bankStatementDoc, currentAddressProofDoc, permanentAddressProofDoc, form26ASDoc, additionalUploaded, companyOfficialEmail, pvtDirectors, partnershipPartners, eduDetails, proDetails, hlLapDetails, omsCustomerId, isSubmittedSuccess]);
 
   // Ensure minimum 2 directors for Limited Liability Partnership (LLP)
   useEffect(() => {
@@ -844,66 +1127,90 @@ export default function ApplyForLoanView({
     }
   }, [businessType]);
 
-  const handleClearDraft = () => {
-    if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
+  const resetEntireApplicationForm = (clearStorage: boolean = true) => {
+    if (clearStorage) {
       try {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
       } catch (e) { }
-      setIsDraftRestored(false);
-      setCurrentStep(1);
-      setBusinessType("sole_proprietorship");
-      setCompanyOfficialEmail("");
-      setPvtDirectors([
-        {
-          id: "dir_1",
-          name: "",
-          phone: "",
-          email: "",
-          aadhaarDoc: { mode: "pdf" },
-          panDoc: { mode: "pdf" },
-          photoDoc: {}
-        }
-      ]);
-      setPartnershipPartners([
-        {
-          id: "partner_1",
-          name: "",
-          phone: "",
-          aadhaarDoc: { mode: "pdf" },
-          panDoc: { mode: "pdf" }
-        }
-      ]);
-      setEduDetails(initialEduDetails);
-      setProDetails(initialProDetails);
-      setHlLapDetails(initialHlLapDetails);
-      setFormData({
-        fullName: "",
-        fatherName: "",
-        motherName: "",
-        mobileNumber: "",
+    }
+    setIsSubmittedSuccess(false);
+    setSubmittedRefNo("");
+    setIsDraftRestored(false);
+    setOmsCustomerId(null);
+    setCurrentStep(1);
+    setBusinessType("sole_proprietorship");
+    setCompanyOfficialEmail("");
+    setPvtDirectors([
+      {
+        id: "dir_1",
+        name: "",
+        phone: "",
         email: "",
-        officialEmail: "",
-        city: "",
-        currentAddress: "",
-        permanentAddress: "",
-        sameAsCurrentAddress: false,
-        workingAddress: "",
-        desiredAmount: 500000,
-        tenureYears: 3,
-        employmentType: "salaried",
-        monthlyIncome: "",
-        acceptTerms: false
-      });
-      setAadhaarDoc({ mode: "pdf" });
-      setPanDoc({ mode: "pdf" });
-      setPhotoDoc({});
-      setSalarySlipsDoc({});
-      setIdCardDoc({});
-      setBankStatementDoc({});
-      setCurrentAddressProofDoc({});
-      setPermanentAddressProofDoc({});
-      setForm26ASDoc({});
-      setAdditionalUploaded({});
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" },
+        photoDoc: {}
+      }
+    ]);
+    setPartnershipPartners([
+      {
+        id: "partner_1",
+        name: "",
+        phone: "",
+        aadhaarDoc: { mode: "pdf" },
+        panDoc: { mode: "pdf" }
+      }
+    ]);
+    setEduDetails({ ...initialEduDetails });
+    setProDetails({ ...initialProDetails });
+    setHlLapDetails({ ...initialHlLapDetails });
+    setFormData({
+      prefix: "Mr.",
+      fullName: "",
+      dob: "",
+      fatherName: "",
+      motherName: "",
+      mobileNumber: "",
+      email: userEmail || "",
+      officialEmail: "",
+      city: "",
+      currentState: "",
+      currentAddress: "",
+      permanentState: "",
+      permanentAddress: "",
+      sameAsCurrentAddress: false,
+      workingAddress: "",
+      desiredAmount: 500000,
+      loanAmountRequired: "5,00,000",
+      loanType: activeTab || "personal",
+      comfortableTenure: "3 Years",
+      selectedProviders: [],
+      leadType: "Notion",
+      caseType: "Fresh",
+      hasExistingLoans: "No",
+      existingLoans: [
+        { id: "loan_1", lenderName: "", loanType: "Personal Loan", monthlyEmi: "", outstandingAmount: "" }
+      ],
+      tenureYears: 3,
+      employmentType: "salaried",
+      monthlyIncome: "",
+      pan: "",
+      acceptTerms: false
+    });
+    setAadhaarDoc({ mode: "pdf" });
+    setPanDoc({ mode: "pdf" });
+    setPhotoDoc({});
+    setSalarySlipsDoc({});
+    setIdCardDoc({});
+    setBankStatementDoc({});
+    setCurrentAddressProofDoc({});
+    setPermanentAddressProofDoc({});
+    setForm26ASDoc({});
+    setAdditionalUploaded({});
+  };
+
+  const handleClearDraft = () => {
+    if (window.confirm("Are you sure you want to reset the form and start a new application?")) {
+      resetEntireApplicationForm(true);
     }
   };
 
@@ -1227,6 +1534,18 @@ export default function ApplyForLoanView({
   const addFilesToDoc = (setter: React.Dispatch<React.SetStateAction<any>>, newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return;
     const names = Array.from(newFiles).map((f) => f.name);
+    const firstFile = newFiles[0];
+    if (firstFile) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setter((prev: any) => ({
+          ...prev,
+          fileData: dataUrl
+        }));
+      };
+      reader.readAsDataURL(firstFile);
+    }
     setter((prev: any) => {
       const existing = getDocFiles(prev);
       const updated = Array.from(new Set([...existing, ...names]));
@@ -1248,7 +1567,8 @@ export default function ApplyForLoanView({
         fileName: updated[0] || undefined,
         fileList: updated,
         isEncrypted: updated.length === 0 ? false : prev.isEncrypted,
-        pdfPassword: updated.length === 0 ? "" : prev.pdfPassword
+        pdfPassword: updated.length === 0 ? "" : prev.pdfPassword,
+        fileData: updated.length === 0 ? undefined : prev.fileData
       };
     });
   };
@@ -1261,11 +1581,9 @@ export default function ApplyForLoanView({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
-  const [submittedRefNo, setSubmittedRefNo] = useState("");
 
   const currentCategory = LOAN_CATEGORIES.find((cat) => cat.id === activeTab || (activeTab === "professional" && cat.id === "doctor")) || LOAN_CATEGORIES[0];
+
 
   // Dynamic Real-Time Bank Statement Notice Date Calculation
   const bankStatementNotice = useMemo(() => {
@@ -1287,20 +1605,34 @@ export default function ApplyForLoanView({
   }, []);
 
   const handleTabChange = (catId: string) => {
-    setActiveTab(catId);
-    const newCat = LOAN_CATEGORIES.find((c) => c.id === catId);
+    const norm = normalizeCategory(catId);
+    setActiveTab(norm);
+    const newCat = LOAN_CATEGORIES.find((c) => c.id === norm);
+    const availableTenures = getTenureOptionsForCategory(norm);
     if (newCat) {
+      const matchedTenure = availableTenures.find((t) => t.startsWith(`${newCat.defaultTenureNum} Year`)) || availableTenures[0];
       setFormData((prev: any) => ({
         ...prev,
         desiredAmount: newCat.defaultAmountNum,
-        tenureYears: newCat.defaultTenureNum
+        loanAmountRequired: newCat.defaultAmountNum.toLocaleString("en-IN"),
+        tenureYears: newCat.defaultTenureNum,
+        comfortableTenure: matchedTenure
       }));
     }
   };
 
-  const handleNextStep1 = () => {
+  const handleNextStep1 = async () => {
     if (!formData.fullName.trim()) {
       alert("Please enter your Full Name.");
+      return;
+    }
+    if (!formData.dob?.trim()) {
+      alert("Please select your Date of Birth (DOB).");
+      return;
+    }
+    const age = calculateAge(formData.dob);
+    if (age === null || age < 20) {
+      alert("You must be at least 20 years old to apply for a loan under partner lending policies.");
       return;
     }
     if (!formData.fatherName.trim()) {
@@ -1331,12 +1663,24 @@ export default function ApplyForLoanView({
       alert("Please enter your Monthly Income.");
       return;
     }
+    if (!formData.loanAmountRequired?.trim()) {
+      alert("Please enter your Loan Amount Required.");
+      return;
+    }
     if (!formData.currentAddress?.trim()) {
       alert("Please enter your Current Address.");
       return;
     }
+    if (!formData.currentState?.trim()) {
+      alert("Please select your Current State.");
+      return;
+    }
     if (!formData.permanentAddress?.trim()) {
       alert("Please enter your Permanent Address.");
+      return;
+    }
+    if (!formData.permanentState?.trim()) {
+      alert("Please select your Permanent State.");
       return;
     }
     if (!formData.workingAddress?.trim()) {
@@ -1344,10 +1688,61 @@ export default function ApplyForLoanView({
       return;
     }
 
-    setCurrentStep(2);
+    setIsStep1Submitting(true);
+    setSubmitError(null);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const applicantPayload = {
+        prefix: formData.prefix || "Mr.",
+        full_name: formData.fullName.trim(),
+        dob: formData.dob || "",
+        father_name: formData.fatherName.trim(),
+        mother_name: formData.motherName.trim(),
+        mobile: formData.mobileNumber.replace(/\D/g, ""),
+        email: formData.email.trim(),
+        official_email: formData.officialEmail?.trim() || companyOfficialEmail?.trim() || "",
+        city: formData.city.trim(),
+        state: formData.currentState?.trim() || formData.permanentState?.trim() || "",
+        current_address: formData.currentAddress.trim(),
+        permanent_address: formData.permanentAddress.trim() || formData.currentAddress.trim(),
+        working_address: formData.workingAddress.trim(),
+        employment_type: formData.employmentType || "salaried",
+        monthly_income: parseFloat(String(formData.monthlyIncome).replace(/,/g, "")) || 0,
+        pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
+      };
+
+      const leadTypeValue = journeyType === "employee" ? "employee" : journeyType === "admin" ? "admin" : "notion";
+      const res = await fetch(`${apiBase}/loan-applications/step1-register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customer_id: omsCustomerId || undefined,
+          applicant: applicantPayload,
+          is_guest: isGuest,
+          lead_type: leadTypeValue,
+          leadType: leadTypeValue,
+          journey_type: journeyType
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.customer_id) {
+          setOmsCustomerId(data.customer_id);
+        }
+      }
+    } catch (err) {
+      console.warn("Step 1 customer registration notice:", err);
+    } finally {
+      setIsStep1Submitting(false);
+      setCurrentStep(2);
+    }
   };
 
-  const handleNextStep2 = () => {
+  const handleNextStep2 = async () => {
     // Validate Mandatory Docs
     const hasAadhaar = aadhaarDoc.mode === "pdf" ? Boolean(aadhaarDoc.fileName) : Boolean(aadhaarDoc.frontPhoto);
     if (!hasAadhaar) {
@@ -1381,10 +1776,56 @@ export default function ApplyForLoanView({
       return;
     }
 
-    setCurrentStep(3);
+    setIsStep2Submitting(true);
+    setSubmitError(null);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+
+      const coreDocsPayload: any[] = [];
+      if (aadhaarDoc.mode === "pdf") {
+        coreDocsPayload.push({ type: "Aadhaar Card", filename: aadhaarDoc.fileName || "aadhaar.pdf", data: aadhaarDoc.fileData });
+      } else {
+        if (aadhaarDoc.frontPhoto) coreDocsPayload.push({ type: "Aadhaar Front", filename: "aadhaar_front.jpg", data: aadhaarDoc.frontPhoto });
+        if (aadhaarDoc.backPhoto) coreDocsPayload.push({ type: "Aadhaar Back", filename: "aadhaar_back.jpg", data: aadhaarDoc.backPhoto });
+      }
+      if (panDoc.mode === "pdf") {
+        coreDocsPayload.push({ type: "PAN Card", filename: panDoc.fileName || "pan.pdf", data: panDoc.fileData });
+      } else if (panDoc.frontPhoto) {
+        coreDocsPayload.push({ type: "PAN Card", filename: "pan.jpg", data: panDoc.frontPhoto });
+      }
+      if (photoDoc.photoPreview || photoDoc.fileData) {
+        coreDocsPayload.push({ type: "Photo", filename: photoDoc.fileName || "photo.jpg", data: photoDoc.photoPreview || photoDoc.fileData });
+      }
+      if (bankStatementDoc.fileName || bankStatementDoc.fileData) {
+        coreDocsPayload.push({ type: "Bank Statements", filename: bankStatementDoc.fileName || "bank_statement.pdf", data: bankStatementDoc.fileData });
+      }
+      if (currentAddressProofDoc.fileName || currentAddressProofDoc.fileData) {
+        coreDocsPayload.push({ type: "Current Address Proof", filename: currentAddressProofDoc.fileName, data: currentAddressProofDoc.fileData });
+      }
+      if (permanentAddressProofDoc.fileName || permanentAddressProofDoc.fileData) {
+        coreDocsPayload.push({ type: "Permanent Address Proof", filename: permanentAddressProofDoc.fileName, data: permanentAddressProofDoc.fileData });
+      }
+
+      await fetch(`${apiBase}/loan-applications/step2-documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customer_id: omsCustomerId,
+          documents: coreDocsPayload
+        })
+      });
+    } catch (err) {
+      console.warn("Step 2 documents upload notice:", err);
+    } finally {
+      setIsStep2Submitting(false);
+      setCurrentStep(3);
+    }
   };
 
-  const handleSubmitFinal = (e: React.FormEvent) => {
+  const handleSubmitFinal = async (e: React.FormEvent) => {
     e.preventDefault();
     const effectiveFields = getEffectiveDocFields();
     for (const field of effectiveFields) {
@@ -1649,16 +2090,202 @@ export default function ApplyForLoanView({
     }
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const randomRef = "F2-" + Math.floor(100000 + Math.random() * 900000);
-      setSubmittedRefNo(randomRef);
+    try {
+      const applicantPayload = {
+        prefix: formData.prefix || "Mr.",
+        full_name: formData.fullName.trim(),
+        dob: formData.dob || "",
+        father_name: formData.fatherName.trim(),
+        mother_name: formData.motherName.trim(),
+        mobile: formData.mobileNumber.replace(/\D/g, ""),
+        email: formData.email.trim(),
+        official_email: formData.officialEmail?.trim() || companyOfficialEmail?.trim() || "",
+        city: formData.city.trim(),
+        state: formData.currentState?.trim() || formData.permanentState?.trim() || "",
+        current_address: formData.currentAddress.trim(),
+        permanent_address: formData.permanentAddress.trim() || formData.currentAddress.trim(),
+        working_address: formData.workingAddress.trim(),
+        employment_type: formData.employmentType || "salaried",
+        monthly_income: parseFloat(String(formData.monthlyIncome).replace(/,/g, "")) || 0,
+        pan: (formData.pan || panDoc.fileName || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
+      };
+
+      // Resolve provider string from selectedProviders
+      const providersList: string[] = Array.isArray(formData.selectedProviders)
+        ? formData.selectedProviders.map((p: any) => String(p).trim()).filter(Boolean)
+        : [];
+
+      let resolvedProvider = "Let F2 Fintech decide your lender";
+      if (providersList.length > 0) {
+        const hasDecide = providersList.some((p) => p.toLowerCase().includes("decide"));
+        if (hasDecide && providersList.length === 1) {
+          resolvedProvider = "Let F2 Fintech decide your lender";
+        } else {
+          const specificBanks = providersList.filter((p) => !p.toLowerCase().includes("decide"));
+          resolvedProvider = specificBanks.length > 0 ? specificBanks.join(", ") : "Let F2 Fintech decide your lender";
+        }
+      }
+
+      const loanPayload = {
+        amount: parseFloat(String(formData.loanAmountRequired || formData.desiredAmount).replace(/,/g, "")) || 500000,
+        type: currentCategory.name || "Personal Loan",
+        tenure_years: formData.tenureYears || 3,
+        purpose: `${currentCategory.name} Application via FinHeal`,
+        provider: resolvedProvider,
+        selected_providers: providersList.length > 0 ? providersList : [resolvedProvider],
+        case_type: formData.caseType || "Fresh",
+        has_existing_loans: formData.hasExistingLoans || "No",
+        existing_loans: formData.hasExistingLoans === "Yes" ? (formData.existingLoans || []) : []
+      };
+
+      const documentsPayload: any[] = [];
+
+      // Aadhaar
+      if (aadhaarDoc.mode === "pdf") {
+        documentsPayload.push({
+          type: "Aadhaar Card",
+          filename: aadhaarDoc.fileName || "aadhaar_card.pdf",
+          data: aadhaarDoc.fileData || null
+        });
+      } else {
+        if (aadhaarDoc.frontPhoto) {
+          documentsPayload.push({
+            type: "Aadhaar Card Front",
+            filename: "aadhaar_front.jpg",
+            data: aadhaarDoc.frontPhoto
+          });
+        }
+        if (aadhaarDoc.backPhoto) {
+          documentsPayload.push({
+            type: "Aadhaar Card Back",
+            filename: "aadhaar_back.jpg",
+            data: aadhaarDoc.backPhoto
+          });
+        }
+      }
+
+      // PAN
+      if (panDoc.mode === "pdf") {
+        documentsPayload.push({
+          type: "PAN Card",
+          filename: panDoc.fileName || "pan_card.pdf",
+          data: panDoc.fileData || null
+        });
+      } else if (panDoc.frontPhoto) {
+        documentsPayload.push({
+          type: "PAN Card",
+          filename: "pan_card.jpg",
+          data: panDoc.frontPhoto
+        });
+      }
+
+      // Passport Photo
+      if (photoDoc.photoPreview || photoDoc.fileData) {
+        documentsPayload.push({
+          type: "Photo",
+          filename: photoDoc.fileName || "passport_photo.jpg",
+          data: photoDoc.photoPreview || photoDoc.fileData
+        });
+      }
+
+      // Current & Permanent Address Proofs
+      if (currentAddressProofDoc.fileName) {
+        documentsPayload.push({
+          type: "Current Address Proof",
+          filename: currentAddressProofDoc.fileName,
+          data: currentAddressProofDoc.fileData || null
+        });
+      }
+
+      if (permanentAddressProofDoc.fileName) {
+        documentsPayload.push({
+          type: "Permanent Address Proof",
+          filename: permanentAddressProofDoc.fileName,
+          data: permanentAddressProofDoc.fileData || null
+        });
+      }
+
+      // Salary Slips
+      if (salarySlipsDoc.fileName) {
+        documentsPayload.push({
+          type: "Salary Slip",
+          filename: salarySlipsDoc.fileName,
+          data: salarySlipsDoc.fileData || null
+        });
+      }
+
+      // Additional category documents
+      Object.entries(additionalUploaded).forEach(([key, item]: [string, any]) => {
+        if (item && item.fileName) {
+          documentsPayload.push({
+            type: key,
+            filename: item.fileName,
+            data: item.fileData || null
+          });
+        }
+      });
+
+      // Bank Statement
+      const bankStatementPayload = {
+        bank_name: "Primary Bank",
+        account_no: "N/A",
+        ifsc_code: "N/A",
+        account_type: "Savings",
+        filename: bankStatementDoc.fileName || "bank_statement.pdf",
+        data: bankStatementDoc.fileData || null
+      };
+
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const session = getStoredAuthSession();
+      const currentLoggedInName = (userName?.trim() || session?.displayName?.trim() || formData.fullName?.trim() || "Applicant").trim();
+      const currentLoggedInEmail = (userEmail?.trim() || session?.email?.trim() || formData.email?.trim() || "").trim();
+
+      const leadTypeValue = journeyType === "employee" ? "employee" : journeyType === "admin" ? "admin" : "notion";
+      const response = await fetch(`${apiBase}/loan-applications/step3-application`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          customer_id: omsCustomerId,
+          loan: loanPayload,
+          provider: resolvedProvider,
+          lead_type: leadTypeValue,
+          leadType: leadTypeValue,
+          journey_type: journeyType,
+          user_name: currentLoggedInName,
+          user_email: currentLoggedInEmail,
+          applied_by_name: (journeyType === "employee" || journeyType === "admin") ? currentLoggedInName : undefined,
+          documents: documentsPayload,
+          business_details: activeTab === "business" ? { businessType, companyOfficialEmail, pvtDirectors, partnershipPartners } : undefined,
+          education_details: activeTab === "education" ? eduDetails : undefined,
+          professional_details: activeTab === "doctor" ? proDetails : undefined,
+          property_details: (activeTab === "home" || activeTab === "lap") ? hlLapDetails : undefined
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server returned status ${response.status}`);
+      }
+
+      const resData = await response.json();
+      const rawRef = String(resData.application_no || resData.reference_no || "").replace(/\D/g, "");
+      const generatedRef = rawRef || String(Math.floor(10000000 + Math.random() * 90000000));
+
+      // Reset all underlying form data and attached documents so next application starts completely blank
+      resetEntireApplicationForm(true);
+      // Set submission confirmation state and reference number for the success screen
+      setSubmittedRefNo(generatedRef);
       setIsSubmittedSuccess(true);
-      try {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-      } catch (e) { }
-    }, 1200);
+    } catch (err: any) {
+      console.error("Loan application submission failed:", err);
+      setSubmitError(err.message || "Failed to submit application. Please verify your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Request browser camera permissions and start stream
@@ -1852,7 +2479,27 @@ export default function ApplyForLoanView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f8fafc] overflow-y-auto">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f8fafc] overflow-y-auto relative">
+      {/* Guest User Restriction Modal (Identical to CIBIL Fetch Page) */}
+      {isGuest && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none">
+          <div className="bg-white border border-gray-150 rounded-[24px] p-[32px] max-w-[420px] w-full mx-4 shadow-[0_24px_80px_rgba(15,23,42,0.25)] animate-scale-in">
+            <div className="text-[36px] text-center mb-[14px]">🔒</div>
+            <h3 className="text-[20px] font-bold text-gray-900 text-center mb-[8px] tracking-tight">Sign in to Apply for a Loan</h3>
+            <p className="text-[13px] text-gray-500 text-center mb-[24px] leading-relaxed">
+              Guest accounts cannot submit loan applications. Please create a free account or sign in to verify your profile and submit your loan application.
+            </p>
+            <button
+              onClick={onLoginRequired}
+              className="h-[48px] w-full rounded-[14px] bg-primary text-white font-semibold text-[14px] hover:bg-[#1e2db8] transition cursor-pointer shadow-md shadow-primary/20"
+              type="button"
+            >
+              Sign Up / Login
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Navigation Bar */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200 px-4 py-3 sm:px-6 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
@@ -1879,7 +2526,7 @@ export default function ApplyForLoanView({
       </header>
 
       {/* Main Content Body */}
-      <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <div className={`max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6 ${isGuest ? "pointer-events-none select-none filter blur-[4px]" : ""}`}>
         {/* Hero Banner Section */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#1e293b] via-[#0f172a] to-[#1e1b4b] text-white p-6 sm:p-8 shadow-xl">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
@@ -2209,15 +2856,22 @@ export default function ApplyForLoanView({
                   <CheckCircle className="w-12 h-12" />
                 </div>
                 <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-full border border-emerald-200 shadow-2xs mx-auto">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Synced with F2 Fintech OMS</span>
+                  </div>
                   <h4 className="text-xl font-bold text-gray-900">Loan Application Submitted!</h4>
                   <p className="text-sm text-gray-600">
                     Thank you for applying for <span className="font-semibold text-gray-900">{currentCategory.name}</span>.
                   </p>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700">
-                  <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Application Reference Number</div>
-                  <div className="text-xl font-extrabold text-primary tracking-widest mt-1">{submittedRefNo}</div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-1">
+                  <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Application Number</div>
+                  <div className="text-2xl font-extrabold text-blue-600 tracking-wider mt-1 select-all">{submittedRefNo}</div>
+                  <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-1 mt-1">
+                    <Check className="w-3.5 h-3.5" /> Direct OMS Lead Generated & Forwarded to Lending Desk
+                  </div>
                 </div>
 
                 <p className="text-xs text-gray-500 leading-relaxed">
@@ -2227,13 +2881,12 @@ export default function ApplyForLoanView({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsSubmittedSuccess(false);
-                    setSubmittedRefNo("");
-                    setCurrentStep(1);
+                    resetEntireApplicationForm(true);
+                    handleScrollToApplicantForm();
                   }}
-                  className="w-full py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-600/25 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Submit Another Loan Application
+                  <Plus className="w-4 h-4" /> Submit Fresh Loan Application
                 </button>
               </div>
             ) : (
@@ -2249,24 +2902,69 @@ export default function ApplyForLoanView({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Full Name */}
-                      <div className="space-y-1.5 sm:col-span-2">
+                      {/* Full Name with Prefix */}
+                      <div className="space-y-1.5 sm:col-span-1">
                         <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantFullName">
                           Full Name (As per PAN Card) *
                         </label>
+                        <div className="flex gap-2">
+                          <select
+                            id="applicantPrefix"
+                            value={formData.prefix || "Mr."}
+                            onChange={(e) => setFormData({ ...formData, prefix: e.target.value })}
+                            className="w-20 sm:w-24 px-2.5 py-2.5 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white cursor-pointer shrink-0"
+                          >
+                            <option value="Mr.">Mr.</option>
+                            <option value="Miss">Miss</option>
+                            <option value="Mrs.">Mrs.</option>
+                            <option value="Dr.">Dr.</option>
+                            <option value="CA">CA</option>
+                          </select>
+                          <div className="relative flex-1">
+                            <UserIcon className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                            <input
+                              id="applicantFullName"
+                              type="text"
+                              required
+                              value={formData.fullName}
+                              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                              placeholder="Enter your full name"
+                              className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Date of Birth (DOB) */}
+                      <div className="space-y-1.5 sm:col-span-1">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantDob">
+                          Date of Birth (DOB) *
+                        </label>
                         <div className="relative">
-                          <UserIcon className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                          <Calendar className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
                           <input
-                            id="applicantFullName"
-                            type="text"
+                            id="applicantDob"
+                            type="date"
                             required
-                            value={formData.fullName}
-                            onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                            placeholder="Enter your full name"
-                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                            max={new Date().toISOString().split("T")[0]}
+                            value={formData.dob || ""}
+                            onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                            className={`w-full pl-10 pr-3.5 py-2.5 border rounded-xl text-xs focus:outline-none transition-all bg-white cursor-pointer ${
+                              formData.dob && isUnderage
+                                ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200 text-red-700 bg-red-50/30"
+                                : "border-gray-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
                           />
                         </div>
                       </div>
+
+                      {/* UNDERAGE BLOCKING BANNER */}
+                      {isUnderage && (
+                        <div className="sm:col-span-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2.5 text-xs text-red-700 animate-in fade-in duration-200 font-medium">
+                          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>You must be at least 20 years old to apply for a loan under partner lending policies.</span>
+                        </div>
+                      )}
 
                       {/* Father's Name */}
                       <div className="space-y-1.5">
@@ -2326,11 +3024,18 @@ export default function ApplyForLoanView({
                         </div>
                       </div>
 
-                      {/* Personal Email (Mandatory) */}
+                      {/* Personal Email (Locked for Direct User, Open for Employee/Admin Client Onboarding) */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
-                          Personal Email ID *
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantEmail">
+                            Personal Email ID *
+                          </label>
+                          {journeyType === "user" && userEmail && (
+                            <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                              ✓ Verified Account Email
+                            </span>
+                          )}
+                        </div>
                         <div className="relative">
                           <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
                           <input
@@ -2338,11 +3043,29 @@ export default function ApplyForLoanView({
                             type="email"
                             required
                             value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            placeholder="Enter your personal email ID"
-                            className="w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white"
+                            onChange={(e) => {
+                              if (journeyType !== "user" || !userEmail) {
+                                setFormData({ ...formData, email: e.target.value });
+                              }
+                            }}
+                            readOnly={journeyType === "user" && Boolean(userEmail)}
+                            placeholder={journeyType === "user" ? "Enter your personal email ID" : "Enter client's personal email ID"}
+                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs transition-all ${
+                              (journeyType === "user" && userEmail)
+                                ? "bg-gray-50/80 text-gray-600 font-medium cursor-not-allowed border-gray-200"
+                                : "bg-white text-gray-800 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
                           />
                         </div>
+                        {journeyType === "user" && userEmail ? (
+                          <p className="text-[10px] text-gray-400">
+                            Locked to your logged-in account so you can track this application in your dashboard.
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400">
+                            Enter the applicant / client email address for correspondence and tracking.
+                          </p>
+                        )}
                       </div>
 
                       {/* Official Email ID (Optional) */}
@@ -2419,6 +3142,359 @@ export default function ApplyForLoanView({
                         </div>
                       </div>
 
+                      {/* Subtitle / Header for Loan Configuration Section */}
+                      <div className="sm:col-span-2 text-center pt-3 pb-1">
+                        <p className="text-xs sm:text-sm font-medium text-gray-500">
+                          Get the loan best suited for your wish
+                        </p>
+                      </div>
+
+                      {/* 1. Loan Amount Required */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="loanAmountRequired">
+                          Loan Amount Required*
+                        </label>
+                        <div className="relative">
+                          <span className="w-4 h-4 text-blue-600 font-bold absolute left-3.5 top-3 flex items-center justify-center text-sm">
+                            ₹
+                          </span>
+                          <input
+                            id="loanAmountRequired"
+                            type="text"
+                            required
+                            value={formData.loanAmountRequired || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const num = parseInt(val.replace(/\D/g, ""), 10) || 0;
+                              setFormData({
+                                ...formData,
+                                loanAmountRequired: val,
+                                desiredAmount: num > 0 ? num : formData.desiredAmount
+                              });
+                            }}
+                            placeholder="e.g. 5,00,000"
+                            className="w-full pl-10 pr-3.5 py-3 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white font-medium text-gray-800"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 2. Select A Comfortable Tenure */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-700 block">
+                          Select A Comfortable Tenure
+                        </label>
+                        <div className="relative">
+                          <Clock className="w-4 h-4 text-blue-600 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <select
+                            value={
+                              getTenureOptionsForCategory(activeTab).includes(formData.comfortableTenure)
+                                ? formData.comfortableTenure
+                                : getTenureOptionsForCategory(activeTab)[0]
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const match = val.match(/(\d+)\s*Year/i);
+                              const years = match ? parseInt(match[1], 10) : formData.tenureYears;
+                              setFormData({
+                                ...formData,
+                                comfortableTenure: val,
+                                tenureYears: years
+                              });
+                            }}
+                            className="w-full pl-10 pr-9 py-3 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white appearance-none cursor-pointer font-medium text-gray-800"
+                          >
+                            {getTenureOptionsForCategory(activeTab).map((tenure) => (
+                              <option key={tenure} value={tenure}>
+                                {tenure}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      {/* 3. Provider Names (Select Multiple) */}
+                      <div className="space-y-1.5 relative sm:col-span-2">
+                        <label className="text-xs font-semibold text-gray-700 block">
+                          Provider Names* (Select Multiple)
+                        </label>
+                        <div className="relative">
+                          <Landmark className="w-4 h-4 text-blue-600 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <button
+                            type="button"
+                            onClick={() => setIsProviderDropdownOpen(!isProviderDropdownOpen)}
+                            className="w-full pl-10 pr-9 py-3 border border-gray-200 rounded-xl text-xs text-left focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white cursor-pointer font-medium text-gray-800 flex items-center justify-between"
+                          >
+                            <span className="truncate">
+                              {formData.selectedProviders && formData.selectedProviders.length > 0
+                                ? formData.selectedProviders.includes("Let F2 Fintech decide your lender")
+                                  ? "✨ Let F2 Fintech decide your lender"
+                                  : formData.selectedProviders.length === 1
+                                    ? formData.selectedProviders[0]
+                                    : `${formData.selectedProviders.length} Banks Selected (${formData.selectedProviders.slice(0, 3).join(", ")}${formData.selectedProviders.length > 3 ? "..." : ""})`
+                                : "Select Banks / Lenders"}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isProviderDropdownOpen ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
+
+                        {/* Multi-Select Dropdown Menu */}
+                        {isProviderDropdownOpen && (
+                          <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-64 overflow-y-auto">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                              <input
+                                type="text"
+                                value={providerSearchQuery}
+                                onChange={(e) => setProviderSearchQuery(e.target.value)}
+                                placeholder="Search bank / lender..."
+                                className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between px-1 text-[11px]">
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, selectedProviders: [...catalogLenders] })}
+                                className="text-blue-600 font-bold hover:underline cursor-pointer"
+                              >
+                                Select All
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, selectedProviders: [] })}
+                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                              >
+                                Clear All
+                              </button>
+                            </div>
+
+                            {/* Featured: Let F2 Fintech decide your lender */}
+                            {(!providerSearchQuery || "let f2 fintech decide your lender".includes(providerSearchQuery.toLowerCase())) && (
+                              <div
+                                onClick={() => {
+                                  const current = formData.selectedProviders || [];
+                                  const isChecked = current.includes("Let F2 Fintech decide your lender");
+                                  // Clicking toggles: if checked, uncheck to []; if unchecked, select it and clear all individual banks
+                                  const next = isChecked ? [] : ["Let F2 Fintech decide your lender"];
+                                  setFormData({ ...formData, selectedProviders: next });
+                                }}
+                                className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer border transition-all select-none ${
+                                  (formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")
+                                    ? "bg-blue-50 border-blue-300 text-blue-900 font-bold shadow-xs"
+                                    : "bg-gradient-to-r from-blue-50/60 to-indigo-50/50 border-blue-100 hover:border-blue-300 text-slate-800"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={(formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")}
+                                    onChange={() => {}}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                                  />
+                                  <span className="font-bold flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    Let F2 Fintech decide your lender
+                                  </span>
+                                </div>
+                                <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-md shadow-2xs">
+                                  Recommended
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                              {catalogLenders
+                                .filter((p) => p.toLowerCase().includes(providerSearchQuery.toLowerCase()))
+                                .map((provider) => {
+                                  const isChecked = (formData.selectedProviders || []).includes(provider);
+                                  return (
+                                    <div
+                                      key={provider}
+                                      onClick={() => {
+                                        // When user selects a specific bank, remove "Let F2 Fintech decide your lender"
+                                        const current = (formData.selectedProviders || []).filter(
+                                          (p: string) => p !== "Let F2 Fintech decide your lender"
+                                        );
+                                        const next = isChecked
+                                          ? current.filter((p: string) => p !== provider)
+                                          : [...current, provider];
+                                        setFormData({ ...formData, selectedProviders: next });
+                                      }}
+                                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors select-none ${isChecked ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-gray-50 text-gray-700"}`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {}}
+                                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                                      />
+                                      <span className="truncate">{provider}</span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* EXISTING LOANS SECTION */}
+                      <div className="sm:col-span-2 space-y-3 pt-4">
+                        {/* Section Header */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center shrink-0">
+                            <Landmark className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-sm font-extrabold text-blue-700 uppercase tracking-wide">
+                            EXISTING LOANS
+                          </h4>
+                        </div>
+
+                        {/* Existing Loans Container Card */}
+                        <div className="border border-slate-200 bg-slate-50/60 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
+                          {/* Loan Records Loop */}
+                          {(formData.existingLoans || [{ id: "loan_1", lenderName: "", loanType: "Personal Loan", monthlyEmi: "", outstandingAmount: "" }]).map((loanRecord: any, rIdx: number) => (
+                            <div key={loanRecord.id || rIdx} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 relative">
+                              <div className="flex items-center justify-between">
+                                <div className="inline-block bg-blue-50 text-blue-600 font-bold px-3 py-1 rounded-md text-[11px] uppercase tracking-wider">
+                                  LOAN RECORD #{rIdx + 1}
+                                </div>
+                                {rIdx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const filtered = (formData.existingLoans || []).filter((_: any, idx: number) => idx !== rIdx);
+                                      setFormData({ ...formData, existingLoans: filtered });
+                                    }}
+                                    className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1 font-semibold cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Remove
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Existing Loans Yes/No Selector (Shown on first record) */}
+                              {rIdx === 0 && (
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-semibold text-gray-700 block">
+                                    Existing Loans*
+                                  </label>
+                                  <div className="relative">
+                                    <select
+                                      value={formData.hasExistingLoans || "No"}
+                                      onChange={(e) => setFormData({ ...formData, hasExistingLoans: e.target.value })}
+                                      className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white appearance-none cursor-pointer font-medium text-gray-800"
+                                    >
+                                      <option value="Yes">Yes</option>
+                                      <option value="No">No</option>
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Detailed Fields if user selected 'Yes' */}
+                              {formData.hasExistingLoans === "Yes" && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100 animate-in fade-in duration-200">
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-semibold text-gray-700">Bank / Lender Name *</label>
+                                    <input
+                                      type="text"
+                                      value={loanRecord.lenderName || ""}
+                                      onChange={(e) => {
+                                        const updated = [...(formData.existingLoans || [])];
+                                        updated[rIdx] = { ...updated[rIdx], lenderName: e.target.value };
+                                        setFormData({ ...formData, existingLoans: updated });
+                                      }}
+                                      placeholder="e.g. HDFC Bank, SBI, Bajaj"
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-semibold text-gray-700">Loan Type *</label>
+                                    <select
+                                      value={loanRecord.loanType || "Personal Loan"}
+                                      onChange={(e) => {
+                                        const updated = [...(formData.existingLoans || [])];
+                                        updated[rIdx] = { ...updated[rIdx], loanType: e.target.value };
+                                        setFormData({ ...formData, existingLoans: updated });
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600 bg-white"
+                                    >
+                                      <option value="Personal Loan">Personal Loan</option>
+                                      <option value="Home Loan">Home Loan</option>
+                                      <option value="Business Loan">Business Loan</option>
+                                      <option value="Professional Loan">Professional Loan</option>
+                                      <option value="Auto / Car Loan">Auto / Car Loan</option>
+                                      <option value="Loan Against Property">Loan Against Property</option>
+                                      <option value="Credit Card EMI">Credit Card EMI</option>
+                                      <option value="Education Loan">Education Loan</option>
+                                      <option value="Gold Loan">Gold Loan</option>
+                                      <option value="Other">Other</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-semibold text-gray-700">Monthly EMI (₹) *</label>
+                                    <input
+                                      type="text"
+                                      value={loanRecord.monthlyEmi || ""}
+                                      onChange={(e) => {
+                                        const updated = [...(formData.existingLoans || [])];
+                                        updated[rIdx] = { ...updated[rIdx], monthlyEmi: e.target.value };
+                                        setFormData({ ...formData, existingLoans: updated });
+                                      }}
+                                      placeholder="e.g. 15,000"
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600"
+                                    />
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-semibold text-gray-700">Outstanding Balance (₹) *</label>
+                                    <input
+                                      type="text"
+                                      value={loanRecord.outstandingAmount || ""}
+                                      onChange={(e) => {
+                                        const updated = [...(formData.existingLoans || [])];
+                                        updated[rIdx] = { ...updated[rIdx], outstandingAmount: e.target.value };
+                                        setFormData({ ...formData, existingLoans: updated });
+                                      }}
+                                      placeholder="e.g. 3,50,000"
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-blue-600"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Add another record button if user has existing loans */}
+                          {formData.hasExistingLoans === "Yes" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const current = formData.existingLoans || [];
+                                setFormData({
+                                  ...formData,
+                                  existingLoans: [
+                                    ...current,
+                                    {
+                                      id: `loan_${Date.now()}_${current.length + 1}`,
+                                      lenderName: "",
+                                      loanType: "Personal Loan",
+                                      monthlyEmi: "",
+                                      outstandingAmount: ""
+                                    }
+                                  ]
+                                });
+                              }}
+                              className="py-2 px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl border border-blue-200 flex items-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Add Another Loan Record
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Address Details Sub-heading */}
                       <div className="pt-2 border-t border-gray-100 sm:col-span-2">
                         <h5 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
@@ -2453,6 +3529,36 @@ export default function ApplyForLoanView({
                         </div>
                       </div>
 
+                      {/* Current State */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantCurrentState">
+                          State (Current Address) *
+                        </label>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <select
+                            id="applicantCurrentState"
+                            required
+                            value={formData.currentState || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                currentState: val,
+                                permanentState: prev.sameAsCurrentAddress ? val : prev.permanentState
+                              }));
+                            }}
+                            className="w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all bg-white cursor-pointer appearance-none"
+                          >
+                            <option value="">Select State / Union Territory</option>
+                            {INDIAN_STATES.map((state) => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
+                        </div>
+                      </div>
+
                       {/* Permanent Address */}
                       <div className="space-y-1.5 sm:col-span-2">
                         <div className="flex items-center justify-between">
@@ -2468,7 +3574,8 @@ export default function ApplyForLoanView({
                                 setFormData((prev: any) => ({
                                   ...prev,
                                   sameAsCurrentAddress: checked,
-                                  permanentAddress: checked ? prev.currentAddress : prev.permanentAddress
+                                  permanentAddress: checked ? prev.currentAddress : prev.permanentAddress,
+                                  permanentState: checked ? prev.currentState : prev.permanentState
                                 }));
                               }}
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
@@ -2486,9 +3593,36 @@ export default function ApplyForLoanView({
                             value={formData.permanentAddress || ""}
                             onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
                             placeholder="Enter permanent address as per Aadhaar / Passport"
-                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all ${formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
-                              }`}
+                            className={`w-full pl-10 pr-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                              formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white"
+                            }`}
                           />
+                        </div>
+                      </div>
+
+                      {/* Permanent State */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-semibold text-gray-700 block" htmlFor="applicantPermanentState">
+                          State (Permanent Address) *
+                        </label>
+                        <div className="relative">
+                          <MapPin className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                          <select
+                            id="applicantPermanentState"
+                            required
+                            disabled={formData.sameAsCurrentAddress}
+                            value={formData.permanentState || ""}
+                            onChange={(e) => setFormData({ ...formData, permanentState: e.target.value })}
+                            className={`w-full pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 transition-all appearance-none ${
+                              formData.sameAsCurrentAddress ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white cursor-pointer"
+                            }`}
+                          >
+                            <option value="">Select State / Union Territory</option>
+                            {INDIAN_STATES.map((state) => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-3.5 pointer-events-none" />
                         </div>
                       </div>
 
@@ -2516,10 +3650,24 @@ export default function ApplyForLoanView({
                       <button
                         type="button"
                         onClick={handleNextStep1}
-                        className="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                        disabled={isUnderage || isStep1Submitting}
+                        className={`py-3 px-8 font-bold text-xs rounded-xl transition-all flex items-center gap-2 ${
+                          isUnderage || isStep1Submitting
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                        }`}
                       >
-                        <span>Next: Upload Documents</span>
-                        <ChevronRight className="w-4 h-4" />
+                        {isStep1Submitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Registering Customer Profile...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{isUnderage ? "Form Locked (Age < 20)" : "Next: Upload Documents"}</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -2943,8 +4091,12 @@ export default function ApplyForLoanView({
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    const url = URL.createObjectURL(file);
-                                    setPhotoDoc({ fileName: file.name, photoPreview: url });
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      const dataUrl = ev.target?.result as string;
+                                      setPhotoDoc({ fileName: file.name, photoPreview: dataUrl, fileData: dataUrl });
+                                    };
+                                    reader.readAsDataURL(file);
                                   }
                                 }}
                                 className="hidden"
@@ -3323,10 +4475,24 @@ export default function ApplyForLoanView({
                       <button
                         type="button"
                         onClick={handleNextStep2}
-                        className="py-3 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                        disabled={isStep2Submitting}
+                        className={`py-3 px-8 font-bold text-xs rounded-xl transition-all flex items-center gap-2 ${
+                          isStep2Submitting
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                        }`}
                       >
-                        <span>Next: Additional Documents</span>
-                        <ChevronRight className="w-4 h-4" />
+                        {isStep2Submitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Uploading Documents</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Next: Additional Documents</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -4530,14 +5696,19 @@ export default function ApplyForLoanView({
                                         onChange={(e) => {
                                           const file = e.target.files?.[0];
                                           if (file) {
-                                            setAdditionalUploaded((prev) => {
-                                              const currentList = getAdditionalFiles(field.id);
-                                              const updated = Array.from(new Set([...currentList, file.name]));
-                                              return {
-                                                ...prev,
-                                                [field.id]: { fileName: updated[0], fileList: updated }
-                                              };
-                                            });
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {
+                                              const dataUrl = ev.target?.result as string;
+                                              setAdditionalUploaded((prev) => {
+                                                const currentList = getAdditionalFiles(field.id);
+                                                const updated = Array.from(new Set([...currentList, file.name]));
+                                                return {
+                                                  ...prev,
+                                                  [field.id]: { fileName: updated[0], fileList: updated, fileData: dataUrl }
+                                                };
+                                              });
+                                            };
+                                            reader.readAsDataURL(file);
                                           }
                                         }}
                                         className="hidden"
@@ -6715,14 +7886,19 @@ export default function ApplyForLoanView({
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  setAdditionalUploaded((prev) => {
-                                    const currentList = getAdditionalFiles(field.id);
-                                    const updated = Array.from(new Set([...currentList, file.name]));
-                                    return {
-                                      ...prev,
-                                      [field.id]: { fileName: updated[0], fileList: updated }
-                                    };
-                                  });
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    const dataUrl = ev.target?.result as string;
+                                    setAdditionalUploaded((prev) => {
+                                      const currentList = getAdditionalFiles(field.id);
+                                      const updated = Array.from(new Set([...currentList, file.name]));
+                                      return {
+                                        ...prev,
+                                        [field.id]: { fileName: updated[0], fileList: updated, fileData: dataUrl }
+                                      };
+                                    });
+                                  };
+                                  reader.readAsDataURL(file);
                                 }
                               }}
                               className="hidden"
@@ -6782,6 +7958,17 @@ export default function ApplyForLoanView({
                         I hereby authorize F2 Fintech and its partner lenders to process my application and uploaded KYC documents for loan sanction and disbursal.
                       </label>
                     </div>
+
+                    {/* Submission Error Banner */}
+                    {submitError && (
+                      <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700 animate-in fade-in duration-200">
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Submission Notice</p>
+                          <p className="text-[11px] text-red-600 mt-0.5">{submitError}</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Final Submit & Back Buttons */}
                     <div className="pt-2 flex justify-between items-center">

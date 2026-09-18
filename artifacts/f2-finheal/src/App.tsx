@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const FinHealChat = lazy(() => import("@/pages/FinHealChat"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function resolveCodespacesBackendFromCurrentHost(): string | null {
@@ -89,9 +91,13 @@ function Router() {
       <Route path="/eligibility" component={FinHealChat} />
       <Route path="/apply-loan/:category" component={FinHealChat} />
       <Route path="/apply-loan" component={FinHealChat} />
+      <Route path="/track-application" component={FinHealChat} />
+      <Route path="/track-tickets" component={FinHealChat} />
       <Route path="/credit-cards" component={FinHealChat} />
       <Route path="/reminders" component={FinHealChat} />
       <Route path="/goals" component={FinHealChat} />
+      <Route path="/verify-email" component={VerifyEmail} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/tests/:id" component={FinHealChat} />
       <Route path="/tests" component={FinHealChat} />
       <Route component={NotFound} />

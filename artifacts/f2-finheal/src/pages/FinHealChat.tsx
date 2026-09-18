@@ -20,7 +20,9 @@ const CreditReadinessReviewView = lazy(() => import("@/components/CreditReadines
 const DynamicTestView = lazy(() => import("@/components/DynamicTestView"));
 const InsightsPanel = lazy(() => import("@/components/InsightsPanel"));
 import AuthScreen from "@/components/AuthScreen";
+import OnboardingModal from "@/components/OnboardingModal";
 import ProfilePage from "@/components/ProfilePage";
+
 import { useBackendChat } from "@/hooks/useBackendChat";
 import type { MoodDimensions } from "@/lib/backendChat";
 import { deleteConversation as apiDeleteConversation } from "@/lib/backendChat";
@@ -42,6 +44,7 @@ const EligibilityCheckerView = lazy(() => import("@/components/EligibilityChecke
 const Dashboard = lazy(() => import("@/components/Dashboard"));
 const RemindersView = lazy(() => import("@/components/RemindersView"));
 const CreditCardGeniusView = lazy(() => import("@/components/CreditCardGeniusView"));
+const TrackApplicationView = lazy(() => import("@/components/TrackApplicationView"));
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
 
 const SESSION_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -59,7 +62,9 @@ export default function FinHealChat() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [isEligibilityModalOpen, setIsEligibilityModalOpen] = useState(false);
   const [applyLoanCategory, setApplyLoanCategory] = useState<string>("personal");
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [location, setLocation] = useLocation();
+
 
   useEffect(() => {
     if (location === "/") {
@@ -110,12 +115,18 @@ export default function FinHealChat() {
           }
         } else if (authSession.userId && !authSession.isGuest) {
           const profile = await fetchUserProfile(authSession.userId);
-          if (profile && profile.name && profile.name !== authSession.displayName) {
-            const updatedSession = { ...authSession, displayName: profile.name };
-            setStoredAuthSession(updatedSession);
-            setAuthSession(updatedSession);
+          if (profile) {
+            if (profile.name && profile.name !== authSession.displayName) {
+              const updatedSession = { ...authSession, displayName: profile.name };
+              setStoredAuthSession(updatedSession);
+              setAuthSession(updatedSession);
+            }
+            if ((!profile.phone || !profile.dateOfBirth) && authSession.userId.startsWith("ga-")) {
+              setShowOnboardingModal(true);
+            }
           }
         }
+
       } catch (err) {
         console.warn("Session validation failed. Forcing logout:", err);
         clearStoredAuthSession();
@@ -145,6 +156,7 @@ export default function FinHealChat() {
     if (location === "/eligibility-cibil") return "eligibility-cibil";
     if (location === "/eligibility-checker" || location === "/eligibility") return "eligibility-checker";
     if (location === "/apply-loan" || location.startsWith("/apply-loan/")) return "apply-loan";
+    if (location === "/track-application" || location === "/track-tickets") return "track-application";
     if (location === "/credit-cards") return "credit-cards";
     if (location === "/tests") return "tests";
     if (location === "/goals") return "goals";
@@ -162,6 +174,7 @@ export default function FinHealChat() {
   const setMainView = (view: string) => {
     if (view === "chat") setLocation("/chat");
     else if (view === "apply-loan") setLocation("/apply-loan");
+    else if (view === "track-application") setLocation("/track-application");
     else if (view === "credit-cards") setLocation("/credit-cards");
     else if (view === "financial-literacy") setLocation("/tests/financial-literacy");
     else if (view === "emergency-fund") setLocation("/tests/emergency-fund");
@@ -404,8 +417,28 @@ export default function FinHealChat() {
       setMainView("chat");
       setShowWelcome(true);
       window.localStorage.removeItem("finheal_quiz_dismissed_time");
+      if (session.isNewUser || (session.userId && session.userId.startsWith("ga-") && !session.isGuest)) {
+        setShowOnboardingModal(true);
+      }
     }
   };
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboardingModal(false);
+    if (authSession?.userId) {
+      try {
+        const updated = await fetchUserProfile(authSession.userId);
+        if (updated && updated.name) {
+          const nextSession = { ...authSession, displayName: updated.name, isNewUser: false };
+          setStoredAuthSession(nextSession);
+          setAuthSession(nextSession);
+        }
+      } catch (e) {
+        console.error("Failed to refresh profile after onboarding:", e);
+      }
+    }
+  };
+
 
   const refreshHearts = useCallback(async () => {
     if (!authSession?.userId || !authSession.isGuest) return;
@@ -760,6 +793,14 @@ export default function FinHealChat() {
   const openDebtBalanceReview = () => openTestInNewTab("debt-balance");
   const openCreditReadiness = () => openTestInNewTab("credit-readiness");
 
+  const openTrackApplication = () => {
+    setMainView("track-application");
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      closeSidebar();
+    }
+  };
+
   const openFreshChat = () => {
     setMainView("chat");
     chat.clearConversation();
@@ -806,6 +847,9 @@ export default function FinHealChat() {
     return false;
   };
 
+  const isEmployeeId = authSession?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authSession.userId);
+  const isStaff = authSession?.isAdvisor || authSession?.isStaff || (authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) || isUserAdvisor(authSession?.email) || isEmployeeId;
+
   const activeSidebarNav = mainView === "chat"
     ? "Talk to FinHeal"
     : mainView === "goals"
@@ -830,6 +874,8 @@ export default function FinHealChat() {
                     ? "CIBIL & Bank Statement Analyser"
                   : mainView === "apply-loan"
                     ? "Apply for Loan"
+                  : mainView === "track-application"
+                    ? (isStaff ? "Track Your Tickets" : "Track Your Application")
                     : mainView === "dashboard"
                       ? "My Dashboard"
                       : mainView === "reminders"
@@ -1074,6 +1120,7 @@ export default function FinHealChat() {
           onOpenEligibilityChecker={openEligibilityChecker}
           onOpenEligibilityModal={openEligibilityModal}
           onOpenApplyLoan={openApplyLoan}
+          onOpenTrackApplication={openTrackApplication}
           onOpenDashboard={openDashboard}
           onOpenReminders={openReminders}
           onOpenCreditCards={openCreditCards}
@@ -1308,10 +1355,29 @@ export default function FinHealChat() {
               <ApplyForLoanView
                 userId={userId}
                 userEmail={authSession?.email}
+                userName={authSession?.displayName}
+                journeyType={
+                  (authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase()))
+                    ? "admin"
+                    : isStaff
+                    ? "employee"
+                    : "user"
+                }
+                isGuest={authSession?.isGuest ?? true}
+                onLoginRequired={handleLogout}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
                 onOpenLoanCalculator={openLoanCalculator}
                 initialCategory={applyLoanCategory}
+              />
+            ) : mainView === "track-application" ? (
+              <TrackApplicationView
+                userId={userId}
+                userEmail={authSession?.email}
+                portalRole={(authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) ? "admin" : isStaff ? "employee" : "user"}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onToggleInsights={() => setInsightsOpen((open) => !open)}
+                onApplyNewLoan={openApplyLoan}
               />
             ) : (
               <DebtBalanceReviewView
@@ -1425,9 +1491,17 @@ export default function FinHealChat() {
           isAdvisor={isUserAdvisor(authSession?.email)}
           isAdmin={authSession?.email === "admin@finheal.com" || authSession?.email === "admin@f2finheal.com"}
         />
+        {showOnboardingModal && authSession && (
+          <OnboardingModal
+            isOpen={showOnboardingModal}
+            session={authSession}
+            onComplete={handleOnboardingComplete}
+          />
+        )}
       </div>
     </>
   );
 }
+
 
 

@@ -33,9 +33,10 @@ interface SidebarProps {
   onOpenReminders?: () => void;
   onOpenCreditCards?: () => void;
   onOpenApplyLoan?: () => void;
+  onOpenTrackApplication?: () => void;
 }
 
-export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenEligibilityModal, onOpenEligibilityChecker, onOpenDashboard, onOpenReminders, onOpenCreditCards, onOpenApplyLoan }: SidebarProps) {
+export default function Sidebar({ userId, userProfile, userEmail, sessionId, isOpen, onClose, onOpenChat, onStartNewChat, onOpenFinancialHealthTests, onOpenProfile, onOpenEducation, onOpenAdvisor, onOpenAdmin, onLogout, initialActiveNav, onSelectMood, onOpenLoanCalculator, onOpenEligibilityCibil, onOpenEligibilityModal, onOpenEligibilityChecker, onOpenDashboard, onOpenReminders, onOpenCreditCards, onOpenApplyLoan, onOpenTrackApplication }: SidebarProps) {
   const [activeMood, setActiveMood] = useState("😐");
   const [activeNav, setActiveNav] = useState(initialActiveNav);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -381,6 +382,16 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
     }
   };
 
+  const handleOpenTrackApplication = () => {
+    const navLabel = isStaff ? "Track Your Tickets" : "Track Your Application";
+    setActiveNav(navLabel);
+    onOpenTrackApplication?.();
+
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches) {
+      onClose();
+    }
+  };
+
   const handleOpenDashboard = () => {
     setActiveNav("My Dashboard");
     onOpenDashboard?.();
@@ -702,6 +713,12 @@ export default function Sidebar({ userId, userProfile, userEmail, sessionId, isO
               )}
               <NavBtn icon="🎯" label="Check your Eligibility" active={activeNav === "Check your Eligibility"} onClick={handleOpenEligibilityChecker} />
               <NavBtn icon="📝" label="Apply for Loan" active={activeNav === "Apply for Loan"} onClick={handleOpenApplyLoan} />
+              <NavBtn
+                icon="📍"
+                label={isSuperAdmin ? "Track All Platform Tickets" : isStaff ? "Track Company Tickets" : "Track Your Loan Applications"}
+                active={activeNav === "Track Your Loan Applications" || activeNav === "Track Company Tickets" || activeNav === "Track All Platform Tickets" || activeNav === "Track Your Application" || activeNav === "Track Your Tickets"}
+                onClick={handleOpenTrackApplication}
+              />
               <NavBtn icon="🏦" label="Loan Calculator" active={activeNav === "Loan Calculator"} onClick={handleOpenLoanCalculator} />
               <NavBtn icon="💳" label="Credit Cards" active={activeNav === "Credit Cards"} onClick={handleOpenCreditCards} />
 

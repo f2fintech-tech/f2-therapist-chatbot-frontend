@@ -1,6 +1,9 @@
+import { signInWithPopup } from "firebase/auth";
+import { getFirebaseAuth, googleProvider } from "./firebase";
 import { getApiBaseUrl } from "@/lib/backendChat";
 import type { AuthSession } from "@/utils/authSession";
 import { isSlotPassed } from "../utils/availability";
+
 
 interface AuthResponse {
   user_id: string;
@@ -9,8 +12,11 @@ interface AuthResponse {
   name?: string;
   hearts?: number;
   is_guest?: boolean;
+  is_new_user?: boolean;
   permissions?: string[];
 }
+
+
 
 export interface BackendUserProfile {
   user_id: string;
@@ -90,8 +96,14 @@ export async function authRequest<T>(path: string, init: RequestInit): Promise<T
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    const message = body || `${response.status} ${response.statusText}`;
-    throw new Error(message);
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed.detail) {
+        message = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
+      }
+    } catch (e) {}
+    throw new Error(message || `${response.status} ${response.statusText}`);
   }
 
   return parseJsonResponse<T>(response);
@@ -148,7 +160,41 @@ export async function signUpUser(email: string, password: string, guestUserId?: 
   };
 }
 
+export async function signInWithGoogle(guestUserId?: string): Promise<AuthSession> {
+  const firebaseAuth = getFirebaseAuth();
+  const userCredential = await signInWithPopup(firebaseAuth, googleProvider);
+
+  const user = userCredential.user;
+  const email = user.email;
+  if (!email) {
+    throw new Error("Unable to retrieve email from Google Account.");
+  }
+
+  const result = await authRequest<AuthResponse>("auth/google", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      name: user.displayName || email,
+      google_id: user.uid,
+      guest_user_id: guestUserId,
+    }),
+  });
+
+  return {
+    userId: result.user_id,
+    token: result.token ?? "",
+    email: result.email,
+    displayName: result.name || email,
+    hearts: result.hearts ?? null,
+    isGuest: false,
+    isNewUser: result.is_new_user ?? false,
+    authenticatedAt: new Date().toISOString(),
+  };
+}
+
+
 export interface AdvisorSignupPayload {
+
   f2_fintech_id: string;
   designation: string;
   password: string;
