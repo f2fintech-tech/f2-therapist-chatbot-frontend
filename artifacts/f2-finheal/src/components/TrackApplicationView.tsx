@@ -38,6 +38,7 @@ import {
   Ban,
   Image as ImageIcon
 } from "lucide-react";
+import { getStoredAuthSession } from "@/utils/authSession";
 
 export interface TicketStage {
   id: number;
@@ -594,17 +595,24 @@ export default function TrackApplicationView({
     setIsLoadingTickets(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const session = getStoredAuthSession();
+      const headers: Record<string, string> = {
+        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
+      };
       // If user portal, pass user's email to backend for safety
       const emailParam = (activeRole === "user" && userEmail) ? `&email=${encodeURIComponent(userEmail.trim())}` : "";
-      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal${emailParam}`);
+      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal${emailParam}`, {
+        headers
+      });
       if (res.ok) {
         const json = await res.json();
         const rawList = Array.isArray(json.tickets) ? json.tickets : (json.data?.data?.results || []);
 
-        // Double safety filter: strictly retain only tickets where applicationSource is 'finheal'
-        const finhealOnly = rawList.filter(
-          (t: any) => String(t.applicationSource || t.source || "").trim().toLowerCase() === "finheal"
-        );
+        // Strictly retain only tickets where applicationSource is 'finheal'
+        const finhealOnly = rawList.filter((t: any) => {
+          const src = String(t.applicationSource || t.source || t.application_source || "").trim().toLowerCase();
+          return src === "finheal";
+        });
 
         const mapped = finhealOnly.map(mapOmsTicketToLoanTicket);
         setTickets(mapped);
@@ -650,7 +658,13 @@ export default function TrackApplicationView({
     setIsLoadingHistory(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/history`);
+      const session = getStoredAuthSession();
+      const headers: Record<string, string> = {
+        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
+      };
+      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/history`, {
+        headers
+      });
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.history)) {
@@ -672,7 +686,13 @@ export default function TrackApplicationView({
     setIsLoadingComments(true);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/comments`);
+      const session = getStoredAuthSession();
+      const headers: Record<string, string> = {
+        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
+      };
+      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/comments`, {
+        headers
+      });
       if (res.ok) {
         const json = await res.json();
         setTicketComments(Array.isArray(json.comments) ? json.comments : []);
@@ -690,7 +710,13 @@ export default function TrackApplicationView({
   const fetchOmsUsers = async () => {
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const res = await fetch(`${apiBase}/loan-applications/oms-users`);
+      const session = getStoredAuthSession();
+      const headers: Record<string, string> = {
+        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
+      };
+      const res = await fetch(`${apiBase}/loan-applications/oms-users`, {
+        headers
+      });
       if (res.ok) {
         const json = await res.json();
         if (json.users && typeof json.users === "object") {
