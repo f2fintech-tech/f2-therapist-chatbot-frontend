@@ -2,13 +2,13 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "[GCP_API_KEY]",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "finheal-59748.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "finheal-59748",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "finheal-59748.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "580523435709",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:580523435709:web:532e43023ccc670ff239d4",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-PKC2ZFWW9B",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "",
 };
 
 export function getFirebaseAuth(): Auth {
