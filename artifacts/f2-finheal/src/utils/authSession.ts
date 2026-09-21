@@ -9,6 +9,7 @@ export interface AuthSession {
   isNewUser?: boolean | null;
   isAdvisor?: boolean | null;
   isStaff?: boolean | null;
+  department?: string | null;
   permissions?: string[];
   authenticatedAt: string;
   lastActiveAt?: string;
