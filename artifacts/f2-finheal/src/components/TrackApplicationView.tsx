@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Search,
   CheckCircle2,
@@ -36,9 +36,11 @@ import {
   Activity,
   XCircle,
   Ban,
-  Image as ImageIcon
+  Image as ImageIcon,
+  X
 } from "lucide-react";
 import { getStoredAuthSession } from "@/utils/authSession";
+import { fetchAdvisors } from "@/lib/backendAuth";
 
 export interface TicketStage {
   id: number;
@@ -56,15 +58,24 @@ export interface LoanTicket {
   applicantName: string;
   applicantMobile: string;
   applicantEmail: string;
+  applicantLocation?: string;
+  applicantDesignation?: string;
   loanCategory: string; // e.g. "Personal Loan", "Home Loan", "Business Loan", "Doctor Loan", "Education Loan", "LAP"
+  loanClassification?: string; // e.g. "Unsecured", "Secured"
   loanAmount: number;
   tenureYears: number;
+  tenureMonths?: number;
   createdDate: string;
+  applicationDateFormatted?: string;
   currentStageId: number; // 1 to 5
   status: string; // Real OMS Status matching dropdown
   bankPartner: string;
+  expectedDecisionDate?: string;
+  source?: string;
   createdByRole: "user" | "employee" | "admin";
   createdByUserId?: string;
+  createdByName?: string;
+  createdByDepartment?: string;
   creditManager: {
     name: string;
     role: string;
@@ -194,6 +205,8 @@ const DEFAULT_MOCK_TICKETS: LoanTicket[] = [];
 interface TrackApplicationViewProps {
   userId?: string;
   userEmail?: string;
+  userName?: string;
+  userDepartment?: string | null;
   portalRole?: "user" | "employee" | "admin";
   onToggleSidebar?: () => void;
   onToggleInsights?: () => void;
@@ -370,6 +383,39 @@ export function normalizeOmsStatus(rawStatus: any): string {
     .join(" ");
 }
 
+export function formatSentenceCase(input?: string): string {
+  if (!input) return "N/A";
+  const str = String(input).trim();
+  if (!str) return "N/A";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+/**
+ * Check if OMS stage/status is terminal (Disbursed, Rejected, Drop).
+ * These 3 terminal stages remove the ticket from the "Total Active OMS Tickets" count.
+ */
+export function isTerminalOmsStatus(status?: string): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+
+  // 1. Disbursed
+  if (s === "disbursed") {
+    return true;
+  }
+
+  // 2. Rejected
+  if (s === "rejected" || s.includes("reject")) {
+    return true;
+  }
+
+  // 3. Drop
+  if (s === "drop" || s === "dropped" || s.startsWith("drop")) {
+    return true;
+  }
+
+  return false;
+}
+
 export function getOmsStatusBadgeColor(status: string): string {
   const s = (status || "").toLowerCase();
   if (s === "disbursed") {
@@ -440,7 +486,19 @@ export function getStageTimestamp(stageName: string, histories: TicketHistoryIte
 }
 
 function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
-  const rawStatus = raw.ticketStatus || raw.loanStatus || "Operations";
+  const rawStatus =
+    raw.status ||
+    raw.stageName ||
+    raw.stage_name ||
+    raw.ticketStatus ||
+    raw.ticket_status ||
+    raw.stage?.name ||
+    raw.stage ||
+    raw.loanStatus ||
+    raw.loan_status ||
+    raw.currentStage ||
+    raw.current_stage ||
+    "Operations";
   const displayStatus = normalizeOmsStatus(rawStatus);
 
   // Map 13 OMS statuses to 5 progressive pipeline stages
@@ -454,16 +512,35 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
     stageId = 3;
   } else if (sLower === "operations" || sLower === "under credit review" || sLower.includes("pendency")) {
     stageId = 2;
-  } else if (raw.createdDate && !raw.ticketStatus) {
+  } else if (raw.createdDate && !raw.ticketStatus && !raw.status) {
     stageId = 1;
   }
 
   const rawCreated = raw.createdAt || raw.created_at || raw.ticketCreatedDate || raw.createdDate || raw.applicationDate;
   const createdDateFormatted = formatDateTimeWithTime(rawCreated);
 
-  const rawAmt = parseFloat(String(raw.applicationAmount || 0).replace(/,/g, "")) || 0;
-  const rawTenure = parseInt(String(raw.applicationTenure || 3), 10) || 3;
+  let appDateFormatted = "09/21/2026";
+  if (rawCreated) {
+    try {
+      const d = new Date(rawCreated);
+      if (!isNaN(d.getTime())) {
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const yyyy = d.getFullYear();
+        appDateFormatted = `${mm}/${dd}/${yyyy}`;
+      }
+    } catch {}
+  }
+
+  const rawAmt = parseFloat(String(raw.applicationAmount || raw.loanAmount || 0).replace(/,/g, "")) || 0;
+  const rawTenure = parseInt(String(raw.applicationTenure || raw.tenure_years || raw.tenure || 3), 10) || 3;
   const rawType = raw.loanType ? (raw.loanType.charAt(0).toUpperCase() + raw.loanType.slice(1)) : "Personal Loan";
+  const rawClassification = formatSentenceCase(raw.loan_category || raw.loanCategory || raw.category || (rawType.toLowerCase().includes("home") || rawType.toLowerCase().includes("lap") ? "Secured" : "Unsecured"));
+
+  const appDetails = raw.applicant_details || raw.applicantDetails || {};
+  const rawLocation = formatSentenceCase(raw.city || raw.customerCity || raw.location || appDetails.city || "Noida");
+  const rawDesignation = formatSentenceCase(raw.employment_type || raw.employmentType || raw.designation || appDetails.employment_type || "Salaried");
+  const rawDecisionDate = raw.expectedDecisionDate || raw.expected_decision_date || raw.decisionDate || "";
 
   // Build 5-stage progressive timeline
   const stages: TicketStage[] = [
@@ -518,22 +595,40 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
     applicantName: raw.customerName || "Applicant",
     applicantMobile: raw.customerContact || "",
     applicantEmail: raw.customerEmail || "",
+    applicantLocation: rawLocation,
+    applicantDesignation: rawDesignation,
     loanCategory: rawType,
+    loanClassification: rawClassification,
     loanAmount: rawAmt,
-    tenureYears: rawTenure,
+    tenureYears: rawTenure <= 10 ? rawTenure : Math.round(rawTenure / 12),
+    tenureMonths: rawTenure > 10 ? rawTenure : rawTenure * 12,
     createdDate: createdDateFormatted,
+    applicationDateFormatted: appDateFormatted,
     currentStageId: stageId,
     status: displayStatus,
     bankPartner: raw.applicationProvider || "Partner Bank",
+    expectedDecisionDate: rawDecisionDate,
+    source: "FINHEAL",
     createdByRole: (
-      raw.journey_type === "admin" ||
-      String(raw.lead_type || raw.leadType || "").toLowerCase() === "admin" ||
       ["7318", "7317", "7316", "7315", "7313"].includes(String(raw.ticketId || raw.id || ""))
     )
       ? "admin"
-      : (raw.journey_type === "employee" || String(raw.lead_type || raw.leadType || "").toLowerCase() === "employee" || Boolean(raw.appliedBy))
+      : (
+        raw.journey_type === "employee" ||
+        String(raw.lead_type || raw.leadType || "").toLowerCase() === "employee" ||
+        (raw.created_by_id && String(raw.created_by_id).toLowerCase().startsWith("f2-")) ||
+        Boolean(raw.appliedBy)
+      )
       ? "employee"
+      : (
+        raw.journey_type === "admin" ||
+        String(raw.lead_type || raw.leadType || "").toLowerCase() === "admin"
+      )
+      ? "admin"
       : "user",
+    createdByUserId: String(raw.created_by_id || raw.created_by_user_id || raw.employee_id || ""),
+    createdByName: String(raw.created_by_name || raw.applied_by_name || raw.user_name || ""),
+    createdByDepartment: String(raw.created_by_department || raw.department || ""),
     isOmsTicket: raw.isOmsTicket !== false && !String(raw.ticketId || "").startsWith("APP-"),
     documents: Array.isArray(raw.documents) ? raw.documents : [],
     creditManager: {
@@ -554,6 +649,8 @@ function mapOmsTicketToLoanTicket(raw: any): LoanTicket {
 export default function TrackApplicationView({
   userId,
   userEmail,
+  userName,
+  userDepartment,
   portalRole,
   onToggleSidebar,
   onToggleInsights,
@@ -563,6 +660,13 @@ export default function TrackApplicationView({
   // Determine exact role: "user" | "employee" | "admin"
   const isSuperAdmin = userEmail ? ["admin@finheal.com", "admin@f2finheal.com"].includes(userEmail.toLowerCase()) : false;
   const activeRole: "user" | "employee" | "admin" = portalRole || (isSuperAdmin ? "admin" : isStaffRole ? "employee" : "user");
+
+  // Determine if employee is in Credit & Operations or Founder's Office
+  const deptClean = (userDepartment || "").trim().toLowerCase();
+  const isOpsOrFounders = [
+    "credit & operations", "credit and operations", "credit", "operations", "ops",
+    "founder's office", "founders office", "founder office"
+  ].includes(deptClean);
 
   // Loading state for live OMS fetch
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
@@ -590,56 +694,6 @@ export default function TrackApplicationView({
     return [];
   });
 
-  // Fetch live tickets strictly with applicationSource = 'finheal'
-  const fetchLiveTickets = async () => {
-    setIsLoadingTickets(true);
-    try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
-      const session = getStoredAuthSession();
-      const headers: Record<string, string> = {
-        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
-      };
-      // If user portal, pass user's email to backend for safety
-      const emailParam = (activeRole === "user" && userEmail) ? `&email=${encodeURIComponent(userEmail.trim())}` : "";
-      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal${emailParam}`, {
-        headers
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const rawList = Array.isArray(json.tickets) ? json.tickets : (json.data?.data?.results || []);
-
-        // Strictly retain only tickets where applicationSource is 'finheal'
-        const finhealOnly = rawList.filter((t: any) => {
-          const src = String(t.applicationSource || t.source || t.application_source || "").trim().toLowerCase();
-          return src === "finheal";
-        });
-
-        const mapped = finhealOnly.map(mapOmsTicketToLoanTicket);
-        setTickets(mapped);
-      }
-    } catch (e) {
-      console.warn("[TrackApplicationView] Could not fetch live FinHeal tickets:", e);
-    } finally {
-      setIsLoadingTickets(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLiveTickets();
-  }, [userEmail, activeRole]);
-
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(tickets));
-    } catch (e) {
-      console.warn("Could not save loan tickets to localStorage", e);
-    }
-  }, [tickets, storageKey]);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
-
   // Live Ticket Audit History from OMS
   const [ticketHistories, setTicketHistories] = useState<TicketHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -648,6 +702,7 @@ export default function TrackApplicationView({
   const [activityTab, setActivityTab] = useState<"history" | "comments">("history");
   const [ticketComments, setTicketComments] = useState<any[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const selectedTicketIdRef = useRef<string>("");
 
   const fetchTicketHistory = async (ticketId: string) => {
     const cleanId = String(ticketId).replace(/\D/g, "");
@@ -662,8 +717,9 @@ export default function TrackApplicationView({
       const headers: Record<string, string> = {
         ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
       };
-      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/history`, {
-        headers
+      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/history?_t=${Date.now()}`, {
+        headers,
+        cache: "no-store"
       });
       if (res.ok) {
         const json = await res.json();
@@ -690,8 +746,9 @@ export default function TrackApplicationView({
       const headers: Record<string, string> = {
         ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
       };
-      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/comments`, {
-        headers
+      const res = await fetch(`${apiBase}/loan-applications/tickets/${cleanId}/comments?_t=${Date.now()}`, {
+        headers,
+        cache: "no-store"
       });
       if (res.ok) {
         const json = await res.json();
@@ -703,6 +760,64 @@ export default function TrackApplicationView({
       setIsLoadingComments(false);
     }
   };
+
+  // Fetch live tickets strictly with applicationSource = 'finheal' and refresh current ticket status
+  const fetchLiveTickets = async () => {
+    setIsLoadingTickets(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const session = getStoredAuthSession();
+      const headers: Record<string, string> = {
+        ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {})
+      };
+      // If user portal, pass user's email to backend for safety
+      const emailParam = (activeRole === "user" && userEmail) ? `&email=${encodeURIComponent(userEmail.trim())}` : "";
+      const res = await fetch(`${apiBase}/loan-applications/tickets?source=finheal${emailParam}&_t=${Date.now()}`, {
+        headers,
+        cache: "no-store"
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = Array.isArray(json.tickets) ? json.tickets : (json.data?.data?.results || []);
+
+        // Strictly retain only tickets where applicationSource is 'finheal'
+        const finhealOnly = rawList.filter((t: any) => {
+          const src = String(t.applicationSource || t.source || t.application_source || "").trim().toLowerCase();
+          return src === "finheal";
+        });
+
+        const mapped = finhealOnly.map(mapOmsTicketToLoanTicket);
+        setTickets(mapped);
+
+        // Immediately refresh audit history & comments for active ticket to update progress tracker & timeline
+        const targetId = selectedTicketIdRef.current || (mapped.length > 0 ? mapped[0].ticketId : "");
+        if (targetId) {
+          fetchTicketHistory(targetId);
+          fetchTicketComments(targetId);
+        }
+      }
+    } catch (e) {
+      console.warn("[TrackApplicationView] Could not fetch live FinHeal tickets:", e);
+    } finally {
+      setIsLoadingTickets(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveTickets();
+  }, [userEmail, activeRole]);
+
+  // Sync to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(tickets));
+    } catch (e) {
+      console.warn("Could not save loan tickets to localStorage", e);
+    }
+  }, [tickets, storageKey]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [copiedTicketId, setCopiedTicketId] = useState<string | null>(null);
 
   // OMS Users directory map, populated 100% dynamically from API
   const [omsUsersMap, setOmsUsersMap] = useState<Record<string, { id: number; name: string; username?: string; role?: string; designation?: string; phone?: string; email?: string }>>({});
@@ -748,6 +863,75 @@ export default function TrackApplicationView({
   const [adminTab, setAdminTab] = useState<"all" | "user" | "staff" | "admin" | "awaiting">("all");
   const [opsFilterStage, setOpsFilterStage] = useState<string>("all");
 
+  // Privileged check: Admin and Employees in Founder's Office or Credit & Operations can see all tickets & filter by Dept / Employee
+  const canFilterByDeptAndEmployee = activeRole === "admin" || (activeRole === "employee" && isOpsOrFounders);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [allEmployeesList, setAllEmployeesList] = useState<{ id: string; name: string; department?: string }[]>([]);
+
+  useEffect(() => {
+    if (canFilterByDeptAndEmployee) {
+      fetchAdvisors(undefined, true)
+        .then((list) => {
+          if (Array.isArray(list)) {
+            setAllEmployeesList(
+              list.map((adv: any) => ({
+                id: adv.f2FintechId || adv.f2_fintech_id || adv.id || "",
+                name: adv.name || "",
+                department: adv.department || "General"
+              }))
+            );
+          }
+        })
+        .catch((err) => console.warn("[TrackApplicationView] Could not load employees list:", err));
+    }
+  }, [canFilterByDeptAndEmployee]);
+
+  const availableDepartments = useMemo(() => {
+    const set = new Set<string>();
+    allEmployeesList.forEach((e) => {
+      if (e.department && e.department.trim()) {
+        set.add(e.department.trim());
+      }
+    });
+    tickets.forEach((t) => {
+      if (t.createdByDepartment && t.createdByDepartment.trim() && t.createdByDepartment !== "Direct Applicant") {
+        set.add(t.createdByDepartment.trim());
+      }
+    });
+    if (set.size === 0) {
+      ["Credit & Operations", "Founder's Office", "Sales", "Technology", "Marketing", "General"].forEach((d) => set.add(d));
+    }
+    return Array.from(set).sort();
+  }, [allEmployeesList, tickets]);
+
+  const availableEmployeesForDept = useMemo(() => {
+    let list = allEmployeesList;
+    if (selectedDepartment !== "all") {
+      const targetDept = selectedDepartment.trim().toLowerCase();
+      list = list.filter((e) => (e.department || "").trim().toLowerCase() === targetDept);
+    }
+    const existingNames = new Set(list.map((e) => e.name.trim().toLowerCase()));
+    const extra: { id: string; name: string; department?: string }[] = [];
+    tickets.forEach((t) => {
+      const cName = (t.createdByName || "").trim();
+      const cDept = (t.createdByDepartment || "").trim().toLowerCase();
+      if (cName && !existingNames.has(cName.toLowerCase())) {
+        if (selectedDepartment === "all" || (cDept && cDept === selectedDepartment.trim().toLowerCase())) {
+          extra.push({
+            id: t.createdByUserId || "",
+            name: cName,
+            department: t.createdByDepartment
+          });
+          existingNames.add(cName.toLowerCase());
+        }
+      }
+    });
+    return [...list, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allEmployeesList, selectedDepartment, tickets]);
+
   // Filter tickets based on active role
   const roleFilteredTickets = tickets.filter((t) => {
     if (activeRole === "user") {
@@ -763,7 +947,26 @@ export default function TrackApplicationView({
       // Strictly never show other applicants' tickets to a regular user!
       return false;
     } else if (activeRole === "employee") {
-      // Employee Portal
+      // Employee in other departments (Sales, Product, Marketing, General, etc.):
+      // Sees ONLY the loan applications they created, and tickets (if picked)
+      if (!isOpsOrFounders) {
+        const currentEmail = (userEmail || "").trim().toLowerCase();
+        const ticketEmail = (t.applicantEmail || "").trim().toLowerCase();
+        const currentName = (userName || "").trim().toLowerCase();
+        const creatorName = (t.createdByName || "").trim().toLowerCase();
+        const creatorId = (t.createdByUserId || "").trim().toLowerCase();
+        const currentId = (userId || "").trim().toLowerCase();
+
+        return (
+          (currentEmail && ticketEmail && currentEmail === ticketEmail) ||
+          (currentId && creatorId && (creatorId === currentId || creatorId.includes(currentId))) ||
+          (currentEmail && creatorId && (creatorId === currentEmail || creatorId.includes(currentEmail))) ||
+          (currentName && creatorName && (creatorName === currentName || creatorName.includes(currentName)))
+        );
+      }
+
+      // Privileged Employee (Credit & Operations / Founder's Office):
+      // Full access across all applications and tickets
       if (employeeTab === "my") {
         return t.createdByRole === "employee" || (t.creditManager.email ? t.creditManager.email.toLowerCase() === (userEmail || "").toLowerCase() : false);
       }
@@ -786,7 +989,47 @@ export default function TrackApplicationView({
         return false;
       }
     }
-    // 2. Search text filter
+
+    // 2. Department filter (Admin / Ops / Founder's Office only)
+    if (canFilterByDeptAndEmployee && selectedDepartment !== "all") {
+      const targetDept = selectedDepartment.trim().toLowerCase();
+      const ticketDept = (t.createdByDepartment || "").trim().toLowerCase();
+
+      const creatorEmp = allEmployeesList.find(
+        (e) =>
+          (t.createdByUserId && e.id && e.id.toLowerCase() === t.createdByUserId.toLowerCase()) ||
+          (t.createdByName && e.name && e.name.toLowerCase() === t.createdByName.toLowerCase())
+      );
+      const empDept = (creatorEmp?.department || "").trim().toLowerCase();
+
+      const matchesDept =
+        ticketDept === targetDept ||
+        empDept === targetDept ||
+        (targetDept.includes("founder") && (t.createdByRole === "admin" || ticketDept.includes("founder") || empDept.includes("founder"))) ||
+        (targetDept.includes("credit") && (ticketDept.includes("credit") || ticketDept.includes("ops") || empDept.includes("credit")));
+
+      if (!matchesDept) return false;
+    }
+
+    // 3. Employee Name filter (Admin / Ops / Founder's Office only)
+    if (canFilterByDeptAndEmployee && selectedEmployee !== "all") {
+      const targetEmp = selectedEmployee.trim().toLowerCase();
+      const creatorName = (t.createdByName || "").trim().toLowerCase();
+      const creatorId = (t.createdByUserId || "").trim().toLowerCase();
+      const creditManagerName = (t.creditManager.name || "").trim().toLowerCase();
+
+      const matchesEmployee =
+        creatorName === targetEmp ||
+        creatorName.includes(targetEmp) ||
+        targetEmp.includes(creatorName) ||
+        creatorId === targetEmp ||
+        creditManagerName === targetEmp ||
+        creditManagerName.includes(targetEmp);
+
+      if (!matchesEmployee) return false;
+    }
+
+    // 4. Search text filter
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -794,11 +1037,17 @@ export default function TrackApplicationView({
       t.applicantName.toLowerCase().includes(q) ||
       t.loanCategory.toLowerCase().includes(q) ||
       t.applicantMobile.includes(q) ||
-      t.status.toLowerCase().includes(q)
+      t.status.toLowerCase().includes(q) ||
+      (t.createdByName && t.createdByName.toLowerCase().includes(q)) ||
+      (t.createdByDepartment && t.createdByDepartment.toLowerCase().includes(q))
     );
   });
 
   const [selectedTicketId, setSelectedTicketId] = useState<string>("");
+
+  useEffect(() => {
+    selectedTicketIdRef.current = selectedTicketId;
+  }, [selectedTicketId]);
 
   // Keep selectedTicketId valid
   useEffect(() => {
@@ -819,6 +1068,23 @@ export default function TrackApplicationView({
       setTicketComments([]);
     }
   }, [activeTicket?.ticketId]);
+
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+
+  const handleRefreshStatus = async () => {
+    setIsRefreshingStatus(true);
+    try {
+      await fetchLiveTickets();
+      if (activeTicket?.ticketId) {
+        await Promise.all([
+          fetchTicketHistory(activeTicket.ticketId),
+          fetchTicketComments(activeTicket.ticketId)
+        ]);
+      }
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  };
 
   const handleCopyTicketId = (tid: string) => {
     navigator.clipboard.writeText(tid);
@@ -883,13 +1149,13 @@ export default function TrackApplicationView({
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
               <h1 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
                 {activeRole === "user" && "Track Your Loan Applications"}
-                {activeRole === "employee" && "Track Company Tickets & Operations"}
+                {activeRole === "employee" && (isOpsOrFounders ? "Track Company Tickets & Operations" : "Track Your Submitted Applications & Tickets")}
                 {activeRole === "admin" && "Track All Platform Tickets (Admin)"}
               </h1>
             </div>
             <p className="text-xs text-gray-500 hidden sm:block">
               {activeRole === "user" && "Real-time tracking of your loan applications, queries & submitted files"}
-              {activeRole === "employee" && "Manage & process loan tickets submitted by applicants and employees across the company"}
+              {activeRole === "employee" && (isOpsOrFounders ? "Manage & process loan tickets submitted by applicants and employees across the company" : "Real-time tracking of loan applications and tickets submitted by you")}
               {activeRole === "admin" && "Complete system-wide overview of all loan tickets created across the platform"}
             </p>
           </div>
@@ -926,22 +1192,30 @@ export default function TrackApplicationView({
         {/* Employee / Admin Role Specific Tab Navigation */}
         {activeRole === "employee" && (
           <div className="bg-white rounded-2xl p-2 border border-slate-200 shadow-xs flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setEmployeeTab("all")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-                }`}
-            >
-              <Building className="w-4 h-4" /> All Company Tickets ({tickets.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setEmployeeTab("my")}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "my" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
-                }`}
-            >
-              <UserCheck className="w-4 h-4" /> My Created / Assigned Tickets ({tickets.filter(t => t.createdByRole === "employee").length})
-            </button>
+            {isOpsOrFounders ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEmployeeTab("all")}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "all" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                >
+                  <Building className="w-4 h-4" /> All Company Tickets ({tickets.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEmployeeTab("my")}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${employeeTab === "my" ? "bg-blue-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                >
+                  <UserCheck className="w-4 h-4" /> My Created / Assigned Tickets ({tickets.filter(t => t.createdByRole === "employee").length})
+                </button>
+              </>
+            ) : (
+              <div className="px-3 py-1.5 text-xs font-bold text-slate-700 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-blue-600" /> My Applications & Tickets ({roleFilteredTickets.length})
+              </div>
+            )}
           </div>
         )}
 
@@ -992,68 +1266,155 @@ export default function TrackApplicationView({
 
         {/* Overview Metrics (Shown for Employee / Admin Portals) */}
         {(activeRole === "employee" || activeRole === "admin") && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Active OMS Tickets</span>
-              <div className="text-2xl font-black text-slate-900">
-                {tickets.filter((t) => t.isOmsTicket !== false).length} Tickets
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+            {/* 1. Total Active OMS Tickets */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block min-h-[2rem] leading-snug">Total Active OMS Tickets</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-slate-900 leading-none">
+                  {roleFilteredTickets.filter((t) => t.isOmsTicket !== false && !isTerminalOmsStatus(t.status)).length}
+                </span>
+                <span className="text-xs font-bold text-slate-500">
+                  {roleFilteredTickets.filter((t) => t.isOmsTicket !== false && !isTerminalOmsStatus(t.status)).length === 1 ? "Ticket" : "Tickets"}
+                </span>
               </div>
-              <p className="text-[11px] text-slate-500">
-                {tickets.filter((t) => t.isOmsTicket === false).length > 0
-                  ? `${tickets.filter((t) => t.isOmsTicket === false).length} awaiting OMS employee pick`
-                  : "Tracked across HDFC, SBI & ICICI hubs"}
+              <p className="text-[11px] text-slate-500 leading-snug">
+                {roleFilteredTickets.filter((t) => t.isOmsTicket === false).length > 0
+                  ? `${roleFilteredTickets.filter((t) => t.isOmsTicket === false).length} awaiting OMS employee pick`
+                  : "All tickets assigned"}
               </p>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block">In Credit Verification</span>
-              <div className="text-2xl font-black text-blue-900">
-                {filteredTickets.filter((t) => t.currentStageId <= 3).length} Applications
+            {/* 2. In Credit Verification */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block min-h-[2rem] leading-snug">In Credit Verification</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-blue-900 leading-none">
+                  {filteredTickets.filter((t) => !isTerminalOmsStatus(t.status) && t.currentStageId <= 3).length}
+                </span>
+                <span className="text-xs font-bold text-blue-600">
+                  {filteredTickets.filter((t) => !isTerminalOmsStatus(t.status) && t.currentStageId <= 3).length === 1 ? "Application" : "Applications"}
+                </span>
               </div>
-              <p className="text-[11px] text-blue-600 font-medium">SLA Target: &lt; 24 Hours</p>
+              <p className="text-[11px] text-blue-600 font-medium leading-snug">Applications in Pipeline</p>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block">Bank Sanction Approved</span>
-              <div className="text-2xl font-black text-amber-900">
-                {filteredTickets.filter((t) => t.currentStageId === 4).length} Applications
+            {/* 3. Bank Sanction Approved */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider block min-h-[2rem] leading-snug">Bank Sanction Approved</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-amber-900 leading-none">
+                  {filteredTickets.filter((t) => !isTerminalOmsStatus(t.status) && t.currentStageId === 4).length}
+                </span>
+                <span className="text-xs font-bold text-amber-600">
+                  {filteredTickets.filter((t) => !isTerminalOmsStatus(t.status) && t.currentStageId === 4).length === 1 ? "Application" : "Applications"}
+                </span>
               </div>
-              <p className="text-[11px] text-amber-600 font-medium">Awaiting agreement signing</p>
+              <p className="text-[11px] text-amber-600 font-medium leading-snug">Approval Received from Lender</p>
             </div>
 
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
-              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block">Disbursed Volume</span>
-              <div className="text-2xl font-black text-emerald-900">
-                ₹
-                {filteredTickets
-                  .filter((t) => t.currentStageId === 5)
+            {/* 4. Disbursed Volume */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block min-h-[2rem] leading-snug">Disbursed Volume</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-emerald-900 leading-none">
+                  {filteredTickets.filter((t) => t.currentStageId === 5 || (t.status && t.status.toLowerCase().includes("disburs") && !t.status.toLowerCase().includes("to be"))).length}
+                </span>
+                <span className="text-xs font-bold text-emerald-600">
+                  {filteredTickets.filter((t) => t.currentStageId === 5 || (t.status && t.status.toLowerCase().includes("disburs") && !t.status.toLowerCase().includes("to be"))).length === 1 ? "Application" : "Applications"}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-600 font-semibold leading-snug">
+                Total: ₹{filteredTickets
+                  .filter((t) => t.currentStageId === 5 || (t.status && t.status.toLowerCase().includes("disburs") && !t.status.toLowerCase().includes("to be")))
                   .reduce((sum, t) => sum + t.loanAmount, 0)
                   .toLocaleString("en-IN")}
+              </p>
+            </div>
+
+            {/* 5. Rejected Cases */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block min-h-[2rem] leading-snug">Rejected Cases</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-rose-900 leading-none">
+                  {filteredTickets.filter((t) => (t.status || "").toLowerCase().includes("reject")).length}
+                </span>
+                <span className="text-xs font-bold text-rose-600">
+                  {filteredTickets.filter((t) => (t.status || "").toLowerCase().includes("reject")).length === 1 ? "Case" : "Cases"}
+                </span>
               </div>
-              <p className="text-[11px] text-emerald-600 font-medium">100% Payout Complete</p>
+              <p className="text-[11px] text-rose-600 font-medium leading-snug">Application Rejected by Lender</p>
+            </div>
+
+            {/* 6. Dropped Cases */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block min-h-[2rem] leading-snug">Dropped Cases</span>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl font-black text-slate-900 leading-none">
+                  {filteredTickets.filter((t) => {
+                    const s = (t.status || "").toLowerCase();
+                    return s === "drop" || s === "dropped" || s.startsWith("drop");
+                  }).length}
+                </span>
+                <span className="text-xs font-bold text-slate-500">
+                  {filteredTickets.filter((t) => {
+                    const s = (t.status || "").toLowerCase();
+                    return s === "drop" || s === "dropped" || s.startsWith("drop");
+                  }).length === 1 ? "Case" : "Cases"}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium leading-snug">Customer / lender dropped</p>
             </div>
           </div>
         )}
 
         {/* Master Unified Loan Tickets Queue Data Table */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <span>
-                  {activeRole === "user" ? "Your Loan Applications" : "Loan Processing Tickets Queue"}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">Click any row below to inspect its live stage progress & timeline</p>
+        <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-xs space-y-2.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <FileText className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+                    {activeRole === "user" ? "Your Loan Applications" : "Loan Processing Tickets Queue"}
+                  </h3>
+                  <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                    {filteredTickets.length}
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-slate-400">Click any row to inspect stage progress & timeline</p>
+              </div>
             </div>
 
-            {/* Controls: OMS Status Filter & Search Input */}
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Controls: OMS Status Filter, Filter Button & Search Input */}
+            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+              {canFilterByDeptAndEmployee && (
+                <button
+                  type="button"
+                  onClick={() => setIsFilterOpen((prev) => !prev)}
+                  className={`px-2.5 py-1.5 border rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                    selectedDepartment !== "all" || selectedEmployee !== "all" || isFilterOpen
+                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                      : "bg-slate-50/80 border-slate-200 text-slate-700 hover:bg-slate-100"
+                  }`}
+                  title="Filter tickets by Department and Employee Name"
+                >
+                  <Filter className={`w-3 h-3 ${selectedDepartment !== "all" || selectedEmployee !== "all" || isFilterOpen ? "text-white" : "text-blue-600"}`} />
+                  <span>Filter</span>
+                  {(selectedDepartment !== "all" || selectedEmployee !== "all") && (
+                    <span className="px-1 py-0.2 bg-white text-blue-700 rounded-full text-[9px] font-black leading-none">
+                      {(selectedDepartment !== "all" ? 1 : 0) + (selectedEmployee !== "all" ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+              )}
+
               <select
                 value={opsFilterStage}
                 onChange={(e) => setOpsFilterStage(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-slate-50/80 focus:outline-none focus:border-blue-600 cursor-pointer"
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-[11px] font-bold bg-slate-50/80 focus:outline-none focus:border-blue-600 cursor-pointer"
               >
                 {OMS_STAGE_OPTIONS.map((opt) => (
                   <option key={opt} value={opt === "All Statuses" ? "all" : opt}>
@@ -1062,168 +1423,264 @@ export default function TrackApplicationView({
                 ))}
               </select>
 
-              <div className="relative flex-1 md:w-72">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <div className="relative flex-1 md:w-52">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Ticket ID, Name or Loan Category..."
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 bg-slate-50/50"
+                  placeholder="Search Ticket ID, Name..."
+                  className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-500/20 bg-slate-50/50"
                 />
               </div>
             </div>
           </div>
+              {/* Department & Employee Filter Bar (shown when Filter is toggled open) */}
+              {canFilterByDeptAndEmployee && isFilterOpen && (
+                <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700">
+                      <SlidersHorizontal className="w-3 h-3 text-blue-600" />
+                      <span>Filter By:</span>
+                    </div>
 
-          {/* Master Data Table */}
-          {isLoadingTickets ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
-              <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-700">Syncing Live FinHeal Tickets...</h4>
-                <p className="text-xs text-slate-400">Connecting to OMS platform to fetch latest records</p>
-              </div>
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200/60 space-y-3">
-              <FileText className="w-10 h-10 text-slate-300 mx-auto" />
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-700">No loan applications found</h4>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  {activeRole === "user"
-                    ? "You haven't submitted any loan applications yet. New loan requests will appear here with live status tracking."
-                    : "No active loan tickets found matching your current filters."}
-                </p>
-              </div>
-              {activeRole === "user" && onApplyNewLoan && (
-                <button
-                  type="button"
-                  onClick={onApplyNewLoan}
-                  className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" /> Apply for a Loan
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl max-h-[380px] overflow-y-auto scrollbar-thin">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="p-3 w-10 text-center">Select</th>
-                    <th className="p-3">Ticket ID</th>
-                    <th className="p-3">Applicant Name</th>
-                    <th className="p-3 whitespace-nowrap">Category</th>
-                    <th className="p-3">Loan Amount</th>
-                    <th className="p-3">Created Date & Time</th>
-                    {(activeRole === "employee" || activeRole === "admin") && (
-                      <th className="p-3">Created By</th>
-                    )}
-                    <th className="p-3">OMS Status</th>
-                    <th className="p-3 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredTickets.map((t) => {
-                    const isSelected = activeTicket?.ticketId === t.ticketId;
-                    const stageName = t.stages.find((s) => s.id === t.currentStageId)?.title.split("&")[0].split("Pick")[0].trim() || "In Progress";
-
-                    return (
-                      <tr
-                        key={t.ticketId}
-                        onClick={() => handleInspectTicket(t.ticketId)}
-                        className={`transition-colors cursor-pointer ${isSelected
-                          ? "bg-blue-50/90 font-bold border-l-4 border-l-blue-600"
-                          : "hover:bg-slate-50/80 bg-white"
-                          }`}
+                    {/* 1. Department Wise */}
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                      <Building2 className="w-3 h-3 text-blue-600 shrink-0" />
+                      <span className="text-[10.5px] font-bold text-slate-500">Dept:</span>
+                      <select
+                        value={selectedDepartment}
+                        onChange={(e) => {
+                          setSelectedDepartment(e.target.value);
+                          setSelectedEmployee("all");
+                        }}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-1"
                       >
-                        {/* Radio Indicator */}
-                        <td className="p-3 text-center">
-                          <div className={`w-4 h-4 mx-auto rounded-full flex items-center justify-center transition-all ${isSelected ? "bg-blue-600 text-white shadow-2xs" : "border border-slate-300 bg-white"
-                            }`}>
-                            {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
-                          </div>
-                        </td>
+                        <option value="all">All Departments</option>
+                        {availableDepartments.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {dept}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                        {/* Ticket ID */}
-                        <td className="p-3 font-black text-blue-900 whitespace-nowrap">
-                          {t.ticketId}
-                        </td>
+                    {/* 2. Employee Name Wise */}
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                      <User className="w-3 h-3 text-blue-600 shrink-0" />
+                      <span className="text-[10.5px] font-bold text-slate-500">Employee:</span>
+                      <select
+                        value={selectedEmployee}
+                        onChange={(e) => setSelectedEmployee(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-1"
+                      >
+                        <option value="all">All Employees</option>
+                        {availableEmployeesForDept.map((emp) => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} {emp.department && emp.department !== "General" ? `(${emp.department})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-                        {/* Applicant Details */}
-                        <td className="p-3">
-                          <div className="font-bold text-slate-900">{t.applicantName}</div>
-                          <div className="text-[10px] text-slate-400">{t.applicantMobile}</div>
-                        </td>
+                  {/* Reset Filters */}
+                  {(selectedDepartment !== "all" || selectedEmployee !== "all") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDepartment("all");
+                        setSelectedEmployee("all");
+                      }}
+                      className="text-[10.5px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              )}
 
-                        {/* Category */}
-                        <td className="p-3 whitespace-nowrap">
-                          <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md whitespace-nowrap inline-block ${isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"
-                            }`}>
-                            {t.loanCategory.split("(")[0].trim()}
-                          </span>
-                        </td>
+              {/* Active Filter Chips */}
+              {canFilterByDeptAndEmployee && !isFilterOpen && (selectedDepartment !== "all" || selectedEmployee !== "all") && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[10px] font-bold text-slate-400">Active Filters:</span>
+                  {selectedDepartment !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold">
+                      <Building2 className="w-2.5 h-2.5" />
+                      Dept: {selectedDepartment}
+                      <X
+                        className="w-2.5 h-2.5 cursor-pointer hover:text-blue-950 transition-colors"
+                        onClick={() => {
+                          setSelectedDepartment("all");
+                          setSelectedEmployee("all");
+                        }}
+                      />
+                    </span>
+                  )}
+                  {selectedEmployee !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold">
+                      <User className="w-2.5 h-2.5" />
+                      Employee: {selectedEmployee}
+                      <X
+                        className="w-2.5 h-2.5 cursor-pointer hover:text-blue-950 transition-colors"
+                        onClick={() => setSelectedEmployee("all")}
+                      />
+                    </span>
+                  )}
+                </div>
+              )}
 
-                        {/* Loan Amount */}
-                        <td className="p-3 font-extrabold text-slate-900 whitespace-nowrap">
-                          ₹{t.loanAmount.toLocaleString("en-IN")}
-                        </td>
-
-                        {/* Created Date & Time */}
-                        <td className="p-3 text-slate-600 text-[11px] whitespace-nowrap">
-                          <div className="flex items-center gap-1 font-semibold">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {t.createdDate}
-                          </div>
-                        </td>
-
-                        {/* Created By (Employee/Admin View) */}
+              {/* Master Data Table */}
+              {isLoadingTickets ? (
+                <div className="text-center py-10 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2">
+                  <RefreshCw className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-slate-700">Syncing Live FinHeal Tickets...</h4>
+                    <p className="text-[10.5px] text-slate-400">Connecting to OMS platform to fetch latest records</p>
+                  </div>
+                </div>
+              ) : filteredTickets.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200/60 space-y-2">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-slate-700">No loan applications found</h4>
+                    <p className="text-[10.5px] text-slate-400 max-w-sm mx-auto">
+                      {activeRole === "user"
+                        ? "You haven't submitted any loan applications yet."
+                        : "No active loan tickets found matching your current filters."}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-[380px] overflow-y-auto scrollbar-thin">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="p-3 w-8 text-center">Select</th>
+                        <th className="p-3">Ticket ID</th>
+                        <th className="p-3">Applicant Name</th>
+                        <th className="p-3 whitespace-nowrap">Category</th>
+                        <th className="p-3">Loan Amount</th>
+                        <th className="p-3">Created Date</th>
                         {(activeRole === "employee" || activeRole === "admin") && (
-                          <td className="p-3 whitespace-nowrap">
-                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${t.createdByRole === "user"
-                              ? "bg-slate-100 text-slate-700"
-                              : t.createdByRole === "employee"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-purple-100 text-purple-800"
-                              }`}>
-                              {t.createdByRole || "user"}
-                            </span>
-                          </td>
+                          <th className="p-3">Created By</th>
                         )}
-
-                        {/* Current OMS Status */}
-                        <td className="p-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 font-extrabold px-2.5 py-1 rounded-lg border text-[10.5px] ${getOmsStatusBadgeColor(t.status)}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                            {t.status}
-                          </span>
-                        </td>
-
-                        {/* Inspect / Open Details Action */}
-                        <td className="p-3 whitespace-nowrap text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleInspectTicket(t.ticketId);
-                            }}
-                            className={`px-3 py-1.5 rounded-xl font-extrabold text-[11px] inline-flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
-                              isSelected
-                                ? "bg-blue-600 text-white shadow-blue-500/20"
-                                : "bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white"
-                            }`}
-                          >
-                            <span>Open Details</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                        <th className="p-3">OMS Status</th>
+                        <th className="p-3 text-center">Action</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-xs">
+                      {filteredTickets.map((t) => {
+                        const isSelected = activeTicket?.ticketId === t.ticketId;
+
+                        return (
+                          <tr
+                            key={t.ticketId}
+                            onClick={() => handleInspectTicket(t.ticketId)}
+                            className={`transition-colors cursor-pointer ${isSelected
+                              ? "bg-blue-50/90 font-bold border-l-4 border-l-blue-600"
+                              : "hover:bg-slate-50/80 bg-white"
+                              }`}
+                          >
+                            {/* Radio Indicator */}
+                            <td className="p-3 text-center">
+                              <div className={`w-4 h-4 mx-auto rounded-full flex items-center justify-center transition-all ${isSelected ? "bg-blue-600 text-white shadow-2xs" : "border border-slate-300 bg-white"
+                                }`}>
+                                {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                              </div>
+                            </td>
+
+                            {/* Ticket ID */}
+                            <td className="p-3 font-black text-blue-900 whitespace-nowrap text-xs">
+                              {t.ticketId}
+                            </td>
+
+                            {/* Applicant Details */}
+                            <td className="p-3">
+                              <div className="font-bold text-slate-900 text-xs">{t.applicantName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">{t.applicantMobile}</div>
+                            </td>
+
+                            {/* Category */}
+                            <td className="p-3 whitespace-nowrap">
+                              <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded whitespace-nowrap inline-block ${isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"
+                                }`}>
+                                {t.loanCategory.split("(")[0].trim()}
+                              </span>
+                            </td>
+
+                            {/* Loan Amount */}
+                            <td className="p-3 font-extrabold text-slate-900 whitespace-nowrap text-xs">
+                              ₹{t.loanAmount.toLocaleString("en-IN")}
+                            </td>
+
+                            {/* Created Date & Time */}
+                            <td className="p-3 text-slate-600 text-xs whitespace-nowrap">
+                              <div className="flex items-center gap-1 font-medium">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                {t.createdDate}
+                              </div>
+                            </td>
+
+                            {/* Created By (Employee/Admin View) */}
+                            {(activeRole === "employee" || activeRole === "admin") && (
+                              <td className="p-3 whitespace-nowrap">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className={`text-[9.5px] font-extrabold uppercase px-1.5 py-0.2 rounded inline-block w-fit ${t.createdByRole === "user"
+                                    ? "bg-slate-100 text-slate-700"
+                                    : t.createdByRole === "employee"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-purple-100 text-purple-800"
+                                    }`}>
+                                    {t.createdByRole || "user"}
+                                  </span>
+                                  {t.createdByName && (
+                                    <span className="text-[10.5px] font-bold text-slate-800">
+                                      {t.createdByName}
+                                    </span>
+                                  )}
+                                  {t.createdByDepartment && (
+                                    <span className="text-[9.5px] text-slate-400 font-medium">
+                                      {t.createdByDepartment}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+
+                            {/* Current OMS Status */}
+                            <td className="p-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 font-extrabold px-2.5 py-0.5 rounded-md border text-[11px] ${getOmsStatusBadgeColor(t.status)}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                {t.status}
+                              </span>
+                            </td>
+
+                            {/* Inspect / Open Details Action */}
+                            <td className="p-3 whitespace-nowrap text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleInspectTicket(t.ticketId);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg font-bold text-[10px] inline-flex items-center gap-1 transition-all shadow-2xs cursor-pointer ${
+                                  isSelected
+                                    ? "bg-blue-600 text-white shadow-blue-500/20"
+                                    : "bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white"
+                                }`}
+                              >
+                                <span>Details</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
         </div>
 
         {/* Selected Ticket Active View */}
@@ -1273,17 +1730,19 @@ export default function TrackApplicationView({
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-300 pt-1">
-                      <div>
-                        Applicant: <span className="font-bold text-white">{activeTicket.applicantName}</span> ({activeTicket.applicantMobile})
+                    {!(activeRole === "admin" || activeRole === "employee") && (
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-300 pt-1">
+                        <div>
+                          Applicant: <span className="font-bold text-white">{activeTicket.applicantName}</span> ({activeTicket.applicantMobile})
+                        </div>
+                        <div>
+                          Loan Amount: <span className="font-extrabold text-emerald-400 text-sm">₹{activeTicket.loanAmount.toLocaleString("en-IN")}</span>
+                        </div>
+                        <div>
+                          Target Banks: <span className="font-bold text-blue-300">{activeTicket.bankPartner}</span>
+                        </div>
                       </div>
-                      <div>
-                        Loan Amount: <span className="font-extrabold text-emerald-400 text-sm">₹{activeTicket.loanAmount.toLocaleString("en-IN")}</span>
-                      </div>
-                      <div>
-                        Target Banks: <span className="font-bold text-blue-300">{activeTicket.bankPartner}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Status Badge */}
@@ -1300,6 +1759,103 @@ export default function TrackApplicationView({
                     </p>
                   </div>
                 </div>
+
+                {/* Integrated Applicant / User Information Details (Admin & Employee) */}
+                {(activeRole === "admin" || activeRole === "employee") && (
+                  <div className="mt-5 pt-4 border-t border-white/10 relative z-10">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-3 text-left">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">NAME</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate" title={activeTicket.applicantName || "N/A"}>
+                          {activeTicket.applicantName || "N/A"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">CONTACT</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate">
+                          {activeTicket.applicantMobile
+                            ? (activeTicket.applicantMobile.startsWith("+")
+                                ? activeTicket.applicantMobile
+                                : `+91 ${activeTicket.applicantMobile.replace(/^\+91\s*/, "")}`)
+                            : "N/A"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">EMAIL</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate" title={activeTicket.applicantEmail || "N/A"}>
+                          {activeTicket.applicantEmail || "N/A"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DESIGNATION</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate capitalize">
+                          {formatSentenceCase(activeTicket.applicantDesignation || "Salaried")}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">LOCATION</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate capitalize">
+                          {formatSentenceCase(activeTicket.applicantLocation || "Noida")}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">AMOUNT</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-emerald-400 truncate">
+                          ₹ {Number(activeTicket.loanAmount || 0).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">TENURE</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate">
+                          {activeTicket.tenureMonths
+                            ? `${activeTicket.tenureMonths} months`
+                            : `${(activeTicket.tenureYears || 3) * 12} months`}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">APPLICATION DATE</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate">
+                          {activeTicket.applicationDateFormatted || "09/21/2026"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">LOAN PROVIDER</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-blue-300 truncate">
+                          {activeTicket.bankPartner || "Icici Bank"}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">LOAN CATEGORY</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate capitalize">
+                          {formatSentenceCase(activeTicket.loanClassification || "Unsecured")}
+                        </p>
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">EXPECTED DECISION</span>
+                        <p className="text-xs sm:text-[13px] font-extrabold text-white truncate">
+                          {(() => {
+                            if (activeTicket.expectedDecisionDate) return activeTicket.expectedDecisionDate;
+                            for (const h of ticketHistories) {
+                              const match = (h.action || "").match(/expected\s+decision\s+date\s+to\s+['"]?([^'"]+)['"]?/i);
+                              if (match) return match[1].trim();
+                            }
+                            return "20 Sept 2026";
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Required Alert Box (if present) */}
@@ -1338,10 +1894,13 @@ export default function TrackApplicationView({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setTickets([...tickets])}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                      onClick={handleRefreshStatus}
+                      disabled={isRefreshingStatus || isLoadingTickets}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      title="Fetch live stage & status update from OMS"
                     >
-                      <RefreshCw className="w-3.5 h-3.5 text-slate-500" /> Refresh Status
+                      <RefreshCw className={`w-3.5 h-3.5 ${(isRefreshingStatus || isLoadingTickets) ? "animate-spin text-blue-600" : "text-slate-500"}`} />
+                      <span>{(isRefreshingStatus || isLoadingTickets) ? "Refreshing..." : "Refresh Status"}</span>
                     </button>
                   </div>
                 </div>
@@ -1580,7 +2139,7 @@ export default function TrackApplicationView({
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-72 overflow-y-auto pr-2 scrollbar-thin">
                       {ticketComments.map((c, idx) => {
                         const authorName = getCommentAuthorName(c);
                         const cleanInitial = (authorName.replace(/^user\s*#?/i, "").trim() || "O").charAt(0).toUpperCase();

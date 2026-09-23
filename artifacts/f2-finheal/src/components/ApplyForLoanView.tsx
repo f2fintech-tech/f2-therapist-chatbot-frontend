@@ -905,15 +905,20 @@ export default function ApplyForLoanView({
     }, 50);
   };
 
-  // Form Data State - Email defaults to logged-in userEmail
-  const [formData, setFormData] = useState(initialDraft?.formData || {
+  // Form Data State - Email defaults to logged-in userEmail ONLY for direct user journey
+  const [formData, setFormData] = useState(initialDraft?.formData ? {
+    ...initialDraft.formData,
+    email: journeyType === "user"
+      ? (initialDraft.formData.email || userEmail || "")
+      : (initialDraft.formData.email && initialDraft.formData.email !== userEmail ? initialDraft.formData.email : "")
+  } : {
     prefix: initialDraft?.formData?.prefix || "Mr.",
     fullName: "",
     dob: initialDraft?.formData?.dob || "",
     fatherName: "",
     motherName: "",
     mobileNumber: "",
-    email: initialDraft?.formData?.email || userEmail || "",
+    email: journeyType === "user" ? (userEmail || "") : "",
     officialEmail: "",
     city: "",
     currentState: initialDraft?.formData?.currentState || "",
@@ -968,6 +973,29 @@ export default function ApplyForLoanView({
   const [providerSearchQuery, setProviderSearchQuery] = useState("");
   const [catalogLenders, setCatalogLenders] = useState<string[]>(PROVIDER_OPTIONS);
   const [isLoadingLenders, setIsLoadingLenders] = useState<boolean>(false);
+  const providerDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Close provider dropdown on outside click or Enter/Escape keypress
+  useEffect(() => {
+    if (!isProviderDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (providerDropdownRef.current && !providerDropdownRef.current.contains(e.target as Node)) {
+        setIsProviderDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === "Escape") {
+        e.preventDefault();
+        setIsProviderDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isProviderDropdownOpen]);
 
   // Dynamically load live lenders from backend lender catalogue
   useEffect(() => {
@@ -1170,7 +1198,7 @@ export default function ApplyForLoanView({
       fatherName: "",
       motherName: "",
       mobileNumber: "",
-      email: userEmail || "",
+      email: journeyType === "user" ? (userEmail || "") : "",
       officialEmail: "",
       city: "",
       currentState: "",
@@ -2258,6 +2286,8 @@ export default function ApplyForLoanView({
           user_name: currentLoggedInName,
           user_email: currentLoggedInEmail,
           applied_by_name: (journeyType === "employee" || journeyType === "admin") ? currentLoggedInName : undefined,
+          created_by_id: session?.userId || undefined,
+          created_by_email: currentLoggedInEmail || undefined,
           documents: documentsPayload,
           business_details: activeTab === "business" ? { businessType, companyOfficialEmail, pvtDirectors, partnershipPartners } : undefined,
           education_details: activeTab === "education" ? eduDetails : undefined,
@@ -3214,7 +3244,7 @@ export default function ApplyForLoanView({
                       </div>
 
                       {/* 3. Provider Names (Select Multiple) */}
-                      <div className="space-y-1.5 relative sm:col-span-2">
+                      <div ref={providerDropdownRef} className="space-y-1.5 relative sm:col-span-2">
                         <label className="text-xs font-semibold text-gray-700 block">
                           Provider Names* (Select Multiple)
                         </label>
@@ -3240,12 +3270,18 @@ export default function ApplyForLoanView({
 
                         {/* Multi-Select Dropdown Menu */}
                         {isProviderDropdownOpen && (
-                          <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-64 overflow-y-auto">
+                          <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 flex flex-col">
                             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                               <input
                                 type="text"
                                 value={providerSearchQuery}
                                 onChange={(e) => setProviderSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    setIsProviderDropdownOpen(false);
+                                  }
+                                }}
                                 placeholder="Search bank / lender..."
                                 className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
                               />
@@ -3267,70 +3303,88 @@ export default function ApplyForLoanView({
                               </button>
                             </div>
 
-                            {/* Featured: Let F2 Fintech decide your lender */}
-                            {(!providerSearchQuery || "let f2 fintech decide your lender".includes(providerSearchQuery.toLowerCase())) && (
-                              <div
-                                onClick={() => {
-                                  const current = formData.selectedProviders || [];
-                                  const isChecked = current.includes("Let F2 Fintech decide your lender");
-                                  // Clicking toggles: if checked, uncheck to []; if unchecked, select it and clear all individual banks
-                                  const next = isChecked ? [] : ["Let F2 Fintech decide your lender"];
-                                  setFormData({ ...formData, selectedProviders: next });
-                                }}
-                                className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer border transition-all select-none ${
-                                  (formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")
-                                    ? "bg-blue-50 border-blue-300 text-blue-900 font-bold shadow-xs"
-                                    : "bg-gradient-to-r from-blue-50/60 to-indigo-50/50 border-blue-100 hover:border-blue-300 text-slate-800"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={(formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")}
-                                    onChange={() => {}}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
-                                  />
-                                  <span className="font-bold flex items-center gap-1.5">
-                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                    Let F2 Fintech decide your lender
+                            <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                              {/* Featured: Let F2 Fintech decide your lender */}
+                              {(!providerSearchQuery || "let f2 fintech decide your lender".includes(providerSearchQuery.toLowerCase())) && (
+                                <div
+                                  onClick={() => {
+                                    const current = formData.selectedProviders || [];
+                                    const isChecked = current.includes("Let F2 Fintech decide your lender");
+                                    // Clicking toggles: if checked, uncheck to []; if unchecked, select it and clear all individual banks
+                                    const next = isChecked ? [] : ["Let F2 Fintech decide your lender"];
+                                    setFormData({ ...formData, selectedProviders: next });
+                                  }}
+                                  className={`flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer border transition-all select-none ${
+                                    (formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")
+                                      ? "bg-blue-50 border-blue-300 text-blue-900 font-bold shadow-xs"
+                                      : "bg-gradient-to-r from-blue-50/60 to-indigo-50/50 border-blue-100 hover:border-blue-300 text-slate-800"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={(formData.selectedProviders || []).includes("Let F2 Fintech decide your lender")}
+                                      onChange={() => {}}
+                                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                                    />
+                                    <span className="font-bold flex items-center gap-1.5">
+                                      <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                      Let F2 Fintech decide your lender
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-md shadow-2xs">
+                                    Recommended
                                   </span>
                                 </div>
-                                <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-md shadow-2xs">
-                                  Recommended
-                                </span>
-                              </div>
-                            )}
+                              )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
-                              {catalogLenders
-                                .filter((p) => p.toLowerCase().includes(providerSearchQuery.toLowerCase()))
-                                .map((provider) => {
-                                  const isChecked = (formData.selectedProviders || []).includes(provider);
-                                  return (
-                                    <div
-                                      key={provider}
-                                      onClick={() => {
-                                        // When user selects a specific bank, remove "Let F2 Fintech decide your lender"
-                                        const current = (formData.selectedProviders || []).filter(
-                                          (p: string) => p !== "Let F2 Fintech decide your lender"
-                                        );
-                                        const next = isChecked
-                                          ? current.filter((p: string) => p !== provider)
-                                          : [...current, provider];
-                                        setFormData({ ...formData, selectedProviders: next });
-                                      }}
-                                      className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors select-none ${isChecked ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-gray-50 text-gray-700"}`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={() => {}}
-                                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
-                                      />
-                                      <span className="truncate">{provider}</span>
-                                    </div>
-                                  );
-                                })}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                                {catalogLenders
+                                  .filter((p) => p.toLowerCase().includes(providerSearchQuery.toLowerCase()))
+                                  .map((provider) => {
+                                    const isChecked = (formData.selectedProviders || []).includes(provider);
+                                    return (
+                                      <div
+                                        key={provider}
+                                        onClick={() => {
+                                          // When user selects a specific bank, remove "Let F2 Fintech decide your lender"
+                                          const current = (formData.selectedProviders || []).filter(
+                                            (p: string) => p !== "Let F2 Fintech decide your lender"
+                                          );
+                                          const next = isChecked
+                                            ? current.filter((p: string) => p !== provider)
+                                            : [...current, provider];
+                                          setFormData({ ...formData, selectedProviders: next });
+                                        }}
+                                        className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors select-none ${isChecked ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-gray-50 text-gray-700"}`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => {}}
+                                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer pointer-events-none"
+                                        />
+                                        <span className="truncate">{provider}</span>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+
+                            {/* Done / Confirm Button Footer */}
+                            <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                              <span className="text-[11px] text-gray-500 font-medium">
+                                {(formData.selectedProviders || []).length > 0
+                                  ? `${formData.selectedProviders.length} Selected`
+                                  : "No bank selected"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setIsProviderDropdownOpen(false)}
+                                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                              >
+                                Done
+                              </button>
                             </div>
                           </div>
                         )}

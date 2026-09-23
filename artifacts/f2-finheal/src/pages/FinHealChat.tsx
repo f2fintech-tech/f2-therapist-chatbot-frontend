@@ -547,6 +547,7 @@ export default function FinHealChat() {
               ...authSession,
               isAdvisor: data.is_advisor,
               isStaff: true,
+              department: data.department || "Founder's Office",
               permissions: data.permissions || [],
               displayName: data.name || authSession.displayName,
               avatarUrl: data.avatar_url || authSession.avatarUrl,
@@ -554,6 +555,7 @@ export default function FinHealChat() {
             if (
               authSession.isAdvisor !== nextSession.isAdvisor ||
               authSession.isStaff !== nextSession.isStaff ||
+              authSession.department !== nextSession.department ||
               JSON.stringify(authSession.permissions) !== JSON.stringify(nextSession.permissions) ||
               authSession.displayName !== nextSession.displayName ||
               authSession.avatarUrl !== nextSession.avatarUrl
@@ -1374,6 +1376,8 @@ export default function FinHealChat() {
               <TrackApplicationView
                 userId={userId}
                 userEmail={authSession?.email}
+                userName={authSession?.displayName}
+                userDepartment={authSession?.department || undefined}
                 portalRole={(authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) ? "admin" : isStaff ? "employee" : "user"}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}
