@@ -1377,7 +1377,7 @@ export default function FinHealChat() {
                 userId={userId}
                 userEmail={authSession?.email}
                 userName={authSession?.displayName}
-                userDepartment={authSession?.department}
+                userDepartment={authSession?.department || undefined}
                 portalRole={(authSession?.email && ["admin@finheal.com", "admin@f2finheal.com"].includes(authSession.email.toLowerCase())) ? "admin" : isStaff ? "employee" : "user"}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onToggleInsights={() => setInsightsOpen((open) => !open)}

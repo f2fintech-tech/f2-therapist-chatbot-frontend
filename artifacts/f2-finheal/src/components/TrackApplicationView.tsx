@@ -206,7 +206,7 @@ interface TrackApplicationViewProps {
   userId?: string;
   userEmail?: string;
   userName?: string;
-  userDepartment?: string;
+  userDepartment?: string | null;
   portalRole?: "user" | "employee" | "admin";
   onToggleSidebar?: () => void;
   onToggleInsights?: () => void;
