@@ -3052,13 +3052,16 @@ export default function EligibilityCibilView({
                     <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {cibilReport.fetched_at ? new Date(cibilReport.fetched_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                     {cibilReport.pdf_url && (
                       <a
-                        href={getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)}
+                        href={cibilReport.pdf_url.toLowerCase().split("?")[0].endsWith(".pdf")
+                          ? getBureauPdfDownloadUrl(cibilReport.pdf_url, `${cibilReport.name.replace(/\s+/g, "").replace(/[^a-zA-Z0-9_]/g, "_")}_${(cibilReport.bureau || cibilBureau || "cibil").toLowerCase()}_report.pdf`)
+                          : cibilReport.pdf_url
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
                       >
                         <FileText className="w-[14px] h-[14px]" />
-                        <span>Download PDF Report</span>
+                        <span>{cibilReport.pdf_url.toLowerCase().split("?")[0].endsWith(".pdf") ? "Download PDF Report" : "View Official CIBIL Report ↗"}</span>
                       </a>
                     )}
                     

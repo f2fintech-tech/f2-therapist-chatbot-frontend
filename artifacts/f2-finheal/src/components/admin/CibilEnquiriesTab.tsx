@@ -535,7 +535,8 @@ export default function CibilEnquiriesTab({
                               name: enq.name,
                               phone: enq.phone,
                               email: enq.email,
-                              bureau: enq.bureau || "CIBIL"
+                              bureau: enq.bureau || "CIBIL",
+                              pdf_url: enq.pdf_url || enq.report_data?.pdf_url
                             });
                             setViewingCibilReportId(enq.id);
                             setViewingCibilReportUserId(enq.user_id);

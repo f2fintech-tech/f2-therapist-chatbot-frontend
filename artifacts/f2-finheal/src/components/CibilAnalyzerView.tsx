@@ -27,7 +27,8 @@ import {
   Hourglass,
   Search,
   Download,
-  Landmark
+  Landmark,
+  ExternalLink
 } from "lucide-react";
 import {
   BarChart,
@@ -1913,16 +1914,34 @@ export default function CibilAnalyzerView({
 
                 <p className="text-[11px] text-gray-400 mt-[12px]">PAN: {report.pan} | Phone: {report.phone}</p>
                 <p className="text-[10px] text-gray-400 mt-[2px]">Fetched at {new Date(report.fetched_at).toLocaleDateString()}</p>
-                {report.pdf_url && (
+                {/* PDF Download & Official Report Actions */}
+                {report.pdf_url ? (
                   <a
-                    href={getBureauPdfDownloadUrl(report.pdf_url, `${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(report.bureau || "CIBIL").toUpperCase()}_Report.pdf`)}
+                    href={
+                      report.pdf_url.toLowerCase().split("?")[0].endsWith(".pdf") || report.pdf_url.includes(".pdf?")
+                        ? getBureauPdfDownloadUrl(report.pdf_url, `${report.name.replace(/[^a-zA-Z0-9_]/g, "_")}_${(report.bureau || "CIBIL").toUpperCase()}_Report.pdf`)
+                        : report.pdf_url
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide"
+                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full cibil-print-hide no-underline"
                   >
                     <FileText className="w-[14px] h-[14px]" />
-                    <span>Download PDF Report</span>
+                    <span>
+                      {report.pdf_url.toLowerCase().split("?")[0].endsWith(".pdf") || report.pdf_url.includes(".pdf?")
+                        ? "Download PDF Report"
+                        : "Download Official CIBIL Report ↗"}
+                    </span>
                   </a>
+                ) : (
+                  <button
+                    onClick={handleDownloadPDF}
+                    disabled={isGeneratingPDF}
+                    className="mt-[14px] flex items-center justify-center gap-[6px] bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold px-[16px] py-[8px] rounded-[10px] shadow-sm transition-all cursor-pointer w-full disabled:opacity-60 disabled:cursor-not-allowed border-none cibil-print-hide"
+                  >
+                    <FileText className="w-[14px] h-[14px]" />
+                    <span>{isGeneratingPDF ? "Downloading PDF..." : "Download PDF Report"}</span>
+                  </button>
                 )}
 
                 {!bsaVerified && (
